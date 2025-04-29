@@ -7,6 +7,7 @@
 
 classDiagram
   class EventoCelebrativo {
+    Long id
     String nomeDaMissaOuEvento
     String dataAcontecimentoHora
     Boolean missaOuCelebracao
@@ -14,12 +15,13 @@ classDiagram
   }
 
   class Local {
+    Long id
     String nomeDaIgreja
     String endereco
   }
 
   class Pessoa {
-    Integer id
+    Long id
     String nome
     String dataAniversario
     String dataAtuacao
