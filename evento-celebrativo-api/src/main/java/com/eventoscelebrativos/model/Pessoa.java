@@ -17,7 +17,7 @@ public abstract class Pessoa implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private Long id;
     private String nome;
     private LocalDate dataAniversario;
     private LocalDateTime dataAtuacao;
@@ -34,7 +34,7 @@ public abstract class Pessoa implements Serializable {
     }
 
 
-    public Pessoa(long id, String nome, LocalDate dataAniversario, LocalDateTime dataAtuacao, String tipo, EventoCelebrativo eventoCelebrativo) {
+    public Pessoa(Long id, String nome, LocalDate dataAniversario, LocalDateTime dataAtuacao, String tipo, EventoCelebrativo eventoCelebrativo) {
         this.id = id;
         this.nome = nome;
         this.dataAniversario = dataAniversario;
@@ -55,7 +55,7 @@ public abstract class Pessoa implements Serializable {
         return Objects.hashCode(id);
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
@@ -79,7 +79,7 @@ public abstract class Pessoa implements Serializable {
         return tipo;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

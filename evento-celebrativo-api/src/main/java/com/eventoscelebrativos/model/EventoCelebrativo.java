@@ -19,7 +19,7 @@ public class EventoCelebrativo implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private Long id;
     private String nomeMissaOuEvento;
     private LocalDateTime dataHoraEvento;
     private Boolean missaOuCelebracao;
@@ -39,7 +39,7 @@ public class EventoCelebrativo implements Serializable {
 
     }
 
-    public EventoCelebrativo(long id, String nomeMissaOuEvento, LocalDateTime dataHoraEvento, Boolean missaOuCelebracao) {
+    public EventoCelebrativo(Long id, String nomeMissaOuEvento, LocalDateTime dataHoraEvento, Boolean missaOuCelebracao) {
         this.id = id;
         this.nomeMissaOuEvento = nomeMissaOuEvento;
         this.dataHoraEvento = dataHoraEvento;
@@ -60,7 +60,7 @@ public class EventoCelebrativo implements Serializable {
         return Objects.hashCode(id);
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
@@ -84,7 +84,7 @@ public class EventoCelebrativo implements Serializable {
         return locais;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

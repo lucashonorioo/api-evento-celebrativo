@@ -16,7 +16,7 @@ public class Local implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private long id;
+    private Long id;
     private String nomeDaIgreja;
     private String endereco;
 
@@ -27,7 +27,7 @@ public class Local implements Serializable {
 
     }
 
-    public Local(long id, String nomeDaIgreja, String endereco) {
+    public Local(Long id, String nomeDaIgreja, String endereco) {
         this.id = id;
         this.nomeDaIgreja = nomeDaIgreja;
         this.endereco = endereco;
@@ -46,7 +46,7 @@ public class Local implements Serializable {
         return Objects.hashCode(id);
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
@@ -62,7 +62,7 @@ public class Local implements Serializable {
         return eventoCelebrativos;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
