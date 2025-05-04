@@ -12,18 +12,19 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
+@Table(name = "evento_celebrativo")
 public class EventoCelebrativo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
     private String nomeMissaOuEvento;
     private LocalDateTime dataHoraEvento;
     private Boolean missaOuCelebracao;
 
-    @OneToMany
+    @OneToMany(mappedBy = "eventoCelebrativo")
     List<Pessoa> pessoas;
 
     @ManyToMany
