@@ -10,7 +10,7 @@ public interface EventoCelebrativoService {
     EventoCelebrativo criarEvento(EventoCelebrativo eventoCelebrativo);
     List<EventoCelebrativo> listarTodosEventos();
     Optional<EventoCelebrativo> buscarEventoPorId(Long id);
-    EventoCelebrativo atualizarEvento(EventoCelebrativo eventoCelebrativo);
+    EventoCelebrativo atualizarEvento(Long id, EventoCelebrativo eventoCelebrativo);
     void deletarEvento(Long id);
 
 }
