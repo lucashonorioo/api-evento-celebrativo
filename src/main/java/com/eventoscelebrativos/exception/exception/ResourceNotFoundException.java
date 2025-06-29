@@ -1,4 +1,4 @@
-package com.eventoscelebrativos.service.exception;
+package com.eventoscelebrativos.exception.exception;
 
 import java.io.Serial;
 

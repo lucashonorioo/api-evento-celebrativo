@@ -7,9 +7,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Padre;
 import com.eventoscelebrativos.repository.PadreRepository;
 import com.eventoscelebrativos.service.PadreService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +26,7 @@ public class PadreServiceImpl implements PadreService {
 
 
     @Override
+    @Transactional
     public Padre criarPadre(Padre padre) {
         if(padre.getNome() == null){
             throw new BusinessRuleViolationException("O nome não pode ser vazio");
@@ -36,16 +38,19 @@ public class PadreServiceImpl implements PadreService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Padre> listarTodosPadre() {
         return padreRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Padre> buscarPadrePorId(Long id) {
         return padreRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public Padre atualizarPadre(Long id, Padre padreAtualizado) {
         Optional<Padre> padreOptional = padreRepository.findById(id);
         if(padreOptional.isEmpty()){
@@ -68,6 +73,7 @@ public class PadreServiceImpl implements PadreService {
     }
 
     @Override
+    @Transactional
     public void deletarPadre(Long id) {
         Optional<Padre> padreOptional = padreRepository.findById(id);
         if (padreOptional.isEmpty()){

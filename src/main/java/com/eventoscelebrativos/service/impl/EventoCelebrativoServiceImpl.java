@@ -3,9 +3,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.EventoCelebrativo;
 import com.eventoscelebrativos.repository.EventoCelebrativoRepository;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +22,7 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
     }
 
     @Override
+    @Transactional
     public EventoCelebrativo criarEvento(EventoCelebrativo eventoCelebrativo) {
         if (eventoCelebrativo.getNomeMissaOuEvento() == null) {
             throw new BusinessRuleViolationException("O nome da missa ou evento não pode ser vazio.");
@@ -36,16 +38,19 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<EventoCelebrativo> listarTodosEventos() {
         return eventoCelebrativoRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<EventoCelebrativo> buscarEventoPorId(Long id) {
         return eventoCelebrativoRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public EventoCelebrativo atualizarEvento(Long id, EventoCelebrativo eventoAtualizado) {
         Optional<EventoCelebrativo> eventoCelebrativoOptional = eventoCelebrativoRepository.findById(id);
         if(eventoCelebrativoOptional.isEmpty()){
@@ -70,6 +75,7 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
     }
 
     @Override
+    @Transactional
     public void deletarEvento(Long id) {
         Optional<EventoCelebrativo> eventoExistenteOptional = eventoCelebrativoRepository.findById(id);
         if(eventoExistenteOptional.isEmpty()){

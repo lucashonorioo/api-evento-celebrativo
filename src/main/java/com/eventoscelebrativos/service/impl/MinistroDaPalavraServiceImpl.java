@@ -6,9 +6,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.MinistroDaPalavra;
 import com.eventoscelebrativos.repository.MinistroDaPalavraRepository;
 import com.eventoscelebrativos.service.MinistroDaPalavraService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,7 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
 
     @Override
+    @Transactional
     public MinistroDaPalavra criarMinistroDaPalavra(MinistroDaPalavra ministroDaPalavra) {
         if(ministroDaPalavra.getNome() == null){
             throw new BusinessRuleViolationException("O nome não pode ser vazio");
@@ -35,16 +37,19 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<MinistroDaPalavra> listarTodosMinistroDaPalavra() {
         return ministroDaPalavraRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<MinistroDaPalavra> buscarMinistroDaPalavraPorId(Long id) {
         return ministroDaPalavraRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public MinistroDaPalavra atualizarMinistroDaPalavra(Long id, MinistroDaPalavra ministroDaPalavraAtualizado) {
         Optional<MinistroDaPalavra> ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id);
         if(ministroDaPalavraOptional.isEmpty()){
@@ -67,6 +72,7 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
     }
 
     @Override
+    @Transactional
     public void deletarMinistroDaPalavra(Long id) {
         Optional<MinistroDaPalavra> ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id);
         if (ministroDaPalavraOptional.isEmpty()){

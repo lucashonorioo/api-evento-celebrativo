@@ -3,9 +3,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Local;
 import com.eventoscelebrativos.repository.LocalRepository;
 import com.eventoscelebrativos.service.LocalService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ public class LocalServiceImpl implements LocalService {
     }
 
     @Override
+    @Transactional
     public Local criarLocal(Local local) {
         if(local.getNomeDaIgreja() == null){
             throw new BusinessRuleViolationException("O nome do local não pode ser vazio");
@@ -31,16 +33,19 @@ public class LocalServiceImpl implements LocalService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Local> listarTodosLocais() {
         return localRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Local> buscarLocalPorId(Long id) {
         return localRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public Local atualizarLocal(Long id, Local localAtualizado) {
         Optional<Local> localOptional = localRepository.findById(id);
         if(localOptional.isEmpty()){
@@ -60,6 +65,7 @@ public class LocalServiceImpl implements LocalService {
     }
 
     @Override
+    @Transactional
     public void deletarLocal(Long id) {
         Optional<Local> localOptional = localRepository.findById(id);
         if(localOptional.isEmpty()){

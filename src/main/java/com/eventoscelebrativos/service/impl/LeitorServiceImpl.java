@@ -3,9 +3,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Leitor;
 import com.eventoscelebrativos.repository.LeitorRepository;
 import com.eventoscelebrativos.service.LeitorService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,7 @@ public class LeitorServiceImpl implements LeitorService {
 
 
     @Override
+    @Transactional
     public Leitor criarLeitor(Leitor leitor) {
         if(leitor.getNome() == null){
             throw new BusinessRuleViolationException("O nome não pode ser vazio");
@@ -32,16 +34,19 @@ public class LeitorServiceImpl implements LeitorService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Leitor> listarTodosLeitor() {
         return leitorRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Leitor> buscarLeitorPorId(Long id) {
         return leitorRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public Leitor atualizarLeitor(Long id, Leitor leitorAtualizado) {
         Optional<Leitor> leitorOptional = leitorRepository.findById(id);
         if(leitorOptional.isEmpty()){
@@ -64,6 +69,7 @@ public class LeitorServiceImpl implements LeitorService {
     }
 
     @Override
+    @Transactional
     public void deletarLeitor(Long id) {
         Optional<Leitor> leitorOptional = leitorRepository.findById(id);
         if (leitorOptional.isEmpty()){

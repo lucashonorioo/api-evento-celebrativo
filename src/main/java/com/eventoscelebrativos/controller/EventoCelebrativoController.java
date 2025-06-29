@@ -1,6 +1,6 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.controller.exception.InvalidRequestBodyException;
+import com.eventoscelebrativos.exception.exception.InvalidRequestBodyException;
 import com.eventoscelebrativos.model.EventoCelebrativo;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
 import org.springframework.http.HttpStatus;

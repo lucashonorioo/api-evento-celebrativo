@@ -3,9 +3,10 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Comentarista;
 import com.eventoscelebrativos.repository.ComentaristaRepository;
 import com.eventoscelebrativos.service.ComentaristaService;
-import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
+import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ public class ComentaristaServiceImpl implements ComentaristaService {
     }
 
     @Override
+    @Transactional
     public Comentarista criarComentarista(Comentarista comentarista) {
         if(comentarista.getNome() == null){
             throw new BusinessRuleViolationException("O nome não pode ser vazio");
@@ -31,16 +33,19 @@ public class ComentaristaServiceImpl implements ComentaristaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Comentarista> listarTodosComentaristas() {
         return comentaristaRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Comentarista> buscarComentaristaPorId(Long id) {
         return comentaristaRepository.findById(id);
     }
 
     @Override
+    @Transactional
     public Comentarista atualizarComentarista(Long id, Comentarista comentaristaAtualizado) {
         Optional<Comentarista> comentaristaOptional = comentaristaRepository.findById(id);
         if(comentaristaOptional.isEmpty()){
@@ -63,6 +68,7 @@ public class ComentaristaServiceImpl implements ComentaristaService {
     }
 
     @Override
+    @Transactional
     public void deletarComentarista(Long id) {
         Optional<Comentarista> comentaristaOptional = comentaristaRepository.findById(id);
         if (comentaristaOptional.isEmpty()){
