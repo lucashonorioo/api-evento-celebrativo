@@ -1,4 +1,4 @@
-package com.eventoscelebrativos.exception;
+package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.service.exception.BusinessRuleViolationException;
 import com.eventoscelebrativos.service.exception.ResourceNotFoundException;
