@@ -33,8 +33,8 @@ classDiagram
   class Leitor
   class Comentarista
 
-  EventoCelebrativo "1" --> "1..*" Local
-  EventoCelebrativo "1" --> "1..*" Pessoa
+  EventoCelebrativo "1..*" --> "1..*" Local
+  EventoCelebrativo "1..*" --> "1..*" Pessoa
 
   Pessoa <|-- Padre
   Pessoa <|-- MinistroDaPalavra
