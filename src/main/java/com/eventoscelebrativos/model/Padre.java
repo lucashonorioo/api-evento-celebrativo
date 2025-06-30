@@ -5,7 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
 @Entity
-@DiscriminatorValue("padre")
+@DiscriminatorValue("tb_padre")
 public class Padre extends Pessoa{
     private Padre(){
         super();

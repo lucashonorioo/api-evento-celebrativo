@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "local")
+@Table(name = "tb_local")
 public class Local implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;

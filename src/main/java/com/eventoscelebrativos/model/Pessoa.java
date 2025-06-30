@@ -4,8 +4,10 @@ import jakarta.persistence.*;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Entity
@@ -20,27 +22,26 @@ public abstract class Pessoa implements Serializable {
     private Long id;
     private String nome;
     private LocalDate dataAniversario;
-    private LocalDateTime dataAtuacao;
+    private Instant dataAtuacao;
 
     @Column(name = "tipo", insertable = false, updatable = false)
     private String tipo;
 
-    @ManyToOne
-    @JoinColumn(name = "evento_celebrativo_id")
-    private EventoCelebrativo eventoCelebrativo;
+    @ManyToMany(mappedBy = "pessoas")
+    private List<EventoCelebrativo> eventoCelebrativo;
 
     public Pessoa(){
 
     }
 
 
-    public Pessoa(Long id, String nome, LocalDate dataAniversario, LocalDateTime dataAtuacao, String tipo, EventoCelebrativo eventoCelebrativo) {
+    public Pessoa(Long id, String nome, LocalDate dataAniversario, Instant dataAtuacao, String tipo) {
         this.id = id;
         this.nome = nome;
         this.dataAniversario = dataAniversario;
         this.dataAtuacao = dataAtuacao;
         this.tipo = tipo;
-        this.eventoCelebrativo = eventoCelebrativo;
+        this.eventoCelebrativo = new ArrayList<>();
     }
 
     @Override
@@ -67,14 +68,13 @@ public abstract class Pessoa implements Serializable {
         return dataAniversario;
     }
 
-    public LocalDateTime getDataAtuacao() {
+    public Instant getDataAtuacao() {
         return dataAtuacao;
     }
 
-    public EventoCelebrativo getEventoCelebrativo() {
+    public List<EventoCelebrativo> getEventoCelebrativo() {
         return eventoCelebrativo;
     }
-
     public String getTipo() {
         return tipo;
     }
@@ -91,12 +91,9 @@ public abstract class Pessoa implements Serializable {
         this.dataAniversario = dataAniversario;
     }
 
-    public void setDataAtuacao(LocalDateTime dataAtuacao) {
+    public void setDataAtuacao(Instant dataAtuacao) {
         this.dataAtuacao = dataAtuacao;
     }
 
-    public void setEventoCelebrativo(EventoCelebrativo eventoCelebrativo) {
-        this.eventoCelebrativo = eventoCelebrativo;
-    }
 
 }

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "evento_celebrativo")
+@Table(name = "tb_evento_celebrativo")
 public class EventoCelebrativo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -26,7 +26,12 @@ public class EventoCelebrativo implements Serializable {
     private LocalDateTime dataHoraEvento;
     private Boolean missaOuCelebracao;
 
-    @OneToMany(mappedBy = "eventoCelebrativo")
+    @ManyToMany
+    @JoinTable(
+            name = "evento_pessoa",
+            joinColumns = @JoinColumn(name = "evento_id", referencedColumnName = "id"),
+            inverseJoinColumns = @JoinColumn(name = "pessoa_id", referencedColumnName = "id")
+    )
     List<Pessoa> pessoas;
 
     @ManyToMany
