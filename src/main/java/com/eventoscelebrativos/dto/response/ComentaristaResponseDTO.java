@@ -8,5 +8,22 @@ public class ComentaristaResponseDTO {
     private Long id;
     private String nome;
     private LocalDate dataAniversario;
-    private Instant dataAtuacao;
+
+    public ComentaristaResponseDTO(Long id, String nome, LocalDate dataAniversario) {
+        this.id = id;
+        this.nome = nome;
+        this.dataAniversario = dataAniversario;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public LocalDate getDataAniversario() {
+        return dataAniversario;
+    }
 }

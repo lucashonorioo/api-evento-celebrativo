@@ -22,7 +22,6 @@ public abstract class Pessoa implements Serializable {
     private Long id;
     private String nome;
     private LocalDate dataAniversario;
-    private Instant dataAtuacao;
 
     @Column(name = "tipo", insertable = false, updatable = false)
     private String tipo;
@@ -35,11 +34,10 @@ public abstract class Pessoa implements Serializable {
     }
 
 
-    public Pessoa(Long id, String nome, LocalDate dataAniversario, Instant dataAtuacao, String tipo) {
+    public Pessoa(Long id, String nome, LocalDate dataAniversario, String tipo) {
         this.id = id;
         this.nome = nome;
         this.dataAniversario = dataAniversario;
-        this.dataAtuacao = dataAtuacao;
         this.tipo = tipo;
         this.eventoCelebrativo = new ArrayList<>();
     }
@@ -68,9 +66,6 @@ public abstract class Pessoa implements Serializable {
         return dataAniversario;
     }
 
-    public Instant getDataAtuacao() {
-        return dataAtuacao;
-    }
 
     public List<EventoCelebrativo> getEventoCelebrativo() {
         return eventoCelebrativo;
@@ -91,9 +86,6 @@ public abstract class Pessoa implements Serializable {
         this.dataAniversario = dataAniversario;
     }
 
-    public void setDataAtuacao(Instant dataAtuacao) {
-        this.dataAtuacao = dataAtuacao;
-    }
 
 
 }
