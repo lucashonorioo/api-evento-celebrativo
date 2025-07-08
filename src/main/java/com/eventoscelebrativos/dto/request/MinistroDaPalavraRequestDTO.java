@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Past;
 
 import java.time.LocalDate;
 
-public class ComentaristaRequestDTO {
+public class MinistroDaPalavraRequestDTO {
 
     @NotBlank(message = "O campo nome não pode ser vazio")
     private String nome;
@@ -15,11 +15,11 @@ public class ComentaristaRequestDTO {
     @Past(message = "A data de nascimento só pode ser no passado")
     private LocalDate dataAniversario;
 
-    public ComentaristaRequestDTO(){
+    public MinistroDaPalavraRequestDTO(){
 
     }
 
-    public ComentaristaRequestDTO(String nome, LocalDate dataAniversario) {
+    public MinistroDaPalavraRequestDTO(String nome, LocalDate dataAniversario) {
         this.nome = nome;
         this.dataAniversario = dataAniversario;
     }
@@ -39,6 +39,4 @@ public class ComentaristaRequestDTO {
     public void setDataAniversario(LocalDate dataAniversario) {
         this.dataAniversario = dataAniversario;
     }
-
-
 }
