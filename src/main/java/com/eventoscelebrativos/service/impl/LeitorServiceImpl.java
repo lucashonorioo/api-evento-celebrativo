@@ -3,8 +3,8 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Leitor;
 import com.eventoscelebrativos.repository.LeitorRepository;
 import com.eventoscelebrativos.service.LeitorService;
-import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +25,10 @@ public class LeitorServiceImpl implements LeitorService {
     @Transactional
     public Leitor criarLeitor(Leitor leitor) {
         if(leitor.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(leitor.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
         return leitorRepository.save(leitor);
     }
@@ -53,18 +53,15 @@ public class LeitorServiceImpl implements LeitorService {
             throw new ResourceNotFoundException("O leitor não foi encontrado com id: " + id);
         }
         if(leitorAtualizado.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(leitorAtualizado.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
-        if(leitorAtualizado.getDataAtuacao() == null){
-            throw new BusinessRuleViolationException("A data de atuação não pode ser vazia");
-        }
+
         Leitor leitorExistente = leitorOptional.get();
         leitorExistente.setNome(leitorAtualizado.getNome());
         leitorExistente.setDataAniversario(leitorAtualizado.getDataAniversario());
-        leitorExistente.setDataAtuacao(leitorAtualizado.getDataAtuacao());
         return leitorExistente;
     }
 

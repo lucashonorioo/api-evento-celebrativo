@@ -3,8 +3,8 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Local;
 import com.eventoscelebrativos.repository.LocalRepository;
 import com.eventoscelebrativos.service.LocalService;
-import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +24,10 @@ public class LocalServiceImpl implements LocalService {
     @Transactional
     public Local criarLocal(Local local) {
         if(local.getNomeDaIgreja() == null){
-            throw new BusinessRuleViolationException("O nome do local não pode ser vazio");
+            throw new BusinessException("O nome do local não pode ser vazio");
         }
         if(local.getEndereco() == null){
-            throw new BusinessRuleViolationException("O endereço não pode ser vazio");
+            throw new BusinessException("O endereço não pode ser vazio");
         }
         return localRepository.save(local);
     }
@@ -53,10 +53,10 @@ public class LocalServiceImpl implements LocalService {
         }
 
         if(localAtualizado.getNomeDaIgreja() == null){
-            throw new BusinessRuleViolationException("O nome do local não pode ser vazio");
+            throw new BusinessException("O nome do local não pode ser vazio");
         }
         if(localAtualizado.getEndereco() == null){
-            throw new BusinessRuleViolationException("O endereço não pode ser vazio");
+            throw new BusinessException("O endereço não pode ser vazio");
         }
         Local localExistente = localOptional.get();
         localExistente.setNomeDaIgreja(localAtualizado.getNomeDaIgreja());

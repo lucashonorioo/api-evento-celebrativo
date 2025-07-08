@@ -3,8 +3,8 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.EventoCelebrativo;
 import com.eventoscelebrativos.repository.EventoCelebrativoRepository;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
-import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +25,13 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
     @Transactional
     public EventoCelebrativo criarEvento(EventoCelebrativo eventoCelebrativo) {
         if (eventoCelebrativo.getNomeMissaOuEvento() == null) {
-            throw new BusinessRuleViolationException("O nome da missa ou evento não pode ser vazio.");
+            throw new BusinessException("O nome da missa ou evento não pode ser vazio.");
         }
         if (eventoCelebrativo.getMissaOuCelebracao() == null) {
-            throw new BusinessRuleViolationException("O campo 'missa ou celebração' não pode ser nulo.");
+            throw new BusinessException("O campo 'missa ou celebração' não pode ser nulo.");
         }
         if (eventoCelebrativo.getDataHoraEvento() == null || eventoCelebrativo.getDataHoraEvento().isBefore(LocalDateTime.now())) {
-            throw new BusinessRuleViolationException("A data e hora do evento não podem ser no passado.");
+            throw new BusinessException("A data e hora do evento não podem ser no passado.");
         }
         eventoCelebrativo.setId(null);
         return eventoCelebrativoRepository.save(eventoCelebrativo);
@@ -59,13 +59,13 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
         EventoCelebrativo eventoExistente = eventoCelebrativoOptional.get();
 
         if(eventoAtualizado.getNomeMissaOuEvento() == null){
-            throw new BusinessRuleViolationException("O nome da missa ou evento não pode ser vazio.");
+            throw new BusinessException("O nome da missa ou evento não pode ser vazio.");
         }
         if(eventoAtualizado.getMissaOuCelebracao() == null){
-            throw new BusinessRuleViolationException("O campo Missa ou Celebração não pode ser vazio");
+            throw new BusinessException("O campo Missa ou Celebração não pode ser vazio");
         }
         if(eventoAtualizado.getDataHoraEvento() == null || eventoAtualizado.getDataHoraEvento().isBefore(LocalDateTime.now())){
-            throw new BusinessRuleViolationException("A data não pode ser vazia e não pode ser no passado");
+            throw new BusinessException("A data não pode ser vazia e não pode ser no passado");
         }
 
         eventoExistente.setNomeMissaOuEvento(eventoAtualizado.getNomeMissaOuEvento());

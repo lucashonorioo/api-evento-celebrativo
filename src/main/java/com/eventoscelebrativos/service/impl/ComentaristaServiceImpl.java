@@ -3,8 +3,8 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.Comentarista;
 import com.eventoscelebrativos.repository.ComentaristaRepository;
 import com.eventoscelebrativos.service.ComentaristaService;
-import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +24,10 @@ public class ComentaristaServiceImpl implements ComentaristaService {
     @Transactional
     public Comentarista criarComentarista(Comentarista comentarista) {
         if(comentarista.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(comentarista.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
         return comentaristaRepository.save(comentarista);
     }
@@ -52,18 +52,15 @@ public class ComentaristaServiceImpl implements ComentaristaService {
             throw new ResourceNotFoundException("O comentarista não foi encontrado com id: " + id);
         }
         if(comentaristaAtualizado.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(comentaristaAtualizado.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
-        if(comentaristaAtualizado.getDataAtuacao() == null){
-            throw new BusinessRuleViolationException("A data de atuação não pode ser vazia");
-        }
+
         Comentarista comentaristaExistente = comentaristaOptional.get();
         comentaristaExistente.setNome(comentaristaAtualizado.getNome());
         comentaristaExistente.setDataAniversario(comentaristaAtualizado.getDataAniversario());
-        comentaristaExistente.setDataAtuacao(comentaristaAtualizado.getDataAtuacao());
         return comentaristaExistente;
     }
 

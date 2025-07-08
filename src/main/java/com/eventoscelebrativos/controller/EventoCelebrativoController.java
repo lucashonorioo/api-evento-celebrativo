@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.exception.exception.InvalidRequestBodyException;
 import com.eventoscelebrativos.model.EventoCelebrativo;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
 import org.springframework.http.HttpStatus;
@@ -22,15 +21,7 @@ public class EventoCelebrativoController {
 
     @PostMapping
     public ResponseEntity<EventoCelebrativo> criarEvento(@RequestBody EventoCelebrativo eventoCelebrativo){
-        if(eventoCelebrativo.getNomeMissaOuEvento() == null){
-            throw new InvalidRequestBodyException("O nome da missa ou evento é obrigatorio.");
-        }
-        if(eventoCelebrativo.getMissaOuCelebracao() == null){
-            throw new InvalidRequestBodyException("É obrigatorio informar se é uma missa ou celebração");
-        }
-        if(eventoCelebrativo.getDataHoraEvento() == null){
-            throw new InvalidRequestBodyException("O obrigado a informar o horario.");
-        }
+
         EventoCelebrativo eventoCriado = eventoCelebrativoService.criarEvento(eventoCelebrativo);
         return new ResponseEntity<>(eventoCriado, HttpStatus.CREATED);
     }
@@ -53,15 +44,7 @@ public class EventoCelebrativoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<EventoCelebrativo> atualizarEvento(@PathVariable Long id, @RequestBody EventoCelebrativo eventoAtualizado){
-        if (eventoAtualizado.getNomeMissaOuEvento() == null) {
-            throw new InvalidRequestBodyException("O nome da missa ou evento é obrigatório para atualização.");
-        }
-        if (eventoAtualizado.getMissaOuCelebracao() == null) {
-            throw new InvalidRequestBodyException("É obrigatório informar se é uma missa ou celebração para atualização.");
-        }
-        if (eventoAtualizado.getDataHoraEvento() == null) {
-            throw new InvalidRequestBodyException("Obrigatório informar o horário para atualização.");
-        }
+
         EventoCelebrativo eventoAtualizadoResultado = eventoCelebrativoService.atualizarEvento(id, eventoAtualizado);
         return new ResponseEntity<>(eventoAtualizadoResultado, HttpStatus.OK);
     }

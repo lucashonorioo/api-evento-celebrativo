@@ -6,8 +6,8 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.model.MinistroDeEucaristia;
 import com.eventoscelebrativos.repository.MinistroDeEucaristiaRepository;
 import com.eventoscelebrativos.service.MinistroDeEucaristiaService;
-import com.eventoscelebrativos.exception.exception.BusinessRuleViolationException;
-import com.eventoscelebrativos.exception.exception.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +28,10 @@ public class MinistroDeEucaristiaServiceImpl implements MinistroDeEucaristiaServ
     @Transactional
     public MinistroDeEucaristia criarMinistroDeEucaristia(MinistroDeEucaristia ministroDeEucaristia) {
         if(ministroDeEucaristia.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(ministroDeEucaristia.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
         return ministroDeEucaristiaRepository.save(ministroDeEucaristia);
     }
@@ -56,18 +56,14 @@ public class MinistroDeEucaristiaServiceImpl implements MinistroDeEucaristiaServ
             throw new ResourceNotFoundException("O ministro de eucaristia não foi encontrado com id: " + id);
         }
         if(ministroDeEucaristiaAtualizado.getNome() == null){
-            throw new BusinessRuleViolationException("O nome não pode ser vazio");
+            throw new BusinessException("O nome não pode ser vazio");
         }
         if(ministroDeEucaristiaAtualizado.getDataAniversario() == null){
-            throw new BusinessRuleViolationException("A data de aniversario não pode ser vazia");
-        }
-        if(ministroDeEucaristiaAtualizado.getDataAtuacao() == null){
-            throw new BusinessRuleViolationException("A data de atuação não pode ser vazia");
+            throw new BusinessException("A data de aniversario não pode ser vazia");
         }
         MinistroDeEucaristia ministroDeEucaristiaExistente = ministroDeEucaristiaOptional.get();
         ministroDeEucaristiaExistente.setNome(ministroDeEucaristiaAtualizado.getNome());
         ministroDeEucaristiaExistente.setDataAniversario(ministroDeEucaristiaAtualizado.getDataAniversario());
-        ministroDeEucaristiaExistente.setDataAtuacao(ministroDeEucaristiaAtualizado.getDataAtuacao());
         return ministroDeEucaristiaExistente;
     }
 
