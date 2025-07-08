@@ -2,13 +2,13 @@ package com.eventoscelebrativos.dto.response;
 
 import java.time.LocalDate;
 
-public class MinistroDeEucaristiaDTO {
+public class MinistroDeEucaristiaResponseDTO {
 
     private Long id;
     private String nome;
     private LocalDate dataAniversario;
 
-    public MinistroDeEucaristiaDTO(Long id, String nome, LocalDate dataAniversario) {
+    public MinistroDeEucaristiaResponseDTO(Long id, String nome, LocalDate dataAniversario) {
         this.id = id;
         this.nome = nome;
         this.dataAniversario = dataAniversario;
