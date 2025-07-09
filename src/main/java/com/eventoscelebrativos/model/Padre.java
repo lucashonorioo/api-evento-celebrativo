@@ -4,10 +4,12 @@ import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
+import java.time.LocalDate;
+
 @Entity
 @DiscriminatorValue("tb_padre")
 public class Padre extends Pessoa{
-    private Padre(){
+    public Padre(){
         super();
     }
 }
