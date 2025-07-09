@@ -1,9 +1,12 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.dto.request.ComentaristaRequestDTO;
+import com.eventoscelebrativos.dto.response.ComentaristaResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.mapper.ComentaristaMapper;
 import com.eventoscelebrativos.model.Comentarista;
 import com.eventoscelebrativos.repository.ComentaristaRepository;
 import com.eventoscelebrativos.service.ComentaristaService;
-import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,62 +18,58 @@ import java.util.Optional;
 public class ComentaristaServiceImpl implements ComentaristaService {
 
     private final ComentaristaRepository comentaristaRepository;
+    private final ComentaristaMapper comentaristaMapper;
 
-    public ComentaristaServiceImpl(ComentaristaRepository comentaristaRepository) {
+    public ComentaristaServiceImpl(ComentaristaRepository comentaristaRepository, ComentaristaMapper comentaristaMapper) {
         this.comentaristaRepository = comentaristaRepository;
+        this.comentaristaMapper = comentaristaMapper;
     }
 
     @Override
     @Transactional
-    public Comentarista criarComentarista(Comentarista comentarista) {
-        if(comentarista.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(comentarista.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        return comentaristaRepository.save(comentarista);
+    public ComentaristaResponseDTO criarComentarista(ComentaristaRequestDTO comentaristaRequestDTO) {
+        Comentarista comentarista = comentaristaMapper.toEntity(comentaristaRequestDTO);
+        comentarista = comentaristaRepository.save(comentarista);
+        return comentaristaMapper.toDto(comentarista);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Comentarista> listarTodosComentaristas() {
-        return comentaristaRepository.findAll();
+    public List<ComentaristaResponseDTO> listarTodosComentaristas() {
+        List<Comentarista> comentaristas = comentaristaRepository.findAll();
+        return comentaristaMapper.toDtoList(comentaristas);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Comentarista> buscarComentaristaPorId(Long id) {
-        return comentaristaRepository.findById(id);
+    public ComentaristaResponseDTO buscarComentaristaPorId(Long id) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O id deve ser positivo e não nulo");
+        }
+        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
+        return comentaristaMapper.toDto(comentarista);
     }
 
     @Override
     @Transactional
-    public Comentarista atualizarComentarista(Long id, Comentarista comentaristaAtualizado) {
-        Optional<Comentarista> comentaristaOptional = comentaristaRepository.findById(id);
-        if(comentaristaOptional.isEmpty()){
-            throw new ResourceNotFoundException("O comentarista não foi encontrado com id: " + id);
+    public ComentaristaResponseDTO atualizarComentarista(Long id, ComentaristaRequestDTO comentaristaRequestDTO) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        if(comentaristaAtualizado.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(comentaristaAtualizado.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
+        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
+        comentaristaMapper.atualizarComentaristaFromDto(comentaristaRequestDTO, comentarista);
+        Comentarista comentaristaSalvo = comentaristaRepository.save(comentarista);
 
-        Comentarista comentaristaExistente = comentaristaOptional.get();
-        comentaristaExistente.setNome(comentaristaAtualizado.getNome());
-        comentaristaExistente.setDataAniversario(comentaristaAtualizado.getDataAniversario());
-        return comentaristaExistente;
+        return comentaristaMapper.toDto(comentaristaSalvo);
     }
 
     @Override
     @Transactional
     public void deletarComentarista(Long id) {
-        Optional<Comentarista> comentaristaOptional = comentaristaRepository.findById(id);
-        if (comentaristaOptional.isEmpty()){
-            throw new ResourceNotFoundException("O comentarista não foi encontrado com id: " + id);
+        if(id == null || id <= 0){
+            throw new BusinessException("O id deve ser positivo e não nulo");
         }
+        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Comentarista", id));
         comentaristaRepository.deleteById(id);
     }
 }
