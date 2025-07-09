@@ -1,5 +1,8 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.dto.request.LocalRequestDTO;
+import com.eventoscelebrativos.dto.response.LocalResponseDTO;
+import com.eventoscelebrativos.mapper.LocalMapper;
 import com.eventoscelebrativos.model.Local;
 import com.eventoscelebrativos.repository.LocalRepository;
 import com.eventoscelebrativos.service.LocalService;
@@ -15,62 +18,58 @@ import java.util.Optional;
 public class LocalServiceImpl implements LocalService {
 
     private final LocalRepository localRepository;
+    private final LocalMapper localMapper;
 
-    public LocalServiceImpl(LocalRepository localRepository) {
+    public LocalServiceImpl(LocalRepository localRepository, LocalMapper localMapper) {
         this.localRepository = localRepository;
+        this.localMapper = localMapper;
     }
 
     @Override
     @Transactional
-    public Local criarLocal(Local local) {
-        if(local.getNomeDaIgreja() == null){
-            throw new BusinessException("O nome do local não pode ser vazio");
-        }
-        if(local.getEndereco() == null){
-            throw new BusinessException("O endereço não pode ser vazio");
-        }
-        return localRepository.save(local);
+    public LocalResponseDTO criarLocal(LocalRequestDTO localRequestDTO) {
+        Local local = localMapper.toEntity(localRequestDTO);
+        local = localRepository.save(local);
+        return localMapper.toDto(local);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Local> listarTodosLocais() {
-        return localRepository.findAll();
+    public List<LocalResponseDTO> listarTodosLocais() {
+        List<Local> locais = localRepository.findAll();
+        return localMapper.toDtoList(locais);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Local> buscarLocalPorId(Long id) {
-        return localRepository.findById(id);
+    public LocalResponseDTO buscarLocalPorId(Long id) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
+        }
+        Local local = localRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
+        return localMapper.toDto(local);
     }
 
     @Override
     @Transactional
-    public Local atualizarLocal(Long id, Local localAtualizado) {
-        Optional<Local> localOptional = localRepository.findById(id);
-        if(localOptional.isEmpty()){
-            throw new ResourceNotFoundException("O local não foi encontrado com id: " + id);
+    public LocalResponseDTO atualizarLocal(Long id, LocalRequestDTO localRequestDTO) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        Local local = localRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
+        localMapper.atualizarLocalFromDto(localRequestDTO, local);
+        Local localSalvo = localRepository.save(local);
 
-        if(localAtualizado.getNomeDaIgreja() == null){
-            throw new BusinessException("O nome do local não pode ser vazio");
-        }
-        if(localAtualizado.getEndereco() == null){
-            throw new BusinessException("O endereço não pode ser vazio");
-        }
-        Local localExistente = localOptional.get();
-        localExistente.setNomeDaIgreja(localAtualizado.getNomeDaIgreja());
-        localExistente.setEndereco(localAtualizado.getEndereco());
-        return localRepository.save(localExistente);
+        return localMapper.toDto(localSalvo);
     }
 
     @Override
     @Transactional
     public void deletarLocal(Long id) {
-        Optional<Local> localOptional = localRepository.findById(id);
-        if(localOptional.isEmpty()){
-            throw new ResourceNotFoundException("O local não foi encontrado com id: " + id);
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        Local local = localRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
         localRepository.deleteById(id);
     }
 }
