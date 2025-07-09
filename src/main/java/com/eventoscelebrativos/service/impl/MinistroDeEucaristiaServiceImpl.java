@@ -3,6 +3,9 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.dto.request.MinistroDeEucaristiaRequestDTO;
+import com.eventoscelebrativos.dto.response.MinistroDeEucaristiaResponseDTO;
+import com.eventoscelebrativos.mapper.MinistroDeEucaristiaMapper;
 import com.eventoscelebrativos.model.MinistroDeEucaristia;
 import com.eventoscelebrativos.repository.MinistroDeEucaristiaRepository;
 import com.eventoscelebrativos.service.MinistroDeEucaristiaService;
@@ -12,68 +15,68 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class MinistroDeEucaristiaServiceImpl implements MinistroDeEucaristiaService {
 
     private final MinistroDeEucaristiaRepository ministroDeEucaristiaRepository;
+    private final MinistroDeEucaristiaMapper ministroDeEucaristiaMapper;
 
-    public MinistroDeEucaristiaServiceImpl(MinistroDeEucaristiaRepository ministroDeEucaristiaRepository) {
+    public MinistroDeEucaristiaServiceImpl(MinistroDeEucaristiaRepository ministroDeEucaristiaRepository, MinistroDeEucaristiaMapper ministroDeEucaristiaMapper) {
         this.ministroDeEucaristiaRepository = ministroDeEucaristiaRepository;
+        this.ministroDeEucaristiaMapper = ministroDeEucaristiaMapper;
     }
 
 
     @Override
     @Transactional
-    public MinistroDeEucaristia criarMinistroDeEucaristia(MinistroDeEucaristia ministroDeEucaristia) {
-        if(ministroDeEucaristia.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(ministroDeEucaristia.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        return ministroDeEucaristiaRepository.save(ministroDeEucaristia);
+    public MinistroDeEucaristiaResponseDTO criarMinistroDeEucaristia(MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO) {
+        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaMapper.toEntity(ministroDeEucaristiaRequestDTO);
+        ministroDeEucaristia = ministroDeEucaristiaRepository.save(ministroDeEucaristia);
+        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristia);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<MinistroDeEucaristia> listarTodosMinistroDeEucaristia() {
-        return ministroDeEucaristiaRepository.findAll();
+    public List<MinistroDeEucaristiaResponseDTO> listarTodosMinistroDeEucaristia() {
+        List<MinistroDeEucaristia> ministrosDeEucaristia = ministroDeEucaristiaRepository.findAll();
+        return ministroDeEucaristiaMapper.toDtoList(ministrosDeEucaristia);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<MinistroDeEucaristia> buscarMinistroDeEucaristiaPorId(Long id) {
-        return ministroDeEucaristiaRepository.findById(id);
+    public MinistroDeEucaristiaResponseDTO buscarMinistroDeEucaristiaPorId(Long id) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
+        }
+        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
+
+        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristia);
     }
 
     @Override
     @Transactional
-    public MinistroDeEucaristia atualizarMinistroDeEucaristia(Long id, MinistroDeEucaristia ministroDeEucaristiaAtualizado) {
-        Optional<MinistroDeEucaristia> ministroDeEucaristiaOptional = ministroDeEucaristiaRepository.findById(id);
-        if(ministroDeEucaristiaOptional.isEmpty()){
-            throw new ResourceNotFoundException("O ministro de eucaristia não foi encontrado com id: " + id);
+    public MinistroDeEucaristiaResponseDTO atualizarMinistroDeEucaristia(Long id, MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(ministroDeEucaristiaAtualizado.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(ministroDeEucaristiaAtualizado.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        MinistroDeEucaristia ministroDeEucaristiaExistente = ministroDeEucaristiaOptional.get();
-        ministroDeEucaristiaExistente.setNome(ministroDeEucaristiaAtualizado.getNome());
-        ministroDeEucaristiaExistente.setDataAniversario(ministroDeEucaristiaAtualizado.getDataAniversario());
-        return ministroDeEucaristiaExistente;
+        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
+        ministroDeEucaristiaMapper.atualizarMinistroDeEucaristiaFromDto(ministroDeEucaristiaRequestDTO, ministroDeEucaristia);
+        MinistroDeEucaristia ministroDeEucaristiaSalvo = ministroDeEucaristiaRepository.save(ministroDeEucaristia);
+
+        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristiaSalvo);
     }
 
     @Override
     @Transactional
     public void deletarMinistroDeEucaristia(Long id) {
-        Optional<MinistroDeEucaristia> MinistroDeEucaristiaOptional = ministroDeEucaristiaRepository.findById(id);
-        if (MinistroDeEucaristiaOptional.isEmpty()){
-            throw new ResourceNotFoundException("O ministro de eucaristia não foi encontrado com id: " + id);
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
         ministroDeEucaristiaRepository.deleteById(id);
     }
 }

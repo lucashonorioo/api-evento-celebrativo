@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.MinistroDeEucaristiaRequestDTO;
+import com.eventoscelebrativos.dto.response.MinistroDeEucaristiaResponseDTO;
 import com.eventoscelebrativos.model.MinistroDeEucaristia;
 
 import java.util.List;
@@ -7,10 +9,10 @@ import java.util.Optional;
 
 public interface MinistroDeEucaristiaService {
 
-    MinistroDeEucaristia criarMinistroDeEucaristia(MinistroDeEucaristia ministroDeEucaristia);
-    List<MinistroDeEucaristia> listarTodosMinistroDeEucaristia();
-    Optional<MinistroDeEucaristia> buscarMinistroDeEucaristiaPorId(Long id);
-    MinistroDeEucaristia atualizarMinistroDeEucaristia(Long id, MinistroDeEucaristia ministroDeEucaristiaAtualizado);
+    MinistroDeEucaristiaResponseDTO criarMinistroDeEucaristia(MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO);
+    List<MinistroDeEucaristiaResponseDTO> listarTodosMinistroDeEucaristia();
+    MinistroDeEucaristiaResponseDTO buscarMinistroDeEucaristiaPorId(Long id);
+    MinistroDeEucaristiaResponseDTO atualizarMinistroDeEucaristia(Long id, MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO);
     void deletarMinistroDeEucaristia(Long id);
 
 }

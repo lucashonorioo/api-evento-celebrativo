@@ -3,6 +3,9 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.dto.request.MinistroDaPalavraRequestDTO;
+import com.eventoscelebrativos.dto.response.MinistroDaPalavraResponseDTO;
+import com.eventoscelebrativos.mapper.MinistroDaPalavraMapper;
 import com.eventoscelebrativos.model.MinistroDaPalavra;
 import com.eventoscelebrativos.repository.MinistroDaPalavraRepository;
 import com.eventoscelebrativos.service.MinistroDaPalavraService;
@@ -18,62 +21,59 @@ import java.util.Optional;
 public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
     private final MinistroDaPalavraRepository ministroDaPalavraRepository;
+    private final MinistroDaPalavraMapper ministroDaPalavraMapper;
 
-    public MinistroDaPalavraServiceImpl(MinistroDaPalavraRepository ministroDaPalavraRepository) {
+    public MinistroDaPalavraServiceImpl(MinistroDaPalavraRepository ministroDaPalavraRepository, MinistroDaPalavraMapper ministroDaPalavraMapper) {
         this.ministroDaPalavraRepository = ministroDaPalavraRepository;
+        this.ministroDaPalavraMapper = ministroDaPalavraMapper;
     }
 
 
     @Override
     @Transactional
-    public MinistroDaPalavra criarMinistroDaPalavra(MinistroDaPalavra ministroDaPalavra) {
-        if(ministroDaPalavra.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(ministroDaPalavra.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        return ministroDaPalavraRepository.save(ministroDaPalavra);
+    public MinistroDaPalavraResponseDTO criarMinistroDaPalavra(MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO) {
+        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraMapper.toEntity(ministroDaPalavraRequestDTO);
+        ministroDaPalavra = ministroDaPalavraRepository.save(ministroDaPalavra);
+
+        return ministroDaPalavraMapper.toDto(ministroDaPalavra);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<MinistroDaPalavra> listarTodosMinistroDaPalavra() {
-        return ministroDaPalavraRepository.findAll();
+    public List<MinistroDaPalavraResponseDTO> listarTodosMinistroDaPalavra() {
+        List<MinistroDaPalavra> ministrosDaPalavra = ministroDaPalavraRepository.findAll();
+        return ministroDaPalavraMapper.toDtoList(ministrosDaPalavra);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<MinistroDaPalavra> buscarMinistroDaPalavraPorId(Long id) {
-        return ministroDaPalavraRepository.findById(id);
+    public MinistroDaPalavraResponseDTO buscarMinistroDaPalavraPorId(Long id) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
+        }
+        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
+        return ministroDaPalavraMapper.toDto(ministroDaPalavra);
     }
 
     @Override
     @Transactional
-    public MinistroDaPalavra atualizarMinistroDaPalavra(Long id, MinistroDaPalavra ministroDaPalavraAtualizado) {
-        Optional<MinistroDaPalavra> ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id);
-        if(ministroDaPalavraOptional.isEmpty()){
-            throw new ResourceNotFoundException("O ministro da palavra não foi encontrado com id: " + id);
+    public MinistroDaPalavraResponseDTO atualizarMinistroDaPalavra(Long id, MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(ministroDaPalavraAtualizado.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(ministroDaPalavraAtualizado.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        MinistroDaPalavra ministroDaPalavraExistente = ministroDaPalavraOptional.get();
-        ministroDaPalavraExistente.setNome(ministroDaPalavraAtualizado.getNome());
-        ministroDaPalavraExistente.setDataAniversario(ministroDaPalavraAtualizado.getDataAniversario());
-        return ministroDaPalavraExistente;
+        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
+        ministroDaPalavraMapper.atualizarMinistroDaPalavraFromDto(ministroDaPalavraRequestDTO, ministroDaPalavra);
+        MinistroDaPalavra ministroDaPalavraSalvo = ministroDaPalavraRepository.save(ministroDaPalavra);
+        return ministroDaPalavraMapper.toDto(ministroDaPalavraSalvo);
     }
 
     @Override
     @Transactional
     public void deletarMinistroDaPalavra(Long id) {
-        Optional<MinistroDaPalavra> ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id);
-        if (ministroDaPalavraOptional.isEmpty()){
-            throw new ResourceNotFoundException("O ministro da palavra não foi encontrado com id: " + id);
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        MinistroDaPalavra ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
         ministroDaPalavraRepository.deleteById(id);
     }
 }

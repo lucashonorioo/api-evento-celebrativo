@@ -4,6 +4,9 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.dto.request.PadreRequestDTO;
+import com.eventoscelebrativos.dto.response.PadreResponseDTO;
+import com.eventoscelebrativos.mapper.PadreMapper;
 import com.eventoscelebrativos.model.Padre;
 import com.eventoscelebrativos.repository.PadreRepository;
 import com.eventoscelebrativos.service.PadreService;
@@ -19,62 +22,58 @@ import java.util.Optional;
 public class PadreServiceImpl implements PadreService {
 
     private final PadreRepository padreRepository;
+    private final PadreMapper padreMapper;
 
-    public PadreServiceImpl(PadreRepository padreRepository) {
+    public PadreServiceImpl(PadreRepository padreRepository, PadreMapper padreMapper) {
         this.padreRepository = padreRepository;
+        this.padreMapper = padreMapper;
     }
 
 
     @Override
     @Transactional
-    public Padre criarPadre(Padre padre) {
-        if(padre.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(padre.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        return padreRepository.save(padre);
+    public PadreResponseDTO criarPadre(PadreRequestDTO padreRequestDTO) {
+        Padre padre = padreMapper.toEntity(padreRequestDTO);
+        padre = padreRepository.save(padre);
+        return padreMapper.toDto(padre);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Padre> listarTodosPadre() {
-        return padreRepository.findAll();
+    public List<PadreResponseDTO> listarTodosPadre() {
+        List<Padre> padres = padreRepository.findAll();
+        return padreMapper.toDtoList(padres);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Padre> buscarPadrePorId(Long id) {
-        return padreRepository.findById(id);
+    public PadreResponseDTO buscarPadrePorId(Long id) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positio e não nulo");
+        }
+        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
+        return padreMapper.toDto(padre);
     }
 
     @Override
     @Transactional
-    public Padre atualizarPadre(Long id, Padre padreAtualizado) {
-        Optional<Padre> padreOptional = padreRepository.findById(id);
-        if(padreOptional.isEmpty()){
-            throw new ResourceNotFoundException("O padre não foi encontrado com id: " + id);
+    public PadreResponseDTO atualizarPadre(Long id, PadreRequestDTO padreRequestDTO) {
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        if(padreAtualizado.getNome() == null){
-            throw new BusinessException("O nome não pode ser vazio");
-        }
-        if(padreAtualizado.getDataAniversario() == null){
-            throw new BusinessException("A data de aniversario não pode ser vazia");
-        }
-        Padre padreExistente = padreOptional.get();
-        padreExistente.setNome(padreAtualizado.getNome());
-        padreExistente.setDataAniversario(padreAtualizado.getDataAniversario());
-        return padreExistente;
+        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
+        padreMapper.atualizarPadreFromDto(padreRequestDTO, padre);
+        Padre padreSalvo = padreRepository.save(padre);
+        return padreMapper.toDto(padreSalvo);
     }
 
     @Override
     @Transactional
     public void deletarPadre(Long id) {
-        Optional<Padre> padreOptional = padreRepository.findById(id);
-        if (padreOptional.isEmpty()){
-            throw new ResourceNotFoundException("O padre não foi encontrado com id: " + id);
+        if(id == null || id <= 0){
+            throw new BusinessException("O Id deve ser positio e não nulo");
         }
+        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
         padreRepository.deleteById(id);
     }
 }
