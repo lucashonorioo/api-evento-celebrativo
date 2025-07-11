@@ -24,8 +24,9 @@ public class PadreRequestDTO {
 
     }
 
-    public PadreRequestDTO(String nome, LocalDate dataAniversario) {
+    public PadreRequestDTO(String nome, String telefone, LocalDate dataAniversario) {
         this.nome = nome;
+        this.telefone = telefone;
         this.dataAniversario = dataAniversario;
     }
 

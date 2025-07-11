@@ -28,7 +28,7 @@ public class EventoCelebrativo implements Serializable {
 
     @ManyToMany
     @JoinTable(
-            name = "evento_pessoa",
+            name = "tb_evento_pessoa",
             joinColumns = @JoinColumn(name = "evento_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "pessoa_id", referencedColumnName = "id")
     )
@@ -36,7 +36,7 @@ public class EventoCelebrativo implements Serializable {
 
     @ManyToMany
     @JoinTable(
-            name = "evento_local",
+            name = "tb_evento_local",
             joinColumns = @JoinColumn(name = "evento_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "local_id", referencedColumnName = "id")
     )

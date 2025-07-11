@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
+@Table(name = "tb_pessoa")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "tipo", discriminatorType = DiscriminatorType.STRING)
 public abstract class Pessoa implements Serializable {

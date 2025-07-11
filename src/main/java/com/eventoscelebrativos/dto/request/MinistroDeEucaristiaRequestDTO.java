@@ -24,8 +24,9 @@ public class MinistroDeEucaristiaRequestDTO {
 
     }
 
-    public MinistroDeEucaristiaRequestDTO(String nome, LocalDate dataAniversario) {
+    public MinistroDeEucaristiaRequestDTO(String nome, String telefone, LocalDate dataAniversario) {
         this.nome = nome;
+        this.telefone = telefone;
         this.dataAniversario = dataAniversario;
     }
 

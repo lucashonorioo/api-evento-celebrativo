@@ -7,7 +7,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 
 @Entity
-@DiscriminatorValue("tb_padre")
+@DiscriminatorValue("padre")
 public class Padre extends Pessoa{
     public Padre(){
         super();
