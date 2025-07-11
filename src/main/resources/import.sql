@@ -24,9 +24,9 @@ INSERT INTO tb_local(nome_da_igreja, endereco) VALUES ('Igreja Matriz Nossa Senh
 INSERT INTO tb_local(nome_da_igreja, endereco) VALUES ('Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG');
 INSERT INTO tb_local(nome_da_igreja, endereco) VALUES ('Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG');
 
-INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_hora_evento, missa_ou_celebracao) VALUES ('Missa de Domingo das 10h', '2025-07-13T10:00:00', TRUE);
-INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_hora_evento, missa_ou_celebracao) VALUES ('Celebração da Palavra de Sábado', '2025-07-12T19:30:00', FALSE);
-INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_hora_evento, missa_ou_celebracao) VALUES ('Missa de Ação de Graças', '2025-07-20T08:00:00', TRUE);
+INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_evento, hora_evento, missa_ou_celebracao) VALUES ('Missa de Domingo da manhã', '2025-07-13', '10:00:00', TRUE);
+INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_evento, hora_evento, missa_ou_celebracao) VALUES ('Celebração da Palavra de Sábado', '2025-07-12', '19:30:00', FALSE);
+INSERT INTO tb_evento_celebrativo(nome_missa_ou_evento, data_evento, hora_evento, missa_ou_celebracao) VALUES ('Missa de Ação de Graças', '2025-07-20', '08:00:00', TRUE);
 
 INSERT INTO tb_evento_pessoa (evento_id, pessoa_id) VALUES (1, 13);
 INSERT INTO tb_evento_pessoa (evento_id, pessoa_id) VALUES (1, 10);

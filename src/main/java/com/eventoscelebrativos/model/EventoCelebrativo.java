@@ -8,7 +8,9 @@ import jakarta.persistence.*;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +25,8 @@ public class EventoCelebrativo implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nomeMissaOuEvento;
-    private LocalDateTime dataHoraEvento;
+    private LocalDate dataEvento;
+    private LocalTime horaEvento;
     private Boolean missaOuCelebracao;
 
     @ManyToMany
@@ -46,13 +49,14 @@ public class EventoCelebrativo implements Serializable {
 
     }
 
-    public EventoCelebrativo(Long id, String nomeMissaOuEvento, LocalDateTime dataHoraEvento, Boolean missaOuCelebracao) {
+    public EventoCelebrativo(Long id, String nomeMissaOuEvento, LocalDate dataEvento, LocalTime horaEvento, Boolean missaOuCelebracao) {
         this.id = id;
         this.nomeMissaOuEvento = nomeMissaOuEvento;
-        this.dataHoraEvento = dataHoraEvento;
+        this.dataEvento = dataEvento;
+        this.horaEvento = horaEvento;
         this.missaOuCelebracao = missaOuCelebracao;
-        this.pessoas = new ArrayList<>();
-        this.locais = new ArrayList<>();
+        pessoas = new ArrayList<>();
+        locais = new ArrayList<>();
     }
 
     @Override
@@ -75,8 +79,12 @@ public class EventoCelebrativo implements Serializable {
         return nomeMissaOuEvento;
     }
 
-    public LocalDateTime getDataHoraEvento() {
-        return dataHoraEvento;
+    public LocalDate getDataEvento() {
+        return dataEvento;
+    }
+
+    public LocalTime getHoraEvento() {
+        return horaEvento;
     }
 
     @JsonSerialize(using = MissaOuCelebracaoSerializer.class)
@@ -100,8 +108,12 @@ public class EventoCelebrativo implements Serializable {
         this.nomeMissaOuEvento = nomeMissaOuEvento;
     }
 
-    public void setDataHoraEvento(LocalDateTime dataHoraEvento) {
-        this.dataHoraEvento = dataHoraEvento;
+    public void setDataEvento(LocalDate dataEvento) {
+        this.dataEvento = dataEvento;
+    }
+
+    public void setHoraEvento(LocalTime horaEvento) {
+        this.horaEvento = horaEvento;
     }
 
     public void setMissaOuCelebracao(Boolean missaOuCelebracao) {

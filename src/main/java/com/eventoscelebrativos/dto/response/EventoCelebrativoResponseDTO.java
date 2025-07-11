@@ -1,18 +1,23 @@
 package com.eventoscelebrativos.dto.response;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 public class EventoCelebrativoResponseDTO {
 
     private Long id;
     private String nomeMissaOuEvento;
-    private LocalDateTime dataHoraEvento;
+    private LocalDate dataEvento;
+    private LocalTime horaEvento;
     private Boolean missaOuCelebracao;
 
-    public EventoCelebrativoResponseDTO(Long id, String nomeMissaOuEvento, LocalDateTime dataHoraEvento, Boolean missaOuCelebracao) {
+
+    public EventoCelebrativoResponseDTO(Long id, String nomeMissaOuEvento, LocalDate dataEvento, LocalTime horaEvento, Boolean missaOuCelebracao) {
         this.id = id;
         this.nomeMissaOuEvento = nomeMissaOuEvento;
-        this.dataHoraEvento = dataHoraEvento;
+        this.dataEvento = dataEvento;
+        this.horaEvento = horaEvento;
         this.missaOuCelebracao = missaOuCelebracao;
     }
 
@@ -24,8 +29,12 @@ public class EventoCelebrativoResponseDTO {
         return nomeMissaOuEvento;
     }
 
-    public LocalDateTime getDataHoraEvento() {
-        return dataHoraEvento;
+    public LocalDate getDataEvento() {
+        return dataEvento;
+    }
+
+    public LocalTime getHoraEvento() {
+        return horaEvento;
     }
 
     public Boolean getMissaOuCelebracao() {

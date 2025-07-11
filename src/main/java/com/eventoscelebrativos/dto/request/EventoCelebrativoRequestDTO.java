@@ -4,7 +4,9 @@ import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 public class EventoCelebrativoRequestDTO {
 
@@ -13,7 +15,10 @@ public class EventoCelebrativoRequestDTO {
 
     @NotNull(message = "O campo da data não pode ser vazio")
     @FutureOrPresent(message = "A data só pode ser no presente ou futuro")
-    private LocalDateTime dataHoraEvento;
+    private LocalDate dataEvento;
+
+    @NotNull(message = "O campo da hora não pode ser vazio")
+    private LocalTime horaEvento;
 
     @NotNull(message = "É obrigatório informar se é uma missa ou celebração.")
     private Boolean missaOuCelebracao;
@@ -22,9 +27,10 @@ public class EventoCelebrativoRequestDTO {
 
     }
 
-    public EventoCelebrativoRequestDTO(String nomeMissaOuEvento, LocalDateTime dataHoraEvento, Boolean missaOuCelebracao) {
+    public EventoCelebrativoRequestDTO(String nomeMissaOuEvento, LocalDate dataEvento, LocalTime horaEvento, Boolean missaOuCelebracao) {
         this.nomeMissaOuEvento = nomeMissaOuEvento;
-        this.dataHoraEvento = dataHoraEvento;
+        this.dataEvento = dataEvento;
+        this.horaEvento = horaEvento;
         this.missaOuCelebracao = missaOuCelebracao;
     }
 
@@ -36,12 +42,20 @@ public class EventoCelebrativoRequestDTO {
         this.nomeMissaOuEvento = nomeMissaOuEvento;
     }
 
-    public LocalDateTime getDataHoraEvento() {
-        return dataHoraEvento;
+    public LocalDate getDataEvento() {
+        return dataEvento;
     }
 
-    public void setDataHoraEvento(LocalDateTime dataHoraEvento) {
-        this.dataHoraEvento = dataHoraEvento;
+    public void setDataEvento(LocalDate dataEvento) {
+        this.dataEvento = dataEvento;
+    }
+
+    public LocalTime getHoraEvento() {
+        return horaEvento;
+    }
+
+    public void setHoraEvento(LocalTime horaEvento) {
+        this.horaEvento = horaEvento;
     }
 
     public Boolean getMissaOuCelebracao() {
