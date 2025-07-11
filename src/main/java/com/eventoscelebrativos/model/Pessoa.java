@@ -21,7 +21,9 @@ public abstract class Pessoa implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nome;
+    private String telefone;
     private LocalDate dataAniversario;
+
 
     @Column(name = "tipo", insertable = false, updatable = false)
     private String tipo;
@@ -33,13 +35,13 @@ public abstract class Pessoa implements Serializable {
 
     }
 
-
-    public Pessoa(Long id, String nome, LocalDate dataAniversario, String tipo) {
+    public Pessoa(Long id, String nome, String telefone, LocalDate dataAniversario, String tipo, List<EventoCelebrativo> eventoCelebrativo) {
         this.id = id;
         this.nome = nome;
+        this.telefone = telefone;
         this.dataAniversario = dataAniversario;
         this.tipo = tipo;
-        this.eventoCelebrativo = new ArrayList<>();
+        this.eventoCelebrativo = eventoCelebrativo;
     }
 
     @Override
@@ -74,12 +76,20 @@ public abstract class Pessoa implements Serializable {
         return tipo;
     }
 
+    public String getTelefone() {
+        return telefone;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
 
     public void setNome(String nome) {
         this.nome = nome;
+    }
+
+    public void setTelefone(String telefone) {
+        this.telefone = telefone;
     }
 
     public void setDataAniversario(LocalDate dataAniversario) {

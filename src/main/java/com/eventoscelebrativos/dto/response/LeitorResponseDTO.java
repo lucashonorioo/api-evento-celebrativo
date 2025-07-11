@@ -6,11 +6,13 @@ public class LeitorResponseDTO {
 
     private Long id;
     private String nome;
+    private String telefone;
     private LocalDate dataAniversario;
 
-    public LeitorResponseDTO(Long id, String nome, LocalDate dataAniversario) {
+    public LeitorResponseDTO(Long id, String nome, String telefone, LocalDate dataAniversario) {
         this.id = id;
         this.nome = nome;
+        this.telefone = telefone;
         this.dataAniversario = dataAniversario;
     }
 
@@ -20,6 +22,10 @@ public class LeitorResponseDTO {
 
     public String getNome() {
         return nome;
+    }
+
+    public String getTelefone() {
+        return telefone;
     }
 
     public LocalDate getDataAniversario() {

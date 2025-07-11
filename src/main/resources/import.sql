@@ -1,0 +1,1 @@
+INSERT INTO tb_comentarista(name, email, phone) VALUES ('Luana Odinson', 'luana@gmail.com', '989374748');
