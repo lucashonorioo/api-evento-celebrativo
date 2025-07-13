@@ -2,13 +2,18 @@ package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.EventoCelebrativoRequestDTO;
 import com.eventoscelebrativos.dto.response.EventoCelebrativoResponseDTO;
+import com.eventoscelebrativos.dto.response.EventoEscalaMinistrosResponseDTO;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -38,6 +43,15 @@ public class EventoCelebrativoController {
         EventoCelebrativoResponseDTO eventoCelebrativoResponseDTO = eventoCelebrativoService.buscarEventoPorId(id);
         return ResponseEntity.ok().body(eventoCelebrativoResponseDTO);
 
+    }
+
+    @GetMapping("/escala-ministros")
+    public Page<EventoEscalaMinistrosResponseDTO> listarEscalaMinistrosEucaristia(
+            @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
+            @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
+            Pageable pageable
+    ) {
+        return eventoCelebrativoService.listarEscalaMinsEucaristia(pageable, dataInicial, dataFinal);
     }
 
     @PutMapping("/{id}")
