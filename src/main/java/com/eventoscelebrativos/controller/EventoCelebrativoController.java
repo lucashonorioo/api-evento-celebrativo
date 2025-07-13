@@ -46,12 +46,15 @@ public class EventoCelebrativoController {
     }
 
     @GetMapping("/escala-ministros")
-    public Page<EventoEscalaMinistrosResponseDTO> listarEscalaMinistrosEucaristia(
+    public ResponseEntity<Page<EventoEscalaMinistrosResponseDTO>> listarEscalaMinistrosEucaristia(
             @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
             @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
             Pageable pageable
     ) {
-        return eventoCelebrativoService.listarEscalaMinsEucaristia(pageable, dataInicial, dataFinal);
+        Page<EventoEscalaMinistrosResponseDTO>  eventoEscalaMinistrosResponseDTOS =
+                eventoCelebrativoService.listarEscalaMinsEucaristia(pageable, dataInicial, dataFinal);
+
+        return ResponseEntity.ok(eventoEscalaMinistrosResponseDTOS);
     }
 
     @PutMapping("/{id}")
