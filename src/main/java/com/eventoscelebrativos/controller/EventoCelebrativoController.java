@@ -45,7 +45,7 @@ public class EventoCelebrativoController {
 
     }
 
-    @GetMapping("/escala-ministros")
+    @GetMapping("/escala/eucaristia")
     public ResponseEntity<Page<EventoEscalaMinistrosResponseDTO>> listarEscalaMinistrosEucaristia(
             @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
             @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
