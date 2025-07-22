@@ -6,9 +6,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Entity
 @Table(name = "tb_pessoa")
@@ -22,8 +20,11 @@ public abstract class Pessoa implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nome;
+
+    @Column(unique = true)
     private String telefone;
     private LocalDate dataAniversario;
+    private String password;
 
 
     @Column(name = "tipo", insertable = false, updatable = false)
@@ -32,29 +33,36 @@ public abstract class Pessoa implements Serializable {
     @ManyToMany(mappedBy = "pessoas")
     private List<EventoCelebrativo> eventoCelebrativo;
 
+    @ManyToMany
+    @JoinTable(
+            name = "tb_pessoa_role",
+            joinColumns = @JoinColumn(name = "pessoa_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<Role> roles = new HashSet<>();
+
     public Pessoa(){
 
     }
 
-    public Pessoa(Long id, String nome, String telefone, LocalDate dataAniversario, String tipo, List<EventoCelebrativo> eventoCelebrativo) {
+    public Pessoa(Long id, String nome, String telefone, LocalDate dataAniversario, String password, String tipo) {
         this.id = id;
         this.nome = nome;
         this.telefone = telefone;
         this.dataAniversario = dataAniversario;
+        this.password = password;
         this.tipo = tipo;
-        this.eventoCelebrativo = eventoCelebrativo;
     }
 
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         Pessoa pessoa = (Pessoa) o;
-        return id == pessoa.id;
+        return Objects.equals(telefone, pessoa.telefone);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(id);
+        return Objects.hashCode(telefone);
     }
 
     public Long getId() {
@@ -97,6 +105,25 @@ public abstract class Pessoa implements Serializable {
         this.dataAniversario = dataAniversario;
     }
 
+    public String getPassword() {
+        return password;
+    }
 
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public void addRole(Role role){
+        roles.add(role);
+    }
+
+    public Boolean hasRole(String roleName){
+        for(Role role : roles){
+            if(role.getAuthority().equals(roleName)){
+                return true;
+            }
+        }
+        return false;
+    }
 
 }
