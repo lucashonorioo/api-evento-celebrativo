@@ -2,12 +2,14 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.LocalRequestDTO;
 import com.eventoscelebrativos.dto.response.LocalResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.LocalMapper;
 import com.eventoscelebrativos.model.Local;
 import com.eventoscelebrativos.repository.LocalRepository;
 import com.eventoscelebrativos.service.LocalService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +71,15 @@ public class LocalServiceImpl implements LocalService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Local local = localRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
-        localRepository.deleteById(id);
+        if(!localRepository.existsById(id)){
+            throw new ResourceNotFoundException("Local", id);
+        }
+        try {
+            localRepository.deleteById(id);
+        }
+        catch (DataIntegrityViolationException e){
+            throw new DatabaseException("Não foi possivel deletar o local, possui outras referencias no sistema");
+        }
+
     }
 }

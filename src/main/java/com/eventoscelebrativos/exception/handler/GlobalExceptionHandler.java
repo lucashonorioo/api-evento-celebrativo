@@ -1,10 +1,7 @@
 package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.exception.error.ErrorResponse;
-import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.ErrorResponseException;
-import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.exception.exceptions.ValidationErrorResponse;
+import com.eventoscelebrativos.exception.exceptions.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -61,5 +58,19 @@ public class GlobalExceptionHandler {
         );
         return new ResponseEntity<>(errorResponse, status);
     }
+
+    @ExceptionHandler(DatabaseException.class)
+    public ResponseEntity<ErrorResponse> handleDatabasesException(DatabaseException e, WebRequest webRequest){
+        HttpStatus status = e.getStatus();
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                e.getMessage(),
+                e.getErrorCode(),
+                webRequest.getDescription(false)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
 
 }

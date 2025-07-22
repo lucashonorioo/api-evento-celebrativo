@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.EventoCelebrativoRequestDTO;
 import com.eventoscelebrativos.dto.response.EventoCelebrativoResponseDTO;
 import com.eventoscelebrativos.dto.response.EventoEscalaMinistrosResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.EventoCelebrativoMapper;
 import com.eventoscelebrativos.model.EventoCelebrativo;
 import com.eventoscelebrativos.projection.EventoEscalaMinistrosProjection;
@@ -10,6 +11,7 @@ import com.eventoscelebrativos.repository.EventoCelebrativoRepository;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -111,7 +113,15 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        EventoCelebrativo eventoCelebrativo = eventoCelebrativoRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
-        eventoCelebrativoRepository.deleteById(id);
+        if(!eventoCelebrativoRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Evento celebrativo", id);
+        }
+        try{
+            eventoCelebrativoRepository.deleteById(id);
+        }
+        catch (DataIntegrityViolationException e){
+            throw new DatabaseException("Não foi possivel deletar evento, possui outras referencias no sistema");
+        }
     }
 }
+
