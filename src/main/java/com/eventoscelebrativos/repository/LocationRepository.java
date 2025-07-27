@@ -1,9 +1,9 @@
 package com.eventoscelebrativos.repository;
 
-import com.eventoscelebrativos.model.Pessoa;
+import com.eventoscelebrativos.model.Location;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface PessoaRepository extends JpaRepository<Pessoa, Long> {
+public interface LocalRepository extends JpaRepository<Location, Long> {
 }

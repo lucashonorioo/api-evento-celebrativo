@@ -21,7 +21,7 @@ public class Local implements Serializable {
     private String endereco;
 
     @ManyToMany(mappedBy = "locais")
-    private List<EventoCelebrativo> eventoCelebrativos;
+    private List<CelebrationEvent> celebrationEvents;
 
     public Local(){
 
@@ -31,7 +31,7 @@ public class Local implements Serializable {
         this.id = id;
         this.nomeDaIgreja = nomeDaIgreja;
         this.endereco = endereco;
-        this.eventoCelebrativos = new ArrayList<>();
+        this.celebrationEvents = new ArrayList<>();
     }
 
     @Override
@@ -58,8 +58,8 @@ public class Local implements Serializable {
         return endereco;
     }
 
-    public List<EventoCelebrativo> getEventoCelebrativos() {
-        return eventoCelebrativos;
+    public List<CelebrationEvent> getEventoCelebrativos() {
+        return celebrationEvents;
     }
 
     public void setId(Long id) {

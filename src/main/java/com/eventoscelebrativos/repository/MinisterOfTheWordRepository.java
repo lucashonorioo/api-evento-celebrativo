@@ -1,9 +1,9 @@
 package com.eventoscelebrativos.repository;
 
-import com.eventoscelebrativos.model.Leitor;
+import com.eventoscelebrativos.model.MinisterOfTheWord;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface LeitorRepository extends JpaRepository<Leitor, Long> {
+public interface MinistroDaPalavraRepository extends JpaRepository<MinisterOfTheWord, Long> {
 }

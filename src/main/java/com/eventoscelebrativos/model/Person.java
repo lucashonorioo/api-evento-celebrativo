@@ -1,10 +1,10 @@
 package com.eventoscelebrativos.model;
 
 import jakarta.persistence.*;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -12,7 +12,7 @@ import java.util.*;
 @Table(name = "tb_pessoa")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "tipo", discriminatorType = DiscriminatorType.STRING)
-public abstract class Pessoa implements Serializable {
+public abstract class Pessoa implements Serializable, UserDetails {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -31,14 +31,14 @@ public abstract class Pessoa implements Serializable {
     private String tipo;
 
     @ManyToMany(mappedBy = "pessoas")
-    private List<EventoCelebrativo> eventoCelebrativo;
+    private List<CelebrationEvent> celebrationEvent;
 
     @ManyToMany
     @JoinTable(
             name = "tb_pessoa_role",
             joinColumns = @JoinColumn(name = "pessoa_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
-    private Set<Role> roles = new HashSet<>();
+    protected Set<Role> roles = new HashSet<>();
 
     public Pessoa(){
 
@@ -78,8 +78,8 @@ public abstract class Pessoa implements Serializable {
     }
 
 
-    public List<EventoCelebrativo> getEventoCelebrativo() {
-        return eventoCelebrativo;
+    public List<CelebrationEvent> getEventoCelebrativo() {
+        return celebrationEvent;
     }
     public String getTipo() {
         return tipo;
@@ -105,16 +105,13 @@ public abstract class Pessoa implements Serializable {
         this.dataAniversario = dataAniversario;
     }
 
-    public String getPassword() {
-        return password;
+    public String getPassword() { return password;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setPassword(String password) { this.password = password;
     }
 
-    public void addRole(Role role){
-        roles.add(role);
+    public void addRole(Role role){ roles.add(role);
     }
 
     public Boolean hasRole(String roleName){
