@@ -4,11 +4,11 @@ package com.eventoscelebrativos.service.impl;
 
 
 
-import com.eventoscelebrativos.dto.request.PadreRequestDTO;
-import com.eventoscelebrativos.dto.response.PadreResponseDTO;
-import com.eventoscelebrativos.mapper.PadreMapper;
-import com.eventoscelebrativos.model.Padre;
-import com.eventoscelebrativos.repository.PadreRepository;
+import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.response.PriestResponseDTO;
+import com.eventoscelebrativos.mapper.PriestMapper;
+import com.eventoscelebrativos.model.Priest;
+import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.service.PadreService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -16,55 +16,54 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class PadreServiceImpl implements PadreService {
 
-    private final PadreRepository padreRepository;
-    private final PadreMapper padreMapper;
+    private final PriestRepository priestRepository;
+    private final PriestMapper priestMapper;
 
-    public PadreServiceImpl(PadreRepository padreRepository, PadreMapper padreMapper) {
-        this.padreRepository = padreRepository;
-        this.padreMapper = padreMapper;
+    public PadreServiceImpl(PriestRepository priestRepository, PriestMapper priestMapper) {
+        this.priestRepository = priestRepository;
+        this.priestMapper = priestMapper;
     }
 
 
     @Override
     @Transactional
-    public PadreResponseDTO criarPadre(PadreRequestDTO padreRequestDTO) {
-        Padre padre = padreMapper.toEntity(padreRequestDTO);
-        padre = padreRepository.save(padre);
-        return padreMapper.toDto(padre);
+    public PriestResponseDTO criarPadre(PriestRequestDTO priestRequestDTO) {
+        Priest priest = priestMapper.toEntity(priestRequestDTO);
+        priest = priestRepository.save(priest);
+        return priestMapper.toDto(priest);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<PadreResponseDTO> listarTodosPadre() {
-        List<Padre> padres = padreRepository.findAll();
-        return padreMapper.toDtoList(padres);
+    public List<PriestResponseDTO> listarTodosPadre() {
+        List<Priest> priests = priestRepository.findAll();
+        return priestMapper.toDtoList(priests);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PadreResponseDTO buscarPadrePorId(Long id) {
+    public PriestResponseDTO buscarPadrePorId(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
-        return padreMapper.toDto(padre);
+        Priest priest = priestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
+        return priestMapper.toDto(priest);
     }
 
     @Override
     @Transactional
-    public PadreResponseDTO atualizarPadre(Long id, PadreRequestDTO padreRequestDTO) {
+    public PriestResponseDTO atualizarPadre(Long id, PriestRequestDTO priestRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
-        padreMapper.atualizarPadreFromDto(padreRequestDTO, padre);
-        Padre padreSalvo = padreRepository.save(padre);
-        return padreMapper.toDto(padreSalvo);
+        Priest priest = priestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
+        priestMapper.atualizarPadreFromDto(priestRequestDTO, priest);
+        Priest priestSalvo = priestRepository.save(priest);
+        return priestMapper.toDto(priestSalvo);
     }
 
     @Override
@@ -73,7 +72,7 @@ public class PadreServiceImpl implements PadreService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Padre padre = padreRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
-        padreRepository.deleteById(id);
+        Priest priest = priestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
+        priestRepository.deleteById(id);
     }
 }

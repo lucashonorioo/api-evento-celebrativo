@@ -7,9 +7,9 @@ import org.springframework.security.core.GrantedAuthority;
 import java.util.Collection;
 
 @Entity
-@DiscriminatorValue("ministro_da_palavra")
-public class MinistroDaPalavra extends Pessoa{
-    public MinistroDaPalavra(){
+@DiscriminatorValue("minister_of_the_word")
+public class MinisterOfTheWord extends Person {
+    public MinisterOfTheWord(){
         super();
     }
 
@@ -20,7 +20,7 @@ public class MinistroDaPalavra extends Pessoa{
 
     @Override
     public String getUsername() {
-        return "telefone";
+        return "phoneNumber";
     }
 
     @Override

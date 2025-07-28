@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ComentaristaRepository extends JpaRepository<Commentator, Long> {
+public interface CommentatorRepository extends JpaRepository<Commentator, Long> {
 }

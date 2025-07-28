@@ -1,8 +1,8 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.dto.request.EventoCelebrativoRequestDTO;
-import com.eventoscelebrativos.dto.response.EventoCelebrativoResponseDTO;
-import com.eventoscelebrativos.dto.response.EventoEscalaMinistrosResponseDTO;
+import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.service.EventoCelebrativoService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -27,40 +27,40 @@ public class EventoCelebrativoController {
     }
 
     @PostMapping
-    public ResponseEntity<EventoCelebrativoResponseDTO> criarEvento(@Valid @RequestBody EventoCelebrativoRequestDTO eventoCelebrativoRequestDTO){
-        EventoCelebrativoResponseDTO eventoCelebrativoResponseDTO = eventoCelebrativoService.criarEvento(eventoCelebrativoRequestDTO);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(eventoCelebrativoResponseDTO.getId()).toUri();
-        return ResponseEntity.created(location).body(eventoCelebrativoResponseDTO);
+    public ResponseEntity<CelebrationEventResponseDTO> criarEvento(@Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
+        CelebrationEventResponseDTO celebrationEventResponseDTO = eventoCelebrativoService.criarEvento(celebrationEventRequestDTO);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(celebrationEventResponseDTO.getId()).toUri();
+        return ResponseEntity.created(location).body(celebrationEventResponseDTO);
     }
 
     @GetMapping
-    public ResponseEntity<List<EventoCelebrativoResponseDTO>> listarEventos(){
-        List<EventoCelebrativoResponseDTO> eventosCelebrativosResponseDTO = eventoCelebrativoService.listarTodosEventos();
+    public ResponseEntity<List<CelebrationEventResponseDTO>> listarEventos(){
+        List<CelebrationEventResponseDTO> eventosCelebrativosResponseDTO = eventoCelebrativoService.listarTodosEventos();
         return ResponseEntity.ok().body(eventosCelebrativosResponseDTO);
     }
     @GetMapping("/{id}")
-    public ResponseEntity<EventoCelebrativoResponseDTO> buscarEventoPorId(@PathVariable Long id){
-        EventoCelebrativoResponseDTO eventoCelebrativoResponseDTO = eventoCelebrativoService.buscarEventoPorId(id);
-        return ResponseEntity.ok().body(eventoCelebrativoResponseDTO);
+    public ResponseEntity<CelebrationEventResponseDTO> buscarEventoPorId(@PathVariable Long id){
+        CelebrationEventResponseDTO celebrationEventResponseDTO = eventoCelebrativoService.buscarEventoPorId(id);
+        return ResponseEntity.ok().body(celebrationEventResponseDTO);
 
     }
 
     @GetMapping("/escala/eucaristia")
-    public ResponseEntity<Page<EventoEscalaMinistrosResponseDTO>> listarEscalaMinistrosEucaristia(
+    public ResponseEntity<Page<EucharistScaleEventResponseDTO>> listarEscalaMinistrosEucaristia(
             @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
             @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
             Pageable pageable
     ) {
-        Page<EventoEscalaMinistrosResponseDTO>  eventoEscalaMinistrosResponseDTOS =
+        Page<EucharistScaleEventResponseDTO>  eventoEscalaMinistrosResponseDTOS =
                 eventoCelebrativoService.listarEscalaMinsEucaristia(pageable, dataInicial, dataFinal);
 
         return ResponseEntity.ok(eventoEscalaMinistrosResponseDTOS);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EventoCelebrativoResponseDTO> atualizarEvento(@PathVariable Long id, @Valid @RequestBody EventoCelebrativoRequestDTO eventoCelebrativoRequestDTO){
-        EventoCelebrativoResponseDTO eventoCelebrativoResponseDTO = eventoCelebrativoService.atualizarEvento(id, eventoCelebrativoRequestDTO);
-        return ResponseEntity.ok().body(eventoCelebrativoResponseDTO);
+    public ResponseEntity<CelebrationEventResponseDTO> atualizarEvento(@PathVariable Long id, @Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
+        CelebrationEventResponseDTO celebrationEventResponseDTO = eventoCelebrativoService.atualizarEvento(id, celebrationEventRequestDTO);
+        return ResponseEntity.ok().body(celebrationEventResponseDTO);
     }
 
     @DeleteMapping("/{id}")

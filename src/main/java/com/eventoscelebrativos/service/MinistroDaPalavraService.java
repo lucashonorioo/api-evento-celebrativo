@@ -1,18 +1,16 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.dto.request.MinistroDaPalavraRequestDTO;
-import com.eventoscelebrativos.dto.response.MinistroDaPalavraResponseDTO;
-import com.eventoscelebrativos.model.MinistroDaPalavra;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface MinistroDaPalavraService {
 
-    MinistroDaPalavraResponseDTO criarMinistroDaPalavra(MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO);
-    List<MinistroDaPalavraResponseDTO> listarTodosMinistroDaPalavra();
-    MinistroDaPalavraResponseDTO buscarMinistroDaPalavraPorId(Long id);
-    MinistroDaPalavraResponseDTO atualizarMinistroDaPalavra(Long id, MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO);
+    MinisterOfTheWordResponseDTO criarMinistroDaPalavra(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO);
+    List<MinisterOfTheWordResponseDTO> listarTodosMinistroDaPalavra();
+    MinisterOfTheWordResponseDTO buscarMinistroDaPalavraPorId(Long id);
+    MinisterOfTheWordResponseDTO atualizarMinistroDaPalavra(Long id, MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO);
     void deletarMinistroDaPalavra(Long id);
 
 }

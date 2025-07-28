@@ -7,52 +7,50 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-public class ComentaristaRequestDTO {
+public class CommentatorRequestDTO {
 
     @NotBlank(message = "O campo nome não pode ser vazio")
-    private String nome;
+    private String name;
 
     @NotBlank(message = "O campo telefone não pode ser vazio")
     @Size(min = 11, max = 11, message = "O Telefone deve ter 11 digitos com o DD")
-    private String telefone;
+    private String phoneNumber;
 
     @NotNull(message = "O campo da data não pode ser vazio")
     @Past(message = "A data de nascimento só pode ser no passado")
-    private LocalDate dataAniversario;
+    private LocalDate birthdayDate;
 
-    public ComentaristaRequestDTO(){
+    public CommentatorRequestDTO(){
 
     }
 
-    public ComentaristaRequestDTO(String nome, String telefone, LocalDate dataAniversario) {
-        this.nome = nome;
-        this.telefone = telefone;
-        this.dataAniversario = dataAniversario;
+    public CommentatorRequestDTO(String name, String phoneNumber, LocalDate birthdayDate) {
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+        this.birthdayDate = birthdayDate;
     }
 
-    public String getNome() {
-        return nome;
+    public String getName() {
+        return name;
     }
 
-    public void setNome(String nome) {
-        this.nome = nome;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getTelefone() {
-        return telefone;
+    public String getPhoneNumber() {
+        return phoneNumber;
     }
 
-    public void setTelefone(String telefone) {
-        this.telefone = telefone;
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
     }
 
-    public LocalDate getDataAniversario() {
-        return dataAniversario;
+    public LocalDate getBirthdayDate() {
+        return birthdayDate;
     }
 
-    public void setDataAniversario(LocalDate dataAniversario) {
-        this.dataAniversario = dataAniversario;
+    public void setBirthdayDate(LocalDate birthdayDate) {
+        this.birthdayDate = birthdayDate;
     }
-
-
 }

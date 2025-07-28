@@ -5,12 +5,11 @@ import jakarta.persistence.Entity;
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Collection;
-import java.util.List;
 
 @Entity
-@DiscriminatorValue("comentarista")
-public class Comentarista extends Pessoa{
-    public Comentarista(){
+@DiscriminatorValue("commentator")
+public class Commentator extends Person {
+    public Commentator(){
         super();
     }
 
@@ -21,7 +20,7 @@ public class Comentarista extends Pessoa{
 
     @Override
     public String getUsername() {
-        return "telefone";
+        return "phoneNumber";
     }
 
     @Override

@@ -1,18 +1,16 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.dto.request.PadreRequestDTO;
-import com.eventoscelebrativos.dto.response.PadreResponseDTO;
-import com.eventoscelebrativos.model.Padre;
+import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface PadreService {
 
-    PadreResponseDTO criarPadre(PadreRequestDTO Padre);
-    List<PadreResponseDTO> listarTodosPadre();
-    PadreResponseDTO buscarPadrePorId(Long id);
-    PadreResponseDTO atualizarPadre(Long id, PadreRequestDTO padreRequestDTO);
+    PriestResponseDTO criarPadre(PriestRequestDTO Padre);
+    List<PriestResponseDTO> listarTodosPadre();
+    PriestResponseDTO buscarPadrePorId(Long id);
+    PriestResponseDTO atualizarPadre(Long id, PriestRequestDTO priestRequestDTO);
     void deletarPadre(Long id);
 
 }

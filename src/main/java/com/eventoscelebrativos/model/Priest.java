@@ -2,16 +2,14 @@ package com.eventoscelebrativos.model;
 
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import org.springframework.security.core.GrantedAuthority;
 
-import java.time.LocalDate;
 import java.util.Collection;
 
 @Entity
-@DiscriminatorValue("padre")
-public class Padre extends Pessoa{
-    public Padre(){
+@DiscriminatorValue("priest")
+public class Priest extends Person {
+    public Priest(){
         super();
     }
 
@@ -22,7 +20,7 @@ public class Padre extends Pessoa{
 
     @Override
     public String getUsername() {
-        return "telefone";
+        return "phoneNumber";
     }
 
     @Override

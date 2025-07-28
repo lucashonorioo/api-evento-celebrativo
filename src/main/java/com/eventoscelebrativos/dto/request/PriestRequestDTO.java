@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-public class ReaderRequestDTO {
+public class PriestRequestDTO {
 
     @NotBlank(message = "O campo nome não pode ser vazio")
     private String name;
@@ -20,11 +20,11 @@ public class ReaderRequestDTO {
     @Past(message = "A data de nascimento só pode ser no passado")
     private LocalDate birthdayDate;
 
-    public ReaderRequestDTO(){
+    public PriestRequestDTO(){
 
     }
 
-    public ReaderRequestDTO(String name, String phoneNumber, LocalDate birthdayDate) {
+    public PriestRequestDTO(String name, String phoneNumber, LocalDate birthdayDate) {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.birthdayDate = birthdayDate;

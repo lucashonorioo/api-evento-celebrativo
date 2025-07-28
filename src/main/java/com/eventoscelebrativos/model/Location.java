@@ -9,36 +9,35 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "tb_local")
-public class Local implements Serializable {
+@Table(name = "tb_location")
+public class Location implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String nomeDaIgreja;
-    private String endereco;
+    private String churchName;
+    private String address;
 
-    @ManyToMany(mappedBy = "locais")
-    private List<CelebrationEvent> celebrationEvents;
+    @ManyToMany(mappedBy = "locations")
+    private List<CelebrationEvent> celebrationEvents = new ArrayList<>();
 
-    public Local(){
+    public Location(){
 
     }
 
-    public Local(Long id, String nomeDaIgreja, String endereco) {
+    public Location(Long id, String churchName, String address) {
         this.id = id;
-        this.nomeDaIgreja = nomeDaIgreja;
-        this.endereco = endereco;
-        this.celebrationEvents = new ArrayList<>();
+        this.churchName = churchName;
+        this.address = address;
     }
 
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
-        Local local = (Local) o;
-        return id == local.id;
+        Location location = (Location) o;
+        return id == location.id;
     }
 
     @Override
@@ -50,27 +49,31 @@ public class Local implements Serializable {
         return id;
     }
 
-    public String getNomeDaIgreja() {
-        return nomeDaIgreja;
-    }
-
-    public String getEndereco() {
-        return endereco;
-    }
-
-    public List<CelebrationEvent> getEventoCelebrativos() {
-        return celebrationEvents;
-    }
-
     public void setId(Long id) {
         this.id = id;
     }
 
-    public void setNomeDaIgreja(String nomeDaIgreja) {
-        this.nomeDaIgreja = nomeDaIgreja;
+    public String getChurchName() {
+        return churchName;
     }
 
-    public void setEndereco(String endereco) {
-        this.endereco = endereco;
+    public void setChurchName(String churchName) {
+        this.churchName = churchName;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public List<CelebrationEvent> getCelebrationEvents() {
+        return celebrationEvents;
+    }
+
+    public void setCelebrationEvents(List<CelebrationEvent> celebrationEvents) {
+        this.celebrationEvents = celebrationEvents;
     }
 }

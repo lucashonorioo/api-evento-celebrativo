@@ -5,64 +5,63 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-public class EventoCelebrativoRequestDTO {
+public class CelebrationEventRequestDTO {
 
     @NotBlank(message = "O campo nome não pode ser vazio")
-    private String nomeMissaOuEvento;
+    private String nameMassOrEvent;
 
     @NotNull(message = "O campo da data não pode ser vazio")
     @FutureOrPresent(message = "A data só pode ser no presente ou futuro")
-    private LocalDate dataEvento;
+    private LocalDate eventDate;
 
     @NotNull(message = "O campo da hora não pode ser vazio")
-    private LocalTime horaEvento;
+    private LocalTime eventTime;
 
     @NotNull(message = "É obrigatório informar se é uma missa ou celebração.")
-    private Boolean missaOuCelebracao;
+    private Boolean massOrCelebration;
 
-    public EventoCelebrativoRequestDTO(){
+    public CelebrationEventRequestDTO(){
 
     }
 
-    public EventoCelebrativoRequestDTO(String nomeMissaOuEvento, LocalDate dataEvento, LocalTime horaEvento, Boolean missaOuCelebracao) {
-        this.nomeMissaOuEvento = nomeMissaOuEvento;
-        this.dataEvento = dataEvento;
-        this.horaEvento = horaEvento;
-        this.missaOuCelebracao = missaOuCelebracao;
+    public CelebrationEventRequestDTO(String nameMassOrEvent, LocalDate eventDate, LocalTime eventTime, Boolean massOrCelebration) {
+        this.nameMassOrEvent = nameMassOrEvent;
+        this.eventDate = eventDate;
+        this.eventTime = eventTime;
+        this.massOrCelebration = massOrCelebration;
     }
 
-    public String getNomeMissaOuEvento() {
-        return nomeMissaOuEvento;
+    public String getNameMassOrEvent() {
+        return nameMassOrEvent;
     }
 
-    public void setNomeMissaOuEvento(String nomeMissaOuEvento) {
-        this.nomeMissaOuEvento = nomeMissaOuEvento;
+    public void setNameMassOrEvent(String nameMassOrEvent) {
+        this.nameMassOrEvent = nameMassOrEvent;
     }
 
-    public LocalDate getDataEvento() {
-        return dataEvento;
+    public LocalDate getEventDate() {
+        return eventDate;
     }
 
-    public void setDataEvento(LocalDate dataEvento) {
-        this.dataEvento = dataEvento;
+    public void setEventDate(LocalDate eventDate) {
+        this.eventDate = eventDate;
     }
 
-    public LocalTime getHoraEvento() {
-        return horaEvento;
+    public LocalTime getEventTime() {
+        return eventTime;
     }
 
-    public void setHoraEvento(LocalTime horaEvento) {
-        this.horaEvento = horaEvento;
+    public void setEventTime(LocalTime eventTime) {
+        this.eventTime = eventTime;
     }
 
-    public Boolean getMissaOuCelebracao() {
-        return missaOuCelebracao;
+    public Boolean getMassOrCelebration() {
+        return massOrCelebration;
     }
 
-    public void setMissaOuCelebracao(Boolean missaOuCelebracao) {
-        this.missaOuCelebracao = missaOuCelebracao;
+    public void setMassOrCelebration(Boolean massOrCelebration) {
+        this.massOrCelebration = massOrCelebration;
     }
 }

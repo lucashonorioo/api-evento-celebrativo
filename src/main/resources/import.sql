@@ -1,29 +1,51 @@
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '123456', 'comentarista');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '123456', 'comentarista');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '123456', 'comentarista');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'comentarista');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'comentarista');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'comentarista');
 
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Alice Lima', '34983246978', '1989-08-24', '123456', 'leitor');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '123456', 'leitor');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '123456', 'leitor');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Alice Lima', '34983246978', '1989-08-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'leitor');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'leitor');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'leitor');
 
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '123456', 'ministro_da_palavra');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Laura Alves', '34998563215', '2006-07-11', '123456', 'ministro_da_palavra');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '123456', 'ministro_da_palavra');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_da_palavra');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Laura Alves', '34998563215', '2006-07-11', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_da_palavra');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_da_palavra');
 
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Mariana Ferraz', '34989374748', '1988-05-21', '123456', 'ministro_de_eucaristia');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '123456', 'ministro_de_eucaristia');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '123456', 'ministro_de_eucaristia');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Mariana Ferraz', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_de_eucaristia');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_de_eucaristia');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'ministro_de_eucaristia');
 
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '123456', 'padre');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '123456', 'padre');
-INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '123456', 'padre');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'padre');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'padre');
+INSERT INTO tb_pessoa(nome, telefone, data_aniversario, password, tipo) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'padre');
 
 INSERT INTO tb_role (authority) VALUES ('ROLE_OPERATOR');
 INSERT INTO tb_role (authority) VALUES ('ROLE_ADMIN');
 
- INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (1, 1);
- INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (2, 1);
- INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (2, 2)
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (1, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (1, 2);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (2, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (3, 1);
+
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (4, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (4, 2)
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (5, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (6, 1);
+
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (7, 1)
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (7, 2);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (8, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (9, 1);
+
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (10, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (10, 2);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (11, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (12, 1);
+
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (13, 1);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (13, 2);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (14, 2);
+INSERT INTO tb_pessoa_role (pessoa_id, role_id) VALUES (15, 1);
+
 
 
 INSERT INTO tb_local(nome_da_igreja, endereco) VALUES ('Igreja Matriz Nossa Senhora do Rosário', 'Praça Rui Barbosa, Centro, Ibiá - MG');

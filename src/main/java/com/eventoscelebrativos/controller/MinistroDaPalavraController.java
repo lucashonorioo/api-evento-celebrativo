@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.dto.request.MinistroDaPalavraRequestDTO;
-import com.eventoscelebrativos.dto.response.MinistroDaPalavraResponseDTO;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.service.MinistroDaPalavraService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,28 +22,28 @@ public class MinistroDaPalavraController {
     }
 
     @PostMapping
-    public ResponseEntity<MinistroDaPalavraResponseDTO> criarMinistroDaPalavra(@Valid @RequestBody MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO){
-        MinistroDaPalavraResponseDTO ministroDaPalavraResponseDTO = ministroDaPalavraService.criarMinistroDaPalavra(ministroDaPalavraRequestDTO);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(ministroDaPalavraResponseDTO.getId()).toUri();
-        return ResponseEntity.created(location).body(ministroDaPalavraResponseDTO);
+    public ResponseEntity<MinisterOfTheWordResponseDTO> criarMinistroDaPalavra(@Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
+        MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministroDaPalavraService.criarMinistroDaPalavra(ministerOfTheWordRequestDTO);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(ministerOfTheWordResponseDTO.getId()).toUri();
+        return ResponseEntity.created(location).body(ministerOfTheWordResponseDTO);
     }
 
     @GetMapping
-    public ResponseEntity<List<MinistroDaPalavraResponseDTO>> listarTodosMinistrosDaPalavra(){
-        List<MinistroDaPalavraResponseDTO> ministrosDaPalavraResponseDTO = ministroDaPalavraService.listarTodosMinistroDaPalavra();
+    public ResponseEntity<List<MinisterOfTheWordResponseDTO>> listarTodosMinistrosDaPalavra(){
+        List<MinisterOfTheWordResponseDTO> ministrosDaPalavraResponseDTO = ministroDaPalavraService.listarTodosMinistroDaPalavra();
         return ResponseEntity.ok().body(ministrosDaPalavraResponseDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MinistroDaPalavraResponseDTO> buscarMinistroDaPalavraPorId(@PathVariable Long id){
-        MinistroDaPalavraResponseDTO ministroDaPalavraResponseDTO = ministroDaPalavraService.buscarMinistroDaPalavraPorId(id);
-        return ResponseEntity.ok().body(ministroDaPalavraResponseDTO);
+    public ResponseEntity<MinisterOfTheWordResponseDTO> buscarMinistroDaPalavraPorId(@PathVariable Long id){
+        MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministroDaPalavraService.buscarMinistroDaPalavraPorId(id);
+        return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<MinistroDaPalavraResponseDTO> atualizarMinistroDaPalavra(@PathVariable Long id, @Valid @RequestBody MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO){
-        MinistroDaPalavraResponseDTO ministroDaPalavraResponseDTO = ministroDaPalavraService.atualizarMinistroDaPalavra(id, ministroDaPalavraRequestDTO);
-        return ResponseEntity.ok().body(ministroDaPalavraResponseDTO);
+    public ResponseEntity<MinisterOfTheWordResponseDTO> atualizarMinistroDaPalavra(@PathVariable Long id, @Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
+        MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministroDaPalavraService.atualizarMinistroDaPalavra(id, ministerOfTheWordRequestDTO);
+        return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
     @DeleteMapping("/{id}")

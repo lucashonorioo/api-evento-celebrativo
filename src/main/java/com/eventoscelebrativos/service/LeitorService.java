@@ -1,18 +1,16 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.dto.request.LeitorRequestDTO;
-import com.eventoscelebrativos.dto.response.LeitorResponseDTO;
-import com.eventoscelebrativos.model.Leitor;
+import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface LeitorService {
 
-    LeitorResponseDTO criarLeitor(LeitorRequestDTO leitor);
-    List<LeitorResponseDTO> listarTodosLeitor();
-    LeitorResponseDTO buscarLeitorPorId(Long id);
-    LeitorResponseDTO atualizarLeitor(Long id, LeitorRequestDTO leitorRequestDTO);
+    ReaderResponseDTO criarLeitor(ReaderRequestDTO leitor);
+    List<ReaderResponseDTO> listarTodosLeitor();
+    ReaderResponseDTO buscarLeitorPorId(Long id);
+    ReaderResponseDTO atualizarLeitor(Long id, ReaderRequestDTO readerRequestDTO);
     void deletarLeitor(Long id);
 
 }

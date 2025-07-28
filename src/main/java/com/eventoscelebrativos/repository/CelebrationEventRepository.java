@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.CelebrationEvent;
-import com.eventoscelebrativos.projection.EventoEscalaMinistrosProjection;
+import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,31 +11,31 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 
 @Repository
-public interface EventoCelebrativoRepository extends JpaRepository<CelebrationEvent, Long> {
+public interface CelebrationEventRepository extends JpaRepository<CelebrationEvent, Long> {
 
     @Query(nativeQuery = true, value = """
-        SELECT 
-            e.nome_missa_ou_evento AS nomeEvento,
-            e.data_evento AS dataEvento,
-            e.hora_evento AS horaEvento,
-            l.nome_da_igreja AS nomeIgreja,
-            p.nome AS nomeMinistro
-        FROM 
-            tb_evento_celebrativo e
-        INNER JOIN 
-            tb_evento_local el ON e.id = el.evento_id
-        INNER JOIN 
-            tb_local l ON l.id = el.local_id
-        INNER JOIN 
-            tb_evento_pessoa ep ON e.id = ep.evento_id
-        INNER JOIN 
-            tb_pessoa p ON ep.pessoa_id = p.id
-        WHERE 
-            p.tipo = 'ministro_de_eucaristia'
-            AND e.data_evento BETWEEN :dataInicial AND :dataFinal
-        ORDER BY 
-            e.nome_missa_ou_evento, e.data_evento
+        SELECT
+             ce.name_mass_or_event AS eventName,
+             ce.event_date AS eventDate,
+             ce.event_time AS eventTime,
+             l.church_name AS churchName,
+             p.name AS ministerName
+        FROM
+             tb_celebration_event ce 
+        INNER JOIN
+              tb_event_location el ON ce.id = el.event_id 
+        INNER JOIN
+              tb_location l ON l.id = el.location_id 
+        INNER JOIN
+               tb_event_person ep ON ce.id = ep.event_id 
+        INNER JOIN
+               tb_person p ON ep.person_id = p.id
+        WHERE
+               p.type = 'eucharist_minister'
+               AND ce.event_date BETWEEN :startDate AND :endDate
+        ORDER BY
+               ce.name_mass_or_event, ce.event_date
     """)
-    Page<EventoEscalaMinistrosProjection> buscarEscalaMinistro(Pageable pageable, LocalDate dataInicial, LocalDate dataFinal);
+    Page<EucharistScaleEventProjection> buscarEscalaMinistro(Pageable pageable, LocalDate starDate, LocalDate endDate);
 
 }

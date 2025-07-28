@@ -3,11 +3,11 @@ package com.eventoscelebrativos.service.impl;
 
 
 
-import com.eventoscelebrativos.dto.request.MinistroDaPalavraRequestDTO;
-import com.eventoscelebrativos.dto.response.MinistroDaPalavraResponseDTO;
-import com.eventoscelebrativos.mapper.MinistroDaPalavraMapper;
-import com.eventoscelebrativos.model.MinistroDaPalavra;
-import com.eventoscelebrativos.repository.MinistroDaPalavraRepository;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
+import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
+import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.service.MinistroDaPalavraService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -15,56 +15,55 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
-    private final MinistroDaPalavraRepository ministroDaPalavraRepository;
-    private final MinistroDaPalavraMapper ministroDaPalavraMapper;
+    private final MinisterOfTheWordRepository ministerOfTheWordRepository;
+    private final MinisterOfTheWordMapper ministerOfTheWordMapper;
 
-    public MinistroDaPalavraServiceImpl(MinistroDaPalavraRepository ministroDaPalavraRepository, MinistroDaPalavraMapper ministroDaPalavraMapper) {
-        this.ministroDaPalavraRepository = ministroDaPalavraRepository;
-        this.ministroDaPalavraMapper = ministroDaPalavraMapper;
+    public MinistroDaPalavraServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper) {
+        this.ministerOfTheWordRepository = ministerOfTheWordRepository;
+        this.ministerOfTheWordMapper = ministerOfTheWordMapper;
     }
 
 
     @Override
     @Transactional
-    public MinistroDaPalavraResponseDTO criarMinistroDaPalavra(MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO) {
-        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraMapper.toEntity(ministroDaPalavraRequestDTO);
-        ministroDaPalavra = ministroDaPalavraRepository.save(ministroDaPalavra);
+    public MinisterOfTheWordResponseDTO criarMinistroDaPalavra(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
+        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
+        ministerOfTheWord = ministerOfTheWordRepository.save(ministerOfTheWord);
 
-        return ministroDaPalavraMapper.toDto(ministroDaPalavra);
+        return ministerOfTheWordMapper.toDto(ministerOfTheWord);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<MinistroDaPalavraResponseDTO> listarTodosMinistroDaPalavra() {
-        List<MinistroDaPalavra> ministrosDaPalavra = ministroDaPalavraRepository.findAll();
-        return ministroDaPalavraMapper.toDtoList(ministrosDaPalavra);
+    public List<MinisterOfTheWordResponseDTO> listarTodosMinistroDaPalavra() {
+        List<MinisterOfTheWord> ministrosDaPalavra = ministerOfTheWordRepository.findAll();
+        return ministerOfTheWordMapper.toDtoList(ministrosDaPalavra);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MinistroDaPalavraResponseDTO buscarMinistroDaPalavraPorId(Long id) {
+    public MinisterOfTheWordResponseDTO buscarMinistroDaPalavraPorId(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        return ministroDaPalavraMapper.toDto(ministroDaPalavra);
+        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
+        return ministerOfTheWordMapper.toDto(ministerOfTheWord);
     }
 
     @Override
     @Transactional
-    public MinistroDaPalavraResponseDTO atualizarMinistroDaPalavra(Long id, MinistroDaPalavraRequestDTO ministroDaPalavraRequestDTO) {
+    public MinisterOfTheWordResponseDTO atualizarMinistroDaPalavra(Long id, MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDaPalavra ministroDaPalavra = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        ministroDaPalavraMapper.atualizarMinistroDaPalavraFromDto(ministroDaPalavraRequestDTO, ministroDaPalavra);
-        MinistroDaPalavra ministroDaPalavraSalvo = ministroDaPalavraRepository.save(ministroDaPalavra);
-        return ministroDaPalavraMapper.toDto(ministroDaPalavraSalvo);
+        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
+        ministerOfTheWordMapper.atualizarMinistroDaPalavraFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
+        MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
+        return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
     }
 
     @Override
@@ -73,7 +72,7 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDaPalavra ministroDaPalavraOptional = ministroDaPalavraRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        ministroDaPalavraRepository.deleteById(id);
+        MinisterOfTheWord ministerOfTheWordOptional = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
+        ministerOfTheWordRepository.deleteById(id);
     }
 }

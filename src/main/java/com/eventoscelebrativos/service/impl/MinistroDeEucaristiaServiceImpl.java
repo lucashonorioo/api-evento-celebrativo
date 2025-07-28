@@ -3,11 +3,11 @@ package com.eventoscelebrativos.service.impl;
 
 
 
-import com.eventoscelebrativos.dto.request.MinistroDeEucaristiaRequestDTO;
-import com.eventoscelebrativos.dto.response.MinistroDeEucaristiaResponseDTO;
-import com.eventoscelebrativos.mapper.MinistroDeEucaristiaMapper;
-import com.eventoscelebrativos.model.MinistroDeEucaristia;
-import com.eventoscelebrativos.repository.MinistroDeEucaristiaRepository;
+import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
+import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
+import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
+import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
 import com.eventoscelebrativos.service.MinistroDeEucaristiaService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -19,54 +19,54 @@ import java.util.List;
 @Service
 public class MinistroDeEucaristiaServiceImpl implements MinistroDeEucaristiaService {
 
-    private final MinistroDeEucaristiaRepository ministroDeEucaristiaRepository;
-    private final MinistroDeEucaristiaMapper ministroDeEucaristiaMapper;
+    private final EucharisticMinisterRepository eucharisticMinisterRepository;
+    private final EucharisticMinisterMapper eucharisticMinisterMapper;
 
-    public MinistroDeEucaristiaServiceImpl(MinistroDeEucaristiaRepository ministroDeEucaristiaRepository, MinistroDeEucaristiaMapper ministroDeEucaristiaMapper) {
-        this.ministroDeEucaristiaRepository = ministroDeEucaristiaRepository;
-        this.ministroDeEucaristiaMapper = ministroDeEucaristiaMapper;
+    public MinistroDeEucaristiaServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper) {
+        this.eucharisticMinisterRepository = eucharisticMinisterRepository;
+        this.eucharisticMinisterMapper = eucharisticMinisterMapper;
     }
 
 
     @Override
     @Transactional
-    public MinistroDeEucaristiaResponseDTO criarMinistroDeEucaristia(MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO) {
-        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaMapper.toEntity(ministroDeEucaristiaRequestDTO);
-        ministroDeEucaristia = ministroDeEucaristiaRepository.save(ministroDeEucaristia);
-        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristia);
+    public EucharisticMinisterResponseDTO criarMinistroDeEucaristia(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
+        EucharisticMinister eucharisticMinister = eucharisticMinisterMapper.toEntity(eucharisticMinisterRequestDTO);
+        eucharisticMinister = eucharisticMinisterRepository.save(eucharisticMinister);
+        return eucharisticMinisterMapper.toDto(eucharisticMinister);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<MinistroDeEucaristiaResponseDTO> listarTodosMinistroDeEucaristia() {
-        List<MinistroDeEucaristia> ministrosDeEucaristia = ministroDeEucaristiaRepository.findAll();
-        return ministroDeEucaristiaMapper.toDtoList(ministrosDeEucaristia);
+    public List<EucharisticMinisterResponseDTO> listarTodosMinistroDeEucaristia() {
+        List<EucharisticMinister> ministrosDeEucaristia = eucharisticMinisterRepository.findAll();
+        return eucharisticMinisterMapper.toDtoList(ministrosDeEucaristia);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MinistroDeEucaristiaResponseDTO buscarMinistroDeEucaristiaPorId(Long id) {
+    public EucharisticMinisterResponseDTO buscarMinistroDeEucaristiaPorId(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+        EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
 
-        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristia);
+        return eucharisticMinisterMapper.toDto(eucharisticMinister);
     }
 
     @Override
     @Transactional
-    public MinistroDeEucaristiaResponseDTO atualizarMinistroDeEucaristia(Long id, MinistroDeEucaristiaRequestDTO ministroDeEucaristiaRequestDTO) {
+    public EucharisticMinisterResponseDTO atualizarMinistroDeEucaristia(Long id, EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+        EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
-        ministroDeEucaristiaMapper.atualizarMinistroDeEucaristiaFromDto(ministroDeEucaristiaRequestDTO, ministroDeEucaristia);
-        MinistroDeEucaristia ministroDeEucaristiaSalvo = ministroDeEucaristiaRepository.save(ministroDeEucaristia);
+        eucharisticMinisterMapper.atualizarMinistroDeEucaristiaFromDto(eucharisticMinisterRequestDTO, eucharisticMinister);
+        EucharisticMinister eucharisticMinisterSalvo = eucharisticMinisterRepository.save(eucharisticMinister);
 
-        return ministroDeEucaristiaMapper.toDto(ministroDeEucaristiaSalvo);
+        return eucharisticMinisterMapper.toDto(eucharisticMinisterSalvo);
     }
 
     @Override
@@ -75,8 +75,8 @@ public class MinistroDeEucaristiaServiceImpl implements MinistroDeEucaristiaServ
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinistroDeEucaristia ministroDeEucaristia = ministroDeEucaristiaRepository.findById(id).orElseThrow(
+        EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
-        ministroDeEucaristiaRepository.deleteById(id);
+        eucharisticMinisterRepository.deleteById(id);
     }
 }

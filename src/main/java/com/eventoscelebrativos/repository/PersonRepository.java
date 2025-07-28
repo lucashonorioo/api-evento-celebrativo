@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface PessoaRepository extends JpaRepository<Person, Long> {
+public interface PersonRepository extends JpaRepository<Person, Long> {
 
     @Query(nativeQuery = true, value = """
          SELECT tb_pessoa.telefone AS username, tb_pessoa.password, tb_role.id

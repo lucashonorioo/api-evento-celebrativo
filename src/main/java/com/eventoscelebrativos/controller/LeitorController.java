@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.dto.request.LeitorRequestDTO;
-import com.eventoscelebrativos.dto.response.LeitorResponseDTO;
+import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.service.LeitorService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,28 +22,28 @@ public class LeitorController {
     }
 
     @PostMapping
-    public ResponseEntity<LeitorResponseDTO> criarLeitor(@Valid @RequestBody LeitorRequestDTO leitorRequestDTO){
-        LeitorResponseDTO leitorResponseDTO = leitorService.criarLeitor(leitorRequestDTO);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(leitorResponseDTO.getId()).toUri();
-        return ResponseEntity.created(location).body(leitorResponseDTO);
+    public ResponseEntity<ReaderResponseDTO> criarLeitor(@Valid @RequestBody ReaderRequestDTO readerRequestDTO){
+        ReaderResponseDTO readerResponseDTO = leitorService.criarLeitor(readerRequestDTO);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(readerResponseDTO.getId()).toUri();
+        return ResponseEntity.created(location).body(readerResponseDTO);
     }
 
     @GetMapping
-    public ResponseEntity<List<LeitorResponseDTO>> listarTodosLeitores(){
-        List<LeitorResponseDTO> leitoresResponseDTO = leitorService.listarTodosLeitor();
+    public ResponseEntity<List<ReaderResponseDTO>> listarTodosLeitores(){
+        List<ReaderResponseDTO> leitoresResponseDTO = leitorService.listarTodosLeitor();
         return ResponseEntity.ok().body(leitoresResponseDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<LeitorResponseDTO> buscarLeitorPorId(@PathVariable Long id){
-        LeitorResponseDTO leitorResponseDTO = leitorService.buscarLeitorPorId(id);
-        return ResponseEntity.ok().body(leitorResponseDTO);
+    public ResponseEntity<ReaderResponseDTO> buscarLeitorPorId(@PathVariable Long id){
+        ReaderResponseDTO readerResponseDTO = leitorService.buscarLeitorPorId(id);
+        return ResponseEntity.ok().body(readerResponseDTO);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<LeitorResponseDTO> atualizarLeitor(@PathVariable Long id,@Valid @RequestBody LeitorRequestDTO leitorRequestDTO){
-        LeitorResponseDTO leitorResponseDTO = leitorService.atualizarLeitor(id, leitorRequestDTO);
-        return ResponseEntity.ok().body(leitorResponseDTO);
+    public ResponseEntity<ReaderResponseDTO> atualizarLeitor(@PathVariable Long id, @Valid @RequestBody ReaderRequestDTO readerRequestDTO){
+        ReaderResponseDTO readerResponseDTO = leitorService.atualizarLeitor(id, readerRequestDTO);
+        return ResponseEntity.ok().body(readerResponseDTO);
     }
 
     @DeleteMapping("/{id}")

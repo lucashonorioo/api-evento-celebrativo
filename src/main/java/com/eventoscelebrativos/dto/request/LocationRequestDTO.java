@@ -2,36 +2,36 @@ package com.eventoscelebrativos.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 
-public class LocalRequestDTO {
+public class LocationRequestDTO {
 
     @NotBlank(message = "O nome da igreja não pode ser vazio")
-    private String nomeDaIgreja;
+    private String churchName;
 
     @NotBlank(message = "O endereço não pode ser vazio")
-    private String endereco;
+    private String address;
 
-    public LocalRequestDTO(){
+    public LocationRequestDTO(){
 
     }
 
-    public LocalRequestDTO(String nomeDaIgreja, String endereco) {
-        this.nomeDaIgreja = nomeDaIgreja;
-        this.endereco = endereco;
+    public LocationRequestDTO(String churchName, String address) {
+        this.churchName = churchName;
+        this.address = address;
     }
 
-    public String getNomeDaIgreja() {
-        return nomeDaIgreja;
+    public String getChurchName() {
+        return churchName;
     }
 
-    public void setNomeDaIgreja(String nomeDaIgreja) {
-        this.nomeDaIgreja = nomeDaIgreja;
+    public void setChurchName(String churchName) {
+        this.churchName = churchName;
     }
 
-    public String getEndereco() {
-        return endereco;
+    public String getAddress() {
+        return address;
     }
 
-    public void setEndereco(String endereco) {
-        this.endereco = endereco;
+    public void setAddress(String address) {
+        this.address = address;
     }
 }

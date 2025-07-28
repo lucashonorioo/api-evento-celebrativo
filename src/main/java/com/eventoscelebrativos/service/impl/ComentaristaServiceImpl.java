@@ -1,11 +1,11 @@
 package com.eventoscelebrativos.service.impl;
 
-import com.eventoscelebrativos.dto.request.ComentaristaRequestDTO;
-import com.eventoscelebrativos.dto.response.ComentaristaResponseDTO;
+import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
+import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.mapper.ComentaristaMapper;
-import com.eventoscelebrativos.model.Comentarista;
-import com.eventoscelebrativos.repository.ComentaristaRepository;
+import com.eventoscelebrativos.mapper.CommentatorMapper;
+import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.service.ComentaristaService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -16,50 +16,50 @@ import java.util.List;
 @Service
 public class ComentaristaServiceImpl implements ComentaristaService {
 
-    private final ComentaristaRepository comentaristaRepository;
-    private final ComentaristaMapper comentaristaMapper;
+    private final CommentatorRepository commentatorRepository;
+    private final CommentatorMapper commentatorMapper;
 
-    public ComentaristaServiceImpl(ComentaristaRepository comentaristaRepository, ComentaristaMapper comentaristaMapper) {
-        this.comentaristaRepository = comentaristaRepository;
-        this.comentaristaMapper = comentaristaMapper;
+    public ComentaristaServiceImpl(CommentatorRepository commentatorRepository, CommentatorMapper commentatorMapper) {
+        this.commentatorRepository = commentatorRepository;
+        this.commentatorMapper = commentatorMapper;
     }
 
     @Override
     @Transactional
-    public ComentaristaResponseDTO criarComentarista(ComentaristaRequestDTO comentaristaRequestDTO) {
-        Comentarista comentarista = comentaristaMapper.toEntity(comentaristaRequestDTO);
-        comentarista = comentaristaRepository.save(comentarista);
-        return comentaristaMapper.toDto(comentarista);
+    public CommentatorResponseDTO criarComentarista(CommentatorRequestDTO commentatorRequestDTO) {
+        Commentator commentator = commentatorMapper.toEntity(commentatorRequestDTO);
+        commentator = commentatorRepository.save(commentator);
+        return commentatorMapper.toDto(commentator);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ComentaristaResponseDTO> listarTodosComentaristas() {
-        List<Comentarista> comentaristas = comentaristaRepository.findAll();
-        return comentaristaMapper.toDtoList(comentaristas);
+    public List<CommentatorResponseDTO> listarTodosComentaristas() {
+        List<Commentator> commentators = commentatorRepository.findAll();
+        return commentatorMapper.toDtoList(commentators);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ComentaristaResponseDTO buscarComentaristaPorId(Long id) {
+    public CommentatorResponseDTO buscarComentaristaPorId(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
-        return comentaristaMapper.toDto(comentarista);
+        Commentator commentator = commentatorRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
+        return commentatorMapper.toDto(commentator);
     }
 
     @Override
     @Transactional
-    public ComentaristaResponseDTO atualizarComentarista(Long id, ComentaristaRequestDTO comentaristaRequestDTO) {
+    public CommentatorResponseDTO atualizarComentarista(Long id, CommentatorRequestDTO commentatorRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
-        comentaristaMapper.atualizarComentaristaFromDto(comentaristaRequestDTO, comentarista);
-        Comentarista comentaristaSalvo = comentaristaRepository.save(comentarista);
+        Commentator commentator = commentatorRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
+        commentatorMapper.atualizarComentaristaFromDto(commentatorRequestDTO, commentator);
+        Commentator commentatorSalvo = commentatorRepository.save(commentator);
 
-        return comentaristaMapper.toDto(comentaristaSalvo);
+        return commentatorMapper.toDto(commentatorSalvo);
     }
 
     @Override
@@ -68,7 +68,8 @@ public class ComentaristaServiceImpl implements ComentaristaService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Comentarista comentarista = comentaristaRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Comentarista", id));
-        comentaristaRepository.deleteById(id);
+        Commentator commentator = commentatorRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Comentarista", id));
+        commentatorRepository.deleteById(id);
     }
+
 }

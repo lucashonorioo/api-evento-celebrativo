@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.dto.request.PadreRequestDTO;
-import com.eventoscelebrativos.dto.response.PadreResponseDTO;
+import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.service.PadreService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,28 +22,28 @@ public class PadreController {
     }
 
     @PostMapping
-    public ResponseEntity<PadreResponseDTO> criarPadre(@Valid @RequestBody PadreRequestDTO padreRequestDTO){
-        PadreResponseDTO padreResponseDTO = padreService.criarPadre(padreRequestDTO);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(padreResponseDTO.getId()).toUri();
-        return ResponseEntity.created(location).body(padreResponseDTO);
+    public ResponseEntity<PriestResponseDTO> criarPadre(@Valid @RequestBody PriestRequestDTO priestRequestDTO){
+        PriestResponseDTO priestResponseDTO = padreService.criarPadre(priestRequestDTO);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(priestResponseDTO.getId()).toUri();
+        return ResponseEntity.created(location).body(priestResponseDTO);
     }
 
     @GetMapping
-    public ResponseEntity<List<PadreResponseDTO>> listarTodosPadres(){
-        List<PadreResponseDTO> padresResponseDTO = padreService.listarTodosPadre();
+    public ResponseEntity<List<PriestResponseDTO>> listarTodosPadres(){
+        List<PriestResponseDTO> padresResponseDTO = padreService.listarTodosPadre();
         return ResponseEntity.ok().body(padresResponseDTO);
     }
 
     @PostMapping("/{id}")
-    public ResponseEntity<PadreResponseDTO> buscarPadrePorId(@PathVariable Long id){
-        PadreResponseDTO padreResponseDTO = padreService.buscarPadrePorId(id);
-        return ResponseEntity.ok().body(padreResponseDTO);
+    public ResponseEntity<PriestResponseDTO> buscarPadrePorId(@PathVariable Long id){
+        PriestResponseDTO priestResponseDTO = padreService.buscarPadrePorId(id);
+        return ResponseEntity.ok().body(priestResponseDTO);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PadreResponseDTO> atualizarPadre(@PathVariable Long id, @Valid @RequestBody PadreRequestDTO padreRequestDTO){
-        PadreResponseDTO padreResponseDTO = padreService.atualizarPadre(id, padreRequestDTO);
-        return ResponseEntity.ok().body(padreResponseDTO);
+    public ResponseEntity<PriestResponseDTO> atualizarPadre(@PathVariable Long id, @Valid @RequestBody PriestRequestDTO priestRequestDTO){
+        PriestResponseDTO priestResponseDTO = padreService.atualizarPadre(id, priestRequestDTO);
+        return ResponseEntity.ok().body(priestResponseDTO);
     }
 
     @DeleteMapping("/{id}")

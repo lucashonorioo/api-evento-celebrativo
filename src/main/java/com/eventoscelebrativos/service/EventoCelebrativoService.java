@@ -1,8 +1,8 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.dto.request.EventoCelebrativoRequestDTO;
-import com.eventoscelebrativos.dto.response.EventoCelebrativoResponseDTO;
-import com.eventoscelebrativos.dto.response.EventoEscalaMinistrosResponseDTO;
+import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -11,11 +11,11 @@ import java.util.List;
 
 public interface EventoCelebrativoService {
 
-    EventoCelebrativoResponseDTO criarEvento(EventoCelebrativoRequestDTO eventoCelebrativoRequestDTO);
-    List<EventoCelebrativoResponseDTO> listarTodosEventos();
-    Page<EventoEscalaMinistrosResponseDTO> listarEscalaMinsEucaristia(Pageable pageable, LocalDate dataInicial, LocalDate dataFinal);
-    EventoCelebrativoResponseDTO buscarEventoPorId(Long id);
-    EventoCelebrativoResponseDTO atualizarEvento(Long id, EventoCelebrativoRequestDTO eventoCelebrativoRequestDTO);
+    CelebrationEventResponseDTO criarEvento(CelebrationEventRequestDTO celebrationEventRequestDTO);
+    List<CelebrationEventResponseDTO> listarTodosEventos();
+    Page<EucharistScaleEventResponseDTO> listarEscalaMinsEucaristia(Pageable pageable, LocalDate dataInicial, LocalDate dataFinal);
+    CelebrationEventResponseDTO buscarEventoPorId(Long id);
+    CelebrationEventResponseDTO atualizarEvento(Long id, CelebrationEventRequestDTO celebrationEventRequestDTO);
     void deletarEvento(Long id);
 
 }

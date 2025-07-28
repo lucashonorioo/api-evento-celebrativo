@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.controller;
 
-import com.eventoscelebrativos.dto.request.ComentaristaRequestDTO;
-import com.eventoscelebrativos.dto.response.ComentaristaResponseDTO;
+import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
+import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.service.ComentaristaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -22,28 +22,28 @@ public class ComentaristaController {
     }
 
     @PostMapping
-    public ResponseEntity<ComentaristaResponseDTO> criarComentarista(@Valid @RequestBody ComentaristaRequestDTO comentaristaRequestDTO){
-        ComentaristaResponseDTO comentaristaResponseDTO = comentaristaService.criarComentarista(comentaristaRequestDTO);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(comentaristaResponseDTO.getId()).toUri();
-        return ResponseEntity.created(location).body(comentaristaResponseDTO);
+    public ResponseEntity<CommentatorResponseDTO> criarComentarista(@Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
+        CommentatorResponseDTO commentatorResponseDTO = comentaristaService.criarComentarista(commentatorRequestDTO);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(commentatorResponseDTO.getId()).toUri();
+        return ResponseEntity.created(location).body(commentatorResponseDTO);
     }
 
     @GetMapping
-    public ResponseEntity<List<ComentaristaResponseDTO>> listarTodosComentaristas(){
-        List<ComentaristaResponseDTO> comentaristaResponseDTO = comentaristaService.listarTodosComentaristas();
-        return ResponseEntity.ok().body(comentaristaResponseDTO);
+    public ResponseEntity<List<CommentatorResponseDTO>> listarTodosComentaristas(){
+        List<CommentatorResponseDTO> commentatorResponseDTO = comentaristaService.listarTodosComentaristas();
+        return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ComentaristaResponseDTO> buscarComentaristaPorId(@PathVariable Long id){
-        ComentaristaResponseDTO comentaristaResponseDTO = comentaristaService.buscarComentaristaPorId(id);
-        return ResponseEntity.ok().body(comentaristaResponseDTO);
+    public ResponseEntity<CommentatorResponseDTO> buscarComentaristaPorId(@PathVariable Long id){
+        CommentatorResponseDTO commentatorResponseDTO = comentaristaService.buscarComentaristaPorId(id);
+        return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ComentaristaResponseDTO> atualizarComentarista(@PathVariable Long id,@Valid @RequestBody ComentaristaRequestDTO comentaristaRequestDTO){
-        ComentaristaResponseDTO comentaristaResponseDTO = comentaristaService.atualizarComentarista(id, comentaristaRequestDTO);
-        return ResponseEntity.ok().body(comentaristaResponseDTO);
+    public ResponseEntity<CommentatorResponseDTO> atualizarComentarista(@PathVariable Long id, @Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
+        CommentatorResponseDTO commentatorResponseDTO = comentaristaService.atualizarComentarista(id, commentatorRequestDTO);
+        return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
     @DeleteMapping("/{id}")
