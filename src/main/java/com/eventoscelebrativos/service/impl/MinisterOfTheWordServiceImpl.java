@@ -8,7 +8,7 @@ import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
-import com.eventoscelebrativos.service.MinistroDaPalavraService;
+import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -17,12 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
+public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
     private final MinisterOfTheWordRepository ministerOfTheWordRepository;
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
 
-    public MinistroDaPalavraServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper) {
+    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
     }
@@ -30,7 +30,7 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
     @Override
     @Transactional
-    public MinisterOfTheWordResponseDTO criarMinistroDaPalavra(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
+    public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         MinisterOfTheWord ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
         ministerOfTheWord = ministerOfTheWordRepository.save(ministerOfTheWord);
 
@@ -39,14 +39,14 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MinisterOfTheWordResponseDTO> listarTodosMinistroDaPalavra() {
+    public List<MinisterOfTheWordResponseDTO> findAllMinistersOfTheWord() {
         List<MinisterOfTheWord> ministrosDaPalavra = ministerOfTheWordRepository.findAll();
         return ministerOfTheWordMapper.toDtoList(ministrosDaPalavra);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MinisterOfTheWordResponseDTO buscarMinistroDaPalavraPorId(Long id) {
+    public MinisterOfTheWordResponseDTO findMinisterOfTheWordById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
@@ -56,19 +56,19 @@ public class MinistroDaPalavraServiceImpl implements MinistroDaPalavraService {
 
     @Override
     @Transactional
-    public MinisterOfTheWordResponseDTO atualizarMinistroDaPalavra(Long id, MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
+    public MinisterOfTheWordResponseDTO updateMinisterOfTheWord(Long id, MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
         MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        ministerOfTheWordMapper.atualizarMinistroDaPalavraFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
+        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
         MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
         return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
     }
 
     @Override
     @Transactional
-    public void deletarMinistroDaPalavra(Long id) {
+    public void deleteMinisterOfTheWord(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }

@@ -6,7 +6,7 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.LocationMapper;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.repository.LocationRepository;
-import com.eventoscelebrativos.service.LocalService;
+import com.eventoscelebrativos.service.LocationService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,19 +16,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-public class LocalServiceImpl implements LocalService {
+public class LocationServiceImpl implements LocationService {
 
     private final LocationRepository locationRepository;
     private final LocationMapper locationMapper;
 
-    public LocalServiceImpl(LocationRepository locationRepository, LocationMapper locationMapper) {
+    public LocationServiceImpl(LocationRepository locationRepository, LocationMapper locationMapper) {
         this.locationRepository = locationRepository;
         this.locationMapper = locationMapper;
     }
 
     @Override
     @Transactional
-    public LocationResponseDTO criarLocal(LocationRequestDTO locationRequestDTO) {
+    public LocationResponseDTO createLocation(LocationRequestDTO locationRequestDTO) {
         Location location = locationMapper.toEntity(locationRequestDTO);
         location = locationRepository.save(location);
         return locationMapper.toDto(location);
@@ -36,14 +36,14 @@ public class LocalServiceImpl implements LocalService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<LocationResponseDTO> listarTodosLocais() {
+    public List<LocationResponseDTO> findAllLocations() {
         List<Location> locais = locationRepository.findAll();
         return locationMapper.toDtoList(locais);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public LocationResponseDTO buscarLocalPorId(Long id) {
+    public LocationResponseDTO findLocationById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
@@ -53,12 +53,12 @@ public class LocalServiceImpl implements LocalService {
 
     @Override
     @Transactional
-    public LocationResponseDTO atualizarLocal(Long id, LocationRequestDTO locationRequestDTO) {
+    public LocationResponseDTO updateLocation(Long id, LocationRequestDTO locationRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
         Location location = locationRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
-        locationMapper.atualizarLocalFromDto(locationRequestDTO, location);
+        locationMapper.updateLocationFromDto(locationRequestDTO, location);
         Location locationSalvo = locationRepository.save(location);
 
         return locationMapper.toDto(locationSalvo);
@@ -66,7 +66,7 @@ public class LocalServiceImpl implements LocalService {
 
     @Override
     @Transactional
-    public void deletarLocal(Long id) {
+    public void deleteLocationById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }

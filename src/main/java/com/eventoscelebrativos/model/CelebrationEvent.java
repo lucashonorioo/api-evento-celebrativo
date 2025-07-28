@@ -2,8 +2,6 @@ package com.eventoscelebrativos.model;
 
 
 
-import com.eventoscelebrativos.model.serializer.MissaOuCelebracaoSerializer;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import jakarta.persistence.*;
 
 import java.io.Serial;

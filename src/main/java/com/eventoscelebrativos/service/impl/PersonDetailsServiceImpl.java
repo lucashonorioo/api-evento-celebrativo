@@ -4,7 +4,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 
 @Service
-public class PessoaDetailsServiceImpl implements UserDetailsService {
+public class PersonDetailsServiceImpl implements UserDetailsService {
 
   /*  private final PessoaRepository pessoaRepository;
 

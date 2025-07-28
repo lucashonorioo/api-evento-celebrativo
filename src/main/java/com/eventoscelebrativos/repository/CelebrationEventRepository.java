@@ -36,6 +36,6 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
         ORDER BY
                ce.name_mass_or_event, ce.event_date
     """)
-    Page<EucharistScaleEventProjection> buscarEscalaMinistro(Pageable pageable, LocalDate starDate, LocalDate endDate);
+    Page<EucharistScaleEventProjection> findEucharistScale(Pageable pageable, LocalDate starDate, LocalDate endDate);
 
 }

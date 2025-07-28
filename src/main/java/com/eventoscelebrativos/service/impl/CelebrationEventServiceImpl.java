@@ -8,7 +8,7 @@ import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
-import com.eventoscelebrativos.service.EventoCelebrativoService;
+import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,19 +26,19 @@ import java.util.Map;
 
 
 @Service
-public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
+public class CelebrationEventServiceImpl implements CelebrationEventService {
 
     private final CelebrationEventRepository celebrationEventRepository;
     private final CelebrationEventMapper celebrationEventMapper;
 
-    public EventoCelebrativoServiceImpl(CelebrationEventRepository celebrationEventRepository, CelebrationEventMapper celebrationEventMapper) {
+    public CelebrationEventServiceImpl(CelebrationEventRepository celebrationEventRepository, CelebrationEventMapper celebrationEventMapper) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.celebrationEventMapper = celebrationEventMapper;
     }
 
     @Override
     @Transactional
-    public CelebrationEventResponseDTO criarEvento(CelebrationEventRequestDTO celebrationEventRequestDTO) {
+    public CelebrationEventResponseDTO createEvent(CelebrationEventRequestDTO celebrationEventRequestDTO) {
         CelebrationEvent celebrationEvent = celebrationEventMapper.toEntity(celebrationEventRequestDTO);
         celebrationEvent = celebrationEventRepository.save(celebrationEvent);
 
@@ -47,32 +47,32 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CelebrationEventResponseDTO> listarTodosEventos() {
-        List<CelebrationEvent> eventosCelebrativo = celebrationEventRepository.findAll();
-        return celebrationEventMapper.toDtoList(eventosCelebrativo);
+    public List<CelebrationEventResponseDTO> findAllEvents() {
+        List<CelebrationEvent> celebrationEvents = celebrationEventRepository.findAll();
+        return celebrationEventMapper.toDtoList(celebrationEvents);
     }
 
     @Override
-    public Page<EucharistScaleEventResponseDTO> listarEscalaMinsEucaristia(Pageable pageable, LocalDate dataInicial, LocalDate dataFinal) {
-        if (dataInicial == null || dataFinal == null || dataInicial.isAfter(dataFinal)) {
+    public Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate starDate, LocalDate endDate) {
+        if (starDate == null || endDate == null || starDate.isAfter(endDate)) {
             throw new BusinessException("As datas estão inválidas");
         }
 
-        Page<EucharistScaleEventProjection> eventoEscalaMinistrosProjection = celebrationEventRepository.buscarEscalaMinistro(pageable, dataInicial, dataFinal);
+        Page<EucharistScaleEventProjection> eucharistScaleEventProjections = celebrationEventRepository.findEucharistScale(pageable, starDate, endDate);
 
         Map<String, EucharistScaleEventResponseDTO> agrupado = new LinkedHashMap<>();
-        for (EucharistScaleEventProjection proj : eventoEscalaMinistrosProjection.getContent()) {
-            String chave = proj.getNomeEvento() + "|" + proj.getDataEvento() + "|" + proj.getHoraEvento();
+        for (EucharistScaleEventProjection proj : eucharistScaleEventProjections.getContent()) {
+            String chave = proj.getNameMassOrEvent() + "|" + proj.getEventDate() + "|" + proj.getEventTime();
 
             EucharistScaleEventResponseDTO dto = agrupado.computeIfAbsent(chave, k ->
                     new EucharistScaleEventResponseDTO(
-                            proj.getNomeEvento(),
-                            proj.getDataEvento(),
-                            proj.getHoraEvento(),
-                            proj.getNomeIgreja()
+                            proj.getNameMassOrEvent(),
+                            proj.getEventDate(),
+                            proj.getEventTime(),
+                            proj.getChurchName()
                     ));
 
-            dto.getNomeMinistros().add(proj.getNomeMinistro());
+            dto.getNameMinisters().add(proj.getNameMinisters());
         }
 
         List<EucharistScaleEventResponseDTO> dtoList = new ArrayList<>(agrupado.values());
@@ -87,7 +87,7 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
 
     @Override
     @Transactional(readOnly = true)
-    public CelebrationEventResponseDTO buscarEventoPorId(Long id) {
+    public CelebrationEventResponseDTO findEventById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
@@ -97,7 +97,7 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
 
     @Override
     @Transactional
-    public CelebrationEventResponseDTO atualizarEvento(Long id, CelebrationEventRequestDTO celebrationEventRequestDTO) {
+    public CelebrationEventResponseDTO updateEvent(Long id, CelebrationEventRequestDTO celebrationEventRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
@@ -109,7 +109,7 @@ public class EventoCelebrativoServiceImpl implements EventoCelebrativoService {
 
     @Override
     @Transactional
-    public void deletarEvento(Long id) {
+    public void deleteEventById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }

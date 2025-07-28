@@ -5,7 +5,7 @@ import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.ReaderRepository;
-import com.eventoscelebrativos.service.LeitorService;
+import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -14,12 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-public class LeitorServiceImpl implements LeitorService {
+public class ReaderServiceImpl implements ReaderService {
 
     private final ReaderRepository readerRepository;
     private final ReaderMapper readerMapper;
 
-    public LeitorServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper) {
+    public ReaderServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper) {
         this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
     }
@@ -27,7 +27,7 @@ public class LeitorServiceImpl implements LeitorService {
 
     @Override
     @Transactional
-    public ReaderResponseDTO criarLeitor(ReaderRequestDTO readerRequestDTO) {
+    public ReaderResponseDTO createReader(ReaderRequestDTO readerRequestDTO) {
         Reader reader = readerMapper.toEntity(readerRequestDTO);
         reader = readerRepository.save(reader);
         return readerMapper.toDto(reader);
@@ -35,14 +35,14 @@ public class LeitorServiceImpl implements LeitorService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReaderResponseDTO> listarTodosLeitor() {
+    public List<ReaderResponseDTO> findAllReaders() {
         List<Reader> reader = readerRepository.findAll();
         return readerMapper.toDtoList(reader);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ReaderResponseDTO buscarLeitorPorId(Long id) {
+    public ReaderResponseDTO findReaderById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positvio e não nulo");
         }
@@ -52,12 +52,12 @@ public class LeitorServiceImpl implements LeitorService {
 
     @Override
     @Transactional
-    public ReaderResponseDTO atualizarLeitor(Long id, ReaderRequestDTO readerRequestDTO) {
+    public ReaderResponseDTO updateReader(Long id, ReaderRequestDTO readerRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
        Reader reader = readerRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Leitor", id));
-       readerMapper.atualizarLeitorFromDto(readerRequestDTO, reader);
+       readerMapper.updateReaderFromDto(readerRequestDTO, reader);
        Reader readerSalvo = readerRepository.save(reader);
 
         return readerMapper.toDto(readerSalvo);
@@ -65,7 +65,7 @@ public class LeitorServiceImpl implements LeitorService {
 
     @Override
     @Transactional
-    public void deletarLeitor(Long id) {
+    public void deleteReaderById(Long id) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
