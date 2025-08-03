@@ -56,4 +56,8 @@ public class Role implements GrantedAuthority {
     public void setAuthority(String authority) {
         this.authority = authority;
     }
+
+    public Set<Person> getPeople() {
+        return people;
+    }
 }

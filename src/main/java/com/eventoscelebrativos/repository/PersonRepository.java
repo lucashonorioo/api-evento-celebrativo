@@ -5,17 +5,19 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
     @Query(nativeQuery = true, value = """
-         SELECT tb_pessoa.telefone AS username, tb_pessoa.password, tb_role.id
+         SELECT tb_person.phone_number AS username, tb_person.password, tb_role.id
          AS roleId, tb_role.authority
-         FROM tb_pessoa
-         INNER JOIN tb_pessoa_role ON tb_pessoa.id = tb_pessoa_role.pessoa_id
-         INNER JOIN tb_role ON tb_role.id = tb_pessoa_role.role_id
-         WHERE tb_pessoa.telefone = :telefone
+         FROM tb_person
+         INNER JOIN tb_person_role ON tb_person.id = tb_person_role.person_id
+         INNER JOIN tb_role ON tb_role.id = tb_person_role.role_id
+         WHERE tb_person.phone_number = :phoneNumber
          """)
-    Person findByTelefone(String telefone);
+    Optional<Person> findByPhoneNumber(String phoneNumber);
 
 }

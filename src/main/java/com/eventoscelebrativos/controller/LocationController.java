@@ -23,32 +23,32 @@ public class LocationController {
 
     @PostMapping
     public ResponseEntity<LocationResponseDTO> criarLocal(@Valid @RequestBody LocationRequestDTO locationRequestDTO){
-        LocationResponseDTO locationResponseDTO = locationService.criarLocal(locationRequestDTO);
+        LocationResponseDTO locationResponseDTO = locationService.createLocation(locationRequestDTO);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(locationResponseDTO.getId()).toUri();
         return ResponseEntity.created(location).body(locationResponseDTO);
     }
 
     @GetMapping
     public ResponseEntity<List<LocationResponseDTO>> listarTodosLocais(){
-        List<LocationResponseDTO> locaisResponseDTO = locationService.listarTodosLocais();
+        List<LocationResponseDTO> locaisResponseDTO = locationService.findAllLocations();
         return ResponseEntity.ok().body(locaisResponseDTO);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<LocationResponseDTO> buscarLocalPorId(@PathVariable Long id){
-        LocationResponseDTO locationResponseDTO = locationService.buscarLocalPorId(id);
+        LocationResponseDTO locationResponseDTO = locationService.findLocationById(id);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<LocationResponseDTO> atualizarLocal(@PathVariable Long id, @Valid @RequestBody LocationRequestDTO locationRequestDTO){
-        LocationResponseDTO locationResponseDTO = locationService.atualizarLocal(id, locationRequestDTO);
+        LocationResponseDTO locationResponseDTO = locationService.updateLocation(id, locationRequestDTO);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarLocal(@PathVariable Long id){
-        locationService.deletarLocal(id);
+        locationService.deleteLocationById(id);
         return ResponseEntity.noContent().build();
     }
 
