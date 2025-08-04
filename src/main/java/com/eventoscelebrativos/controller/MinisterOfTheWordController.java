@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/ministrosDaPalavra")
+@RequestMapping(value = "/ministrosDaPalavra")
 public class MinisterOfTheWordController {
 
     private final MinisterOfTheWordService ministerOfTheWordService;
@@ -34,19 +34,19 @@ public class MinisterOfTheWordController {
         return ResponseEntity.ok().body(ministrosDaPalavraResponseDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<MinisterOfTheWordResponseDTO> findMinisterOfTheWordById(@PathVariable Long id){
         MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.findMinisterOfTheWordById(id);
         return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<MinisterOfTheWordResponseDTO> updateMinisterOfTheWord(@PathVariable Long id, @Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
         MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.updateMinisterOfTheWord(id, ministerOfTheWordRequestDTO);
         return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteMinisterOfTheWord(@PathVariable Long id){
         ministerOfTheWordService.deleteMinisterOfTheWord(id);
         return ResponseEntity.noContent().build();

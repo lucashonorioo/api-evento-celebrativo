@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/eventos")
+@RequestMapping(value = "/eventos")
 public class CelebrationEventController {
 
     private final CelebrationEventService celebrationEventService;
@@ -38,14 +38,14 @@ public class CelebrationEventController {
         List<CelebrationEventResponseDTO> eventosCelebrativosResponseDTO = celebrationEventService.findAllEvents();
         return ResponseEntity.ok().body(eventosCelebrativosResponseDTO);
     }
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<CelebrationEventResponseDTO> findEventById(@PathVariable Long id){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.findEventById(id);
         return ResponseEntity.ok().body(celebrationEventResponseDTO);
 
     }
 
-    @GetMapping("/escala/eucaristia")
+    @GetMapping(value = "/escala/eucaristia")
     public ResponseEntity<Page<EucharistScaleEventResponseDTO>> findEucharistScale(
             @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
             @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
@@ -57,13 +57,13 @@ public class CelebrationEventController {
         return ResponseEntity.ok(eventoEscalaMinistrosResponseDTOS);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<CelebrationEventResponseDTO> updateEvent(@PathVariable Long id, @Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.updateEvent(id, celebrationEventRequestDTO);
         return ResponseEntity.ok().body(celebrationEventResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteEventById(@PathVariable Long id){
         celebrationEventService.deleteEventById(id);
         return ResponseEntity.noContent().build();

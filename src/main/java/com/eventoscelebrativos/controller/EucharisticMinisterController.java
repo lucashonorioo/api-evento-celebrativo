@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/ministrosDeEucaristia")
+@RequestMapping(value = "/ministrosDeEucaristia")
 public class EucharisticMinisterController {
 
     private final EucharisticMinisterService eucharisticMinisterService;
@@ -34,19 +34,19 @@ public class EucharisticMinisterController {
         return ResponseEntity.ok().body(ministrosDeEucaristiaResponseDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<EucharisticMinisterResponseDTO> findEucharisticMinistersById(@PathVariable Long id){
         EucharisticMinisterResponseDTO eucharisticMinisterResponseDTO = eucharisticMinisterService.findEucharisticMinistersById(id);
         return ResponseEntity.ok().body(eucharisticMinisterResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<EucharisticMinisterResponseDTO> updateEucharisticMinisters(@PathVariable Long id, @Valid @RequestBody EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO){
         EucharisticMinisterResponseDTO eucharisticMinisterResponseDTO = eucharisticMinisterService.updateEucharisticMinisters(id, eucharisticMinisterRequestDTO);
         return ResponseEntity.ok().body(eucharisticMinisterResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<EucharisticMinisterResponseDTO> deleteEucharisticMinisterById(@PathVariable Long id){
         eucharisticMinisterService.deleteEucharisticMinisterById(id);
         return ResponseEntity.noContent().build();

@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/comentaristas")
+@RequestMapping(value = "/comentaristas")
 public class CommentatorController {
 
     private final CommentatorService commentatorService;
@@ -34,19 +34,19 @@ public class CommentatorController {
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<CommentatorResponseDTO> findCommentatorById(@PathVariable Long id){
         CommentatorResponseDTO commentatorResponseDTO = commentatorService.findCommentatorById(id);
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<CommentatorResponseDTO> updateCommentator(@PathVariable Long id, @Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
         CommentatorResponseDTO commentatorResponseDTO = commentatorService.updateCommentator(id, commentatorRequestDTO);
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteCommentatorById(@PathVariable Long id){
         commentatorService.deleteCommentatorById(id);
         return ResponseEntity.noContent().build();

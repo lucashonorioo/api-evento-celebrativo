@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/leitores")
+@RequestMapping(value = "/leitores")
 public class ReaderController {
 
     private final ReaderService readerService;
@@ -34,19 +34,19 @@ public class ReaderController {
         return ResponseEntity.ok().body(leitoresResponseDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<ReaderResponseDTO> findReaderById(@PathVariable Long id){
         ReaderResponseDTO readerResponseDTO = readerService.findReaderById(id);
         return ResponseEntity.ok().body(readerResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<ReaderResponseDTO> updateReader(@PathVariable Long id, @Valid @RequestBody ReaderRequestDTO readerRequestDTO){
         ReaderResponseDTO readerResponseDTO = readerService.updateReader(id, readerRequestDTO);
         return ResponseEntity.ok().body(readerResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteReaderById(@PathVariable Long id){
         readerService.deleteReaderById(id);
         return ResponseEntity.noContent().build();

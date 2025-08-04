@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/locais")
+@RequestMapping(value = "/locais")
 public class LocationController {
 
     private final LocationService locationService;
@@ -34,19 +34,19 @@ public class LocationController {
         return ResponseEntity.ok().body(locaisResponseDTO);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> buscarLocalPorId(@PathVariable Long id){
         LocationResponseDTO locationResponseDTO = locationService.findLocationById(id);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> atualizarLocal(@PathVariable Long id, @Valid @RequestBody LocationRequestDTO locationRequestDTO){
         LocationResponseDTO locationResponseDTO = locationService.updateLocation(id, locationRequestDTO);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deletarLocal(@PathVariable Long id){
         locationService.deleteLocationById(id);
         return ResponseEntity.noContent().build();

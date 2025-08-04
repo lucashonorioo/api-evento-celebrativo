@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/padres")
+@RequestMapping(value = "/padres")
 public class PriestController {
 
     private final PriestService priestService;
@@ -34,19 +34,19 @@ public class PriestController {
         return ResponseEntity.ok().body(padresResponseDTO);
     }
 
-    @PostMapping("/{id}")
+    @PostMapping(value = "/{id}")
     public ResponseEntity<PriestResponseDTO> findPriestById(@PathVariable Long id){
         PriestResponseDTO priestResponseDTO = priestService.findPriestById(id);
         return ResponseEntity.ok().body(priestResponseDTO);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}")
     public ResponseEntity<PriestResponseDTO> updatePriest(@PathVariable Long id, @Valid @RequestBody PriestRequestDTO priestRequestDTO){
         PriestResponseDTO priestResponseDTO = priestService.updatePriest(id, priestRequestDTO);
         return ResponseEntity.ok().body(priestResponseDTO);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deletePriestById(@PathVariable Long id){
         priestService.deletePriestById(id);
         return ResponseEntity.noContent().build();
