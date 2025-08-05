@@ -82,8 +82,8 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 				.collect(Collectors.toSet());
 
 		Set<String> authorizedScopes = new HashSet<>(requestedScopes);
-		authorizedScopes.retainAll(registeredClient.getScopes()); // Interseção com scopes do cliente registrado
-		authorizedScopes.retainAll(availableScopes); // Interseção com scopes do usuário (authorities)
+		authorizedScopes.retainAll(registeredClient.getScopes());
+		authorizedScopes.retainAll(availableScopes);
 
 		if (authorizedScopes.isEmpty() && !requestedScopes.isEmpty()) {
 			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_SCOPE, "Invalid scope(s) for user", ERROR_URI));
@@ -133,7 +133,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		OAuth2Authorization authorization = authorizationBuilder.build();
 		this.authorizationService.save(authorization);
 
-		return new OAuth2AccessTokenAuthenticationToken(registeredClient, userAuthentication, accessToken); 
+		return new OAuth2AccessTokenAuthenticationToken(registeredClient, userAuthentication, accessToken);
 	}
 
 	@Override

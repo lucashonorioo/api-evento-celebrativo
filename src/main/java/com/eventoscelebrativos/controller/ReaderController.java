@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.service.ReaderService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -21,6 +22,7 @@ public class ReaderController {
         this.readerService = readerService;
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<ReaderResponseDTO> createReader(@Valid @RequestBody ReaderRequestDTO readerRequestDTO){
         ReaderResponseDTO readerResponseDTO = readerService.createReader(readerRequestDTO);
@@ -34,18 +36,21 @@ public class ReaderController {
         return ResponseEntity.ok().body(leitoresResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<ReaderResponseDTO> findReaderById(@PathVariable Long id){
         ReaderResponseDTO readerResponseDTO = readerService.findReaderById(id);
         return ResponseEntity.ok().body(readerResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
     public ResponseEntity<ReaderResponseDTO> updateReader(@PathVariable Long id, @Valid @RequestBody ReaderRequestDTO readerRequestDTO){
         ReaderResponseDTO readerResponseDTO = readerService.updateReader(id, readerRequestDTO);
         return ResponseEntity.ok().body(readerResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteReaderById(@PathVariable Long id){
         readerService.deleteReaderById(id);

@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.service.CommentatorService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -21,6 +22,7 @@ public class CommentatorController {
         this.commentatorService = commentatorService;
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<CommentatorResponseDTO> createCommentator(@Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
         CommentatorResponseDTO commentatorResponseDTO = commentatorService.createCommentator(commentatorRequestDTO);
@@ -34,18 +36,21 @@ public class CommentatorController {
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<CommentatorResponseDTO> findCommentatorById(@PathVariable Long id){
         CommentatorResponseDTO commentatorResponseDTO = commentatorService.findCommentatorById(id);
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
     public ResponseEntity<CommentatorResponseDTO> updateCommentator(@PathVariable Long id, @Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
         CommentatorResponseDTO commentatorResponseDTO = commentatorService.updateCommentator(id, commentatorRequestDTO);
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteCommentatorById(@PathVariable Long id){
         commentatorService.deleteCommentatorById(id);

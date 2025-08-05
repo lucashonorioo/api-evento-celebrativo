@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.LocationResponseDTO;
 import com.eventoscelebrativos.service.LocationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -21,6 +22,7 @@ public class LocationController {
         this.locationService = locationService;
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<LocationResponseDTO> criarLocal(@Valid @RequestBody LocationRequestDTO locationRequestDTO){
         LocationResponseDTO locationResponseDTO = locationService.createLocation(locationRequestDTO);
@@ -34,18 +36,21 @@ public class LocationController {
         return ResponseEntity.ok().body(locaisResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> buscarLocalPorId(@PathVariable Long id){
         LocationResponseDTO locationResponseDTO = locationService.findLocationById(id);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> atualizarLocal(@PathVariable Long id, @Valid @RequestBody LocationRequestDTO locationRequestDTO){
         LocationResponseDTO locationResponseDTO = locationService.updateLocation(id, locationRequestDTO);
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deletarLocal(@PathVariable Long id){
         locationService.deleteLocationById(id);

@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -21,6 +22,7 @@ public class MinisterOfTheWordController {
         this.ministerOfTheWordService = ministerOfTheWordService;
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<MinisterOfTheWordResponseDTO> createMinisterOfTheWord(@Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
         MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.createMinisterOfTheWord(ministerOfTheWordRequestDTO);
@@ -34,18 +36,21 @@ public class MinisterOfTheWordController {
         return ResponseEntity.ok().body(ministrosDaPalavraResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<MinisterOfTheWordResponseDTO> findMinisterOfTheWordById(@PathVariable Long id){
         MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.findMinisterOfTheWordById(id);
         return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
     public ResponseEntity<MinisterOfTheWordResponseDTO> updateMinisterOfTheWord(@PathVariable Long id, @Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
         MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.updateMinisterOfTheWord(id, ministerOfTheWordRequestDTO);
         return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deleteMinisterOfTheWord(@PathVariable Long id){
         ministerOfTheWordService.deleteMinisterOfTheWord(id);
