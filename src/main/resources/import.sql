@@ -1,22 +1,23 @@
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Alice Lima', '34983246978', '1989-08-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Alice Lima', '34983246978', '1989-08-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Laura Alves', '34998563215', '2006-07-11', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Laura Alves', '34998563215', '2006-07-11', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Mariana Ferraz', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharist_minister');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharist_minister');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharist_minister');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Mariana Ferraz', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, type) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
+INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
+
 
 
 INSERT INTO tb_role (authority) VALUES ('ROLE_OPERATOR');

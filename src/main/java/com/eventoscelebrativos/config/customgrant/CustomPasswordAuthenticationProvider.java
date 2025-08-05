@@ -6,9 +6,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -39,14 +39,11 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 	private final UserDetailsService userDetailsService;
 	private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
 	private final PasswordEncoder passwordEncoder;
-	private String username = "";
-	private String password = "";
-	private Set<String> authorizedScopes = new HashSet<>();
 
 	public CustomPasswordAuthenticationProvider(OAuth2AuthorizationService authorizationService,
-			OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator, 
-			UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-		
+												OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
+												UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+
 		Assert.notNull(authorizationService, "authorizationService cannot be null");
 		Assert.notNull(tokenGenerator, "TokenGenerator cannot be null");
 		Assert.notNull(userDetailsService, "UserDetailsService cannot be null");
@@ -56,56 +53,63 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		this.userDetailsService = userDetailsService;
 		this.passwordEncoder = passwordEncoder;
 	}
-	
+
 	@Override
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-		
+
 		CustomPasswordAuthenticationToken customPasswordAuthenticationToken = (CustomPasswordAuthenticationToken) authentication;
 		OAuth2ClientAuthenticationToken clientPrincipal = getAuthenticatedClientElseThrowInvalidClient(customPasswordAuthenticationToken);
 		RegisteredClient registeredClient = clientPrincipal.getRegisteredClient();
-		username = customPasswordAuthenticationToken.getUsername();
-		password = customPasswordAuthenticationToken.getPassword();	
-		
-		UserDetails user = null;
+
+		String username = customPasswordAuthenticationToken.getUsername();
+		String password = customPasswordAuthenticationToken.getPassword();
+
+		UserDetails userDetails = null;
 		try {
-			user = userDetailsService.loadUserByUsername(username);
+			userDetails = userDetailsService.loadUserByUsername(username);
 		} catch (UsernameNotFoundException e) {
-			throw new OAuth2AuthenticationException("Invalid credentials");
+			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, "Invalid credentials", ERROR_URI));
 		}
-				
-		if (!passwordEncoder.matches(password, user.getPassword()) || !user.getUsername().equals(username)) {
-			throw new OAuth2AuthenticationException("Invalid credentials");
+
+		if (!passwordEncoder.matches(password, userDetails.getPassword())) {
+			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, "Invalid credentials", ERROR_URI));
 		}
-		
-		authorizedScopes = user.getAuthorities().stream()
+
+		Set<String> requestedScopes = customPasswordAuthenticationToken.getScopes();
+
+		Set<String> availableScopes = userDetails.getAuthorities().stream()
 				.map(scope -> scope.getAuthority())
-				.filter(scope -> registeredClient.getScopes().contains(scope))
 				.collect(Collectors.toSet());
-		
-		//-----------Create a new Security Context Holder Context----------
-		OAuth2ClientAuthenticationToken oAuth2ClientAuthenticationToken = (OAuth2ClientAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
-		CustomUserAuthorities customPasswordUser = new CustomUserAuthorities(username, user.getAuthorities());
-		oAuth2ClientAuthenticationToken.setDetails(customPasswordUser);
-		
-		var newcontext = SecurityContextHolder.createEmptyContext();
-		newcontext.setAuthentication(oAuth2ClientAuthenticationToken);
-		SecurityContextHolder.setContext(newcontext);		
-		
+
+		Set<String> authorizedScopes = new HashSet<>(requestedScopes);
+		authorizedScopes.retainAll(registeredClient.getScopes()); // Interseção com scopes do cliente registrado
+		authorizedScopes.retainAll(availableScopes); // Interseção com scopes do usuário (authorities)
+
+		if (authorizedScopes.isEmpty() && !requestedScopes.isEmpty()) {
+			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_SCOPE, "Invalid scope(s) for user", ERROR_URI));
+		}
+
+		UsernamePasswordAuthenticationToken userAuthentication = new UsernamePasswordAuthenticationToken(
+				userDetails,
+				null,
+				userDetails.getAuthorities()
+		);
+
 		//-----------TOKEN BUILDERS----------
 		DefaultOAuth2TokenContext.Builder tokenContextBuilder = DefaultOAuth2TokenContext.builder()
 				.registeredClient(registeredClient)
-				.principal(clientPrincipal)
+				.principal(userAuthentication)
 				.authorizationServerContext(AuthorizationServerContextHolder.getContext())
 				.authorizedScopes(authorizedScopes)
 				.authorizationGrantType(new AuthorizationGrantType("password"))
 				.authorizationGrant(customPasswordAuthenticationToken);
-		
+
 		OAuth2Authorization.Builder authorizationBuilder = OAuth2Authorization.withRegisteredClient(registeredClient)
-				.attribute(Principal.class.getName(), clientPrincipal)
-				.principalName(clientPrincipal.getName())
+				.attribute(Principal.class.getName(), userAuthentication)
+				.principalName(userAuthentication.getName())
 				.authorizationGrantType(new AuthorizationGrantType("password"))
 				.authorizedScopes(authorizedScopes);
-		
+
 		//-----------ACCESS TOKEN----------
 		OAuth2TokenContext tokenContext = tokenContextBuilder.tokenType(OAuth2TokenType.ACCESS_TOKEN).build();
 		OAuth2Token generatedAccessToken = this.tokenGenerator.generate(tokenContext);
@@ -118,17 +122,18 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER,
 				generatedAccessToken.getTokenValue(), generatedAccessToken.getIssuedAt(),
 				generatedAccessToken.getExpiresAt(), tokenContext.getAuthorizedScopes());
+
 		if (generatedAccessToken instanceof ClaimAccessor) {
 			authorizationBuilder.token(accessToken, (metadata) ->
 					metadata.put(OAuth2Authorization.Token.CLAIMS_METADATA_NAME, ((ClaimAccessor) generatedAccessToken).getClaims()));
 		} else {
 			authorizationBuilder.accessToken(accessToken);
 		}
-				
+
 		OAuth2Authorization authorization = authorizationBuilder.build();
 		this.authorizationService.save(authorization);
-		
-		return new OAuth2AccessTokenAuthenticationToken(registeredClient, clientPrincipal, accessToken);
+
+		return new OAuth2AccessTokenAuthenticationToken(registeredClient, userAuthentication, accessToken); 
 	}
 
 	@Override
@@ -137,7 +142,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 	}
 
 	private static OAuth2ClientAuthenticationToken getAuthenticatedClientElseThrowInvalidClient(Authentication authentication) {
-		
+
 		OAuth2ClientAuthenticationToken clientPrincipal = null;
 		if (OAuth2ClientAuthenticationToken.class.isAssignableFrom(authentication.getPrincipal().getClass())) {
 			clientPrincipal = (OAuth2ClientAuthenticationToken) authentication.getPrincipal();
@@ -146,5 +151,5 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 			return clientPrincipal;
 		}
 		throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
-	}	
+	}
 }

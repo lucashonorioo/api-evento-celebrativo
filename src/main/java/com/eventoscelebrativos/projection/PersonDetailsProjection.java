@@ -1,6 +1,6 @@
 package com.eventoscelebrativos.projection;
 
-public interface PessoaDetailsProjection {
+public interface PersonDetailsProjection {
 
     String getUsername();
     String getPassword();

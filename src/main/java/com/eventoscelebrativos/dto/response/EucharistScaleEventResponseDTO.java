@@ -30,7 +30,7 @@ public class EucharistScaleEventResponseDTO {
         eventDate = celebrationEvent.getEventDate();
         eventTime = celebrationEvent.getEventTime();
         churchName = celebrationEvent.getLocations().get(0).getChurchName();
-        nameMinisters = celebrationEvent.getPeople().stream().filter(p -> "eucharistic_minister".equals(p.getType())).map(Person::getName).toList();
+        nameMinisters = celebrationEvent.getPeople().stream().filter(p -> "eucharistic_minister".equals(p.getPersonType())).map(Person::getName).toList();
     }
 
     public String getNameMassOrEvent() {

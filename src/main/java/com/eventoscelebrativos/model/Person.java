@@ -11,7 +11,7 @@ import java.util.*;
 @Entity
 @Table(name = "tb_person")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "type", discriminatorType = DiscriminatorType.STRING)
+@DiscriminatorColumn(name = "person_type", discriminatorType = DiscriminatorType.STRING)
 public abstract class Person implements Serializable, UserDetails {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -27,8 +27,8 @@ public abstract class Person implements Serializable, UserDetails {
     private String password;
 
 
-    @Column(name = "type", insertable = false, updatable = false)
-    private String type;
+    @Column(name = "person_type", insertable = false, updatable = false)
+    private String personType;
 
     @ManyToMany(mappedBy = "people")
     private List<CelebrationEvent> celebrationEvent = new ArrayList<>();
@@ -44,13 +44,13 @@ public abstract class Person implements Serializable, UserDetails {
 
     }
 
-    public Person(Long id, String name, String phoneNumber, LocalDate birthdayDate, String password, String type) {
+    public Person(Long id, String name, String phoneNumber, LocalDate birthdayDate, String password, String personType) {
         this.id = id;
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.birthdayDate = birthdayDate;
         this.password = password;
-        this.type = type;
+        this.personType = personType;
     }
 
     @Override
@@ -97,12 +97,12 @@ public abstract class Person implements Serializable, UserDetails {
         this.birthdayDate = birthdayDate;
     }
 
-    public String getType() {
-        return type;
+    public String getPersonType() {
+        return personType;
     }
 
-    public void setType(String type) {
-        this.type = type;
+    public void setPersonType(String personType) {
+        this.personType = personType;
     }
 
     public String getPassword() { return password;
