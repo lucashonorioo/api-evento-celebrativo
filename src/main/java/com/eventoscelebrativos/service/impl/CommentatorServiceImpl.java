@@ -76,13 +76,10 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        try{
-            commentatorRepository.deleteById(id);
-        }
-        catch (EmptyResultDataAccessException e){
+        if(!commentatorRepository.existsById(id)){
             throw new ResourceNotFoundException("Comentarista", id);
         }
-
+            commentatorRepository.deleteById(id);
     }
 
 }

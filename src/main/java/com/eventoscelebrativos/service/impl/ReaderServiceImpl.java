@@ -75,10 +75,10 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try {
-            readerRepository.deleteById(id);
-        }catch (EmptyResultDataAccessException e){
+        if(!readerRepository.existsById(id)){
             throw new ResourceNotFoundException("Leitor", id);
         }
+        readerRepository.deleteById(id);
+
     }
 }

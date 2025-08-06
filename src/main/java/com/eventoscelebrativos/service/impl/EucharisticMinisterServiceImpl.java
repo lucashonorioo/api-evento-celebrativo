@@ -80,10 +80,10 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try {
-            eucharisticMinisterRepository.deleteById(id);
-        }catch (EmptyResultDataAccessException e) {
+        if(!eucharisticMinisterRepository.existsById(id)){
             throw new ResourceNotFoundException("Ministro de Eucaristia", id);
         }
+        eucharisticMinisterRepository.deleteById(id);
+
     }
 }

@@ -76,11 +76,11 @@ public class LocationServiceImpl implements LocationService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        if(!locationRepository.existsById(id)){
+            throw new ResourceNotFoundException("Local", id);
+        }
         try {
             locationRepository.deleteById(id);
-        }
-        catch (EmptyResultDataAccessException e){
-            throw new ResourceNotFoundException("Local", id);
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não foi possivel deletar o local, possui outras referencias no sistema");

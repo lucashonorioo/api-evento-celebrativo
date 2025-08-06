@@ -119,11 +119,11 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        if(!celebrationEventRepository.existsById(id)){
+            throw new ResourceNotFoundException("Evento celebrativo", id);
+        }
         try{
             celebrationEventRepository.deleteById(id);
-        }
-        catch (EmptyResultDataAccessException e){
-            throw new ResourceNotFoundException("Evento celebrativo", id);
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não foi possivel deletar evento, possui outras referencias no sistema");

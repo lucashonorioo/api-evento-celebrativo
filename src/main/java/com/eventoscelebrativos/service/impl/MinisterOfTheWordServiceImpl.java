@@ -78,11 +78,9 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try {
-            ministerOfTheWordRepository.deleteById(id);
-        }catch (EmptyResultDataAccessException e){
+        if(!ministerOfTheWordRepository.existsById(id)){
             throw new ResourceNotFoundException("Ministro da Palavra", id);
         }
-
+        ministerOfTheWordRepository.deleteById(id);
     }
 }

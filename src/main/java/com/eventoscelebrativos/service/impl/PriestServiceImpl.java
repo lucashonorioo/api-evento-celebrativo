@@ -79,10 +79,10 @@ public class PriestServiceImpl implements PriestService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        try {
-            priestRepository.deleteById(id);
-        }catch (EmptyResultDataAccessException e){
+        if(!priestRepository.existsById(id)){
             throw new ResourceNotFoundException("Padre", id);
         }
+        priestRepository.deleteById(id);
+
     }
 }
