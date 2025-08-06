@@ -19,8 +19,7 @@ Este projeto **está em fase de desenvolvimento** e será expandido ao longo do 
   - H2 (para o perfil de `test`)
   - PostgreSQL (para o perfil de `dev`)
 - **Spring Data JPA**
-- **Spring Security** *(planejado para futuras versões)*
-
+- **Spring Security** 
 ---
 
 
