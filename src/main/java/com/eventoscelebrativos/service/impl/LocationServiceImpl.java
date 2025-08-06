@@ -9,7 +9,9 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.service.LocationService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,11 +59,15 @@ public class LocationServiceImpl implements LocationService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Location location = locationRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Local", id));
-        locationMapper.updateLocationFromDto(locationRequestDTO, location);
-        Location locationSalvo = locationRepository.save(location);
+        try {
+            Location location = locationRepository.getReferenceById(id);
+            locationMapper.updateLocationFromDto(locationRequestDTO, location);
+            Location locationSalvo = locationRepository.save(location);
 
-        return locationMapper.toDto(locationSalvo);
+            return locationMapper.toDto(locationSalvo);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Local", id);
+        }
     }
 
     @Override
@@ -70,11 +76,11 @@ public class LocationServiceImpl implements LocationService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(!locationRepository.existsById(id)){
-            throw new ResourceNotFoundException("Local", id);
-        }
         try {
             locationRepository.deleteById(id);
+        }
+        catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Local", id);
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não foi possivel deletar o local, possui outras referencias no sistema");

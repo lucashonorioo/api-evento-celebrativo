@@ -12,6 +12,8 @@ import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +62,15 @@ public class PriestServiceImpl implements PriestService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Priest priest = priestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
-        priestMapper.updatePriestFromDto(priestRequestDTO, priest);
-        Priest priestSalvo = priestRepository.save(priest);
-        return priestMapper.toDto(priestSalvo);
+        try {
+            Priest priest = priestRepository.getReferenceById(id);
+            priestMapper.updatePriestFromDto(priestRequestDTO, priest);
+            Priest priestSalvo = priestRepository.save(priest);
+            return priestMapper.toDto(priestSalvo);
+
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Padre", id);
+        }
     }
 
     @Override
@@ -72,7 +79,10 @@ public class PriestServiceImpl implements PriestService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Priest priest = priestRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Padre", id));
-        priestRepository.deleteById(id);
+        try {
+            priestRepository.deleteById(id);
+        }catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Padre", id);
+        }
     }
 }

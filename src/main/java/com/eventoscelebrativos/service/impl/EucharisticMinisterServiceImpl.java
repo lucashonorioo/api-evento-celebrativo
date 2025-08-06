@@ -11,6 +11,8 @@ import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,12 +63,15 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.findById(id).orElseThrow(
-                () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
-        eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterRequestDTO, eucharisticMinister);
-        EucharisticMinister eucharisticMinisterSalvo = eucharisticMinisterRepository.save(eucharisticMinister);
+        try {
+            EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.getReferenceById(id);
+            eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterRequestDTO, eucharisticMinister);
+            EucharisticMinister eucharisticMinisterSalvo = eucharisticMinisterRepository.save(eucharisticMinister);
 
-        return eucharisticMinisterMapper.toDto(eucharisticMinisterSalvo);
+            return eucharisticMinisterMapper.toDto(eucharisticMinisterSalvo);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Ministro de Eucaristia", id);
+        }
     }
 
     @Override
@@ -75,8 +80,10 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.findById(id).orElseThrow(
-                () -> new ResourceNotFoundException("Ministro De Eucaristia", id));
-        eucharisticMinisterRepository.deleteById(id);
+        try {
+            eucharisticMinisterRepository.deleteById(id);
+        }catch (EmptyResultDataAccessException e) {
+            throw new ResourceNotFoundException("Ministro de Eucaristia", id);
+        }
     }
 }

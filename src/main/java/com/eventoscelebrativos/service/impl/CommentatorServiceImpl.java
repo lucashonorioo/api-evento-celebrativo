@@ -3,11 +3,15 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,11 +59,15 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Commentator commentator = commentatorRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
-        commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, commentator);
-        Commentator commentatorSalvo = commentatorRepository.save(commentator);
+        try {
+            Commentator commentator = commentatorRepository.getReferenceById(id);
+            commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, commentator);
+            Commentator commentatorSalvo = commentatorRepository.save(commentator);
 
-        return commentatorMapper.toDto(commentatorSalvo);
+            return commentatorMapper.toDto(commentatorSalvo);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Comentarista", id);
+        }
     }
 
     @Override
@@ -68,8 +76,13 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Commentator commentator = commentatorRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Comentarista", id));
-        commentatorRepository.deleteById(id);
+        try{
+            commentatorRepository.deleteById(id);
+        }
+        catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Comentarista", id);
+        }
+
     }
 
 }

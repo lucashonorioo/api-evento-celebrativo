@@ -11,6 +11,8 @@ import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +62,14 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
-        MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
-        return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
+        try {
+            MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.getReferenceById(id);
+            ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
+            MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
+            return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Ministro da Palavra", id);
+        }
     }
 
     @Override
@@ -72,7 +78,11 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinisterOfTheWord ministerOfTheWordOptional = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        ministerOfTheWordRepository.deleteById(id);
+        try {
+            ministerOfTheWordRepository.deleteById(id);
+        }catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Ministro da Palavra", id);
+        }
+
     }
 }

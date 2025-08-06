@@ -11,7 +11,9 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -101,10 +103,14 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        CelebrationEvent celebrationEvent = celebrationEventRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Evento celebrativo", id));
-        celebrationEvent = celebrationEventRepository.save(celebrationEvent);
+        try{
+            CelebrationEvent celebrationEvent = celebrationEventRepository.getReferenceById(id);
+            celebrationEvent = celebrationEventRepository.save(celebrationEvent);
 
-        return celebrationEventMapper.toDto(celebrationEvent);
+            return celebrationEventMapper.toDto(celebrationEvent);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Evento celebrativo", id);
+        }
     }
 
     @Override
@@ -113,11 +119,11 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(!celebrationEventRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Evento celebrativo", id);
-        }
         try{
             celebrationEventRepository.deleteById(id);
+        }
+        catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Evento celebrativo", id);
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não foi possivel deletar evento, possui outras referencias no sistema");

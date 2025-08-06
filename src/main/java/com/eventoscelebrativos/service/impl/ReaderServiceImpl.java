@@ -8,6 +8,8 @@ import com.eventoscelebrativos.repository.ReaderRepository;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,11 +58,15 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-       Reader reader = readerRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Leitor", id));
-       readerMapper.updateReaderFromDto(readerRequestDTO, reader);
-       Reader readerSalvo = readerRepository.save(reader);
+        try {
+            Reader reader = readerRepository.getReferenceById(id);
+            readerMapper.updateReaderFromDto(readerRequestDTO, reader);
+            Reader readerSalvo = readerRepository.save(reader);
 
-        return readerMapper.toDto(readerSalvo);
+            return readerMapper.toDto(readerSalvo);
+        }catch (EntityNotFoundException e){
+            throw new ResourceNotFoundException("Leitor", id);
+        }
     }
 
     @Override
@@ -69,7 +75,10 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Reader reader = readerRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Leitor", id));
-        readerRepository.deleteById(id);
+        try {
+            readerRepository.deleteById(id);
+        }catch (EmptyResultDataAccessException e){
+            throw new ResourceNotFoundException("Leitor", id);
+        }
     }
 }
