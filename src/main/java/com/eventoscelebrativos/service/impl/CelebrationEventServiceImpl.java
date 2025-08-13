@@ -13,7 +13,6 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -21,10 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -55,35 +53,28 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     }
 
     @Override
-    public Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate starDate, LocalDate endDate) {
-        if (starDate == null || endDate == null || starDate.isAfter(endDate)) {
+    public Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate startDate , LocalDate endDate) {
+        if (startDate  == null || endDate == null || startDate .isAfter(endDate)) {
             throw new BusinessException("As datas estão inválidas");
         }
 
-        Page<EucharistScaleEventProjection> eucharistScaleEventProjections = celebrationEventRepository.findEucharistScale(pageable, starDate, endDate);
+        Page<EucharistScaleEventProjection> projections = celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
 
-        Map<String, EucharistScaleEventResponseDTO> agrupado = new LinkedHashMap<>();
-        for (EucharistScaleEventProjection proj : eucharistScaleEventProjections.getContent()) {
-            String chave = proj.getNameMassOrEvent() + "|" + proj.getEventDate() + "|" + proj.getEventTime();
+        Map<Object, List<EucharistScaleEventProjection>> groupedByEvent = projections.stream()
+                .collect(Collectors.groupingBy(p -> p.getNameMassOrEvent() + p.getEventDate() + p.getEventTime()));
 
-            EucharistScaleEventResponseDTO dto = agrupado.computeIfAbsent(chave, k ->
-                    new EucharistScaleEventResponseDTO(
-                            proj.getNameMassOrEvent(),
-                            proj.getEventDate(),
-                            proj.getEventTime(),
-                            proj.getChurchName()
-                    ));
+        List<EucharistScaleEventResponseDTO> dtoList = groupedByEvent.values().stream().map(list -> {
+            EucharistScaleEventResponseDTO dto = new EucharistScaleEventResponseDTO(
+                    list.get(0).getNameMassOrEvent(),
+                    list.get(0).getEventDate(),
+                    list.get(0).getEventTime(),
+                    list.get(0).getChurchName()
+            );
+            dto.getNameMinisters().addAll(list.stream().map(EucharistScaleEventProjection::getMinisterName).toList());
+            return dto;
+        }).toList();
 
-            dto.getNameMinisters().add(proj.getNameMinisters());
-        }
-
-        List<EucharistScaleEventResponseDTO> dtoList = new ArrayList<>(agrupado.values());
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), dtoList.size());
-
-        List<EucharistScaleEventResponseDTO> pagedList = dtoList.subList(start, end);
-
-        return new PageImpl<>(pagedList, pageable, dtoList.size());
+        return new PageImpl<>(dtoList, pageable, projections.getTotalElements());
     }
 
 

@@ -13,7 +13,7 @@ public interface CelebrationEventService {
 
     CelebrationEventResponseDTO createEvent(CelebrationEventRequestDTO celebrationEventRequestDTO);
     List<CelebrationEventResponseDTO> findAllEvents();
-    Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate starDate, LocalDate endDate);
+    Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate startDate, LocalDate endDate);
     CelebrationEventResponseDTO findEventById(Long id);
     CelebrationEventResponseDTO updateEvent(Long id, CelebrationEventRequestDTO celebrationEventRequestDTO);
     void deleteEventById(Long id);

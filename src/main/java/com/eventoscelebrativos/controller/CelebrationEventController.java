@@ -52,12 +52,12 @@ public class CelebrationEventController {
     @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/escala/eucaristia")
     public ResponseEntity<Page<EucharistScaleEventResponseDTO>> findEucharistScale(
-            @RequestParam("dataInicial") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicial,
-            @RequestParam("dataFinal") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFinal,
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Pageable pageable
     ) {
         Page<EucharistScaleEventResponseDTO>  eventoEscalaMinistrosResponseDTOS =
-                celebrationEventService.findEucharistScale(pageable, dataInicial, dataFinal);
+                celebrationEventService.findEucharistScale(pageable, startDate, endDate);
 
         return ResponseEntity.ok(eventoEscalaMinistrosResponseDTOS);
     }
