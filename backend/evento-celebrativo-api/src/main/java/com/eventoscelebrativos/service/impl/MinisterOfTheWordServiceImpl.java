@@ -7,12 +7,14 @@ import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
+import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,14 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
     private final MinisterOfTheWordRepository ministerOfTheWordRepository;
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper) {
+    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
 
@@ -34,6 +40,14 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Transactional
     public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         MinisterOfTheWord ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
+
+        ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWord.getPassword()));
+
+        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
+
+        ministerOfTheWord.addRole(operatorRole);
+
         ministerOfTheWord = ministerOfTheWordRepository.save(ministerOfTheWord);
 
         return ministerOfTheWordMapper.toDto(ministerOfTheWord);
@@ -65,6 +79,9 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         try {
             MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.getReferenceById(id);
             ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
+
+            ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWord.getPassword()));
+
             MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
             return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
         }catch (EntityNotFoundException e){

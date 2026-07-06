@@ -20,7 +20,7 @@ public class EucharisticMinister extends Person {
 
     @Override
     public String getUsername() {
-        return "phoneNumber";
+        return getPhoneNumber();
     }
 
     @Override

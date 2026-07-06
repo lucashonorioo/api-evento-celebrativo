@@ -14,15 +14,13 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 
 @Service
@@ -53,28 +51,32 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     }
 
     @Override
-    public Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate startDate , LocalDate endDate) {
-        if (startDate  == null || endDate == null || startDate .isAfter(endDate)) {
+    @Transactional(readOnly = true)
+    public Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw new BusinessException("As datas estão inválidas");
         }
 
-        Page<EucharistScaleEventProjection> projections = celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
+        Page<EucharistScaleEventProjection> projections =
+                celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
 
-        Map<Object, List<EucharistScaleEventProjection>> groupedByEvent = projections.stream()
-                .collect(Collectors.groupingBy(p -> p.getNameMassOrEvent() + p.getEventDate() + p.getEventTime()));
-
-        List<EucharistScaleEventResponseDTO> dtoList = groupedByEvent.values().stream().map(list -> {
+        return projections.map(projection -> {
             EucharistScaleEventResponseDTO dto = new EucharistScaleEventResponseDTO(
-                    list.get(0).getNameMassOrEvent(),
-                    list.get(0).getEventDate(),
-                    list.get(0).getEventTime(),
-                    list.get(0).getChurchName()
+                    projection.getNameMassOrEvent(),
+                    projection.getEventDate(),
+                    projection.getEventTime(),
+                    projection.getChurchName()
             );
-            dto.getNameMinisters().addAll(list.stream().map(EucharistScaleEventProjection::getMinisterName).toList());
-            return dto;
-        }).toList();
 
-        return new PageImpl<>(dtoList, pageable, projections.getTotalElements());
+            if (projection.getMinisterNames() != null && !projection.getMinisterNames().isBlank()) {
+                Arrays.stream(projection.getMinisterNames().split(","))
+                        .map(String::trim)
+                        .filter(name -> !name.isBlank())
+                        .forEach(dto.getNameMinisters()::add);
+            }
+
+            return dto;
+        });
     }
 
 
@@ -96,6 +98,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
         try{
             CelebrationEvent celebrationEvent = celebrationEventRepository.getReferenceById(id);
+
+            celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
             celebrationEvent = celebrationEventRepository.save(celebrationEvent);
 
             return celebrationEventMapper.toDto(celebrationEvent);

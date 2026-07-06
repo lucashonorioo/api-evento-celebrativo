@@ -20,14 +20,19 @@ public class MinisterOfTheWordRequestDTO {
     @Past(message = "A data de nascimento só pode ser no passado")
     private LocalDate birthdayDate;
 
+    @NotBlank(message = "O campo senha não pode ser vazio")
+    @Size(min = 6, message = "A senha deve ter no mínimo 6 caracteres")
+    private String password;
+
     public MinisterOfTheWordRequestDTO(){
 
     }
 
-    public MinisterOfTheWordRequestDTO(String name, String phoneNumber, LocalDate birthdayDate) {
+    public MinisterOfTheWordRequestDTO(String name, String phoneNumber, LocalDate birthdayDate,  String password) {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.birthdayDate = birthdayDate;
+        this.password = password;
     }
 
     public String getName() {
@@ -52,5 +57,13 @@ public class MinisterOfTheWordRequestDTO {
 
     public void setBirthdayDate(LocalDate birthdayDate) {
         this.birthdayDate = birthdayDate;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

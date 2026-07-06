@@ -52,7 +52,7 @@ public class EucharisticMinisterController {
 
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<EucharisticMinisterResponseDTO> deleteEucharisticMinisterById(@PathVariable Long id){
+    public ResponseEntity<Void> deleteEucharisticMinisterById(@PathVariable Long id){
         eucharisticMinisterService.deleteEucharisticMinisterById(id);
         return ResponseEntity.noContent().build();
     }

@@ -9,6 +9,6 @@ public interface EucharistScaleEventProjection {
     LocalDate getEventDate();
     LocalTime getEventTime();
     String getChurchName();
-    String getMinisterName();
+    String getMinisterNames();
 
 }

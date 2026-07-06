@@ -3,15 +3,15 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.CommentatorRepository;
+import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +23,28 @@ public class CommentatorServiceImpl implements CommentatorService {
     private final CommentatorRepository commentatorRepository;
     private final CommentatorMapper commentatorMapper;
 
-    public CommentatorServiceImpl(CommentatorRepository commentatorRepository, CommentatorMapper commentatorMapper) {
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public CommentatorServiceImpl(CommentatorRepository commentatorRepository, CommentatorMapper commentatorMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
         this.commentatorRepository = commentatorRepository;
         this.commentatorMapper = commentatorMapper;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public CommentatorResponseDTO createCommentator(CommentatorRequestDTO commentatorRequestDTO) {
         Commentator commentator = commentatorMapper.toEntity(commentatorRequestDTO);
+
+        commentator.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
+
+        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
+
+        commentator.addRole(operatorRole);
+
         commentator = commentatorRepository.save(commentator);
         return commentatorMapper.toDto(commentator);
     }
@@ -62,6 +75,8 @@ public class CommentatorServiceImpl implements CommentatorService {
         try {
             Commentator commentator = commentatorRepository.getReferenceById(id);
             commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, commentator);
+            commentator.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
+
             Commentator commentatorSalvo = commentatorRepository.save(commentator);
 
             return commentatorMapper.toDto(commentatorSalvo);

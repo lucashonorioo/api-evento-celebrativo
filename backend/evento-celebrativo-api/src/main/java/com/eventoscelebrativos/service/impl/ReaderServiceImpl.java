@@ -4,12 +4,14 @@ import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.Reader;
+import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.ReaderRepository;
+import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +23,14 @@ public class ReaderServiceImpl implements ReaderService {
     private final ReaderRepository readerRepository;
     private final ReaderMapper readerMapper;
 
-    public ReaderServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper) {
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public ReaderServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
         this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
 
@@ -31,6 +38,14 @@ public class ReaderServiceImpl implements ReaderService {
     @Transactional
     public ReaderResponseDTO createReader(ReaderRequestDTO readerRequestDTO) {
         Reader reader = readerMapper.toEntity(readerRequestDTO);
+
+        reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
+
+        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
+
+        reader.addRole(operatorRole);
+
         reader = readerRepository.save(reader);
         return readerMapper.toDto(reader);
     }
@@ -61,6 +76,9 @@ public class ReaderServiceImpl implements ReaderService {
         try {
             Reader reader = readerRepository.getReferenceById(id);
             readerMapper.updateReaderFromDto(readerRequestDTO, reader);
+
+            reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
+
             Reader readerSalvo = readerRepository.save(reader);
 
             return readerMapper.toDto(readerSalvo);

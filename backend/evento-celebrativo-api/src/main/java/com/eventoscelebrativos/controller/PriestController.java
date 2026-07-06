@@ -37,7 +37,7 @@ public class PriestController {
     }
 
     @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
-    @PostMapping(value = "/{id}")
+    @GetMapping(value = "/{id}")
     public ResponseEntity<PriestResponseDTO> findPriestById(@PathVariable Long id){
         PriestResponseDTO priestResponseDTO = priestService.findPriestById(id);
         return ResponseEntity.ok().body(priestResponseDTO);

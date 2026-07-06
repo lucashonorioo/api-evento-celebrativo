@@ -7,12 +7,14 @@ import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
 import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
+import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,14 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
 
     private final EucharisticMinisterRepository eucharisticMinisterRepository;
     private final EucharisticMinisterMapper eucharisticMinisterMapper;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public EucharisticMinisterServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper) {
+    public EucharisticMinisterServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
         this.eucharisticMinisterRepository = eucharisticMinisterRepository;
         this.eucharisticMinisterMapper = eucharisticMinisterMapper;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
 
@@ -34,6 +40,14 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     @Transactional
     public EucharisticMinisterResponseDTO createEucharisticMinister(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
         EucharisticMinister eucharisticMinister = eucharisticMinisterMapper.toEntity(eucharisticMinisterRequestDTO);
+
+        eucharisticMinister.setPassword(passwordEncoder.encode(eucharisticMinisterRequestDTO.getPassword()));
+
+        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso,", "ROLE_OPERATOR"));
+
+        eucharisticMinister.addRole(operatorRole);
+
         eucharisticMinister = eucharisticMinisterRepository.save(eucharisticMinister);
         return eucharisticMinisterMapper.toDto(eucharisticMinister);
     }
@@ -65,7 +79,10 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         }
         try {
             EucharisticMinister eucharisticMinister = eucharisticMinisterRepository.getReferenceById(id);
+
             eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterRequestDTO, eucharisticMinister);
+            eucharisticMinister.setPassword(passwordEncoder.encode(eucharisticMinisterRequestDTO.getPassword()));
+
             EucharisticMinister eucharisticMinisterSalvo = eucharisticMinisterRepository.save(eucharisticMinister);
 
             return eucharisticMinisterMapper.toDto(eucharisticMinisterSalvo);

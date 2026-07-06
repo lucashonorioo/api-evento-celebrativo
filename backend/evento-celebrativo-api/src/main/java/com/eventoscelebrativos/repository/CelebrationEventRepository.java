@@ -13,15 +13,46 @@ import java.time.LocalDate;
 @Repository
 public interface CelebrationEventRepository extends JpaRepository<CelebrationEvent, Long> {
 
-    @Query(value = "SELECT ce.name_mass_or_event AS nameMassOrEvent, ce.event_date AS eventDate, ce.event_time AS eventTime, l.church_name AS churchName, p.name AS ministerName " +
-            "FROM tb_celebration_event ce " +
-            "INNER JOIN tb_event_location el ON ce.id = el.event_id " +
-            "INNER JOIN tb_location l ON l.id = el.location_id " +
-            "INNER JOIN tb_event_person ep ON ce.id = ep.event_id " +
-            "INNER JOIN tb_person p ON ep.person_id = p.id " +
-            "WHERE p.person_type = 'eucharistic_minister' " +
-            "AND ce.event_date BETWEEN :startDate AND :endDate " +
-            "ORDER BY ce.name_mass_or_event, ce.event_date",
+    @Query(
+            value = """
+                    SELECT
+                        ce.name_mass_or_event AS nameMassOrEvent,
+                        ce.event_date AS eventDate,
+                        ce.event_time AS eventTime,
+                        l.church_name AS churchName,
+                        GROUP_CONCAT(p.name) AS ministerNames
+                    FROM tb_celebration_event ce
+                    INNER JOIN tb_event_location el ON ce.id = el.event_id
+                    INNER JOIN tb_location l ON l.id = el.location_id
+                    INNER JOIN tb_event_person ep ON ce.id = ep.event_id
+                    INNER JOIN tb_person p ON ep.person_id = p.id
+                    WHERE p.person_type = 'eucharistic_minister'
+                    AND ce.event_date BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        ce.id,
+                        ce.name_mass_or_event,
+                        ce.event_date,
+                        ce.event_time,
+                        l.id,
+                        l.church_name
+                    ORDER BY ce.event_date, ce.event_time, ce.name_mass_or_event
+                    """,
+            countQuery = """
+                    SELECT COUNT(*)
+                    FROM (
+                        SELECT
+                            ce.id AS event_id,
+                            l.id AS location_id
+                        FROM tb_celebration_event ce
+                        INNER JOIN tb_event_location el ON ce.id = el.event_id
+                        INNER JOIN tb_location l ON l.id = el.location_id
+                        INNER JOIN tb_event_person ep ON ce.id = ep.event_id
+                        INNER JOIN tb_person p ON ep.person_id = p.id
+                        WHERE p.person_type = 'eucharistic_minister'
+                        AND ce.event_date BETWEEN :startDate AND :endDate
+                        GROUP BY ce.id, l.id
+                    ) AS total
+                    """,
             nativeQuery = true)
     Page<EucharistScaleEventProjection> findEucharistScale(Pageable pageable, LocalDate startDate, LocalDate endDate);
 
