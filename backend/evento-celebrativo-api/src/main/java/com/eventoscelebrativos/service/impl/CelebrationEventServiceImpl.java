@@ -119,9 +119,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
         try{
             celebrationEventRepository.deleteById(id);
+            celebrationEventRepository.flush();
         }
         catch (DataIntegrityViolationException e){
-            throw new DatabaseException("Não foi possivel deletar evento, possui outras referencias no sistema");
+            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
     }
 }

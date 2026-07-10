@@ -171,7 +171,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedEvent() {
         when(repository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(repository).deleteById(1L);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
 
         assertThrows(DatabaseException.class, () -> service.deleteEventById(1L));
     }

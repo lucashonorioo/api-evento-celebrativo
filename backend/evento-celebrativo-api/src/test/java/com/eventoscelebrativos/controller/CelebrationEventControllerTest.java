@@ -2,6 +2,7 @@ package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import org.junit.jupiter.api.Test;
@@ -118,6 +119,16 @@ class CelebrationEventControllerTest {
         mockMvc.perform(delete("/eventos/99").with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenDeletingReferencedEvent() throws Exception {
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(celebrationEventService).deleteEventById(1L);
+
+        mockMvc.perform(delete("/eventos/1").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
     }
 
     @Test

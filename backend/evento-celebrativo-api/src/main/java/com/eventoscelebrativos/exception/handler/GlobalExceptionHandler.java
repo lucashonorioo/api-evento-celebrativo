@@ -2,6 +2,7 @@ package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.exception.error.ErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -70,5 +71,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(errorResponse);
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(DataIntegrityViolationException e, WebRequest webRequest){
+        HttpStatus status = HttpStatus.CONFLICT;
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                "Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.",
+                "DATABASE_RULE_VIOLATION",
+                webRequest.getDescription(false)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
 
 }

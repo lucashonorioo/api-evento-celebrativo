@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import org.junit.jupiter.api.Test;
@@ -113,6 +114,16 @@ class MinisterOfTheWordControllerTest {
         mockMvc.perform(delete("/ministrosDaPalavra/99").with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenDeletingReferencedMinisterOfTheWord() throws Exception {
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(ministerOfTheWordService).deleteMinisterOfTheWord(1L);
+
+        mockMvc.perform(delete("/ministrosDaPalavra/1").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
     }
 
     private MinisterOfTheWordResponseDTO response(String name) {

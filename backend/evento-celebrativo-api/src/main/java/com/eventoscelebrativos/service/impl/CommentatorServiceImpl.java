@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.Role;
@@ -11,6 +12,7 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,7 +96,13 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(!commentatorRepository.existsById(id)){
             throw new ResourceNotFoundException("Comentarista", id);
         }
+        try {
             commentatorRepository.deleteById(id);
+            commentatorRepository.flush();
+        }
+        catch (DataIntegrityViolationException e){
+            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
+        }
     }
 
 }

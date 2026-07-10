@@ -80,9 +80,10 @@ public class LocationServiceImpl implements LocationService {
         }
         try {
             locationRepository.deleteById(id);
+            locationRepository.flush();
         }
         catch (DataIntegrityViolationException e){
-            throw new DatabaseException("Não foi possivel deletar o local, possui outras referencias no sistema");
+            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
 
     }

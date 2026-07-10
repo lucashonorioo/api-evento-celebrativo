@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.Reader;
@@ -17,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -163,6 +165,14 @@ class ReaderServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class, () -> service.deleteReaderById(99L));
         verify(readerRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void shouldThrowDatabaseExceptionWhenDeletingReferencedReader() {
+        when(readerRepository.existsById(1L)).thenReturn(true);
+        doThrow(new DataIntegrityViolationException("constraint")).when(readerRepository).flush();
+
+        assertThrows(DatabaseException.class, () -> service.deleteReaderById(1L));
     }
 
     private ReaderRequestDTO request() {

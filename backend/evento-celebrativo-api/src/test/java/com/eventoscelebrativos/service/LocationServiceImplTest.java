@@ -127,7 +127,7 @@ class LocationServiceImplTest {
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedLocation() {
         when(repository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(repository).deleteById(1L);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
 
         assertThrows(DatabaseException.class, () -> service.deleteLocationById(1L));
     }

@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
@@ -17,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -128,6 +130,14 @@ class CommentatorServiceImplTest {
 
         when(repository.existsById(99L)).thenReturn(false);
         assertThrows(ResourceNotFoundException.class, () -> service.deleteCommentatorById(99L));
+    }
+
+    @Test
+    void shouldThrowDatabaseExceptionWhenDeletingReferencedCommentator() {
+        when(repository.existsById(1L)).thenReturn(true);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
+
+        assertThrows(DatabaseException.class, () -> service.deleteCommentatorById(1L));
     }
 
     private CommentatorRequestDTO request() {

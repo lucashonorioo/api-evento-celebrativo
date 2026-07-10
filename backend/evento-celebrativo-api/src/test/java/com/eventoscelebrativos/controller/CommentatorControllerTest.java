@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.CommentatorService;
 import org.junit.jupiter.api.Test;
@@ -113,6 +114,16 @@ class CommentatorControllerTest {
         mockMvc.perform(delete("/comentaristas/99").with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenDeletingReferencedCommentator() throws Exception {
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(commentatorService).deleteCommentatorById(1L);
+
+        mockMvc.perform(delete("/comentaristas/1").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
     }
 
     private CommentatorResponseDTO response(String name) {

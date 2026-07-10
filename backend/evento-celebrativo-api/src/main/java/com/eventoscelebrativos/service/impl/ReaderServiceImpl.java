@@ -2,6 +2,7 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
@@ -11,6 +12,7 @@ import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,7 +98,13 @@ public class ReaderServiceImpl implements ReaderService {
         if(!readerRepository.existsById(id)){
             throw new ResourceNotFoundException("Leitor", id);
         }
-        readerRepository.deleteById(id);
+        try {
+            readerRepository.deleteById(id);
+            readerRepository.flush();
+        }
+        catch (DataIntegrityViolationException e){
+            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
+        }
 
     }
 }

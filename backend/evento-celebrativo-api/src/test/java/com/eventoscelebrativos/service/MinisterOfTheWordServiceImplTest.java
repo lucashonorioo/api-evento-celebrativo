@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
@@ -17,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -133,6 +135,14 @@ class MinisterOfTheWordServiceImplTest {
 
         when(repository.existsById(99L)).thenReturn(false);
         assertThrows(ResourceNotFoundException.class, () -> service.deleteMinisterOfTheWord(99L));
+    }
+
+    @Test
+    void shouldThrowDatabaseExceptionWhenDeletingReferencedMinisterOfTheWord() {
+        when(repository.existsById(1L)).thenReturn(true);
+        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
+
+        assertThrows(DatabaseException.class, () -> service.deleteMinisterOfTheWord(1L));
     }
 
     private MinisterOfTheWordRequestDTO request() {
