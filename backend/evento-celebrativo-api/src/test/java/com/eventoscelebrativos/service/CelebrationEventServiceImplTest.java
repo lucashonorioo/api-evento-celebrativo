@@ -1,15 +1,28 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
+import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
+import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
+import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
+import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.Location;
+import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.Priest;
+import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
+import com.eventoscelebrativos.repository.LocationRepository;
+import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.CelebrationEventServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -40,7 +53,16 @@ class CelebrationEventServiceImplTest {
     private CelebrationEventRepository repository;
 
     @Mock
+    private LocationRepository locationRepository;
+
+    @Mock
+    private PersonRepository personRepository;
+
+    @Mock
     private CelebrationEventMapper mapper;
+
+    @Mock
+    private CelebrationEventScaleMapper scaleMapper;
 
     @InjectMocks
     private CelebrationEventServiceImpl service;
@@ -176,8 +198,205 @@ class CelebrationEventServiceImplTest {
         assertThrows(DatabaseException.class, () -> service.deleteEventById(1L));
     }
 
+    @Test
+    void shouldUpdateEventScaleWhenEventExists() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Priest priest = person(new Priest(), 8L, "Padre");
+        Reader reader = person(new Reader(), 2L, "Leitor");
+        Commentator commentator = person(new Commentator(), 4L, "Comentarista");
+        MinisterOfTheWord ministerOfTheWord = person(new MinisterOfTheWord(), 5L, "Ministro da Palavra");
+        EucharisticMinister eucharisticMinister = person(new EucharisticMinister(), 6L, "Ministro da Eucaristia");
+        CelebrationEventScaleRequestDTO request = scaleRequest();
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
+        when(personRepository.findById(2L)).thenReturn(Optional.of(reader));
+        when(personRepository.findById(4L)).thenReturn(Optional.of(commentator));
+        when(personRepository.findById(5L)).thenReturn(Optional.of(ministerOfTheWord));
+        when(personRepository.findById(6L)).thenReturn(Optional.of(eucharisticMinister));
+        when(repository.save(event)).thenReturn(event);
+        when(scaleMapper.toDto(event)).thenReturn(response);
+
+        assertSame(response, service.updateEventScale(1L, request));
+        assertEquals(List.of(location), event.getLocations());
+        assertEquals(List.of(priest, reader, commentator, ministerOfTheWord, eucharisticMinister), event.getPeople());
+    }
+
+    @Test
+    void shouldCreateEventWithScale() {
+        Location location = location(1L);
+        Priest priest = person(new Priest(), 8L, "Padre");
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
+        when(repository.save(any(CelebrationEvent.class))).thenAnswer(invocation -> {
+            CelebrationEvent event = invocation.getArgument(0);
+            event.setId(1L);
+            return event;
+        });
+        when(scaleMapper.toDto(any(CelebrationEvent.class))).thenReturn(response);
+
+        assertSame(response, service.createEventWithScale(eventWithScaleRequest()));
+        verify(repository).save(argThat(event ->
+                "Missa".equals(event.getNameMassOrEvent())
+                        && EVENT_DATE.equals(event.getEventDate())
+                        && EVENT_TIME.equals(event.getEventTime())
+                        && event.getLocations().contains(location)
+                        && event.getPeople().contains(priest)
+        ));
+    }
+
+    @Test
+    void shouldReplacePreviousScaleWhenUpdatingEventScale() {
+        CelebrationEvent event = event(1L);
+        Location oldLocation = location(9L);
+        Reader oldReader = person(new Reader(), 9L, "Leitor antigo");
+        event.getLocations().add(oldLocation);
+        event.getPeople().add(oldReader);
+        Location newLocation = location(1L);
+
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
+        when(repository.save(event)).thenReturn(event);
+        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
+
+        assertEquals(List.of(newLocation), event.getLocations());
+        assertTrue(event.getPeople().isEmpty());
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenUpdatingScaleOfMissingEvent() {
+        when(repository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.updateEventScale(99L, scaleRequest()));
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenScaleLocationDoesNotExist() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+        when(locationRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.updateEventScale(1L, scaleRequest()));
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenScalePersonDoesNotExist() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
+        when(personRepository.findById(8L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.updateEventScale(1L, scaleRequest()));
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenScalePersonHasWrongType() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
+        when(personRepository.findById(8L)).thenReturn(Optional.of(person(new Reader(), 8L, "Leitor")));
+
+        assertThrows(BusinessException.class, () -> service.updateEventScale(1L, scaleRequest()));
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenScaleLocationIdIsInvalid() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+
+        assertAll(
+                () -> assertThrows(BusinessException.class,
+                        () -> service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(null, null, null, null, null, null))),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(0L, null, null, null, null, null))),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(-1L, null, null, null, null, null)))
+        );
+    }
+
+    @Test
+    void shouldTreatNullListsAsEmptyWhenUpdatingScale() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(repository.save(event)).thenReturn(event);
+        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
+
+        assertTrue(event.getPeople().isEmpty());
+        assertEquals(List.of(location), event.getLocations());
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenScaleListHasDuplicatedIds() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
+
+        CelebrationEventScaleRequestDTO request =
+                new CelebrationEventScaleRequestDTO(1L, null, List.of(2L, 2L), null, null, null);
+
+        assertThrows(BusinessException.class, () -> service.updateEventScale(1L, request));
+    }
+
+    @Test
+    void shouldNotChangePersonPasswordRolesOrRegistrationDataWhenUpdatingScale() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Priest priest = person(new Priest(), 8L, "Padre");
+        priest.setPassword("encoded");
+        priest.setPhoneNumber("34999999999");
+
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
+        when(repository.save(event)).thenReturn(event);
+        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null));
+
+        assertEquals("encoded", priest.getPassword());
+        assertEquals("34999999999", priest.getPhoneNumber());
+    }
+
+    @Test
+    void shouldNotCreateEventWithScaleWhenScaleIsInvalid() {
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
+        when(personRepository.findById(8L)).thenReturn(Optional.of(person(new Reader(), 8L, "Leitor")));
+
+        assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
+        verify(repository, never()).save(any());
+    }
+
     private CelebrationEventRequestDTO request() {
         return new CelebrationEventRequestDTO("Missa", EVENT_DATE, EVENT_TIME, true);
+    }
+
+    private CelebrationEventScaleRequestDTO scaleRequest() {
+        return new CelebrationEventScaleRequestDTO(
+                1L,
+                8L,
+                List.of(2L),
+                List.of(4L),
+                List.of(5L),
+                List.of(6L)
+        );
+    }
+
+    private CelebrationEventWithScaleRequestDTO eventWithScaleRequest() {
+        CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
+        request.setNameMassOrEvent("Missa");
+        request.setEventDate(EVENT_DATE);
+        request.setEventTime(EVENT_TIME);
+        request.setMassOrCelebration(true);
+        request.setLocationId(1L);
+        request.setPriestId(8L);
+        return request;
     }
 
     private CelebrationEvent event(Long id) {
@@ -192,6 +411,17 @@ class CelebrationEventServiceImplTest {
 
     private CelebrationEventResponseDTO response(Long id) {
         return new CelebrationEventResponseDTO(id, "Missa", EVENT_DATE, EVENT_TIME, true);
+    }
+
+    private Location location(Long id) {
+        return new Location(id, "Igreja Matriz", "Praça Central");
+    }
+
+    private <T extends Person> T person(T person, Long id, String name) {
+        person.setId(id);
+        person.setName(name);
+        person.setPhoneNumber("34" + id);
+        return person;
     }
 
     private EucharistScaleEventProjection projection(
