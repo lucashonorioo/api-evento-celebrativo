@@ -6,6 +6,7 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Role;
@@ -15,6 +16,7 @@ import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,7 +101,13 @@ public class PriestServiceImpl implements PriestService {
         if(!priestRepository.existsById(id)){
             throw new ResourceNotFoundException("Padre", id);
         }
-        priestRepository.deleteById(id);
+        try {
+            priestRepository.deleteById(id);
+            priestRepository.flush();
+        }
+        catch (DataIntegrityViolationException e){
+            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
+        }
 
     }
 }

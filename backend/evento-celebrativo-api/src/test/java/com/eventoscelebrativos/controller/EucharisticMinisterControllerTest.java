@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import org.junit.jupiter.api.Test;
@@ -116,6 +117,16 @@ class EucharisticMinisterControllerTest {
         mockMvc.perform(delete("/ministrosDeEucaristia/99").with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenDeletingReferencedEucharisticMinister() throws Exception {
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(eucharisticMinisterService).deleteEucharisticMinisterById(1L);
+
+        mockMvc.perform(delete("/ministrosDeEucaristia/1").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
     }
 
     private EucharisticMinisterResponseDTO response(String name) {
