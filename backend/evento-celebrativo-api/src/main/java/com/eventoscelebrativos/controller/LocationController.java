@@ -3,6 +3,10 @@ package com.eventoscelebrativos.controller;
 import com.eventoscelebrativos.dto.request.LocationRequestDTO;
 import com.eventoscelebrativos.dto.response.LocationResponseDTO;
 import com.eventoscelebrativos.service.LocationService;
+import com.eventoscelebrativos.config.OpenApiConfig;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +18,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping(value = "/locais")
+@Tag(name = "Locais", description = "Gerenciamento de locais dos eventos")
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class LocationController {
 
     private final LocationService locationService;
@@ -22,6 +28,7 @@ public class LocationController {
         this.locationService = locationService;
     }
 
+    @Operation(summary = "Cria um local")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<LocationResponseDTO> criarLocal(@Valid @RequestBody LocationRequestDTO locationRequestDTO){
@@ -30,12 +37,14 @@ public class LocationController {
         return ResponseEntity.created(location).body(locationResponseDTO);
     }
 
+    @Operation(summary = "Lista locais")
     @GetMapping
     public ResponseEntity<List<LocationResponseDTO>> listarTodosLocais(){
         List<LocationResponseDTO> locaisResponseDTO = locationService.findAllLocations();
         return ResponseEntity.ok().body(locaisResponseDTO);
     }
 
+    @Operation(summary = "Busca um local por ID")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> buscarLocalPorId(@PathVariable Long id){
@@ -43,6 +52,7 @@ public class LocationController {
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
+    @Operation(summary = "Atualiza um local")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> atualizarLocal(@PathVariable Long id, @Valid @RequestBody LocationRequestDTO locationRequestDTO){
@@ -50,6 +60,7 @@ public class LocationController {
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
+    @Operation(summary = "Remove um local")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<Void> deletarLocal(@PathVariable Long id){

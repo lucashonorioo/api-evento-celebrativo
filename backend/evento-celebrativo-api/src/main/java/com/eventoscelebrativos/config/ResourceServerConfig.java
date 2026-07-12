@@ -47,8 +47,10 @@ public class ResourceServerConfig {
 		http.csrf(csrf -> csrf.disable());
 
 		http.authorizeHttpRequests(authorize -> authorize
+				.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
 				.requestMatchers(HttpMethod.POST, "/public/login").permitAll()
-				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/*", "/eventos/escala/eucaristia").permitAll()
+				.requestMatchers(HttpMethod.GET, "/eventos/escala/eucaristia").permitAll()
+				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
 				.anyRequest().authenticated());
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
 		http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
