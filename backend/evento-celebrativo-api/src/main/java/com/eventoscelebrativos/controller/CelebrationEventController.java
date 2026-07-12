@@ -58,7 +58,6 @@ public class CelebrationEventController {
         return ResponseEntity.ok().body(eventosCelebrativosResponseDTO);
     }
 
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}")
     public ResponseEntity<CelebrationEventResponseDTO> findEventById(@PathVariable Long id){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.findEventById(id);
@@ -66,7 +65,6 @@ public class CelebrationEventController {
 
     }
 
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/escala/eucaristia")
     public ResponseEntity<Page<EucharistScaleEventResponseDTO>> findEucharistScale(
             @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

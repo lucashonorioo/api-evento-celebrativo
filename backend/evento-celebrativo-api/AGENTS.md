@@ -1,54 +1,88 @@
-# PAPEL
+# Projeto
 
-Você é um especialista em desenvolvimento de APIs backend.
+Backend do projeto `api-evento-celebrativo`, uma API REST para gerenciamento de eventos celebrativos, pessoas, locais, perfis de acesso e escalas.
 
-# PRINCÍPIOS DE DESIGN DE API
+# Stack
 
-* **Design RESTful**: siga convenções REST e utilize corretamente os métodos HTTP
-* **Nomenclatura consistente**: use nomes claros e consistentes para os endpoints
-* **Versionamento**: Preserve a estratégia de versionamento existente. Só proponha versionamento quando houver API pública, quebra de contrato ou necessidade real
-* **Documentação**: mantenha a documentação da API clara e atualizada
-* **Tratamento de erros**: forneça respostas de erro significativas
+* Java 21
+* Spring Boot 3.4.5
+* Maven Wrapper
+* Spring Web, Spring Data JPA, Bean Validation, Spring Security, OAuth2 Authorization Server e Resource Server
+* MapStruct para conversão entre Entity e DTO
 
-# SEGURANÇA EM PRIMEIRO LUGAR
+# Comandos oficiais
 
-* **Autenticação**: implemente mecanismos adequados de autenticação, como JWT ou OAuth, quando o projeto exigir
-* **Autorização**: utilize controle de acesso baseado em papéis/perfis
-* **Validação de entrada**: valide e trate todas as entradas recebidas
-* **Limitação de requisições**: Considere rate limiting apenas para endpoints públicos, sensíveis ou sujeitos a abuso
-* **HTTPS**: utilize HTTPS em produção
+No Windows, execute a partir da pasta `backend/evento-celebrativo-api`:
 
-# VALIDAÇÃO DE DADOS
+* `.\mvnw.cmd clean compile`
+* `.\mvnw.cmd test`
+* `.\mvnw.cmd -q test`
+* `.\mvnw.cmd spring-boot:run`
 
-* **Validação de schema**: utilize mecanismos adequados de validação conforme a linguagem e o framework do projeto
-* **Segurança de tipos**: aproveite os recursos da linguagem para reduzir erros em tempo de compilação
-* **Sanitização**: trate entradas do usuário para reduzir riscos de injeção e dados inválidos
-* **Regras de negócio**: valide regras de negócio na camada de serviço
+Antes de concluir tarefas de código, rode `.\mvnw.cmd -q test` sempre que possível.
 
-# TRATAMENTO DE ERROS
+# Arquitetura
 
-* **Formato consistente**: use um padrão consistente para respostas de erro
-* **Códigos HTTP**: utilize códigos de status HTTP adequados
-* **Logs**: registre erros com contexto suficiente para investigação
-* **Mensagens amigáveis**: forneça mensagens úteis, sem expor detalhes sensíveis
+Use a divisão atual de pacotes:
 
-# BOAS PRÁTICAS DE BANCO DE DADOS
+* `controller`: entrada HTTP, status codes, validação do request e composição da resposta.
+* `service`: contratos de regras de negócio.
+* `service.impl`: implementação das regras de negócio e transações.
+* `repository`: persistência via Spring Data JPA.
+* `model`: entidades JPA.
+* `dto.request`: dados de entrada da API.
+* `dto.response`: dados de saída da API.
+* `mapper`: conversão Entity <-> DTO, preferencialmente com MapStruct.
+* `exception`: exceptions customizadas e tratamento global.
 
-* **Migrations**: utilize migrations para alterações de estrutura quando o projeto trabalhar dessa forma
-* **Índices**: otimize consultas com índices adequados quando necessário
-* **Transações**: utilize transações para garantir consistência dos dados
-* **Pool de conexões**: utilize pool de conexões para melhor desempenho
+# Padrões do projeto
 
-# ESTRATÉGIA DE TESTES
+* Não exponha entidades JPA diretamente na API.
+* Use DTOs para entrada e saída.
+* Use mappers/MapStruct para conversão entre entidades e DTOs.
+* Mantenha controllers focados em HTTP, status, validação e delegação.
+* Mantenha services focados em regra de negócio.
+* Use exceptions customizadas e `GlobalExceptionHandler` para respostas de erro consistentes.
+* Preserve os endpoints existentes; não altere contratos já validados sem autorização.
+* Para novos endpoints, evite camelCase no path e prefira nomes consistentes e legíveis.
 
-* **Testes unitários**: teste funções, métodos e regras isoladas
-* **Testes de integração**: teste endpoints e fluxos completos da API
-* **Testes de banco de dados**: teste operações de persistência quando necessário
-* **Mock de serviços externos**: simule chamadas para APIs de terceiros
+# Segurança
 
-# MONITORAMENTO E LOGS
+* Login público atual: `POST /public/login`.
+* Endpoints públicos atuais:
+  * `GET /eventos`
+  * `GET /eventos/{id}`
+  * `GET /eventos/escala/eucaristia`
+* Endpoints de pessoas e locais exigem autenticação:
+  * `GET /locais`
+  * `GET /leitores`
+  * `GET /comentaristas`
+  * `GET /ministrosDeEucaristia`
+  * `GET /ministrosDaPalavra`
+  * `GET /padres`
+* Novos usuários cadastrados pela API recebem `ROLE_OPERATOR`.
+* Apenas `ROLE_ADMIN` pode alterar roles em `PUT /pessoas/{id}/roles`.
+* Apenas `ROLE_ADMIN` pode criar, alterar ou deletar recursos administrativos.
+* Apenas `ROLE_ADMIN` pode criar evento com escala em `POST /eventos/com-escala`.
+* Apenas `ROLE_ADMIN` pode alterar escala em `PUT /eventos/{id}/escala`.
+* Não remova a segurança global nem desabilite autenticação para fazer testes passarem.
 
-* **Logs estruturados**: utilize um formato de log consistente
-* **Rastreamento de requisições**: utilize identificadores de requisição quando o projeto possuir esse padrão
-* **Métricas de desempenho**: monitore tempo de resposta e volume de requisições quando aplicável
-* **Health checks**: Use health check quando o projeto já tiver Actuator, monitoramento ou requisito de infraestrutura
+# Testes
+
+* Testes de service usam Mockito.
+* Testes de controller usam MockMvc.
+* Testes de repository usam `@DataJpaTest`.
+* Use `@MockitoBean`, não `@MockBean`.
+* Cubra regras de autorização quando alterar endpoints ou segurança.
+* Rode `.\mvnw.cmd -q test` antes de concluir tarefas sempre que possível.
+
+# Pendências futuras
+
+Documente e trate em tarefas próprias, sem implementar junto com mudanças não relacionadas:
+
+* Separar profiles `test`, `dev` e `prod`.
+* Remover secrets default antes de ambiente real.
+* Remover hardcoded `localhost` do `PublicController` antes de integração/deploy.
+* Avaliar Flyway ou Liquibase antes de MySQL real.
+* Avaliar Swagger/OpenAPI depois de estabilizar a API.
+* Avaliar JaCoCo e separação Failsafe/Surefire quando os testes crescerem.
