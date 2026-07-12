@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/public")
 @CrossOrigin(origins = "http://localhost:4200")
+@Tag(name = "Autenticação", description = "Endpoints públicos de autenticação")
 public class PublicController {
 
     @Value("${security.client-id}")
@@ -32,6 +35,7 @@ public class PublicController {
         public String password;
     }
 
+    @Operation(summary = "Realiza login e retorna token de acesso")
     @PostMapping("/login")
     public ResponseEntity<Map> proxyLogin(@RequestBody LoginProxyRequest request) {
 

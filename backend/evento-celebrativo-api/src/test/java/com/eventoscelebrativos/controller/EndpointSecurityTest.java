@@ -30,7 +30,29 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/escala/eucaristia")
                         .param("startDate", "2025-07-01")
-                        .param("endDate", "2025-07-31"))
+                        .param("endDate", "2026-12-31")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldAllowPublicEucharistScaleEndpointWithInvalidSortWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/eventos/escala/eucaristia")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2026-12-31")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "[\"string\"]"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldAllowSwaggerEndpointsWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk());
     }
 
@@ -52,6 +74,14 @@ class EndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/padres"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRequireAuthenticationForAdministrativeEventEndpoints() throws Exception {
+        mockMvc.perform(post("/eventos/com-escala")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validEventWithScalePayload()))
                 .andExpect(status().isUnauthorized());
     }
 

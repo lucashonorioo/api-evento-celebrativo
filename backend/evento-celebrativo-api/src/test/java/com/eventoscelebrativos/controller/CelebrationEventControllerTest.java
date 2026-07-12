@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -241,6 +242,32 @@ class CelebrationEventControllerTest {
                 .andExpect(jsonPath("$.content[0].nameMinisters[0]").value("Ana"));
 
         verify(celebrationEventService).findEucharistScale(any(), eq(LocalDate.of(2026, 8, 1)), eq(LocalDate.of(2026, 8, 31)));
+    }
+
+    @Test
+    void shouldIgnoreInvalidSortWhenFindingEucharistScaleByPeriod() throws Exception {
+        EucharistScaleEventResponseDTO response = new EucharistScaleEventResponseDTO(
+                "Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz"
+        );
+        when(celebrationEventService.findEucharistScale(any(), eq(LocalDate.of(2025, 7, 1)), eq(LocalDate.of(2026, 12, 31))))
+                .thenReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escala/eucaristia")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2026-12-31")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "[\"string\"]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].nameMassOrEvent").value("Missa"));
+
+        verify(celebrationEventService).findEucharistScale(
+                argThat((Pageable pageable) -> pageable.getPageNumber() == 0
+                        && pageable.getPageSize() == 10
+                        && pageable.getSort().isUnsorted()),
+                eq(LocalDate.of(2025, 7, 1)),
+                eq(LocalDate.of(2026, 12, 31))
+        );
     }
 
     private CelebrationEventResponseDTO response(String nameMassOrEvent) {
