@@ -32,7 +32,7 @@ public class ResourceServerConfig {
 	private String corsOrigins;
 
 	@Bean
-	@Profile("test")
+	@Profile({ "test", "local" })
 	@Order(1)
 	public SecurityFilterChain h2SecurityFilterChain(HttpSecurity http) throws Exception {
 
