@@ -1,42 +1,51 @@
+import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../auth.service';
 import { Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
+import { AuthSessionService } from '../auth-session.service';
+import { LoginRequest } from '../auth.models';
+import { AuthService } from '../auth.service';
 
 @Component({
   selector: 'app-login',
   imports: [FormsModule, CommonModule],
   templateUrl: './login.component.html',
-  styleUrl: './login.component.css'
+  styleUrl: './login.component.css',
 })
 export class LoginComponent {
   phone: string = '';
   password: string = '';
   errorMessage: string = '';
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly authSessionService: AuthSessionService,
+    private readonly router: Router,
+  ) {}
 
-  onSubmit(){
+  onSubmit(): void {
     this.errorMessage = '';
 
-    this.authService.login({phone: this.phone, password: this.password}).subscribe({
-      next: (response) => {
-        console.log('Login bem-sucedido!', response);
+    const request: LoginRequest = {
+      username: this.phone,
+      password: this.password,
+    };
 
-        localStorage.setItem('access_token', response.access_token);
-        localStorage.setItem('token_type', response.token_type);
+    this.authService.login(request).subscribe({
+      next: (response) => {
+        this.authSessionService.saveToken(response);
 
         this.router.navigate(['/dashboard']);
       },
-      error: (error) => {
-        console.error('Erro de login:', error);
+      error: (error: HttpErrorResponse) => {
         if (error.status === 401) {
-            this.errorMessage = 'Credenciais inválidas. Por favor, tente novamente.';
+          this.errorMessage = 'Credenciais inválidas. Por favor, tente novamente.';
         } else {
-            this.errorMessage = 'Ocorreu um erro no servidor. Tente mais tarde.';
+          this.errorMessage = 'Ocorreu um erro no servidor. Tente mais tarde.';
         }
-      }
+      },
     });
   }
 }
