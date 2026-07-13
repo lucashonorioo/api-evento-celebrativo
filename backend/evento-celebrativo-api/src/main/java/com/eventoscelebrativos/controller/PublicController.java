@@ -17,7 +17,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/public")
-@CrossOrigin(origins = "http://localhost:4200")
 @Tag(name = "Autenticação", description = "Endpoints públicos de autenticação")
 public class PublicController {
 
@@ -26,6 +25,9 @@ public class PublicController {
 
     @Value("${security.client-secret}")
     private String clientSecret;
+
+    @Value("${security.oauth-token-url}")
+    private String oauthTokenUrl;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -54,8 +56,7 @@ public class PublicController {
         try {
             org.springframework.http.HttpEntity<MultiValueMap<String, String>> entity =
                     new org.springframework.http.HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(
-                    "http://localhost:8080/oauth2/token", entity, Map.class);
+            ResponseEntity<Map> response = restTemplate.postForEntity(oauthTokenUrl, entity, Map.class);
             return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         } catch (HttpClientErrorException ex) {
             return ResponseEntity.status(ex.getStatusCode())
