@@ -108,9 +108,21 @@ describe('LoginComponent', () => {
 
   it('should render a public events link', () => {
     const compiled = fixture.nativeElement as HTMLElement;
-    const link = compiled.querySelector('.login-secondary-link') as HTMLAnchorElement | null;
+    const links = Array.from(compiled.querySelectorAll('.login-secondary-link'));
+    const linkTargets = links.map((link) => link.getAttribute('href'));
+    const linkTexts = links.map((link) => link.textContent);
 
-    expect(link?.getAttribute('href')).toBe('/eventos');
-    expect(link?.textContent).toContain('Consultar eventos');
+    expect(linkTargets).toContain('/eventos');
+    expect(linkTexts.join(' ')).toContain('Consultar eventos');
+  });
+
+  it('should render a public Eucharist schedule link', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const links = Array.from(compiled.querySelectorAll('.login-secondary-link'));
+    const linkTargets = links.map((link) => link.getAttribute('href'));
+    const linkTexts = links.map((link) => link.textContent);
+
+    expect(linkTargets).toContain('/escala/eucaristia');
+    expect(linkTexts.join(' ')).toContain('Consultar escala de Eucaristia');
   });
 });
