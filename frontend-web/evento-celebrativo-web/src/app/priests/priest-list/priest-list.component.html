@@ -1,0 +1,28 @@
+<section class="priests" aria-labelledby="priests-title">
+  <header class="priests__header">
+    <h1 id="priests-title">Padres</h1>
+    <p>Consulte os padres cadastrados no sistema.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="priests__status" role="status">Carregando padres...</p>
+  } @else if (errorMessage()) {
+    <div class="priests__feedback priests__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="priests__button" type="button" (click)="loadPriests()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (priests().length === 0) {
+    <p class="priests__feedback">Nenhum padre cadastrado foi encontrado.</p>
+  } @else {
+    <ul class="priests__list" aria-label="Lista de padres cadastrados">
+      @for (priest of priests(); track priest.id) {
+        <li class="priests__item">
+          <h2>{{ priest.name }}</h2>
+        </li>
+      }
+    </ul>
+  }
+</section>

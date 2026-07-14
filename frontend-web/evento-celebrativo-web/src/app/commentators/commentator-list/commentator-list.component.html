@@ -1,0 +1,28 @@
+<section class="commentators" aria-labelledby="commentators-title">
+  <header class="commentators__header">
+    <h1 id="commentators-title">Comentaristas</h1>
+    <p>Consulte os comentaristas cadastrados no sistema.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="commentators__status" role="status">Carregando comentaristas...</p>
+  } @else if (errorMessage()) {
+    <div class="commentators__feedback commentators__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="commentators__button" type="button" (click)="loadCommentators()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (commentators().length === 0) {
+    <p class="commentators__feedback">Nenhum comentarista cadastrado foi encontrado.</p>
+  } @else {
+    <ul class="commentators__list" aria-label="Lista de comentaristas cadastrados">
+      @for (commentator of commentators(); track commentator.id) {
+        <li class="commentators__item">
+          <h2>{{ commentator.name }}</h2>
+        </li>
+      }
+    </ul>
+  }
+</section>

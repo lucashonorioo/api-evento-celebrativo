@@ -1,0 +1,28 @@
+<section class="readers" aria-labelledby="readers-title">
+  <header class="readers__header">
+    <h1 id="readers-title">Leitores</h1>
+    <p>Consulte os leitores cadastrados no sistema.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="readers__status" role="status">Carregando leitores...</p>
+  } @else if (errorMessage()) {
+    <div class="readers__feedback readers__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="readers__button" type="button" (click)="loadReaders()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (readers().length === 0) {
+    <p class="readers__feedback">Nenhum leitor cadastrado foi encontrado.</p>
+  } @else {
+    <ul class="readers__list" aria-label="Lista de leitores cadastrados">
+      @for (reader of readers(); track reader.id) {
+        <li class="readers__item">
+          <h2>{{ reader.name }}</h2>
+        </li>
+      }
+    </ul>
+  }
+</section>
