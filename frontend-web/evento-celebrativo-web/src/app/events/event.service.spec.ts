@@ -55,6 +55,62 @@ describe('EventService', () => {
     request.flush([]);
   });
 
+  it('should request an event by id from the public event endpoint', () => {
+    const event = events[0];
+
+    service.findById(1).subscribe((response) => {
+      expect(response).toEqual(event);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1`);
+
+    expect(request.request.method).toBe('GET');
+
+    request.flush(event);
+  });
+
+  it('should propagate not found errors when requesting an event by id', (done) => {
+    service.findById(99).subscribe({
+      next: () => {
+        fail('Expected event request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/99`);
+    request.flush(
+      { errorCode: 'RESOURCE_NOT_FOUND' },
+      {
+        status: 404,
+        statusText: 'Not Found',
+      },
+    );
+  });
+
+  it('should propagate server errors when requesting an event by id', (done) => {
+    service.findById(1).subscribe({
+      next: () => {
+        fail('Expected event request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1`);
+    request.flush(
+      { message: 'Internal server error' },
+      {
+        status: 500,
+        statusText: 'Server Error',
+      },
+    );
+  });
+
   it('should propagate HTTP errors', (done) => {
     service.findAll().subscribe({
       next: () => {

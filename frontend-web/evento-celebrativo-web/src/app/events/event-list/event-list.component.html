@@ -32,6 +32,8 @@
               <dd>{{ formatTime(event.eventTime) }}</dd>
             </div>
           </dl>
+
+          <a class="event-card__link" [routerLink]="[event.id]">Ver detalhes</a>
         </li>
       }
     </ul>

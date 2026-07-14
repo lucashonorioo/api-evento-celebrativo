@@ -1,0 +1,35 @@
+<section class="event-detail" aria-labelledby="event-detail-title">
+  <a class="event-detail__back" routerLink="..">Voltar para eventos</a>
+
+  @if (isLoading()) {
+    <p class="event-detail__status" role="status">Carregando evento...</p>
+  } @else if (notFound()) {
+    <div class="event-detail__feedback" role="status">
+      <h1 id="event-detail-title">Evento não encontrado</h1>
+      <p>O evento solicitado não existe ou não está disponível.</p>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="event-detail__feedback event-detail__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+      <button class="event-detail__button" type="button" (click)="retry()">Tentar novamente</button>
+    </div>
+  } @else if (event(); as selectedEvent) {
+    <article class="event-detail__card">
+      <header class="event-detail__header">
+        <h1 id="event-detail-title">{{ selectedEvent.nameMassOrEvent }}</h1>
+        <span class="event-detail__type">{{ getEventType(selectedEvent) }}</span>
+      </header>
+
+      <dl class="event-detail__details">
+        <div>
+          <dt>Data</dt>
+          <dd>{{ selectedEvent.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+        </div>
+        <div>
+          <dt>Horário</dt>
+          <dd>{{ formatTime(selectedEvent.eventTime) }}</dd>
+        </div>
+      </dl>
+    </article>
+  }
+</section>

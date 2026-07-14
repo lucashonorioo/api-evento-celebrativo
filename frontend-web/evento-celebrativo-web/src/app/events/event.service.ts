@@ -14,4 +14,8 @@ export class EventService {
   findAll(): Observable<CelebrationEventResponse[]> {
     return this.http.get<CelebrationEventResponse[]>(`${API_BASE_URL}/eventos`);
   }
+
+  findById(id: number): Observable<CelebrationEventResponse> {
+    return this.http.get<CelebrationEventResponse>(`${API_BASE_URL}/eventos/${id}`);
+  }
 }
