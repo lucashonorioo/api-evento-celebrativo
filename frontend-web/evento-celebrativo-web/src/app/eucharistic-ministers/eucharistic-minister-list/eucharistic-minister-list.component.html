@@ -1,0 +1,38 @@
+<main class="eucharistic-ministers">
+  <section class="eucharistic-ministers__content" aria-labelledby="eucharistic-ministers-title">
+    <header class="eucharistic-ministers__header">
+      <p class="eucharistic-ministers__eyebrow">Pessoas</p>
+      <h1 id="eucharistic-ministers-title">Ministros da Eucaristia</h1>
+      <p class="eucharistic-ministers__description">
+        Consulte os ministros da Eucaristia cadastrados no sistema.
+      </p>
+    </header>
+
+    @if (isLoading()) {
+      <p class="eucharistic-ministers__status">Carregando ministros da Eucaristia...</p>
+    } @else if (errorMessage()) {
+      <div class="eucharistic-ministers__feedback" role="alert">
+        <p>{{ errorMessage() }}</p>
+        <button
+          class="eucharistic-ministers__button"
+          type="button"
+          (click)="loadMinisters()"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    } @else if (ministers().length === 0) {
+      <p class="eucharistic-ministers__status">
+        Nenhum ministro da Eucaristia cadastrado foi encontrado.
+      </p>
+    } @else {
+      <ul class="eucharistic-ministers__list" aria-label="Ministros da Eucaristia cadastrados">
+        @for (minister of ministers(); track minister.id) {
+          <li class="eucharistic-ministers__item">
+            {{ minister.name }}
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</main>

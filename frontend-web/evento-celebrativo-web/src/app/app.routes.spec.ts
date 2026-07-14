@@ -1,5 +1,7 @@
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
+import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
+import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
@@ -7,6 +9,9 @@ import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
+import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
+import { PriestListComponent } from './priests/priest-list/priest-list.component';
+import { ReaderListComponent } from './readers/reader-list/reader-list.component';
 import { routes } from './app.routes';
 
 describe('routes', () => {
@@ -42,6 +47,36 @@ describe('routes', () => {
     const publicLocationRoute = routes.find((route) => route.path === 'locais');
 
     expect(publicLocationRoute).toBeUndefined();
+  });
+
+  it('should not expose readers as a public route', () => {
+    const publicReaderRoute = routes.find((route) => route.path === 'leitores');
+
+    expect(publicReaderRoute).toBeUndefined();
+  });
+
+  it('should not expose commentators as a public route', () => {
+    const publicCommentatorRoute = routes.find((route) => route.path === 'comentaristas');
+
+    expect(publicCommentatorRoute).toBeUndefined();
+  });
+
+  it('should not expose priests as a public route', () => {
+    const publicPriestRoute = routes.find((route) => route.path === 'padres');
+
+    expect(publicPriestRoute).toBeUndefined();
+  });
+
+  it('should not expose ministers of the Word as a public route', () => {
+    const publicMinisterRoute = routes.find((route) => route.path === 'ministros-palavra');
+
+    expect(publicMinisterRoute).toBeUndefined();
+  });
+
+  it('should not expose eucharistic ministers as a public route', () => {
+    const publicMinisterRoute = routes.find((route) => route.path === 'ministros-eucaristia');
+
+    expect(publicMinisterRoute).toBeUndefined();
   });
 
   it('should render authenticated events inside the protected app route', () => {
@@ -80,6 +115,57 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appLocationRoute?.component).toBe(LocationListComponent);
+  });
+
+  it('should render readers inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appReaderRoute = appRoute?.children?.find((route) => route.path === 'leitores');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appReaderRoute?.component).toBe(ReaderListComponent);
+  });
+
+  it('should render commentators inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appCommentatorRoute = appRoute?.children?.find(
+      (route) => route.path === 'comentaristas',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appCommentatorRoute?.component).toBe(CommentatorListComponent);
+  });
+
+  it('should render priests inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appPriestRoute = appRoute?.children?.find((route) => route.path === 'padres');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appPriestRoute?.component).toBe(PriestListComponent);
+  });
+
+  it('should render ministers of the Word inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appMinisterRoute = appRoute?.children?.find(
+      (route) => route.path === 'ministros-palavra',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appMinisterRoute?.component).toBe(MinisterOfTheWordListComponent);
+  });
+
+  it('should render eucharistic ministers inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appMinisterRoute = appRoute?.children?.find(
+      (route) => route.path === 'ministros-eucaristia',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appMinisterRoute?.component).toBe(EucharisticMinisterListComponent);
   });
 
   it('should preserve the authenticated home route', () => {

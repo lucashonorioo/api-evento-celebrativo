@@ -1,0 +1,106 @@
+.eucharistic-ministers {
+  min-height: 100%;
+  padding: 2rem 1.5rem;
+  background: #f7f7f4;
+}
+
+.eucharistic-ministers__content {
+  width: min(100%, 56rem);
+  margin: 0 auto;
+}
+
+.eucharistic-ministers__header {
+  margin-bottom: 1.5rem;
+}
+
+.eucharistic-ministers__eyebrow {
+  margin: 0 0 0.35rem;
+  color: #5f6368;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.eucharistic-ministers__header h1 {
+  margin: 0;
+  color: #202124;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+.eucharistic-ministers__description {
+  max-width: 42rem;
+  margin: 0.75rem 0 0;
+  color: #4f5358;
+  line-height: 1.6;
+}
+
+.eucharistic-ministers__status,
+.eucharistic-ministers__feedback,
+.eucharistic-ministers__list {
+  border: 1px solid #d7dadf;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+.eucharistic-ministers__status,
+.eucharistic-ministers__feedback {
+  margin: 0;
+  padding: 1rem;
+  color: #34383d;
+}
+
+.eucharistic-ministers__feedback {
+  display: grid;
+  gap: 1rem;
+}
+
+.eucharistic-ministers__feedback p {
+  margin: 0;
+}
+
+.eucharistic-ministers__button {
+  min-height: 2.5rem;
+  justify-self: start;
+  padding: 0.625rem 1rem;
+  border: 1px solid #202124;
+  border-radius: 0.5rem;
+  background: #202124;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.eucharistic-ministers__button:hover {
+  background: #34383d;
+}
+
+.eucharistic-ministers__button:focus-visible {
+  outline: 3px solid #7aa7ff;
+  outline-offset: 3px;
+}
+
+.eucharistic-ministers__list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+.eucharistic-ministers__item {
+  padding: 1rem;
+  color: #202124;
+  overflow-wrap: anywhere;
+}
+
+.eucharistic-ministers__item + .eucharistic-ministers__item {
+  border-top: 1px solid #e5e7eb;
+}
+
+@media (max-width: 40rem) {
+  .eucharistic-ministers {
+    padding: 1.5rem 1rem;
+  }
+}

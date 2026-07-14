@@ -1,0 +1,88 @@
+.ministers-of-the-word {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.ministers-of-the-word__header {
+  margin-bottom: 1.5rem;
+}
+
+.ministers-of-the-word__header h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  line-height: 1.1;
+  color: #172033;
+}
+
+.ministers-of-the-word__header p,
+.ministers-of-the-word__feedback,
+.ministers-of-the-word__status {
+  margin: 0;
+  color: #4b5565;
+  line-height: 1.5;
+}
+
+.ministers-of-the-word__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.ministers-of-the-word__item {
+  padding: 1rem;
+  border: 1px solid #d9dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
+}
+
+.ministers-of-the-word__item h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #172033;
+}
+
+.ministers-of-the-word__feedback--error {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #f4b4b4;
+  border-radius: 8px;
+  background: #fff4f4;
+  color: #8a1f1f;
+}
+
+.ministers-of-the-word__button {
+  width: fit-content;
+  min-height: 2.5rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 6px;
+  background: #172033;
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ministers-of-the-word__button:hover {
+  background: #263553;
+}
+
+.ministers-of-the-word__button:focus-visible {
+  outline: 3px solid #7da7ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .ministers-of-the-word {
+    padding: 1rem;
+  }
+
+  .ministers-of-the-word__list {
+    grid-template-columns: 1fr;
+  }
+}

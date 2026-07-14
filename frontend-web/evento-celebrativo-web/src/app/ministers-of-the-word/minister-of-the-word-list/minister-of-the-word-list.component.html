@@ -1,0 +1,32 @@
+<section class="ministers-of-the-word" aria-labelledby="ministers-of-the-word-title">
+  <header class="ministers-of-the-word__header">
+    <h1 id="ministers-of-the-word-title">Ministros da Palavra</h1>
+    <p>Consulte os ministros da Palavra cadastrados no sistema.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="ministers-of-the-word__status" role="status">
+      Carregando ministros da Palavra...
+    </p>
+  } @else if (errorMessage()) {
+    <div class="ministers-of-the-word__feedback ministers-of-the-word__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="ministers-of-the-word__button" type="button" (click)="loadMinisters()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (ministers().length === 0) {
+    <p class="ministers-of-the-word__feedback">
+      Nenhum ministro da Palavra cadastrado foi encontrado.
+    </p>
+  } @else {
+    <ul class="ministers-of-the-word__list" aria-label="Lista de ministros da Palavra cadastrados">
+      @for (minister of ministers(); track minister.id) {
+        <li class="ministers-of-the-word__item">
+          <h2>{{ minister.name }}</h2>
+        </li>
+      }
+    </ul>
+  }
+</section>
