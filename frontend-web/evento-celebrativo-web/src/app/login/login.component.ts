@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { AuthSessionService } from '../auth-session.service';
 import { LoginRequest } from '../auth.models';
@@ -10,7 +10,7 @@ import { AuthService } from '../auth.service';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, CommonModule],
+  imports: [FormsModule, CommonModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
 })

@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../auth-session.service';
@@ -13,7 +13,8 @@ describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
   let authService: jasmine.SpyObj<AuthService>;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
-  let router: jasmine.SpyObj<Router>;
+  let router: Router;
+  let navigateSpy: jasmine.Spy;
 
   const tokenResponse: TokenResponse = {
     access_token: 'access-token-value',
@@ -26,17 +27,18 @@ describe('LoginComponent', () => {
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
       'saveToken',
     ]);
-    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
+        provideRouter([]),
         { provide: AuthService, useValue: authService },
         { provide: AuthSessionService, useValue: authSessionService },
-        { provide: Router, useValue: router },
       ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
     fixture = TestBed.createComponent(LoginComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -72,7 +74,7 @@ describe('LoginComponent', () => {
 
     component.onSubmit();
 
-    expect(router.navigate).toHaveBeenCalledOnceWith(['/app/inicio']);
+    expect(navigateSpy).toHaveBeenCalledOnceWith(['/app/inicio']);
   });
 
   it('should not store the token when login fails', () => {
@@ -102,5 +104,13 @@ describe('LoginComponent', () => {
     component.onSubmit();
 
     expect(setItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('should render a public events link', () => {
+    const compiled = fixture.nativeElement as HTMLElement;
+    const link = compiled.querySelector('.login-secondary-link') as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/eventos');
+    expect(link?.textContent).toContain('Consultar eventos');
   });
 });
