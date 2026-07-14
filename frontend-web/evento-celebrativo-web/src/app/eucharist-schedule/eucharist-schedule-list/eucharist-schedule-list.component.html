@@ -1,0 +1,93 @@
+<section class="eucharist-schedule" aria-labelledby="eucharist-schedule-title">
+  <header class="eucharist-schedule__header">
+    <h1 id="eucharist-schedule-title">Escala de Eucaristia</h1>
+    <p>Consulte os ministros da Eucaristia escalados por período.</p>
+  </header>
+
+  <form class="schedule-filter" (ngSubmit)="onSubmit()">
+    <div class="schedule-filter__field">
+      <label for="schedule-start-date">Data inicial</label>
+      <input
+        id="schedule-start-date"
+        type="date"
+        name="startDate"
+        [(ngModel)]="startDate"
+        required
+      />
+    </div>
+
+    <div class="schedule-filter__field">
+      <label for="schedule-end-date">Data final</label>
+      <input id="schedule-end-date" type="date" name="endDate" [(ngModel)]="endDate" required />
+    </div>
+
+    <button class="schedule-filter__button" type="submit">Consultar</button>
+  </form>
+
+  @if (validationMessage()) {
+    <p class="eucharist-schedule__validation" role="alert">{{ validationMessage() }}</p>
+  }
+
+  @if (isLoading()) {
+    <p class="eucharist-schedule__status" role="status">Carregando escala...</p>
+  } @else if (errorMessage()) {
+    <div class="eucharist-schedule__feedback eucharist-schedule__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+      <button class="eucharist-schedule__button" type="button" (click)="retry()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (schedules().length === 0) {
+    <p class="eucharist-schedule__feedback">
+      Nenhuma escala de Eucaristia foi encontrada para o período informado.
+    </p>
+  } @else {
+    <ul class="schedule-list" aria-label="Lista de escalas de ministros da Eucaristia">
+      @for (schedule of schedules(); track schedule.nameMassOrEvent + schedule.eventDate + schedule.eventTime + schedule.churchName) {
+        <li class="schedule-card">
+          <header class="schedule-card__header">
+            <h2>{{ schedule.nameMassOrEvent }}</h2>
+            <p>{{ schedule.churchName }}</p>
+          </header>
+
+          <dl class="schedule-card__details">
+            <div>
+              <dt>Data</dt>
+              <dd>{{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+            </div>
+            <div>
+              <dt>Horário</dt>
+              <dd>{{ formatTime(schedule.eventTime) }}</dd>
+            </div>
+          </dl>
+
+          <section class="schedule-card__ministers" aria-label="Ministros da Eucaristia">
+            <h3>Ministros da Eucaristia</h3>
+
+            @if (schedule.nameMinisters.length === 0) {
+              <p>Nenhum ministro foi escalado para este evento.</p>
+            } @else {
+              <ul>
+                @for (minister of schedule.nameMinisters; track minister) {
+                  <li>{{ minister }}</li>
+                }
+              </ul>
+            }
+          </section>
+        </li>
+      }
+    </ul>
+
+    @if (totalPages() > 0) {
+      <nav class="schedule-pagination" aria-label="Paginação da escala">
+        <button type="button" (click)="previousPage()" [disabled]="isFirstPage() || isLoading()">
+          Anterior
+        </button>
+        <span>Página {{ currentPage() + 1 }} de {{ totalPages() }}</span>
+        <button type="button" (click)="nextPage()" [disabled]="isLastPage() || isLoading()">
+          Próxima
+        </button>
+      </nav>
+    }
+  }
+</section>

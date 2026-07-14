@@ -1,5 +1,6 @@
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
+import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
@@ -29,6 +30,13 @@ describe('routes', () => {
     expect(eventDetailRoute?.canActivate).toBeUndefined();
   });
 
+  it('should expose the public Eucharist schedule route without guards', () => {
+    const eucharistScheduleRoute = routes.find((route) => route.path === 'escala/eucaristia');
+
+    expect(eucharistScheduleRoute?.component).toBe(EucharistScheduleListComponent);
+    expect(eucharistScheduleRoute?.canActivate).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -45,6 +53,17 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appEventDetailRoute?.component).toBe(EventDetailComponent);
+  });
+
+  it('should render authenticated Eucharist schedule inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appScheduleRoute = appRoute?.children?.find(
+      (route) => route.path === 'escala/eucaristia',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appScheduleRoute?.component).toBe(EucharistScheduleListComponent);
   });
 
   it('should preserve the authenticated home route', () => {

@@ -77,8 +77,10 @@ describe('AuthenticatedLayoutComponent', () => {
 
     expect(linkTargets).toContain('/app/inicio');
     expect(linkTargets).toContain('/app/eventos');
+    expect(linkTargets).toContain('/app/escala/eucaristia');
     expect(linkTexts.join(' ')).toContain('Inicio');
     expect(linkTexts.join(' ')).toContain('Eventos');
+    expect(linkTexts.join(' ')).toContain('Escala de Eucaristia');
   });
 
   it('should render the router outlet for child pages', async () => {
