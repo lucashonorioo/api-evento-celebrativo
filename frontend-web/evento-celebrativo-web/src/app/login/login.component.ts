@@ -37,7 +37,7 @@ export class LoginComponent {
       next: (response) => {
         this.authSessionService.saveToken(response);
 
-        this.router.navigate(['/dashboard']);
+        void this.router.navigate(['/inicio']);
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 401) {

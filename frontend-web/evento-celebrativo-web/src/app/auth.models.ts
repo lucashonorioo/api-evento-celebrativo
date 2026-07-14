@@ -9,3 +9,9 @@ export interface TokenResponse {
   expires_in: number;
   scope?: string;
 }
+
+export interface JwtPayload {
+  username: string;
+  authorities: string[];
+  exp: number;
+}
