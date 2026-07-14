@@ -115,6 +115,22 @@
   margin: 0.25rem 0 0;
 }
 
+.event-card__link {
+  justify-self: start;
+  color: #173b7a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.event-card__link:hover {
+  text-decoration: underline;
+}
+
+.event-card__link:focus-visible {
+  outline: 3px solid #7aa7ff;
+  outline-offset: 3px;
+}
+
 @media (max-width: 36rem) {
   .event-card__main,
   .event-card__details {

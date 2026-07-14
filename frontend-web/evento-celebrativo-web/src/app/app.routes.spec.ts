@@ -1,5 +1,6 @@
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
+import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
@@ -21,6 +22,13 @@ describe('routes', () => {
     expect(eventsRoute?.canActivate).toBeUndefined();
   });
 
+  it('should expose the public event detail route without guards', () => {
+    const eventDetailRoute = routes.find((route) => route.path === 'eventos/:id');
+
+    expect(eventDetailRoute?.component).toBe(EventDetailComponent);
+    expect(eventDetailRoute?.canActivate).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -28,6 +36,15 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appEventsRoute?.component).toBe(EventListComponent);
+  });
+
+  it('should render authenticated event details inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appEventDetailRoute = appRoute?.children?.find((route) => route.path === 'eventos/:id');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appEventDetailRoute?.component).toBe(EventDetailComponent);
   });
 
   it('should preserve the authenticated home route', () => {

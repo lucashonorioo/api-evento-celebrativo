@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { CelebrationEventResponse } from '../event.models';
@@ -8,7 +9,7 @@ import { EventService } from '../event.service';
 @Component({
   selector: 'app-event-list',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   templateUrl: './event-list.component.html',
   styleUrl: './event-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

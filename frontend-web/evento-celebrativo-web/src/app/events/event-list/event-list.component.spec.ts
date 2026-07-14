@@ -1,9 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
+import { provideRouter, RouterOutlet } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { CelebrationEventResponse } from '../event.models';
 import { EventService } from '../event.service';
 import { EventListComponent } from './event-list.component';
+
+@Component({
+  selector: 'app-test-shell',
+  standalone: true,
+  imports: [RouterOutlet],
+  template: '<router-outlet />',
+})
+class TestShellComponent {}
+
+@Component({
+  selector: 'app-empty-test',
+  standalone: true,
+  template: '',
+})
+class EmptyTestComponent {}
 
 describe('EventListComponent', () => {
   let fixture: ComponentFixture<EventListComponent>;
@@ -33,7 +51,7 @@ describe('EventListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [EventListComponent],
-      providers: [{ provide: EventService, useValue: eventService }],
+      providers: [provideRouter([]), { provide: EventService, useValue: eventService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventListComponent);
@@ -143,7 +161,7 @@ describe('EventListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [EventListComponent],
-      providers: [{ provide: EventService, useValue: eventService }],
+      providers: [provideRouter([]), { provide: EventService, useValue: eventService }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventListComponent);
@@ -158,5 +176,56 @@ describe('EventListComponent', () => {
 
     expect(eventService.findAll).toHaveBeenCalledTimes(2);
     expect(compiled.textContent).toContain('Missa de Domingo');
+  });
+
+  it('should render public detail links relative to the public list route', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
+    eventService.findAll.and.returnValue(of(events));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'eventos', component: EventListComponent },
+          { path: 'eventos/:id', component: EmptyTestComponent },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/eventos');
+    const link = harness.routeNativeElement?.querySelector(
+      '.event-card__link',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/eventos/1');
+    expect(link?.textContent).toContain('Ver detalhes');
+  });
+
+  it('should render authenticated detail links relative to the authenticated list route', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
+    eventService.findAll.and.returnValue(of(events));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EventListComponent },
+              { path: 'eventos/:id', component: EmptyTestComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos');
+    const link = harness.routeNativeElement?.querySelector(
+      '.event-card__link',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/app/eventos/1');
   });
 });
