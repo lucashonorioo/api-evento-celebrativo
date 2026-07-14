@@ -7,6 +7,7 @@ import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
+import { LocationListComponent } from './locations/location-list/location-list.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard] },
@@ -22,6 +23,7 @@ export const routes: Routes = [
       { path: 'eventos', component: EventListComponent },
       { path: 'eventos/:id', component: EventDetailComponent },
       { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
+      { path: 'locais', component: LocationListComponent },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],
   },

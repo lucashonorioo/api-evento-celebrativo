@@ -6,6 +6,7 @@ import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
+import { LocationListComponent } from './locations/location-list/location-list.component';
 import { routes } from './app.routes';
 
 describe('routes', () => {
@@ -37,6 +38,12 @@ describe('routes', () => {
     expect(eucharistScheduleRoute?.canActivate).toBeUndefined();
   });
 
+  it('should not expose locations as a public route', () => {
+    const publicLocationRoute = routes.find((route) => route.path === 'locais');
+
+    expect(publicLocationRoute).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -64,6 +71,15 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appScheduleRoute?.component).toBe(EucharistScheduleListComponent);
+  });
+
+  it('should render locations inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appLocationRoute = appRoute?.children?.find((route) => route.path === 'locais');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appLocationRoute?.component).toBe(LocationListComponent);
   });
 
   it('should preserve the authenticated home route', () => {

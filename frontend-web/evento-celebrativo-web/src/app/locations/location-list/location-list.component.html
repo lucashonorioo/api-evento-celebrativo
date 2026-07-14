@@ -1,0 +1,32 @@
+<section class="locations" aria-labelledby="locations-title">
+  <header class="locations__header">
+    <h1 id="locations-title">Locais</h1>
+    <p>Consulte os locais cadastrados no sistema.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="locations__status" role="status">Carregando locais...</p>
+  } @else if (errorMessage()) {
+    <div class="locations__feedback locations__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="locations__button" type="button" (click)="loadLocations()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (locations().length === 0) {
+    <p class="locations__feedback">Nenhum local cadastrado foi encontrado.</p>
+  } @else {
+    <ul class="locations__list" aria-label="Lista de locais cadastrados">
+      @for (location of locations(); track location.id) {
+        <li class="locations__item">
+          <h2>{{ location.churchName }}</h2>
+
+          @if (location.address) {
+            <p>{{ location.address }}</p>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>
