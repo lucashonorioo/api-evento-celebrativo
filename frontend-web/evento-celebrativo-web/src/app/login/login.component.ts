@@ -37,7 +37,7 @@ export class LoginComponent {
       next: (response) => {
         this.authSessionService.saveToken(response);
 
-        void this.router.navigate(['/inicio']);
+        void this.router.navigate(['/app/inicio']);
       },
       error: (error: HttpErrorResponse) => {
         if (error.status === 401) {
