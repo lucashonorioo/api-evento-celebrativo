@@ -1,0 +1,39 @@
+<section class="events" aria-labelledby="events-title">
+  <header class="events__header">
+    <h1 id="events-title">Eventos</h1>
+    <p>Consulte os próximos eventos celebrativos.</p>
+  </header>
+
+  @if (isLoading()) {
+    <p class="events__status" role="status">Carregando eventos...</p>
+  } @else if (errorMessage()) {
+    <div class="events__feedback events__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+      <button class="events__button" type="button" (click)="loadEvents()">Tentar novamente</button>
+    </div>
+  } @else if (events().length === 0) {
+    <p class="events__feedback">Nenhum evento encontrado.</p>
+  } @else {
+    <ul class="events__list" aria-label="Lista de eventos celebrativos">
+      @for (event of events(); track event.id) {
+        <li class="event-card">
+          <div class="event-card__main">
+            <h2>{{ event.nameMassOrEvent }}</h2>
+            <span class="event-card__type">{{ getEventType(event) }}</span>
+          </div>
+
+          <dl class="event-card__details">
+            <div>
+              <dt>Data</dt>
+              <dd>{{ event.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+            </div>
+            <div>
+              <dt>Horário</dt>
+              <dd>{{ formatTime(event.eventTime) }}</dd>
+            </div>
+          </dl>
+        </li>
+      }
+    </ul>
+  }
+</section>

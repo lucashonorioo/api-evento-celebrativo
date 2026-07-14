@@ -67,14 +67,18 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(authService.logout).toHaveBeenCalledOnceWith();
   });
 
-  it('should render a navigation link to the authenticated home route', async () => {
+  it('should render navigation links to the authenticated routes', async () => {
     await setup();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    const link = compiled.querySelector('.app-navigation__link') as HTMLAnchorElement | null;
+    const links = Array.from(compiled.querySelectorAll('.app-navigation__link'));
+    const linkTargets = links.map((link) => link.getAttribute('href'));
+    const linkTexts = links.map((link) => link.textContent);
 
-    expect(link?.getAttribute('href')).toBe('/app/inicio');
-    expect(link?.textContent).toContain('Inicio');
+    expect(linkTargets).toContain('/app/inicio');
+    expect(linkTargets).toContain('/app/eventos');
+    expect(linkTexts.join(' ')).toContain('Inicio');
+    expect(linkTexts.join(' ')).toContain('Eventos');
   });
 
   it('should render the router outlet for child pages', async () => {

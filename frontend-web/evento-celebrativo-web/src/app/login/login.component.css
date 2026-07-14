@@ -61,3 +61,19 @@ button:hover {
   margin-top: -10px; 
   margin-bottom: 20px;
 }
+
+.login-secondary-link {
+  margin-top: 1rem;
+  color: #0056b3;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-secondary-link:hover {
+  text-decoration: underline;
+}
+
+.login-secondary-link:focus-visible {
+  outline: 3px solid #7aa7ff;
+  outline-offset: 3px;
+}
