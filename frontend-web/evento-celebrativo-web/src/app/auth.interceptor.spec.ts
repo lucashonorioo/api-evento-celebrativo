@@ -20,7 +20,7 @@ describe('authInterceptor', () => {
   let currentRouterUrl: string;
 
   beforeEach(() => {
-    currentRouterUrl = '/inicio';
+    currentRouterUrl = '/app/inicio';
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
       'clear',
       'getAccessToken',

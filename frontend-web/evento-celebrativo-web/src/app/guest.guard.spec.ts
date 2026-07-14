@@ -27,7 +27,7 @@ describe('guestGuard', () => {
     router = jasmine.createSpyObj<Router>('Router', ['createUrlTree', 'serializeUrl']);
     urlSerializer = new DefaultUrlSerializer();
 
-    router.createUrlTree.and.returnValue(urlSerializer.parse('/inicio'));
+    router.createUrlTree.and.returnValue(urlSerializer.parse('/app/inicio'));
     router.serializeUrl.and.callFake((urlTree: UrlTree) => urlSerializer.serialize(urlTree));
 
     TestBed.configureTestingModule({
@@ -43,8 +43,8 @@ describe('guestGuard', () => {
 
     const result = executeGuard();
 
-    expect(router.createUrlTree).toHaveBeenCalledOnceWith(['/inicio']);
-    expect(router.serializeUrl(result as UrlTree)).toBe('/inicio');
+    expect(router.createUrlTree).toHaveBeenCalledOnceWith(['/app/inicio']);
+    expect(router.serializeUrl(result as UrlTree)).toBe('/app/inicio');
   });
 
   it('should allow access to login when the user does not have a session', () => {

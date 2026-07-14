@@ -1,0 +1,25 @@
+<div class="app-shell">
+  <header class="app-header">
+    <a class="app-header__brand" routerLink="/app/inicio">Evento Celebrativo</a>
+
+    <div class="app-header__account">
+      <span class="app-header__username">{{ username }}</span>
+      <button class="app-header__logout" type="button" (click)="onLogout()">Sair</button>
+    </div>
+  </header>
+
+  <nav class="app-navigation" aria-label="Navegacao principal">
+    <a
+      class="app-navigation__link"
+      routerLink="/app/inicio"
+      routerLinkActive="app-navigation__link--active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Inicio
+    </a>
+  </nav>
+
+  <main class="app-content">
+    <router-outlet />
+  </main>
+</div>

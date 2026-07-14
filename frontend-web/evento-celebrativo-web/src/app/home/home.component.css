@@ -24,25 +24,3 @@
   line-height: 1.5;
   color: #4f5358;
 }
-
-.home__logout {
-  margin-top: 1.5rem;
-  min-height: 2.75rem;
-  padding: 0.75rem 1.25rem;
-  border: 1px solid #202124;
-  border-radius: 0.5rem;
-  background: #202124;
-  color: #ffffff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.home__logout:hover {
-  background: #34383d;
-}
-
-.home__logout:focus-visible {
-  outline: 3px solid #7aa7ff;
-  outline-offset: 3px;
-}
