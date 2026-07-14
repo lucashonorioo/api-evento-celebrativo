@@ -72,7 +72,7 @@ describe('LoginComponent', () => {
 
     component.onSubmit();
 
-    expect(router.navigate).toHaveBeenCalledOnceWith(['/dashboard']);
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/inicio']);
   });
 
   it('should not store the token when login fails', () => {

@@ -1,13 +1,18 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 
+import { API_BASE_URL } from './api.config';
+import { AuthSessionService } from './auth-session.service';
 import { LoginRequest, TokenResponse } from './auth.models';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let httpTestingController: HttpTestingController;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
+  let router: jasmine.SpyObj<Router>;
 
   const loginRequest: LoginRequest = {
     username: '11999999999',
@@ -21,8 +26,17 @@ describe('AuthService', () => {
   };
 
   beforeEach(() => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', ['clear']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.returnValue(Promise.resolve(true));
+
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: Router, useValue: router },
+      ],
     });
     service = TestBed.inject(AuthService);
     httpTestingController = TestBed.inject(HttpTestingController);
@@ -41,7 +55,7 @@ describe('AuthService', () => {
       expect(response).toEqual(tokenResponse);
     });
 
-    const request = httpTestingController.expectOne('http://localhost:8080/public/login');
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/public/login`);
 
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual(loginRequest);
@@ -60,7 +74,7 @@ describe('AuthService', () => {
       },
     });
 
-    const request = httpTestingController.expectOne('http://localhost:8080/public/login');
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/public/login`);
     request.flush(
       { error: 'Invalid credentials' },
       {
@@ -68,5 +82,40 @@ describe('AuthService', () => {
         statusText: 'Unauthorized',
       },
     );
+  });
+
+  it('should clear the session when logging out', () => {
+    service.logout();
+
+    expect(authSessionService.clear).toHaveBeenCalledOnceWith();
+  });
+
+  it('should navigate to login when logging out', () => {
+    service.logout();
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/login']);
+  });
+
+  it('should clear the session before navigating on logout', () => {
+    const calls: string[] = [];
+    authSessionService.clear.and.callFake(() => {
+      calls.push('clear');
+    });
+    router.navigate.and.callFake(() => {
+      calls.push('navigate');
+      return Promise.resolve(true);
+    });
+
+    service.logout();
+
+    expect(calls).toEqual(['clear', 'navigate']);
+  });
+
+  it('should not make an HTTP request when logging out', () => {
+    service.logout();
+
+    const logoutRequests = httpTestingController.match(`${API_BASE_URL}/public/logout`);
+
+    expect(logoutRequests).toHaveSize(0);
   });
 });
