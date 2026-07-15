@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { LocationResponse } from './location.models';
+import { LocationRequest, LocationResponse } from './location.models';
 import { LocationService } from './location.service';
 
 describe('LocationService', () => {
@@ -17,6 +17,10 @@ describe('LocationService', () => {
       address: 'Rua Central',
     },
   ];
+  const locationRequest: LocationRequest = {
+    churchName: 'Igreja Matriz',
+    address: 'Rua Central',
+  };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -73,5 +77,104 @@ describe('LocationService', () => {
         statusText: 'Forbidden',
       },
     );
+  });
+
+  it('should create a location without adding authorization manually', () => {
+    const createdLocation: LocationResponse = {
+      id: 2,
+      ...locationRequest,
+    };
+
+    service.create(locationRequest).subscribe((response) => {
+      expect(response).toEqual(createdLocation);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/locais`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(locationRequest);
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(createdLocation);
+  });
+
+  it('should update a location without adding authorization manually', () => {
+    const updatedLocation: LocationResponse = {
+      id: 1,
+      ...locationRequest,
+    };
+
+    service.update(1, locationRequest).subscribe((response) => {
+      expect(response).toEqual(updatedLocation);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/locais/1`);
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(locationRequest);
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(updatedLocation);
+  });
+
+  it('should delete a location without adding authorization manually', () => {
+    service.delete(1).subscribe((response) => {
+      expect(response).toBeNull();
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/locais/1`);
+
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(null);
+  });
+
+  [400, 403, 404, 409].forEach((status) => {
+    it(`should propagate ${status} errors when creating locations`, (done) => {
+      service.create(locationRequest).subscribe({
+        next: () => {
+          fail('Expected create request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/locais`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
+
+    it(`should propagate ${status} errors when updating locations`, (done) => {
+      service.update(1, locationRequest).subscribe({
+        next: () => {
+          fail('Expected update request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/locais/1`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
+
+    it(`should propagate ${status} errors when deleting locations`, (done) => {
+      service.delete(1).subscribe({
+        next: () => {
+          fail('Expected delete request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/locais/1`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
   });
 });

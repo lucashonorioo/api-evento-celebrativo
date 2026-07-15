@@ -10,12 +10,14 @@ describe('AuthenticatedLayoutComponent', () => {
   let authService: jasmine.SpyObj<AuthService>;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
 
-  async function setup(username: string | null = '11999999999'): Promise<void> {
+  async function setup(username: string | null = '11999999999', isAdmin = false): Promise<void> {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['logout']);
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
       'getUsername',
+      'hasAuthority',
     ]);
     authSessionService.getUsername.and.returnValue(username);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
 
     await TestBed.configureTestingModule({
       imports: [AuthenticatedLayoutComponent],
@@ -78,6 +80,7 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTargets).toContain('/app/inicio');
     expect(linkTargets).toContain('/app/eventos');
     expect(linkTargets).toContain('/app/locais');
+    expect(linkTargets).not.toContain('/app/admin/locais');
     expect(linkTargets).toContain('/app/leitores');
     expect(linkTargets).toContain('/app/comentaristas');
     expect(linkTargets).toContain('/app/padres');
@@ -87,12 +90,42 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTexts.join(' ')).toContain('Inicio');
     expect(linkTexts.join(' ')).toContain('Eventos');
     expect(linkTexts.join(' ')).toContain('Locais');
+    expect(linkTexts.join(' ')).not.toContain('Gerenciar locais');
     expect(linkTexts.join(' ')).toContain('Leitores');
     expect(linkTexts.join(' ')).toContain('Comentaristas');
     expect(linkTexts.join(' ')).toContain('Padres');
     expect(linkTexts.join(' ')).toContain('Ministros da Palavra');
     expect(linkTexts.join(' ')).toContain('Ministros da Eucaristia');
     expect(linkTexts.join(' ')).toContain('Escala de Eucaristia');
+  });
+
+  it('should render the location management link for administrators', async () => {
+    await setup('11999999999', true);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const links = Array.from(compiled.querySelectorAll('.app-navigation__link'));
+    const linkTargets = links.map((link) => link.getAttribute('href'));
+    const linkTexts = links.map((link) => link.textContent);
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(linkTargets).toContain('/app/admin/locais');
+    expect(linkTexts.join(' ')).toContain('Gerenciar locais');
+  });
+
+  it('should keep the common locations link and hide management for operators', async () => {
+    await setup('11999999999', false);
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const links = Array.from(compiled.querySelectorAll('.app-navigation__link'));
+    const linkTargets = links.map((link) => link.getAttribute('href'));
+    const linkTexts = links.map((link) => link.textContent);
+
+    expect(linkTargets).toContain('/app/locais');
+    expect(linkTargets).not.toContain('/app/admin/locais');
+    expect(linkTexts.join(' ')).toContain('Locais');
+    expect(linkTexts.join(' ')).not.toContain('Gerenciar locais');
+    expect(linkTexts.join(' ')).toContain('Eventos');
+    expect(linkTexts.join(' ')).toContain('Leitores');
   });
 
   it('should render the router outlet for child pages', async () => {

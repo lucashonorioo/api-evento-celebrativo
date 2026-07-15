@@ -1,0 +1,148 @@
+<section class="location-management" aria-labelledby="location-management-title">
+  <header class="location-management__header">
+    <h1 id="location-management-title">Gerenciar locais</h1>
+    <p>Cadastre, edite e exclua locais disponiveis para os eventos.</p>
+  </header>
+
+  <form class="location-management__form" [formGroup]="form" (ngSubmit)="submit()">
+    <h2>{{ isEditing ? 'Editar local' : 'Cadastrar local' }}</h2>
+
+    <div class="location-management__field">
+      <label for="churchName">Nome do local</label>
+      <input
+        id="churchName"
+        type="text"
+        formControlName="churchName"
+        autocomplete="organization"
+        [attr.aria-invalid]="fieldErrorMessage('churchName') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('churchName') !== null ? 'churchName-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('churchName'); as message) {
+        <p id="churchName-error" class="location-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="location-management__field">
+      <label for="address">Endereco</label>
+      <input
+        id="address"
+        type="text"
+        formControlName="address"
+        autocomplete="street-address"
+        [attr.aria-invalid]="fieldErrorMessage('address') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('address') !== null ? 'address-error' : null"
+      />
+
+      @if (fieldErrorMessage('address'); as message) {
+        <p id="address-error" class="location-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="location-management__actions">
+      <button class="location-management__button" type="submit" [disabled]="isSaving()">
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="location-management__button location-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="location-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="location-management__feedback location-management__feedback--success">
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p class="location-management__feedback location-management__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="location-management__list-section" aria-labelledby="location-list-title">
+    <h2 id="location-list-title">Locais cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="location-management__status" role="status">Carregando locais...</p>
+    } @else if (errorMessage() && locations().length === 0) {
+      <button class="location-management__button" type="button" (click)="loadLocations()">
+        Tentar novamente
+      </button>
+    } @else if (locations().length === 0) {
+      <p class="location-management__feedback">Nenhum local cadastrado foi encontrado.</p>
+    } @else {
+      <ul class="location-management__list" aria-label="Lista de locais cadastrados">
+        @for (location of locations(); track location.id) {
+          <li class="location-management__item">
+            <div class="location-management__item-content">
+              <h3>{{ location.churchName }}</h3>
+
+              @if (location.address) {
+                <p>{{ location.address }}</p>
+              }
+            </div>
+
+            <div class="location-management__item-actions">
+              <button
+                class="location-management__button location-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(location)"
+              >
+                Editar
+              </button>
+              <button
+                class="location-management__button location-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(location)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as location) {
+    <section class="location-management__confirmation" aria-labelledby="delete-confirmation-title">
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este local?</h2>
+      <p>{{ location.churchName }}</p>
+
+      <div class="location-management__actions">
+        <button
+          class="location-management__button location-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === location.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="location-management__button location-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === location.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>

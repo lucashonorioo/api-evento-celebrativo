@@ -1,4 +1,6 @@
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
+import { adminGuard } from './admin.guard';
+import { AccessDeniedComponent } from './access-denied/access-denied.component';
 import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
@@ -8,6 +10,7 @@ import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
+import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
@@ -47,6 +50,12 @@ describe('routes', () => {
     const publicLocationRoute = routes.find((route) => route.path === 'locais');
 
     expect(publicLocationRoute).toBeUndefined();
+  });
+
+  it('should not expose location management as a public route', () => {
+    const publicManagementRoute = routes.find((route) => route.path === 'admin/locais');
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose readers as a public route', () => {
@@ -115,6 +124,27 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appLocationRoute?.component).toBe(LocationListComponent);
+    expect(appLocationRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render access denied inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const accessDeniedRoute = appRoute?.children?.find((route) => route.path === 'acesso-negado');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(accessDeniedRoute?.component).toBe(AccessDeniedComponent);
+    expect(accessDeniedRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render location management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/locais');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(LocationManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render readers inside the protected app route', () => {

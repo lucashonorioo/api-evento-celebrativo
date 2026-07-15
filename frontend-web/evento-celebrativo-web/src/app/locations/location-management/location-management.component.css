@@ -1,0 +1,123 @@
+.location-management {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 64rem;
+}
+
+.location-management__header,
+.location-management__form,
+.location-management__field,
+.location-management__list-section,
+.location-management__item-content,
+.location-management__confirmation {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.location-management__header h1,
+.location-management__header p,
+.location-management__form h2,
+.location-management__list-section h2,
+.location-management__item-content h3,
+.location-management__item-content p,
+.location-management__confirmation h2,
+.location-management__confirmation p,
+.location-management__feedback,
+.location-management__status,
+.location-management__field-error {
+  margin: 0;
+}
+
+.location-management__form,
+.location-management__confirmation {
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.location-management__field label {
+  font-weight: 600;
+}
+
+.location-management__field input {
+  border: 1px solid #b8c2d1;
+  border-radius: 6px;
+  font: inherit;
+  padding: 0.75rem;
+  width: 100%;
+}
+
+.location-management__field input:focus-visible,
+.location-management__button:focus-visible {
+  outline: 3px solid #1f4f8f;
+  outline-offset: 2px;
+}
+
+.location-management__field input[aria-invalid='true'] {
+  border-color: #9f1d1d;
+}
+
+.location-management__field-error,
+.location-management__feedback--error {
+  color: #9f1d1d;
+}
+
+.location-management__feedback--success {
+  color: #1f6b3d;
+}
+
+.location-management__actions,
+.location-management__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.location-management__button {
+  background: #1f4f8f;
+  border: 1px solid #1f4f8f;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.65rem 0.9rem;
+}
+
+.location-management__button--secondary {
+  background: #ffffff;
+  color: #1f4f8f;
+}
+
+.location-management__button--danger {
+  background: #9f1d1d;
+  border-color: #9f1d1d;
+}
+
+.location-management__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.location-management__list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.location-management__item {
+  align-items: start;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+@media (min-width: 48rem) {
+  .location-management__item {
+    grid-template-columns: 1fr auto;
+  }
+}

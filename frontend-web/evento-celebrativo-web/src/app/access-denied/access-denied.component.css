@@ -1,0 +1,26 @@
+.access-denied {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 42rem;
+}
+
+.access-denied__header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.access-denied__header h1,
+.access-denied__header p {
+  margin: 0;
+}
+
+.access-denied__link {
+  color: #1f4f8f;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.access-denied__link:focus-visible {
+  outline: 3px solid #1f4f8f;
+  outline-offset: 3px;
+}

@@ -17,6 +17,7 @@ export class AuthenticatedLayoutComponent {
   private readonly authSessionService = inject(AuthSessionService);
 
   readonly username = this.authSessionService.getUsername() ?? 'Usuario';
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
 
   onLogout(): void {
     this.authService.logout();
