@@ -5,6 +5,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
 import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
@@ -96,6 +97,12 @@ describe('routes', () => {
     expect(publicMinisterRoute).toBeUndefined();
   });
 
+  it('should not expose full schedule details as a public route', () => {
+    const publicScheduleDetailRoute = routes.find((route) => route.path === 'escalas/eventos/:id');
+
+    expect(publicScheduleDetailRoute).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -133,6 +140,18 @@ describe('routes', () => {
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appScheduleRoute?.component).toBe(EventScheduleListComponent);
     expect(appScheduleRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render authenticated full schedule detail inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appScheduleDetailRoute = appRoute?.children?.find(
+      (route) => route.path === 'escalas/eventos/:id',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appScheduleDetailRoute?.component).toBe(EventScheduleDetailComponent);
+    expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
   });
 
   it('should render locations inside the protected app route', () => {

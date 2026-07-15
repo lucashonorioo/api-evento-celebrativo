@@ -42,3 +42,27 @@ export interface EventSchedulePage {
   readonly numberOfElements: number;
   readonly empty: boolean;
 }
+
+export interface EventSchedulePersonSummary {
+  readonly id: number;
+  readonly name: string;
+}
+
+export interface EventScheduleLocationSummary {
+  readonly id: number;
+  readonly churchName: string;
+}
+
+export interface EventScheduleDetailResponse {
+  readonly eventId: number;
+  readonly eventName: string;
+  readonly eventDate: string;
+  readonly eventTime: string;
+  readonly massOrCelebration: boolean;
+  readonly location: EventScheduleLocationSummary | null;
+  readonly priest: EventSchedulePersonSummary | null;
+  readonly readers: EventSchedulePersonSummary[];
+  readonly commentators: EventSchedulePersonSummary[];
+  readonly ministersOfTheWord: EventSchedulePersonSummary[];
+  readonly eucharisticMinisters: EventSchedulePersonSummary[];
+}

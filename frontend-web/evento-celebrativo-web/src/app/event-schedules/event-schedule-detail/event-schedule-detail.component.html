@@ -1,0 +1,85 @@
+<section class="event-schedule-detail page-shell" aria-labelledby="event-schedule-detail-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Escalas</p>
+      <h1 id="event-schedule-detail-title">Escala do evento</h1>
+      <p>Consulte todas as pessoas escaladas para esta celebracao.</p>
+    </div>
+
+    <a class="page-action" routerLink="/app/escalas" [queryParams]="backQueryParams()">
+      Voltar para Escalas
+    </a>
+  </header>
+
+  @if (isLoading()) {
+    <p class="event-schedule-detail__status" role="status" aria-live="polite">
+      Carregando escala...
+    </p>
+  } @else if (errorMessage()) {
+    <div class="event-schedule-detail__feedback event-schedule-detail__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <div class="event-schedule-detail__actions">
+        @if (eventId() !== null) {
+          <button class="event-schedule-detail__button" type="button" (click)="retry()">
+            Tentar novamente
+          </button>
+        }
+
+        <a class="event-schedule-detail__link" routerLink="/app/escalas" [queryParams]="backQueryParams()">
+          Voltar para Escalas
+        </a>
+      </div>
+    </div>
+  } @else if (schedule(); as schedule) {
+    <article class="event-summary surface-card" aria-labelledby="event-summary-title">
+      <header class="event-summary__header">
+        <p>{{ eventKind(schedule.massOrCelebration) }}</p>
+        <h2 id="event-summary-title">{{ schedule.eventName }}</h2>
+      </header>
+
+      <dl class="event-summary__details">
+        <div>
+          <dt>Data</dt>
+          <dd>{{ formatDate(schedule.eventDate) }}</dd>
+        </div>
+        <div>
+          <dt>Horario</dt>
+          <dd>{{ formatTime(schedule.eventTime) }}</dd>
+        </div>
+        <div>
+          <dt>Local</dt>
+          <dd>{{ schedule.location?.churchName ?? 'Local nao informado' }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <section class="schedule-sections" aria-label="Pessoas escaladas por funcao">
+      <article class="schedule-section surface-card">
+        <h2>Padre</h2>
+
+        @if (schedule.priest) {
+          <p>{{ schedule.priest.name }}</p>
+        } @else {
+          <p>Nenhum padre informado.</p>
+        }
+      </article>
+
+      @for (section of participantSections(schedule); track section.title) {
+        <article class="schedule-section surface-card">
+          <h2>{{ section.title }}</h2>
+
+          @if (section.people.length === 0) {
+            <p>{{ section.emptyMessage }}</p>
+          } @else {
+            <ul>
+              @for (person of section.people; track person.id) {
+                <li>{{ person.name }}</li>
+              }
+            </ul>
+          }
+        </article>
+      }
+    </section>
+  }
+</section>

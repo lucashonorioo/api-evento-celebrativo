@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import {
@@ -22,12 +23,13 @@ interface EventScheduleTypeOption {
 @Component({
   selector: 'app-event-schedule-list',
   standalone: true,
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, RouterLink],
   templateUrl: './event-schedule-list.component.html',
   styleUrl: './event-schedule-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EventScheduleListComponent implements OnInit {
+  private readonly activatedRoute = inject(ActivatedRoute);
   private readonly eventScheduleService = inject(EventScheduleService);
 
   readonly scheduleTypeOptions: readonly EventScheduleTypeOption[] = [
@@ -57,7 +59,9 @@ export class EventScheduleListComponent implements OnInit {
   private lastValidQuery: EventScheduleQuery | null = null;
 
   ngOnInit(): void {
-    this.loadPage(0);
+    const restoredPage = this.restoreFiltersFromQueryParams();
+
+    this.loadPage(restoredPage);
   }
 
   onSubmit(): void {
@@ -116,6 +120,19 @@ export class EventScheduleListComponent implements OnInit {
 
   assignmentTypeLabel(type: EventScheduleType): string {
     return this.labelForType(type);
+  }
+
+  detailQueryParams(): Params {
+    return {
+      type: this.selectedType,
+      month: this.selectedMonth,
+      includeUnassigned: this.includeUnassigned,
+      page: this.currentPage(),
+    };
+  }
+
+  detailLinkFor(schedule: EventScheduleResponse): readonly string[] {
+    return ['/app/escalas/eventos', String(schedule.eventId)];
   }
 
   private loadPage(page: number): void {
@@ -178,6 +195,48 @@ export class EventScheduleListComponent implements OnInit {
   private labelForType(type: EventScheduleType): string {
     return this.scheduleTypeOptions.find((option) => option.value === type)?.label ?? 'Escala';
   }
+
+  private restoreFiltersFromQueryParams(): number {
+    const queryParamMap = this.activatedRoute.snapshot.queryParamMap;
+    const type = queryParamMap.get('type');
+    const month = queryParamMap.get('month');
+    const includeUnassigned = queryParamMap.get('includeUnassigned');
+    const page = queryParamMap.get('page');
+
+    if (isEventScheduleType(type)) {
+      this.selectedType = type;
+    }
+
+    if (month !== null && isYearMonth(month)) {
+      this.selectedMonth = month;
+    }
+
+    if (includeUnassigned === 'true') {
+      this.includeUnassigned = true;
+    } else if (includeUnassigned === 'false') {
+      this.includeUnassigned = false;
+    }
+
+    return validPageOrDefault(page);
+  }
+}
+
+function isEventScheduleType(value: string | null): value is EventScheduleType {
+  return (
+    value === 'PRIEST' ||
+    value === 'READER' ||
+    value === 'COMMENTATOR' ||
+    value === 'MINISTER_OF_THE_WORD' ||
+    value === 'EUCHARISTIC_MINISTER'
+  );
+}
+
+function validPageOrDefault(value: string | null): number {
+  if (value === null || !/^\d+$/.test(value)) {
+    return 0;
+  }
+
+  return Number(value);
 }
 
 function errorMessageFor(error: unknown): string {

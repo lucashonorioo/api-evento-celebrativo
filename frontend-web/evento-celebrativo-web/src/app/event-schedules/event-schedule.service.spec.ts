@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { EventSchedulePage } from './event-schedule.models';
+import { EventScheduleDetailResponse, EventSchedulePage } from './event-schedule.models';
 import { EventScheduleService } from './event-schedule.service';
 
 describe('EventScheduleService', () => {
@@ -32,6 +32,25 @@ describe('EventScheduleService', () => {
     number: 0,
     numberOfElements: 1,
     empty: false,
+  };
+  const detail: EventScheduleDetailResponse = {
+    eventId: 1,
+    eventName: 'Missa de Domingo da manha',
+    eventDate: '2025-07-13',
+    eventTime: '10:00:00',
+    massOrCelebration: true,
+    location: {
+      id: 1,
+      churchName: 'Igreja Matriz Nossa Senhora do Rosario',
+    },
+    priest: {
+      id: 13,
+      name: 'Padre Miguel',
+    },
+    readers: [{ id: 4, name: 'Alice Lima' }],
+    commentators: [{ id: 1, name: 'Luana Odinson' }],
+    ministersOfTheWord: [{ id: 7, name: 'Davi Gomes' }],
+    eucharisticMinisters: [{ id: 10, name: 'Mariana Ferraz' }],
   };
 
   beforeEach(() => {
@@ -125,6 +144,87 @@ describe('EventScheduleService', () => {
     const request = httpTestingController.expectOne(
       (req) => req.url === `${API_BASE_URL}/eventos/escalas`,
     );
+    request.flush(
+      { message: 'Forbidden' },
+      {
+        status: 403,
+        statusText: 'Forbidden',
+      },
+    );
+  });
+
+  it('should request the full schedule detail by event id', () => {
+    service.findByEventId(1).subscribe((response) => {
+      expect(response).toEqual(detail);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.body).toBeNull();
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(detail);
+  });
+
+  it('should accept nullable location, nullable priest and empty participant lists', () => {
+    const emptyDetail: EventScheduleDetailResponse = {
+      ...detail,
+      location: null,
+      priest: null,
+      readers: [],
+      commentators: [],
+      ministersOfTheWord: [],
+      eucharisticMinisters: [],
+    };
+
+    service.findByEventId(99).subscribe((response) => {
+      expect(response.location).toBeNull();
+      expect(response.priest).toBeNull();
+      expect(response.readers).toEqual([]);
+      expect(response.commentators).toEqual([]);
+      expect(response.ministersOfTheWord).toEqual([]);
+      expect(response.eucharisticMinisters).toEqual([]);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/99/escala`);
+
+    request.flush(emptyDetail);
+  });
+
+  it('should propagate not found errors from the detail endpoint', (done) => {
+    service.findByEventId(404).subscribe({
+      next: () => {
+        fail('Expected schedule detail request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/404/escala`);
+    request.flush(
+      { message: 'Not found' },
+      {
+        status: 404,
+        statusText: 'Not Found',
+      },
+    );
+  });
+
+  it('should propagate forbidden errors from the detail endpoint', (done) => {
+    service.findByEventId(403).subscribe({
+      next: () => {
+        fail('Expected schedule detail request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/403/escala`);
     request.flush(
       { message: 'Forbidden' },
       {
