@@ -20,6 +20,7 @@ import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
+import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 import { routes } from './app.routes';
 
 describe('routes', () => {
@@ -73,6 +74,12 @@ describe('routes', () => {
     const publicReaderRoute = routes.find((route) => route.path === 'leitores');
 
     expect(publicReaderRoute).toBeUndefined();
+  });
+
+  it('should not expose reader management as a public route', () => {
+    const publicManagementRoute = routes.find((route) => route.path === 'admin/leitores');
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose commentators as a public route', () => {
@@ -247,6 +254,17 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appReaderRoute?.component).toBe(ReaderListComponent);
+    expect(appReaderRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render reader management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/leitores');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(ReaderManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render commentators inside the protected app route', () => {

@@ -21,6 +21,7 @@ import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
+import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard] },
@@ -57,6 +58,11 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       { path: 'leitores', component: ReaderListComponent },
+      {
+        path: 'admin/leitores',
+        component: ReaderManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: 'comentaristas', component: CommentatorListComponent },
       { path: 'padres', component: PriestListComponent },
       { path: 'ministros-palavra', component: MinisterOfTheWordListComponent },

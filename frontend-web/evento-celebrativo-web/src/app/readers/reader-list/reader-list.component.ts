@@ -1,21 +1,25 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { ReaderResponse } from '../reader.models';
 import { ReaderService } from '../reader.service';
 
 @Component({
   selector: 'app-reader-list',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './reader-list.component.html',
   styleUrl: './reader-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReaderListComponent implements OnInit {
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly readerService = inject(ReaderService);
 
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly readers = signal<ReaderResponse[]>([]);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
