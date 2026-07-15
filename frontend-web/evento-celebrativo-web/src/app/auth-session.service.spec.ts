@@ -237,4 +237,38 @@ describe('AuthSessionService', () => {
     expect(authorities).toEqual(['ROLE_ADMIN', 'ROLE_OPERATOR']);
     expect(authorities).not.toBe(payload.authorities);
   });
+
+  it('should identify when an authority exists', () => {
+    saveAccessToken(createToken(createValidPayload()));
+
+    expect(service.hasAuthority('ROLE_ADMIN')).toBeTrue();
+  });
+
+  it('should return false when an authority does not exist', () => {
+    saveAccessToken(createToken(createValidPayload()));
+
+    expect(service.hasAuthority('ROLE_UNKNOWN')).toBeFalse();
+  });
+
+  it('should return false for invalid sessions when checking an authority', () => {
+    saveAccessToken('invalid-token');
+
+    expect(service.hasAuthority('ROLE_ADMIN')).toBeFalse();
+  });
+
+  it('should not accept partial authority matches', () => {
+    saveAccessToken(createToken(createValidPayload()));
+
+    expect(service.hasAuthority('ADMIN')).toBeFalse();
+  });
+
+  it('should not change the stored session when checking an authority', () => {
+    const token = createToken(createValidPayload());
+    saveAccessToken(token);
+
+    service.hasAuthority('ROLE_ADMIN');
+
+    expect(service.getAccessToken()).toBe(token);
+    expect(service.getTokenType()).toBe(tokenResponse.token_type);
+  });
 });

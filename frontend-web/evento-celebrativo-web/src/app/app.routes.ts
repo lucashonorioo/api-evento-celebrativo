@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { AccessDeniedComponent } from './access-denied/access-denied.component';
+import { adminGuard } from './admin.guard';
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
@@ -9,6 +11,7 @@ import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
+import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
@@ -25,10 +28,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'inicio', component: HomeComponent },
+      { path: 'acesso-negado', component: AccessDeniedComponent },
       { path: 'eventos', component: EventListComponent },
       { path: 'eventos/:id', component: EventDetailComponent },
       { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
       { path: 'locais', component: LocationListComponent },
+      {
+        path: 'admin/locais',
+        component: LocationManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: 'leitores', component: ReaderListComponent },
       { path: 'comentaristas', component: CommentatorListComponent },
       { path: 'padres', component: PriestListComponent },

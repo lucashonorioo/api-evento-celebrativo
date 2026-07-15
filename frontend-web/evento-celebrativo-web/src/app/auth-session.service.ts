@@ -62,6 +62,10 @@ export class AuthSessionService {
     return payload === null ? [] : [...payload.authorities];
   }
 
+  hasAuthority(authority: string): boolean {
+    return this.getAuthorities().includes(authority);
+  }
+
   clear(): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(TOKEN_TYPE_KEY);

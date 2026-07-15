@@ -31,6 +31,15 @@
     >
       Locais
     </a>
+    @if (isAdmin) {
+      <a
+        class="app-navigation__link"
+        routerLink="/app/admin/locais"
+        routerLinkActive="app-navigation__link--active"
+      >
+        Gerenciar locais
+      </a>
+    }
     <a
       class="app-navigation__link"
       routerLink="/app/leitores"
