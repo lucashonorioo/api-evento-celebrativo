@@ -5,7 +5,9 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.model.EventScheduleType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -17,6 +19,14 @@ public interface CelebrationEventService {
     CelebrationEventResponseDTO createEvent(CelebrationEventRequestDTO celebrationEventRequestDTO);
     List<CelebrationEventResponseDTO> findAllEvents();
     Page<EucharistScaleEventResponseDTO> findEucharistScale(Pageable pageable, LocalDate startDate, LocalDate endDate);
+    Page<EventScheduleQueryResponseDTO> findEventSchedules(
+            LocalDate startDate,
+            LocalDate endDate,
+            EventScheduleType type,
+            int page,
+            int size,
+            boolean includeUnassigned
+    );
     CelebrationEventResponseDTO findEventById(Long id);
     CelebrationEventResponseDTO updateEvent(Long id, CelebrationEventRequestDTO celebrationEventRequestDTO);
     CelebrationEventScaleResponseDTO updateEventScale(Long id, CelebrationEventScaleRequestDTO celebrationEventScaleRequestDTO);

@@ -1,14 +1,20 @@
 package com.eventoscelebrativos.repository;
 
+import com.eventoscelebrativos.model.CelebrationEvent;
+import com.eventoscelebrativos.model.EventScheduleType;
+import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -17,6 +23,9 @@ class CelebrationEventRepositoryTest {
 
     @Autowired
     private CelebrationEventRepository eventRepository;
+
+    @Autowired
+    private TestEntityManager entityManager;
 
     @Test
     void shouldFindEucharistScaleWhenEventsExistInPeriod() {
@@ -94,5 +103,197 @@ class CelebrationEventRepositoryTest {
 
         Assertions.assertTrue(result.isEmpty());
         Assertions.assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    void shouldFindPriestScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.PRIEST, false);
+
+        Assertions.assertEquals(2, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !assignments(event, EventScheduleType.PRIEST).isEmpty()));
+    }
+
+    @Test
+    void shouldFindReaderScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.READER, false);
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !assignments(event, EventScheduleType.READER).isEmpty()));
+    }
+
+    @Test
+    void shouldFindCommentatorScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.COMMENTATOR, false);
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !assignments(event, EventScheduleType.COMMENTATOR).isEmpty()));
+    }
+
+    @Test
+    void shouldFindMinisterOfTheWordScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.MINISTER_OF_THE_WORD, false);
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !assignments(event, EventScheduleType.MINISTER_OF_THE_WORD).isEmpty()));
+    }
+
+    @Test
+    void shouldFindEucharisticMinisterScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.EUCHARISTIC_MINISTER, false);
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !assignments(event, EventScheduleType.EUCHARISTIC_MINISTER).isEmpty()));
+    }
+
+    @Test
+    void shouldFilterScheduleEventsByPeriod() {
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 10),
+                LocalDate.of(2025, 7, 12),
+                LocalDate.of(2025, 7, 13),
+                EventScheduleType.READER.getPersonType(),
+                false
+        );
+
+        Assertions.assertEquals(2, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .allMatch(event -> !event.getEventDate().isBefore(LocalDate.of(2025, 7, 12))
+                        && !event.getEventDate().isAfter(LocalDate.of(2025, 7, 13))));
+    }
+
+    @Test
+    void shouldPaginateScheduleByEvent() {
+        Page<EventScheduleEventProjection> firstPage = eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 2),
+                LocalDate.of(2025, 7, 1),
+                LocalDate.of(2025, 7, 31),
+                EventScheduleType.EUCHARISTIC_MINISTER.getPersonType(),
+                false
+        );
+        Page<EventScheduleEventProjection> secondPage = eventRepository.findEventScheduleEvents(
+                PageRequest.of(1, 2),
+                LocalDate.of(2025, 7, 1),
+                LocalDate.of(2025, 7, 31),
+                EventScheduleType.EUCHARISTIC_MINISTER.getPersonType(),
+                false
+        );
+
+        Assertions.assertEquals(3, firstPage.getTotalElements());
+        Assertions.assertEquals(2, firstPage.getNumberOfElements());
+        Assertions.assertEquals(1, secondPage.getNumberOfElements());
+    }
+
+    @Test
+    void shouldGroupSeveralAssignmentsInSameEvent() {
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 10),
+                LocalDate.of(2025, 7, 13),
+                LocalDate.of(2025, 7, 13),
+                EventScheduleType.EUCHARISTIC_MINISTER.getPersonType(),
+                false
+        );
+
+        List<EventScheduleAssignmentProjection> assignments = eventRepository.findEventScheduleAssignments(
+                result.getContent().stream().map(EventScheduleEventProjection::getEventId).toList(),
+                EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()
+        );
+
+        Assertions.assertEquals(1, result.getTotalElements());
+        Assertions.assertEquals(2, assignments.size());
+        Assertions.assertEquals(1L, assignments.get(0).getEventId());
+        Assertions.assertEquals(1L, assignments.get(1).getEventId());
+    }
+
+    @Test
+    void shouldOrderScheduleEventsByDateTimeAndId() {
+        CelebrationEvent first = new CelebrationEvent(null, "Missa Teste 1", LocalDate.of(2026, 1, 1), LocalTime.of(8, 0), true);
+        CelebrationEvent second = new CelebrationEvent(null, "Missa Teste 2", LocalDate.of(2026, 1, 1), LocalTime.of(8, 0), true);
+        entityManager.persist(first);
+        entityManager.persist(second);
+        entityManager.flush();
+
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 10),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 1, 1),
+                EventScheduleType.READER.getPersonType(),
+                true
+        );
+
+        Assertions.assertEquals(List.of(first.getId(), second.getId()),
+                result.getContent().stream().map(EventScheduleEventProjection::getEventId).toList());
+    }
+
+    @Test
+    void shouldNotDuplicateScheduleEvents() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.EUCHARISTIC_MINISTER, false);
+
+        List<Long> ids = result.getContent().stream().map(EventScheduleEventProjection::getEventId).toList();
+        Assertions.assertEquals(ids.size(), ids.stream().distinct().count());
+    }
+
+    @Test
+    void shouldReturnOnlyAssignedEventsWhenIncludeUnassignedIsFalse() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.PRIEST, false);
+
+        Assertions.assertEquals(2, result.getTotalElements());
+    }
+
+    @Test
+    void shouldReturnAllEventsWhenIncludeUnassignedIsTrue() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.PRIEST, true);
+        List<EventScheduleAssignmentProjection> assignments = eventRepository.findEventScheduleAssignments(
+                result.getContent().stream().map(EventScheduleEventProjection::getEventId).toList(),
+                EventScheduleType.PRIEST.getPersonType()
+        );
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().stream()
+                .anyMatch(event -> assignments.stream().noneMatch(assignment -> assignment.getEventId().equals(event.getEventId()))));
+    }
+
+    @Test
+    void shouldReturnEmptySchedulePageWhenNoEventsExistInPeriod() {
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 10),
+                LocalDate.of(2030, 1, 1),
+                LocalDate.of(2030, 1, 31),
+                EventScheduleType.READER.getPersonType(),
+                false
+        );
+
+        Assertions.assertTrue(result.isEmpty());
+        Assertions.assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    void shouldCountScheduleTotalElementsByEventsAndNotPeople() {
+        Page<EventScheduleEventProjection> result = findSchedule(EventScheduleType.EUCHARISTIC_MINISTER, false);
+        List<EventScheduleAssignmentProjection> assignments = eventRepository.findEventScheduleAssignments(
+                result.getContent().stream().map(EventScheduleEventProjection::getEventId).toList(),
+                EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()
+        );
+
+        Assertions.assertEquals(3, result.getTotalElements());
+        Assertions.assertTrue(assignments.size() > result.getTotalElements());
+    }
+
+    private Page<EventScheduleEventProjection> findSchedule(EventScheduleType type, boolean includeUnassigned) {
+        return eventRepository.findEventScheduleEvents(
+                PageRequest.of(0, 10),
+                LocalDate.of(2025, 7, 1),
+                LocalDate.of(2025, 7, 31),
+                type.getPersonType(),
+                includeUnassigned
+        );
+    }
+
+    private List<EventScheduleAssignmentProjection> assignments(EventScheduleEventProjection event, EventScheduleType type) {
+        return eventRepository.findEventScheduleAssignments(List.of(event.getEventId()), type.getPersonType());
     }
 }
