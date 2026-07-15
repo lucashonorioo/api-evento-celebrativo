@@ -6,6 +6,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
@@ -32,6 +33,7 @@ export const routes: Routes = [
       { path: 'acesso-negado', component: AccessDeniedComponent },
       { path: 'eventos', component: EventListComponent },
       { path: 'eventos/:id', component: EventDetailComponent },
+      { path: 'escalas', component: EventScheduleListComponent },
       { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
       { path: 'locais', component: LocationListComponent },
       { path: 'pessoas', component: PeopleHubComponent },

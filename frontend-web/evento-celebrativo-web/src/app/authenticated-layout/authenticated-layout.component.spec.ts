@@ -117,7 +117,7 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTargets).toEqual([
       '/app/inicio',
       '/app/eventos',
-      '/app/escala/eucaristia',
+      '/app/escalas',
       '/app/pessoas',
       '/app/locais',
     ]);
@@ -201,7 +201,7 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTargets).toEqual([
       '/app/inicio',
       '/app/eventos',
-      '/app/escala/eucaristia',
+      '/app/escalas',
       '/app/pessoas',
       '/app/locais',
     ]);
