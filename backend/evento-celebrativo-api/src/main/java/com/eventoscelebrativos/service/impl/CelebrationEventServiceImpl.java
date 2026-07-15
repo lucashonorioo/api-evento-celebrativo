@@ -4,12 +4,14 @@ import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
+import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Commentator;
@@ -42,6 +44,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,19 +62,22 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final PersonRepository personRepository;
     private final CelebrationEventMapper celebrationEventMapper;
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
+    private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
             LocationRepository locationRepository,
             PersonRepository personRepository,
             CelebrationEventMapper celebrationEventMapper,
-            CelebrationEventScaleMapper celebrationEventScaleMapper
+            CelebrationEventScaleMapper celebrationEventScaleMapper,
+            CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
         this.personRepository = personRepository;
         this.celebrationEventMapper = celebrationEventMapper;
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
+        this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
     }
 
     @Override
@@ -165,6 +171,32 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
         CelebrationEvent celebrationEvent = celebrationEventRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
         return celebrationEventMapper.toDto(celebrationEvent);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CelebrationEventScaleDetailResponseDTO findScaleByEventId(Long id) {
+        validateId(id);
+        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
+        celebrationEventRepository.findByIdWithPeople(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
+
+        Location location = firstLocation(celebrationEvent);
+        List<Priest> priests = peopleByType(celebrationEvent, Priest.class);
+        if (priests.size() > 1) {
+            throw new BusinessException("Evento possui mais de um padre vinculado à escala");
+        }
+
+        return celebrationEventScaleDetailMapper.toDto(
+                celebrationEvent,
+                location,
+                priests.isEmpty() ? null : priests.get(0),
+                peopleByType(celebrationEvent, Reader.class),
+                peopleByType(celebrationEvent, Commentator.class),
+                peopleByType(celebrationEvent, MinisterOfTheWord.class),
+                peopleByType(celebrationEvent, EucharisticMinister.class)
+        );
     }
 
     @Override
@@ -317,6 +349,25 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+    }
+
+    private Location firstLocation(CelebrationEvent celebrationEvent) {
+        if (celebrationEvent.getLocations().isEmpty()) {
+            return null;
+        }
+        return celebrationEvent.getLocations().stream()
+                .min(Comparator.comparing(Location::getId, Comparator.nullsLast(Long::compareTo)))
+                .orElse(null);
+    }
+
+    private <T extends Person> List<T> peopleByType(CelebrationEvent celebrationEvent, Class<T> type) {
+        return celebrationEvent.getPeople().stream()
+                .filter(type::isInstance)
+                .map(type::cast)
+                .sorted(Comparator
+                        .comparing(Person::getName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(Person::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList();
     }
 
     private void validateEventScheduleQuery(

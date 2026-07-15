@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CelebrationEventRepository extends JpaRepository<CelebrationEvent, Long> {
@@ -133,5 +134,21 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
             @Param("eventIds") List<Long> eventIds,
             @Param("personType") String personType
     );
+
+    @Query("""
+            SELECT ce
+            FROM CelebrationEvent ce
+            LEFT JOIN FETCH ce.locations
+            WHERE ce.id = :id
+            """)
+    Optional<CelebrationEvent> findByIdWithLocations(@Param("id") Long id);
+
+    @Query("""
+            SELECT DISTINCT ce
+            FROM CelebrationEvent ce
+            LEFT JOIN FETCH ce.people
+            WHERE ce.id = :id
+            """)
+    Optional<CelebrationEvent> findByIdWithPeople(@Param("id") Long id);
 
 }

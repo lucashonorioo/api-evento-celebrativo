@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleLocationResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScalePersonResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
@@ -123,6 +124,73 @@ class CelebrationEventControllerTest {
                 .andExpect(jsonPath("$.eventId").value(1))
                 .andExpect(jsonPath("$.location.id").value(1))
                 .andExpect(jsonPath("$.priest.id").value(8));
+    }
+
+    @Test
+    void shouldReturnOkWhenAdminGetsEventScaleDetail() throws Exception {
+        when(celebrationEventService.findScaleByEventId(1L)).thenReturn(scaleDetailResponse());
+
+        mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(1))
+                .andExpect(jsonPath("$.eventName").value("Missa"))
+                .andExpect(jsonPath("$.eventDate").value("2026-08-15"))
+                .andExpect(jsonPath("$.eventTime").value("19:30:00"))
+                .andExpect(jsonPath("$.massOrCelebration").value(true))
+                .andExpect(jsonPath("$.location.id").value(1))
+                .andExpect(jsonPath("$.location.churchName").value("Igreja Matriz"))
+                .andExpect(jsonPath("$.priest.id").value(13))
+                .andExpect(jsonPath("$.readers[0].id").value(4))
+                .andExpect(jsonPath("$.commentators[0].id").value(1))
+                .andExpect(jsonPath("$.ministersOfTheWord[0].id").value(7))
+                .andExpect(jsonPath("$.eucharisticMinisters[0].id").value(10))
+                .andExpect(jsonPath("$.phoneNumber").doesNotExist())
+                .andExpect(jsonPath("$.readers[0].phoneNumber").doesNotExist())
+                .andExpect(jsonPath("$.readers[0].birthdayDate").doesNotExist())
+                .andExpect(jsonPath("$.readers[0].password").doesNotExist())
+                .andExpect(jsonPath("$.readers[0].roles").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnOkWhenOperatorGetsEventScaleDetail() throws Exception {
+        when(celebrationEventService.findScaleByEventId(1L)).thenReturn(scaleDetailResponse());
+
+        mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(1));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenGettingMissingEventScaleDetail() throws Exception {
+        when(celebrationEventService.findScaleByEventId(99L))
+                .thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
+
+        mockMvc.perform(get("/eventos/99/escala"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldSerializeNullsAndEmptyListsWhenGettingEventScaleDetail() throws Exception {
+        CelebrationEventScaleDetailResponseDTO response = scaleDetailResponse();
+        response.setLocation(null);
+        response.setPriest(null);
+        response.setReaders(List.of());
+        response.setCommentators(List.of());
+        response.setMinistersOfTheWord(List.of());
+        response.setEucharisticMinisters(List.of());
+        when(celebrationEventService.findScaleByEventId(1L)).thenReturn(response);
+
+        mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.location").doesNotExist())
+                .andExpect(jsonPath("$.priest").doesNotExist())
+                .andExpect(jsonPath("$.readers").isArray())
+                .andExpect(jsonPath("$.readers").isEmpty())
+                .andExpect(jsonPath("$.commentators").isEmpty())
+                .andExpect(jsonPath("$.ministersOfTheWord").isEmpty())
+                .andExpect(jsonPath("$.eucharisticMinisters").isEmpty());
     }
 
     @Test
@@ -412,6 +480,28 @@ class CelebrationEventControllerTest {
         response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
         response.setPriest(new CelebrationEventScalePersonResponseDTO(8L, "Padre"));
         response.setReaders(List.of(new CelebrationEventScalePersonResponseDTO(2L, "Leitor")));
+        return response;
+    }
+
+    private CelebrationEventScaleDetailResponseDTO scaleDetailResponse() {
+        CelebrationEventScaleDetailResponseDTO response = new CelebrationEventScaleDetailResponseDTO();
+        response.setEventId(1L);
+        response.setEventName("Missa");
+        response.setEventDate(EVENT_DATE);
+        response.setEventTime(EVENT_TIME);
+        response.setMassOrCelebration(true);
+        response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
+        response.setPriest(new CelebrationEventScalePersonResponseDTO(13L, "Padre Miguel"));
+        response.setReaders(List.of(
+                new CelebrationEventScalePersonResponseDTO(4L, "Alice Lima"),
+                new CelebrationEventScalePersonResponseDTO(5L, "Arthur Costa")
+        ));
+        response.setCommentators(List.of(new CelebrationEventScalePersonResponseDTO(1L, "Luana Odinson")));
+        response.setMinistersOfTheWord(List.of(new CelebrationEventScalePersonResponseDTO(7L, "Davi Gomes")));
+        response.setEucharisticMinisters(List.of(
+                new CelebrationEventScalePersonResponseDTO(10L, "Mariana Ferraz"),
+                new CelebrationEventScalePersonResponseDTO(11L, "Carlos Silva")
+        ));
         return response;
     }
 
