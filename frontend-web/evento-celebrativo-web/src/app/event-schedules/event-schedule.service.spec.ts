@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
 import {
+  CreateEventWithScheduleRequest,
+  CreateEventWithScheduleResponse,
   EventScheduleDetailResponse,
   EventSchedulePage,
   UpdateEventScheduleRequest,
@@ -89,6 +91,34 @@ describe('EventScheduleService', () => {
       { id: 11, name: 'Mariana Ferraz' },
       { id: 12, name: 'Carlos Mendes' },
     ],
+  };
+  const createRequest: CreateEventWithScheduleRequest = {
+    nameMassOrEvent: 'Missa nova',
+    eventDate: '2026-08-15',
+    eventTime: '19:30:00',
+    massOrCelebration: true,
+    locationId: 2,
+    priestId: null,
+    readerIds: [5],
+    commentatorIds: [],
+    ministerOfTheWordIds: [8],
+    eucharisticMinisterIds: [],
+  };
+  const createResponse: CreateEventWithScheduleResponse = {
+    eventId: 3,
+    nameMassOrEvent: 'Missa nova',
+    eventDate: '2026-08-15',
+    eventTime: '19:30:00',
+    massOrCelebration: true,
+    location: {
+      id: 2,
+      churchName: 'Capela Sao Jose',
+    },
+    priest: null,
+    readers: [{ id: 5, name: 'Alice Lima' }],
+    commentators: [],
+    ministersOfTheWord: [{ id: 8, name: 'Davi Gomes' }],
+    eucharisticMinisters: [],
   };
 
   beforeEach(() => {
@@ -395,6 +425,146 @@ describe('EventScheduleService', () => {
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+    request.flush(
+      { message: 'Conflict' },
+      {
+        status: 409,
+        statusText: 'Conflict',
+      },
+    );
+  });
+
+  it('should create an event with schedule with the expected body', () => {
+    service.createEventWithSchedule(createRequest).subscribe((response) => {
+      expect(response).toEqual(createResponse);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(createRequest);
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(createResponse);
+  });
+
+  it('should send empty participant lists and nullable priest when creating', () => {
+    const emptyRequest: CreateEventWithScheduleRequest = {
+      nameMassOrEvent: 'Celebracao sem participantes',
+      eventDate: '2026-09-01',
+      eventTime: '08:00:00',
+      massOrCelebration: false,
+      locationId: 2,
+      priestId: null,
+      readerIds: [],
+      commentatorIds: [],
+      ministerOfTheWordIds: [],
+      eucharisticMinisterIds: [],
+    };
+    const emptyResponse: CreateEventWithScheduleResponse = {
+      ...createResponse,
+      eventId: 4,
+      nameMassOrEvent: 'Celebracao sem participantes',
+      massOrCelebration: false,
+      priest: null,
+      readers: [],
+      commentators: [],
+      ministersOfTheWord: [],
+      eucharisticMinisters: [],
+    };
+
+    service.createEventWithSchedule(emptyRequest).subscribe((response) => {
+      expect(response.eventId).toBe(4);
+      expect(response.priest).toBeNull();
+      expect(response.readers).toEqual([]);
+      expect(response.commentators).toEqual([]);
+      expect(response.ministersOfTheWord).toEqual([]);
+      expect(response.eucharisticMinisters).toEqual([]);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(emptyRequest);
+
+    request.flush(emptyResponse);
+  });
+
+  it('should propagate bad request errors from the create endpoint', (done) => {
+    service.createEventWithSchedule(createRequest).subscribe({
+      next: () => {
+        fail('Expected create request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
+    request.flush(
+      { message: 'Invalid data' },
+      {
+        status: 400,
+        statusText: 'Bad Request',
+      },
+    );
+  });
+
+  it('should propagate forbidden errors from the create endpoint', (done) => {
+    service.createEventWithSchedule(createRequest).subscribe({
+      next: () => {
+        fail('Expected create request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
+    request.flush(
+      { message: 'Forbidden' },
+      {
+        status: 403,
+        statusText: 'Forbidden',
+      },
+    );
+  });
+
+  it('should propagate not found errors from the create endpoint', (done) => {
+    service.createEventWithSchedule(createRequest).subscribe({
+      next: () => {
+        fail('Expected create request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
+    request.flush(
+      { message: 'Not found' },
+      {
+        status: 404,
+        statusText: 'Not Found',
+      },
+    );
+  });
+
+  it('should propagate conflict errors from the create endpoint', (done) => {
+    service.createEventWithSchedule(createRequest).subscribe({
+      next: () => {
+        fail('Expected create request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/com-escala`);
     request.flush(
       { message: 'Conflict' },
       {

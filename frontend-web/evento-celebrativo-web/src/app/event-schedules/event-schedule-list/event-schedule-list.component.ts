@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import {
   EventSchedulePage,
   EventScheduleQuery,
@@ -30,6 +31,7 @@ interface EventScheduleTypeOption {
 })
 export class EventScheduleListComponent implements OnInit {
   private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly eventScheduleService = inject(EventScheduleService);
 
   readonly scheduleTypeOptions: readonly EventScheduleTypeOption[] = [
@@ -133,6 +135,10 @@ export class EventScheduleListComponent implements OnInit {
 
   detailLinkFor(schedule: EventScheduleResponse): readonly string[] {
     return ['/app/escalas/eventos', String(schedule.eventId)];
+  }
+
+  isAdmin(): boolean {
+    return this.authSessionService.hasAuthority('ROLE_ADMIN');
   }
 
   private loadPage(page: number): void {

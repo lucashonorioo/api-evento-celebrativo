@@ -5,6 +5,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
 import { EventScheduleEditComponent } from './event-schedules/event-schedule-edit/event-schedule-edit.component';
 import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
@@ -112,6 +113,14 @@ describe('routes', () => {
     expect(publicScheduleEditRoute).toBeUndefined();
   });
 
+  it('should not expose event with schedule creation as a public route', () => {
+    const publicScheduleCreateRoute = routes.find(
+      (route) => route.path === 'admin/escalas/novo-evento',
+    );
+
+    expect(publicScheduleCreateRoute).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -177,6 +186,18 @@ describe('routes', () => {
     expect(appScheduleEditRoute?.component).toBe(EventScheduleEditComponent);
     expect(appScheduleEditRoute?.canActivate).toEqual([adminGuard]);
     expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render event with schedule creation inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appScheduleCreateRoute = appRoute?.children?.find(
+      (route) => route.path === 'admin/escalas/novo-evento',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appScheduleCreateRoute?.component).toBe(EventScheduleCreateComponent);
+    expect(appScheduleCreateRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render locations inside the protected app route', () => {
