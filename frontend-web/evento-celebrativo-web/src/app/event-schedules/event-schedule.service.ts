@@ -7,6 +7,8 @@ import {
   EventScheduleDetailResponse,
   EventSchedulePage,
   EventScheduleQuery,
+  UpdateEventScheduleRequest,
+  UpdateEventScheduleResponse,
 } from './event-schedule.models';
 
 @Injectable({
@@ -30,6 +32,16 @@ export class EventScheduleService {
   findByEventId(eventId: number): Observable<EventScheduleDetailResponse> {
     return this.http.get<EventScheduleDetailResponse>(
       `${API_BASE_URL}/eventos/${eventId}/escala`,
+    );
+  }
+
+  updateEventSchedule(
+    eventId: number,
+    request: UpdateEventScheduleRequest,
+  ): Observable<UpdateEventScheduleResponse> {
+    return this.http.put<UpdateEventScheduleResponse>(
+      `${API_BASE_URL}/eventos/${eventId}/escala`,
+      request,
     );
   }
 }

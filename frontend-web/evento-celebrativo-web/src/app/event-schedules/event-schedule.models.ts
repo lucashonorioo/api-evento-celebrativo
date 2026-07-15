@@ -66,3 +66,26 @@ export interface EventScheduleDetailResponse {
   readonly ministersOfTheWord: EventSchedulePersonSummary[];
   readonly eucharisticMinisters: EventSchedulePersonSummary[];
 }
+
+export interface UpdateEventScheduleRequest {
+  readonly locationId: number;
+  readonly priestId: number | null;
+  readonly readerIds: number[];
+  readonly commentatorIds: number[];
+  readonly ministerOfTheWordIds: number[];
+  readonly eucharisticMinisterIds: number[];
+}
+
+export interface UpdateEventScheduleResponse {
+  readonly eventId: number;
+  readonly nameMassOrEvent: string;
+  readonly eventDate: string;
+  readonly eventTime: string;
+  readonly massOrCelebration: boolean;
+  readonly location: EventScheduleLocationSummary | null;
+  readonly priest: EventSchedulePersonSummary | null;
+  readonly readers: EventSchedulePersonSummary[];
+  readonly commentators: EventSchedulePersonSummary[];
+  readonly ministersOfTheWord: EventSchedulePersonSummary[];
+  readonly eucharisticMinisters: EventSchedulePersonSummary[];
+}

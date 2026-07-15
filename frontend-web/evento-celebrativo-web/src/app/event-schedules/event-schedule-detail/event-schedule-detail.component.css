@@ -10,6 +10,13 @@
   background: var(--color-surface);
 }
 
+.event-schedule-detail__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .event-schedule-detail__feedback--error {
   border-color: #f0b6b6;
   background: #fff7f7;
@@ -147,8 +154,13 @@
     grid-template-columns: 1fr;
   }
 
+  .event-schedule-detail__header-actions {
+    width: 100%;
+  }
+
   .event-schedule-detail__button,
-  .event-schedule-detail__link {
+  .event-schedule-detail__link,
+  .event-schedule-detail__header-actions .page-action {
     width: 100%;
   }
 }
