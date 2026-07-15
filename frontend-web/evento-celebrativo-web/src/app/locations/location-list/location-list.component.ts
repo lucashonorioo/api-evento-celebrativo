@@ -1,21 +1,25 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { LocationResponse } from '../location.models';
 import { LocationService } from '../location.service';
 
 @Component({
   selector: 'app-location-list',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './location-list.component.html',
   styleUrl: './location-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LocationListComponent implements OnInit {
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly locationService = inject(LocationService);
 
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly locations = signal<LocationResponse[]>([]);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);

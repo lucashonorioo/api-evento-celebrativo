@@ -1,0 +1,22 @@
+<section class="people-hub page-shell" aria-labelledby="people-hub-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Pessoas</p>
+      <h1 id="people-hub-title">Central de pessoas</h1>
+      <p>Escolha uma categoria para consultar os cadastros relacionados as celebracoes.</p>
+    </div>
+  </header>
+
+  <div class="people-hub__grid">
+    @for (link of peopleLinks; track link.path) {
+      <article class="people-hub__card surface-card">
+        <div>
+          <h2>{{ link.title }}</h2>
+          <p>{{ link.description }}</p>
+        </div>
+
+        <a class="people-hub__link" [routerLink]="link.path">Consultar</a>
+      </article>
+    }
+  </div>
+</section>

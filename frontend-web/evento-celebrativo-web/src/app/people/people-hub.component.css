@@ -1,0 +1,41 @@
+.people-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+.people-hub__card {
+  display: grid;
+  gap: 1rem;
+  align-content: space-between;
+  min-height: 12rem;
+  padding: 1.25rem;
+}
+
+.people-hub__card h2 {
+  margin: 0 0 0.5rem;
+  color: var(--color-text);
+  font-size: 1.15rem;
+}
+
+.people-hub__card p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.people-hub__link {
+  width: fit-content;
+  color: var(--color-primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.people-hub__link:hover {
+  text-decoration: underline;
+}
+
+.people-hub__link:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}

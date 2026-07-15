@@ -1,90 +1,106 @@
-<div class="app-shell">
-  <header class="app-header">
-    <a class="app-header__brand" routerLink="/app/inicio">Evento Celebrativo</a>
-
-    <div class="app-header__account">
-      <span class="app-header__username">{{ username }}</span>
-      <button class="app-header__logout" type="button" (click)="onLogout()">Sair</button>
+<div class="app-shell" [class.app-shell--sidebar-open]="isSidebarOpen()">
+  <aside id="app-sidebar" class="sidebar" aria-label="Navegacao principal">
+    <div class="sidebar__brand" aria-label="Evento Celebrativo">
+      <span class="sidebar__mark" aria-hidden="true">EC</span>
+      <span class="sidebar__brand-text">
+        <span>Evento</span>
+        <span>Celebrativo</span>
+      </span>
     </div>
-  </header>
 
-  <nav class="app-navigation" aria-label="Navegacao principal">
-    <a
-      class="app-navigation__link"
-      routerLink="/app/inicio"
-      routerLinkActive="app-navigation__link--active"
-      [routerLinkActiveOptions]="{ exact: true }"
-    >
-      Inicio
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/eventos"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Eventos
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/locais"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Locais
-    </a>
-    @if (isAdmin) {
+    <nav class="sidebar__navigation">
       <a
-        class="app-navigation__link"
-        routerLink="/app/admin/locais"
-        routerLinkActive="app-navigation__link--active"
+        class="sidebar__link"
+        routerLink="/app/inicio"
+        routerLinkActive="sidebar__link--active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
       >
-        Gerenciar locais
+        Inicio
       </a>
-    }
-    <a
-      class="app-navigation__link"
-      routerLink="/app/leitores"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Leitores
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/comentaristas"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Comentaristas
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/padres"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Padres
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/ministros-palavra"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Ministros da Palavra
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/ministros-eucaristia"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Ministros da Eucaristia
-    </a>
-    <a
-      class="app-navigation__link"
-      routerLink="/app/escala/eucaristia"
-      routerLinkActive="app-navigation__link--active"
-    >
-      Escala de Eucaristia
-    </a>
-  </nav>
+      <a
+        class="sidebar__link"
+        routerLink="/app/eventos"
+        routerLinkActive="sidebar__link--active"
+        (click)="closeSidebar()"
+      >
+        Eventos
+      </a>
+      <a
+        class="sidebar__link"
+        routerLink="/app/escala/eucaristia"
+        routerLinkActive="sidebar__link--active"
+        (click)="closeSidebar()"
+      >
+        Escalas
+      </a>
+      <a
+        class="sidebar__link"
+        routerLink="/app/pessoas"
+        routerLinkActive="sidebar__link--active"
+        (click)="closeSidebar()"
+      >
+        Pessoas
+      </a>
+      <a
+        class="sidebar__link"
+        routerLink="/app/locais"
+        routerLinkActive="sidebar__link--active"
+        (click)="closeSidebar()"
+      >
+        Locais
+      </a>
+    </nav>
+  </aside>
 
-  <main class="app-content">
-    <router-outlet />
-  </main>
+  <button
+    class="sidebar-backdrop"
+    type="button"
+    aria-label="Fechar menu"
+    (click)="closeSidebar()"
+  ></button>
+
+  <div class="app-shell__workspace">
+    <header class="topbar">
+      <button
+        class="topbar__menu-button"
+        type="button"
+        aria-label="Abrir menu"
+        aria-controls="app-sidebar"
+        [attr.aria-expanded]="isSidebarOpen()"
+        (click)="toggleSidebar()"
+      >
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+
+      <div class="topbar__spacer"></div>
+
+      <div class="user-menu">
+        <button
+          class="user-menu__trigger"
+          type="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="isUserMenuOpen()"
+          (click)="toggleUserMenu()"
+        >
+          <span class="user-menu__avatar" aria-hidden="true">{{ userInitials }}</span>
+          <span class="user-menu__name">{{ username }}</span>
+        </button>
+
+        @if (isUserMenuOpen()) {
+          <div class="user-menu__panel" role="menu">
+            <button class="user-menu__item" type="button" role="menuitem" (click)="onLogout()">
+              Sair
+            </button>
+          </div>
+        }
+      </div>
+    </header>
+
+    <main class="app-content">
+      <router-outlet />
+    </main>
+  </div>
 </div>

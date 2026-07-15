@@ -1,1 +1,127 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --color-primary-dark: #102a43;
+  --color-primary: #1f4f8f;
+  --color-primary-soft: #e8f0fb;
+  --color-accent: #c9a227;
+  --color-background: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-text: #172033;
+  --color-text-muted: #5d6675;
+  --color-border: #d8dee8;
+  --color-success: #1f6b3d;
+  --color-danger: #9f1d1d;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 8px 24px rgba(16, 42, 67, 0.08);
+  --shadow-md: 0 16px 40px rgba(16, 42, 67, 0.14);
+  --layout-sidebar-width: 17rem;
+  --layout-topbar-height: 4.5rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.page-shell {
+  display: grid;
+  gap: 1.5rem;
+  width: min(100%, 70rem);
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-header__content {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.page-header__eyebrow {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-header h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.page-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.page-action:hover {
+  background: #173f73;
+}
+
+.page-action:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.surface-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 48rem) {
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-action {
+    width: 100%;
+  }
+}

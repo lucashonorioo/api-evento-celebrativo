@@ -13,6 +13,7 @@ import { LoginComponent } from './login/login.component';
 import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
+import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
 import { routes } from './app.routes';
@@ -56,6 +57,12 @@ describe('routes', () => {
     const publicManagementRoute = routes.find((route) => route.path === 'admin/locais');
 
     expect(publicManagementRoute).toBeUndefined();
+  });
+
+  it('should not expose people as a public route', () => {
+    const publicPeopleRoute = routes.find((route) => route.path === 'pessoas');
+
+    expect(publicPeopleRoute).toBeUndefined();
   });
 
   it('should not expose readers as a public route', () => {
@@ -135,6 +142,16 @@ describe('routes', () => {
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(accessDeniedRoute?.component).toBe(AccessDeniedComponent);
     expect(accessDeniedRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render people hub inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const peopleRoute = appRoute?.children?.find((route) => route.path === 'pessoas');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(peopleRoute?.component).toBe(PeopleHubComponent);
+    expect(peopleRoute?.canActivate).toBeUndefined();
   });
 
   it('should render location management inside the protected app route for admins only', () => {

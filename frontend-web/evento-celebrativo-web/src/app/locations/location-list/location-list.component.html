@@ -1,7 +1,14 @@
-<section class="locations" aria-labelledby="locations-title">
-  <header class="locations__header">
-    <h1 id="locations-title">Locais</h1>
-    <p>Consulte os locais cadastrados no sistema.</p>
+<section class="locations page-shell" aria-labelledby="locations-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Locais</p>
+      <h1 id="locations-title">Locais</h1>
+      <p>Consulte os locais cadastrados no sistema.</p>
+    </div>
+
+    @if (isAdmin) {
+      <a class="page-action" routerLink="/app/admin/locais">Gerenciar locais</a>
+    }
   </header>
 
   @if (isLoading()) {
