@@ -1,7 +1,14 @@
-<section class="readers" aria-labelledby="readers-title">
-  <header class="readers__header">
-    <h1 id="readers-title">Leitores</h1>
-    <p>Consulte os leitores cadastrados no sistema.</p>
+<section class="readers page-shell" aria-labelledby="readers-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Pessoas</p>
+      <h1 id="readers-title">Leitores</h1>
+      <p>Consulte os leitores cadastrados no sistema.</p>
+    </div>
+
+    @if (isAdmin) {
+      <a class="page-action" routerLink="/app/admin/leitores">Gerenciar leitores</a>
+    }
   </header>
 
   @if (isLoading()) {

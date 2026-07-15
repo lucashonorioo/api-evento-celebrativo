@@ -1,0 +1,188 @@
+<section class="reader-management" aria-labelledby="reader-management-title">
+  <header class="reader-management__header">
+    <h1 id="reader-management-title">Gerenciar leitores</h1>
+    <p>Cadastre, edite e exclua leitores disponiveis para as escalas.</p>
+  </header>
+
+  <form class="reader-management__form" [formGroup]="form" (ngSubmit)="submit()">
+    <h2>{{ isEditing ? 'Editar leitor' : 'Cadastrar leitor' }}</h2>
+
+    <div class="reader-management__field">
+      <label for="name">Nome</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'name-error' : null"
+      />
+
+      @if (fieldErrorMessage('name'); as message) {
+        <p id="name-error" class="reader-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="reader-management__field">
+      <label for="phoneNumber">Telefone</label>
+      <input
+        id="phoneNumber"
+        type="tel"
+        formControlName="phoneNumber"
+        autocomplete="tel"
+        inputmode="numeric"
+        maxlength="11"
+        [attr.aria-invalid]="fieldErrorMessage('phoneNumber') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('phoneNumber') !== null ? 'phoneNumber-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('phoneNumber'); as message) {
+        <p id="phoneNumber-error" class="reader-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="reader-management__field">
+      <label for="birthdayDate">Data de nascimento</label>
+      <input
+        id="birthdayDate"
+        type="date"
+        formControlName="birthdayDate"
+        autocomplete="bday"
+        [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('birthdayDate') !== null ? 'birthdayDate-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('birthdayDate'); as message) {
+        <p id="birthdayDate-error" class="reader-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="reader-management__field">
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
+      />
+
+      @if (fieldErrorMessage('password'); as message) {
+        <p id="password-error" class="reader-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="reader-management__actions">
+      <button class="reader-management__button" type="submit" [disabled]="isSaving()">
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="reader-management__button reader-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="reader-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="reader-management__feedback reader-management__feedback--success">
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p class="reader-management__feedback reader-management__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="reader-management__list-section" aria-labelledby="reader-list-title">
+    <h2 id="reader-list-title">Leitores cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="reader-management__status" role="status">Carregando leitores...</p>
+    } @else if (errorMessage() && readers().length === 0) {
+      <button class="reader-management__button" type="button" (click)="loadReaders()">
+        Tentar novamente
+      </button>
+    } @else if (readers().length === 0) {
+      <p class="reader-management__feedback">Nenhum leitor cadastrado foi encontrado.</p>
+    } @else {
+      <ul class="reader-management__list" aria-label="Lista de leitores cadastrados">
+        @for (reader of readers(); track reader.id) {
+          <li class="reader-management__item">
+            <div class="reader-management__item-content">
+              <h3>{{ reader.name }}</h3>
+
+              @if (reader.phoneNumber) {
+                <p>Telefone: {{ reader.phoneNumber }}</p>
+              }
+
+              @if (reader.birthdayDate) {
+                <p>Nascimento: {{ reader.birthdayDate }}</p>
+              }
+            </div>
+
+            <div class="reader-management__item-actions">
+              <button
+                class="reader-management__button reader-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(reader)"
+              >
+                Editar
+              </button>
+              <button
+                class="reader-management__button reader-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(reader)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as reader) {
+    <section class="reader-management__confirmation" aria-labelledby="delete-confirmation-title">
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este leitor?</h2>
+      <p>{{ reader.name }}</p>
+
+      <div class="reader-management__actions">
+        <button
+          class="reader-management__button reader-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === reader.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="reader-management__button reader-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === reader.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>

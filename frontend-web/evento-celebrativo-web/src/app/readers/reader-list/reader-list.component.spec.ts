@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { ReaderResponse } from '../reader.models';
 import { ReaderService } from '../reader.service';
 import { ReaderListComponent } from './reader-list.component';
@@ -9,6 +11,7 @@ import { ReaderListComponent } from './reader-list.component';
 describe('ReaderListComponent', () => {
   let component: ReaderListComponent;
   let fixture: ComponentFixture<ReaderListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let readerService: jasmine.SpyObj<ReaderService>;
 
   const readers: ReaderResponse[] = [
@@ -26,13 +29,21 @@ describe('ReaderListComponent', () => {
     },
   ];
 
-  async function setup(response = of(readers)): Promise<void> {
+  async function setup(response = of(readers), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     readerService = jasmine.createSpyObj<ReaderService>('ReaderService', ['findAll']);
     readerService.findAll.and.returnValue(response);
 
     await TestBed.configureTestingModule({
       imports: [ReaderListComponent],
-      providers: [{ provide: ReaderService, useValue: readerService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: ReaderService, useValue: readerService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ReaderListComponent);
@@ -81,6 +92,40 @@ describe('ReaderListComponent', () => {
 
     expect(pageText).toContain('Maria Leitora');
     expect(pageText).toContain('João Leitor');
+  });
+
+  it('should show reader management link for administrators', async () => {
+    await setup(of(readers), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar leitores');
+    expect(link.getAttribute('href')).toBe('/app/admin/leitores');
+  });
+
+  it('should hide reader management link for operators', async () => {
+    await setup(of(readers), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar leitores');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Maria Leitora');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render reader identifiers', async () => {
