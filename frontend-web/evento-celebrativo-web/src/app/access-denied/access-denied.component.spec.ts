@@ -28,7 +28,7 @@ describe('AccessDeniedComponent', () => {
   });
 
   it('should link back to the authenticated home page', () => {
-    const link = fixture.nativeElement.querySelector('.access-denied__link') as HTMLAnchorElement;
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
 
     expect(link.textContent).toContain('Voltar para o inicio');
     expect(link.getAttribute('href')).toBe('/app/inicio');

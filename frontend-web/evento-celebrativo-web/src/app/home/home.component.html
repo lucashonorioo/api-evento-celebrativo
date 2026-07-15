@@ -1,6 +1,22 @@
-<main class="home">
-  <section class="home__content" aria-labelledby="home-title">
-    <h1 id="home-title">Evento Celebrativo</h1>
-    <p>Bem-vindo ao sistema.</p>
+<section class="home page-shell" aria-labelledby="home-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Inicio</p>
+      <h1 id="home-title">Painel da Paroquia</h1>
+      <p>Bem-vindo, {{ username }}. Acesse rapidamente as areas principais do sistema.</p>
+    </div>
+  </header>
+
+  <section class="home__quick-access" aria-labelledby="quick-access-title">
+    <h2 id="quick-access-title">Acessos rapidos</h2>
+
+    <div class="home__grid">
+      @for (link of quickAccessLinks; track link.path) {
+        <a class="home__card surface-card" [routerLink]="link.path">
+          <span>{{ link.label }}</span>
+          <small>{{ link.description }}</small>
+        </a>
+      }
+    </div>
   </section>
-</main>
+</section>

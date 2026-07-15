@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { LocationResponse } from '../location.models';
 import { LocationService } from '../location.service';
 import { LocationListComponent } from './location-list.component';
@@ -9,6 +11,7 @@ import { LocationListComponent } from './location-list.component';
 describe('LocationListComponent', () => {
   let component: LocationListComponent;
   let fixture: ComponentFixture<LocationListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let locationService: jasmine.SpyObj<LocationService>;
 
   const locations: LocationResponse[] = [
@@ -24,13 +27,21 @@ describe('LocationListComponent', () => {
     },
   ];
 
-  async function setup(response = of(locations)): Promise<void> {
+  async function setup(response = of(locations), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     locationService = jasmine.createSpyObj<LocationService>('LocationService', ['findAll']);
     locationService.findAll.and.returnValue(response);
 
     await TestBed.configureTestingModule({
       imports: [LocationListComponent],
-      providers: [{ provide: LocationService, useValue: locationService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: LocationService, useValue: locationService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LocationListComponent);
@@ -80,6 +91,40 @@ describe('LocationListComponent', () => {
     expect(pageText).toContain('Igreja Matriz');
     expect(pageText).toContain('Rua Central');
     expect(pageText).toContain('Capela Santa Luzia');
+  });
+
+  it('should show location management link for administrators', async () => {
+    await setup(of(locations), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar locais');
+    expect(link.getAttribute('href')).toBe('/app/admin/locais');
+  });
+
+  it('should hide location management link for operators', async () => {
+    await setup(of(locations), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar locais');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Igreja Matriz');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render location identifiers', async () => {

@@ -14,6 +14,7 @@ import { LoginComponent } from './login/login.component';
 import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
+import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
 
@@ -33,6 +34,7 @@ export const routes: Routes = [
       { path: 'eventos/:id', component: EventDetailComponent },
       { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
       { path: 'locais', component: LocationListComponent },
+      { path: 'pessoas', component: PeopleHubComponent },
       {
         path: 'admin/locais',
         component: LocationManagementComponent,
