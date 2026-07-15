@@ -5,6 +5,8 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
@@ -12,11 +14,14 @@ import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
+import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
@@ -27,6 +32,8 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +41,18 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 @Service
 public class CelebrationEventServiceImpl implements CelebrationEventService {
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final CelebrationEventRepository celebrationEventRepository;
     private final LocationRepository locationRepository;
@@ -105,6 +117,43 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
             return dto;
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EventScheduleQueryResponseDTO> findEventSchedules(
+            LocalDate startDate,
+            LocalDate endDate,
+            EventScheduleType type,
+            int page,
+            int size,
+            boolean includeUnassigned
+    ) {
+        validateEventScheduleQuery(startDate, endDate, type, page, size);
+
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEvents(
+                pageable,
+                startDate,
+                endDate,
+                type.getPersonType(),
+                includeUnassigned
+        );
+
+        List<Long> eventIds = eventPage.getContent().stream()
+                .map(EventScheduleEventProjection::getEventId)
+                .toList();
+
+        Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent = findAssignmentsByEvent(
+                eventIds,
+                type
+        );
+
+        List<EventScheduleQueryResponseDTO> content = eventPage.getContent().stream()
+                .map(event -> toEventScheduleQueryResponse(event, type, assignmentsByEvent))
+                .toList();
+
+        return new PageImpl<>(content, pageable, eventPage.getTotalElements());
     }
 
 
@@ -268,6 +317,66 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+    }
+
+    private void validateEventScheduleQuery(
+            LocalDate startDate,
+            LocalDate endDate,
+            EventScheduleType type,
+            int page,
+            int size
+    ) {
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
+            throw new BusinessException("As datas estão inválidas");
+        }
+        if (type == null) {
+            throw new BusinessException("O tipo da escala deve ser informado");
+        }
+        if (page < 0) {
+            throw new BusinessException("A página deve ser maior ou igual a zero");
+        }
+        if (size <= 0 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException("O tamanho da página deve ser maior que zero e menor ou igual a 100");
+        }
+    }
+
+    private Map<Long, List<EventScheduleAssignmentResponseDTO>> findAssignmentsByEvent(
+            List<Long> eventIds,
+            EventScheduleType type
+    ) {
+        if (eventIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return celebrationEventRepository.findEventScheduleAssignments(eventIds, type.getPersonType()).stream()
+                .collect(Collectors.groupingBy(
+                        EventScheduleAssignmentProjection::getEventId,
+                        Collectors.mapping(
+                                assignment -> new EventScheduleAssignmentResponseDTO(
+                                        assignment.getPersonId(),
+                                        assignment.getPersonName()
+                                ),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
+    private EventScheduleQueryResponseDTO toEventScheduleQueryResponse(
+            EventScheduleEventProjection event,
+            EventScheduleType type,
+            Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent
+    ) {
+        EventScheduleQueryResponseDTO dto = new EventScheduleQueryResponseDTO();
+        dto.setEventId(event.getEventId());
+        dto.setEventName(event.getEventName());
+        dto.setEventDate(event.getEventDate());
+        dto.setEventTime(event.getEventTime());
+        dto.setMassOrCelebration(event.getMassOrCelebration());
+        dto.setLocationId(event.getLocationId());
+        dto.setChurchName(event.getChurchName());
+        dto.setAssignmentType(type);
+        dto.setAssignments(assignmentsByEvent.getOrDefault(event.getEventId(), List.of()));
+        return dto;
     }
 }
 

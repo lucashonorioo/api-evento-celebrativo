@@ -5,7 +5,9 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
@@ -91,6 +93,33 @@ public class CelebrationEventController {
                 celebrationEventService.findEucharistScale(PageRequest.of(page, size), startDate, endDate);
 
         return ResponseEntity.ok(eventoEscalaMinistrosResponseDTOS);
+    }
+
+    @Operation(summary = "Consulta escalas por período e tipo de função")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
+    @GetMapping(value = "/escalas")
+    public ResponseEntity<Page<EventScheduleQueryResponseDTO>> findEventSchedules(
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Tipo da função: PRIEST, READER, COMMENTATOR, MINISTER_OF_THE_WORD, EUCHARISTIC_MINISTER")
+            @RequestParam("type") EventScheduleType type,
+            @Parameter(description = "Número da página, iniciando em 0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Quantidade de registros por página. Máximo: 100")
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean includeUnassigned
+    ) {
+        Page<EventScheduleQueryResponseDTO> eventSchedules = celebrationEventService.findEventSchedules(
+                startDate,
+                endDate,
+                type,
+                page,
+                size,
+                includeUnassigned
+        );
+
+        return ResponseEntity.ok(eventSchedules);
     }
 
     @Operation(summary = "Atualiza um evento celebrativo")

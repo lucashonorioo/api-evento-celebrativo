@@ -83,6 +83,12 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEventWithScalePayload()))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2025-07-31")
+                        .param("type", "READER"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -107,6 +113,12 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validScalePayload()))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2025-07-31")
+                        .param("type", "READER"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -130,6 +142,12 @@ class EndpointSecurityTest {
         mockMvc.perform(put("/eventos/1/escala")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validScalePayload()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2025-07-31")
+                        .param("type", "READER"))
                 .andExpect(status().isOk());
     }
 

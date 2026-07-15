@@ -4,10 +4,13 @@ import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleLocationResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScalePersonResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,8 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -270,6 +275,129 @@ class CelebrationEventControllerTest {
         );
     }
 
+    @Test
+    void shouldReturnOkWhenAdminFindsEventSchedules() throws Exception {
+        when(celebrationEventService.findEventSchedules(
+                eq(LocalDate.of(2026, 8, 1)),
+                eq(LocalDate.of(2026, 8, 31)),
+                eq(EventScheduleType.READER),
+                eq(0),
+                eq(10),
+                eq(false)
+        )).thenReturn(new PageImpl<>(List.of(scheduleResponse(EventScheduleType.READER)), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "READER")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("includeUnassigned", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].eventId").value(1))
+                .andExpect(jsonPath("$.content[0].assignmentType").value("READER"))
+                .andExpect(jsonPath("$.content[0].assignments[0].personId").value(10))
+                .andExpect(jsonPath("$.content[0].assignments[0].personName").value("Maria"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnOkWhenOperatorFindsEventSchedules() throws Exception {
+        when(celebrationEventService.findEventSchedules(any(), any(), eq(EventScheduleType.PRIEST), anyInt(), anyInt(), anyBoolean()))
+                .thenReturn(new PageImpl<>(List.of(scheduleResponse(EventScheduleType.PRIEST)), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "PRIEST"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].assignmentType").value("PRIEST"));
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEventScheduleTypeIsInvalid() throws Exception {
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "INVALID"))
+                .andExpect(status().isBadRequest());
+
+        verify(celebrationEventService, never()).findEventSchedules(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRequiredEventScheduleParameterIsMissing() throws Exception {
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "READER"))
+                .andExpect(status().isBadRequest());
+
+        verify(celebrationEventService, never()).findEventSchedules(any(), any(), any(), anyInt(), anyInt(), anyBoolean());
+    }
+
+    @Test
+    void shouldReturnBusinessErrorWhenEventSchedulePeriodIsInvalid() throws Exception {
+        when(celebrationEventService.findEventSchedules(
+                eq(LocalDate.of(2026, 8, 31)),
+                eq(LocalDate.of(2026, 8, 1)),
+                eq(EventScheduleType.READER),
+                eq(0),
+                eq(10),
+                eq(false)
+        )).thenThrow(new BusinessException("As datas estão inválidas"));
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-31")
+                        .param("endDate", "2026-08-01")
+                        .param("type", "READER"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    void shouldUseDefaultPaginationWhenFindingEventSchedules() throws Exception {
+        when(celebrationEventService.findEventSchedules(any(), any(), eq(EventScheduleType.READER), eq(0), eq(10), eq(false)))
+                .thenReturn(new PageImpl<>(List.of(scheduleResponse(EventScheduleType.READER)), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "READER")
+                        .param("sort", "[\"string\"]"))
+                .andExpect(status().isOk());
+
+        verify(celebrationEventService).findEventSchedules(
+                eq(LocalDate.of(2026, 8, 1)),
+                eq(LocalDate.of(2026, 8, 31)),
+                eq(EventScheduleType.READER),
+                eq(0),
+                eq(10),
+                eq(false)
+        );
+    }
+
+    @Test
+    void shouldApplyIncludeUnassignedWhenFindingEventSchedules() throws Exception {
+        when(celebrationEventService.findEventSchedules(any(), any(), eq(EventScheduleType.PRIEST), eq(0), eq(10), eq(true)))
+                .thenReturn(new PageImpl<>(List.of(scheduleResponse(EventScheduleType.PRIEST)), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escalas")
+                        .param("startDate", "2026-08-01")
+                        .param("endDate", "2026-08-31")
+                        .param("type", "PRIEST")
+                        .param("includeUnassigned", "true"))
+                .andExpect(status().isOk());
+
+        verify(celebrationEventService).findEventSchedules(
+                eq(LocalDate.of(2026, 8, 1)),
+                eq(LocalDate.of(2026, 8, 31)),
+                eq(EventScheduleType.PRIEST),
+                eq(0),
+                eq(10),
+                eq(true)
+        );
+    }
+
     private CelebrationEventResponseDTO response(String nameMassOrEvent) {
         return new CelebrationEventResponseDTO(1L, nameMassOrEvent, EVENT_DATE, EVENT_TIME, true);
     }
@@ -284,6 +412,20 @@ class CelebrationEventControllerTest {
         response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
         response.setPriest(new CelebrationEventScalePersonResponseDTO(8L, "Padre"));
         response.setReaders(List.of(new CelebrationEventScalePersonResponseDTO(2L, "Leitor")));
+        return response;
+    }
+
+    private EventScheduleQueryResponseDTO scheduleResponse(EventScheduleType type) {
+        EventScheduleQueryResponseDTO response = new EventScheduleQueryResponseDTO();
+        response.setEventId(1L);
+        response.setEventName("Missa");
+        response.setEventDate(EVENT_DATE);
+        response.setEventTime(EVENT_TIME);
+        response.setMassOrCelebration(true);
+        response.setLocationId(1L);
+        response.setChurchName("Igreja Matriz");
+        response.setAssignmentType(type);
+        response.setAssignments(List.of(new EventScheduleAssignmentResponseDTO(10L, "Maria")));
         return response;
     }
 

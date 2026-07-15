@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -14,11 +15,14 @@ import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
+import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
@@ -148,6 +152,123 @@ class CelebrationEventServiceImplTest {
                         () -> service.findEucharistScale(pageable, EVENT_DATE, null)),
                 () -> assertThrows(BusinessException.class,
                         () -> service.findEucharistScale(pageable, EVENT_DATE.plusDays(1), EVENT_DATE))
+        );
+    }
+
+    @Test
+    void shouldFindEventSchedulesForEachType() {
+        for (EventScheduleType type : EventScheduleType.values()) {
+            when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(type.getPersonType()), eq(false)))
+                    .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+            when(repository.findEventScheduleAssignments(List.of(1L), type.getPersonType()))
+                    .thenReturn(List.of(scheduleAssignment(1L, 10L, "Pessoa")));
+
+            Page<EventScheduleQueryResponseDTO> result = service.findEventSchedules(EVENT_DATE, EVENT_DATE, type, 0, 10, false);
+
+            assertEquals(1, result.getTotalElements());
+            assertEquals(type, result.getContent().get(0).getAssignmentType());
+            assertEquals(1, result.getContent().get(0).getAssignments().size());
+        }
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenEventSchedulePeriodIsInvalid() {
+        assertAll(
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(null, EVENT_DATE, EventScheduleType.READER, 0, 10, false)),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(EVENT_DATE, null, EventScheduleType.READER, 0, 10, false)),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(EVENT_DATE.plusDays(1), EVENT_DATE, EventScheduleType.READER, 0, 10, false))
+        );
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenEventSchedulePageSizeIsInvalid() {
+        assertAll(
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, -1, 10, false)),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 0, false)),
+                () -> assertThrows(BusinessException.class,
+                        () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 101, false))
+        );
+    }
+
+    @Test
+    void shouldMapEventScheduleToResponse() {
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
+                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.READER.getPersonType()))
+                .thenReturn(List.of(scheduleAssignment(1L, 10L, "Maria")));
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
+
+        EventScheduleQueryResponseDTO dto = result.getContent().get(0);
+        assertEquals(1L, dto.getEventId());
+        assertEquals("Missa", dto.getEventName());
+        assertEquals(EVENT_DATE, dto.getEventDate());
+        assertEquals(EVENT_TIME, dto.getEventTime());
+        assertEquals(1L, dto.getLocationId());
+        assertEquals("Igreja Matriz", dto.getChurchName());
+        assertEquals(EventScheduleType.READER, dto.getAssignmentType());
+        assertEquals(10L, dto.getAssignments().get(0).getPersonId());
+        assertEquals("Maria", dto.getAssignments().get(0).getPersonName());
+    }
+
+    @Test
+    void shouldMapEventScheduleWithSeveralAssignments() {
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()), eq(false)))
+                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()))
+                .thenReturn(List.of(
+                        scheduleAssignment(1L, 10L, "Ana"),
+                        scheduleAssignment(1L, 11L, "Bruno")
+                ));
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.EUCHARISTIC_MINISTER, 0, 10, false);
+
+        assertEquals(2, result.getContent().get(0).getAssignments().size());
+    }
+
+    @Test
+    void shouldReturnEmptyAssignmentsWhenIncludeUnassignedIsTrueAndEventHasNoPerson() {
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.PRIEST.getPersonType()), eq(true)))
+                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.PRIEST.getPersonType()))
+                .thenReturn(List.of());
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.PRIEST, 0, 10, true);
+
+        assertTrue(result.getContent().get(0).getAssignments().isEmpty());
+    }
+
+    @Test
+    void shouldReturnEmptyEventSchedulePage() {
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
+
+        assertTrue(result.isEmpty());
+        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
+    }
+
+    @Test
+    void shouldNotExposePersonalDataInEventScheduleResponse() {
+        assertAll(
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> EventScheduleQueryResponseDTO.class.getMethod("getPhoneNumber")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> EventScheduleQueryResponseDTO.class.getMethod("getBirthdayDate")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> EventScheduleQueryResponseDTO.class.getMethod("getPassword")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> EventScheduleQueryResponseDTO.class.getMethod("getRoles"))
         );
     }
 
@@ -422,6 +543,64 @@ class CelebrationEventServiceImplTest {
         person.setName(name);
         person.setPhoneNumber("34" + id);
         return person;
+    }
+
+    private EventScheduleEventProjection scheduleEvent(Long eventId) {
+        return new EventScheduleEventProjection() {
+            @Override
+            public Long getEventId() {
+                return eventId;
+            }
+
+            @Override
+            public String getEventName() {
+                return "Missa";
+            }
+
+            @Override
+            public LocalDate getEventDate() {
+                return EVENT_DATE;
+            }
+
+            @Override
+            public LocalTime getEventTime() {
+                return EVENT_TIME;
+            }
+
+            @Override
+            public Boolean getMassOrCelebration() {
+                return true;
+            }
+
+            @Override
+            public Long getLocationId() {
+                return 1L;
+            }
+
+            @Override
+            public String getChurchName() {
+                return "Igreja Matriz";
+            }
+        };
+    }
+
+    private EventScheduleAssignmentProjection scheduleAssignment(Long eventId, Long personId, String personName) {
+        return new EventScheduleAssignmentProjection() {
+            @Override
+            public Long getEventId() {
+                return eventId;
+            }
+
+            @Override
+            public Long getPersonId() {
+                return personId;
+            }
+
+            @Override
+            public String getPersonName() {
+                return personName;
+            }
+        };
     }
 
     private EucharistScaleEventProjection projection(
