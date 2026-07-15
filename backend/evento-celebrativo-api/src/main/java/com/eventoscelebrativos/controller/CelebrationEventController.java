@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
@@ -120,6 +121,16 @@ public class CelebrationEventController {
         );
 
         return ResponseEntity.ok(eventSchedules);
+    }
+
+    @Operation(summary = "Consulta a escala completa de um evento celebrativo")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
+    @GetMapping(value = "/{id}/escala")
+    public ResponseEntity<CelebrationEventScaleDetailResponseDTO> findEventScaleById(@PathVariable Long id) {
+        CelebrationEventScaleDetailResponseDTO celebrationEventScaleDetailResponseDTO =
+                celebrationEventService.findScaleByEventId(id);
+        return ResponseEntity.ok(celebrationEventScaleDetailResponseDTO);
     }
 
     @Operation(summary = "Atualiza um evento celebrativo")

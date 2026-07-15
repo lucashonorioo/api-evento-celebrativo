@@ -283,6 +283,46 @@ class CelebrationEventRepositoryTest {
         Assertions.assertTrue(assignments.size() > result.getTotalElements());
     }
 
+    @Test
+    void shouldFindEventWithLocations() {
+        CelebrationEvent event = eventRepository.findByIdWithLocations(1L).orElseThrow();
+
+        Assertions.assertEquals(1L, event.getId());
+        Assertions.assertFalse(event.getLocations().isEmpty());
+    }
+
+    @Test
+    void shouldFindEventWithPeopleWithoutDuplicatingEvent() {
+        CelebrationEvent event = eventRepository.findByIdWithPeople(1L).orElseThrow();
+
+        Assertions.assertEquals(1L, event.getId());
+        Assertions.assertEquals(7, event.getPeople().size());
+    }
+
+    @Test
+    void shouldFindEventWithoutLocation() {
+        CelebrationEvent event = new CelebrationEvent(null, "Evento sem local", LocalDate.of(2026, 2, 1), LocalTime.of(9, 0), true);
+        entityManager.persist(event);
+        entityManager.flush();
+        entityManager.clear();
+
+        CelebrationEvent result = eventRepository.findByIdWithLocations(event.getId()).orElseThrow();
+
+        Assertions.assertTrue(result.getLocations().isEmpty());
+    }
+
+    @Test
+    void shouldFindEventWithoutPeople() {
+        CelebrationEvent event = new CelebrationEvent(null, "Evento sem pessoas", LocalDate.of(2026, 2, 2), LocalTime.of(9, 0), true);
+        entityManager.persist(event);
+        entityManager.flush();
+        entityManager.clear();
+
+        CelebrationEvent result = eventRepository.findByIdWithPeople(event.getId()).orElseThrow();
+
+        Assertions.assertTrue(result.getPeople().isEmpty());
+    }
+
     private Page<EventScheduleEventProjection> findSchedule(EventScheduleType type, boolean includeUnassigned) {
         return eventRepository.findEventScheduleEvents(
                 PageRequest.of(0, 10),

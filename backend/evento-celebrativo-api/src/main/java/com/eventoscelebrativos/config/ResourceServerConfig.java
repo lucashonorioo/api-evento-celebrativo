@@ -51,6 +51,7 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.POST, "/public/login").permitAll()
 				.requestMatchers(HttpMethod.GET, "/eventos/escala/eucaristia").permitAll()
 				.requestMatchers(HttpMethod.GET, "/eventos/escalas").authenticated()
+				.requestMatchers(HttpMethod.GET, "/eventos/*/escala").authenticated()
 				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
 				.anyRequest().authenticated());
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));

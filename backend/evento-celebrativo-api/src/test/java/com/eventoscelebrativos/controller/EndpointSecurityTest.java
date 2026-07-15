@@ -89,6 +89,9 @@ class EndpointSecurityTest {
                         .param("endDate", "2025-07-31")
                         .param("type", "READER"))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -119,6 +122,9 @@ class EndpointSecurityTest {
                         .param("endDate", "2025-07-31")
                         .param("type", "READER"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -148,6 +154,9 @@ class EndpointSecurityTest {
                         .param("startDate", "2025-07-01")
                         .param("endDate", "2025-07-31")
                         .param("type", "READER"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isOk());
     }
 

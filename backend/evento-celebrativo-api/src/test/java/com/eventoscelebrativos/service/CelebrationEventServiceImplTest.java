@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
@@ -11,6 +12,7 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
+import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Commentator;
@@ -68,6 +70,9 @@ class CelebrationEventServiceImplTest {
     @Mock
     private CelebrationEventScaleMapper scaleMapper;
 
+    @Mock
+    private CelebrationEventScaleDetailMapper scaleDetailMapper;
+
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -109,6 +114,175 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findEventById(99L));
+    }
+
+    @Test
+    void shouldFindCompleteEventScale() {
+        CelebrationEvent event = eventWithCompleteScale();
+        CelebrationEventScaleDetailResponseDTO response = detailResponse();
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(
+                eq(event),
+                any(Location.class),
+                any(Priest.class),
+                anyList(),
+                anyList(),
+                anyList(),
+                anyList()
+        )).thenReturn(response);
+
+        assertSame(response, service.findScaleByEventId(1L));
+    }
+
+    @Test
+    void shouldFindEventScaleWithoutPriest() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Reader(), 4L, "Alice"));
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), isNull(), anyList(), anyList(), anyList(), anyList()))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), isNull(), anyList(), anyList(), anyList(), anyList());
+    }
+
+    @Test
+    void shouldFindEventScaleWithEmptyRoleLists() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Priest(), 13L, "Padre"));
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(Priest.class), eq(List.of()), eq(List.of()), eq(List.of()), eq(List.of())))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), any(Priest.class), eq(List.of()), eq(List.of()), eq(List.of()), eq(List.of()));
+    }
+
+    @Test
+    void shouldFindEventScaleWithoutLocation() {
+        CelebrationEvent event = event(1L);
+        event.getPeople().add(person(new Priest(), 13L, "Padre"));
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), isNull(), any(Priest.class), anyList(), anyList(), anyList(), anyList()))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        verify(scaleDetailMapper).toDto(eq(event), isNull(), any(Priest.class), anyList(), anyList(), anyList(), anyList());
+    }
+
+    @Test
+    void shouldSeparateAllPersonSubtypesWhenFindingEventScale() {
+        CelebrationEvent event = eventWithCompleteScale();
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), any(), any(), anyList(), anyList(), anyList(), anyList()))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        verify(scaleDetailMapper).toDto(
+                eq(event),
+                any(Location.class),
+                any(Priest.class),
+                argThat(list -> list.size() == 2 && list.stream().allMatch(Reader.class::isInstance)),
+                argThat(list -> list.size() == 1 && list.stream().allMatch(Commentator.class::isInstance)),
+                argThat(list -> list.size() == 1 && list.stream().allMatch(MinisterOfTheWord.class::isInstance)),
+                argThat(list -> list.size() == 2 && list.stream().allMatch(EucharisticMinister.class::isInstance))
+        );
+    }
+
+    @Test
+    void shouldSortPeopleDeterministicallyWhenFindingEventScale() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Reader(), 5L, "Bruno"));
+        event.getPeople().add(person(new Reader(), 4L, "Ana"));
+        event.getPeople().add(person(new Reader(), 3L, "Ana"));
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), any(), isNull(), anyList(), anyList(), anyList(), anyList()))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        verify(scaleDetailMapper).toDto(
+                eq(event),
+                any(Location.class),
+                isNull(),
+                argThat(list -> List.of(3L, 4L, 5L).equals(list.stream().map(Person::getId).toList())),
+                anyList(),
+                anyList(),
+                anyList()
+        );
+    }
+
+    @Test
+    void shouldNotExposePersonalDataInEventScaleDetailResponse() {
+        assertAll(
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> CelebrationEventScaleDetailResponseDTO.class.getMethod("getPhoneNumber")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> CelebrationEventScaleDetailResponseDTO.class.getMethod("getBirthdayDate")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> CelebrationEventScaleDetailResponseDTO.class.getMethod("getPassword")),
+                () -> assertThrows(NoSuchMethodException.class,
+                        () -> CelebrationEventScaleDetailResponseDTO.class.getMethod("getRoles"))
+        );
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenFindingScaleForMissingEvent() {
+        when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenFindingScaleWithInvalidId() {
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> service.findScaleByEventId(null)),
+                () -> assertThrows(BusinessException.class, () -> service.findScaleByEventId(0L)),
+                () -> assertThrows(BusinessException.class, () -> service.findScaleByEventId(-1L))
+        );
+    }
+
+    @Test
+    void shouldNotModifyEventWhenFindingScale() {
+        CelebrationEvent event = eventWithCompleteScale();
+        int locationCount = event.getLocations().size();
+        int peopleCount = event.getPeople().size();
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(eq(event), any(), any(), anyList(), anyList(), anyList(), anyList()))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        assertEquals(locationCount, event.getLocations().size());
+        assertEquals(peopleCount, event.getPeople().size());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenEventScaleHasMoreThanOnePriest() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Priest(), 13L, "Padre A"));
+        event.getPeople().add(person(new Priest(), 14L, "Padre B"));
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -532,6 +706,29 @@ class CelebrationEventServiceImplTest {
 
     private CelebrationEventResponseDTO response(Long id) {
         return new CelebrationEventResponseDTO(id, "Missa", EVENT_DATE, EVENT_TIME, true);
+    }
+
+    private CelebrationEventScaleDetailResponseDTO detailResponse() {
+        CelebrationEventScaleDetailResponseDTO response = new CelebrationEventScaleDetailResponseDTO();
+        response.setEventId(1L);
+        response.setEventName("Missa");
+        response.setEventDate(EVENT_DATE);
+        response.setEventTime(EVENT_TIME);
+        response.setMassOrCelebration(true);
+        return response;
+    }
+
+    private CelebrationEvent eventWithCompleteScale() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Priest(), 13L, "Padre"));
+        event.getPeople().add(person(new Reader(), 5L, "Bruno"));
+        event.getPeople().add(person(new Reader(), 4L, "Ana"));
+        event.getPeople().add(person(new Commentator(), 1L, "Luana"));
+        event.getPeople().add(person(new MinisterOfTheWord(), 7L, "Davi"));
+        event.getPeople().add(person(new EucharisticMinister(), 11L, "Carlos"));
+        event.getPeople().add(person(new EucharisticMinister(), 10L, "Mariana"));
+        return event;
     }
 
     private Location location(Long id) {
