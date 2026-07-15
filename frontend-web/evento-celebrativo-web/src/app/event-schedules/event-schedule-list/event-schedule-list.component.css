@@ -208,6 +208,30 @@
   color: var(--color-text-muted);
 }
 
+.schedule-card__detail-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.schedule-card__detail-link:hover {
+  background: var(--color-primary-soft);
+}
+
+.schedule-card__detail-link:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .schedule-pagination {
   display: flex;
   align-items: center;
@@ -233,7 +257,8 @@
   }
 
   .schedule-filter__button,
-  .schedule-filter__secondary-button {
+  .schedule-filter__secondary-button,
+  .schedule-card__detail-link {
     width: 100%;
   }
 }

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import {
@@ -15,7 +16,10 @@ describe('EventScheduleListComponent', () => {
   let fixture: ComponentFixture<EventScheduleListComponent>;
   let eventScheduleService: jasmine.SpyObj<EventScheduleService>;
 
-  async function setup(response: EventSchedulePage = createPage()): Promise<void> {
+  async function setup(
+    response: EventSchedulePage = createPage(),
+    queryParams: Record<string, string> = {},
+  ): Promise<void> {
     eventScheduleService = jasmine.createSpyObj<EventScheduleService>('EventScheduleService', [
       'findMonthlySchedules',
     ]);
@@ -23,7 +27,18 @@ describe('EventScheduleListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [EventScheduleListComponent],
-      providers: [{ provide: EventScheduleService, useValue: eventScheduleService }],
+      providers: [
+        provideRouter([]),
+        { provide: EventScheduleService, useValue: eventScheduleService },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap(queryParams),
+            },
+          },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventScheduleListComponent);
@@ -71,6 +86,27 @@ describe('EventScheduleListComponent', () => {
     expect(text).toContain('19:00');
     expect(text).toContain('Maria da Silva');
     expect(text).toContain('Leitores');
+  });
+
+  it('should render a link to the full schedule detail without showing ids as text', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const detailLink = fixture.nativeElement.querySelector(
+      '.schedule-card__detail-link',
+    ) as HTMLAnchorElement;
+    const text = textContent();
+
+    expect(detailLink).not.toBeNull();
+    expect(detailLink.textContent).toContain('Ver escala completa');
+    expect(detailLink.getAttribute('href')).toContain('/app/escalas/eventos/10');
+    expect(detailLink.getAttribute('href')).toContain('type=READER');
+    expect(detailLink.getAttribute('href')).toContain('includeUnassigned=false');
+    expect(detailLink.getAttribute('href')).toContain('page=0');
+    expect(text).not.toContain('eventId');
+    expect(text).not.toContain('personId');
+    expect(text).not.toContain('locationId');
   });
 
   it('should render a message when an event has no assignments', async () => {
@@ -177,6 +213,46 @@ describe('EventScheduleListComponent', () => {
       page: 0,
       size: 10,
       includeUnassigned: true,
+    });
+  });
+
+  it('should restore valid filters from query params when returning from detail', async () => {
+    await setup(createPage(), {
+      type: 'PRIEST',
+      month: '2026-08',
+      includeUnassigned: 'true',
+      page: '2',
+    });
+
+    fixture.detectChanges();
+
+    expect(eventScheduleService.findMonthlySchedules).toHaveBeenCalledOnceWith({
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+      type: 'PRIEST',
+      page: 2,
+      size: 10,
+      includeUnassigned: true,
+    });
+  });
+
+  it('should use defaults when query params are invalid', async () => {
+    await setup(createPage(), {
+      type: 'INVALID',
+      month: '2026',
+      includeUnassigned: 'maybe',
+      page: '-1',
+    });
+
+    fixture.detectChanges();
+
+    expect(eventScheduleService.findMonthlySchedules).toHaveBeenCalledOnceWith({
+      startDate: firstDayOfCurrentMonth(),
+      endDate: lastDayOfCurrentMonth(),
+      type: 'READER',
+      page: 0,
+      size: 10,
+      includeUnassigned: false,
     });
   });
 

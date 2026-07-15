@@ -3,7 +3,11 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
-import { EventSchedulePage, EventScheduleQuery } from './event-schedule.models';
+import {
+  EventScheduleDetailResponse,
+  EventSchedulePage,
+  EventScheduleQuery,
+} from './event-schedule.models';
 
 @Injectable({
   providedIn: 'root',
@@ -21,5 +25,11 @@ export class EventScheduleService {
       .set('includeUnassigned', String(query.includeUnassigned));
 
     return this.http.get<EventSchedulePage>(`${API_BASE_URL}/eventos/escalas`, { params });
+  }
+
+  findByEventId(eventId: number): Observable<EventScheduleDetailResponse> {
+    return this.http.get<EventScheduleDetailResponse>(
+      `${API_BASE_URL}/eventos/${eventId}/escala`,
+    );
   }
 }

@@ -100,6 +100,14 @@
               </ul>
             }
           </section>
+
+          <a
+            class="schedule-card__detail-link"
+            [routerLink]="detailLinkFor(schedule)"
+            [queryParams]="detailQueryParams()"
+          >
+            Ver escala completa
+          </a>
         </li>
       }
     </ul>
