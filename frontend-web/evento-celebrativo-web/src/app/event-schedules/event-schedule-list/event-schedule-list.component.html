@@ -1,0 +1,119 @@
+<section class="event-schedules page-shell" aria-labelledby="event-schedules-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Escalas</p>
+      <h1 id="event-schedules-title">Consulta mensal de escalas</h1>
+      <p>Consulte os participantes escalados por tipo e por mes.</p>
+    </div>
+  </header>
+
+  <form class="schedule-filter surface-card" (ngSubmit)="onSubmit()">
+    <div class="schedule-filter__field">
+      <label for="schedule-type">Tipo de escala</label>
+      <select id="schedule-type" name="scheduleType" [(ngModel)]="selectedType" required>
+        @for (option of scheduleTypeOptions; track option.value) {
+          <option [ngValue]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="schedule-filter__field">
+      <label for="schedule-month">Mes</label>
+      <input id="schedule-month" type="month" name="selectedMonth" [(ngModel)]="selectedMonth" required />
+    </div>
+
+    <label class="schedule-filter__checkbox">
+      <input type="checkbox" name="includeUnassigned" [(ngModel)]="includeUnassigned" />
+      <span>Incluir eventos sem pessoas escaladas</span>
+    </label>
+
+    <div class="schedule-filter__actions" aria-label="Navegacao por mes">
+      <button class="schedule-filter__secondary-button" type="button" (click)="previousMonth()">
+        Mes anterior
+      </button>
+      <button class="schedule-filter__secondary-button" type="button" (click)="nextMonth()">
+        Proximo mes
+      </button>
+      <button class="schedule-filter__button" type="submit">Consultar</button>
+    </div>
+  </form>
+
+  @if (validationMessage()) {
+    <p class="event-schedules__validation" role="alert">{{ validationMessage() }}</p>
+  }
+
+  @if (isLoading()) {
+    <p class="event-schedules__status" role="status">Carregando escalas...</p>
+  } @else if (errorMessage()) {
+    <div class="event-schedules__feedback event-schedules__feedback--error" role="alert">
+      <p>{{ errorMessage() }}</p>
+
+      <button class="event-schedules__button" type="button" (click)="retry()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (schedules().length === 0) {
+    <p class="event-schedules__feedback">
+      Nenhuma escala de {{ selectedTypeLabel() }} foi encontrada para o mes informado.
+    </p>
+  } @else {
+    <div class="event-schedules__summary" aria-live="polite">
+      {{ totalElements() }} resultado(s) encontrado(s).
+    </div>
+
+    <ul class="schedule-list" aria-label="Lista mensal de escalas">
+      @for (schedule of schedules(); track schedule.eventId + '-' + schedule.assignmentType) {
+        <li class="schedule-card surface-card">
+          <header class="schedule-card__header">
+            <div>
+              <p class="schedule-card__eyebrow">{{ eventKind(schedule.massOrCelebration) }}</p>
+              <h2>{{ schedule.eventName }}</h2>
+            </div>
+            <span>{{ assignmentTypeLabel(schedule.assignmentType) }}</span>
+          </header>
+
+          <dl class="schedule-card__details">
+            <div>
+              <dt>Data</dt>
+              <dd>{{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+            </div>
+            <div>
+              <dt>Horario</dt>
+              <dd>{{ formatTime(schedule.eventTime) }}</dd>
+            </div>
+            <div>
+              <dt>Local</dt>
+              <dd>{{ schedule.churchName }}</dd>
+            </div>
+          </dl>
+
+          <section class="schedule-card__assignments" aria-label="Pessoas escaladas">
+            <h3>Pessoas escaladas</h3>
+
+            @if (schedule.assignments.length === 0) {
+              <p>Nenhuma pessoa foi escalada para esta funcao.</p>
+            } @else {
+              <ul>
+                @for (assignment of schedule.assignments; track assignment.personId) {
+                  <li>{{ assignment.personName }}</li>
+                }
+              </ul>
+            }
+          </section>
+        </li>
+      }
+    </ul>
+
+    @if (totalPages() > 0) {
+      <nav class="schedule-pagination" aria-label="Paginacao das escalas">
+        <button type="button" (click)="previousPage()" [disabled]="isFirstPage() || isLoading()">
+          Anterior
+        </button>
+        <span>Pagina {{ currentPage() + 1 }} de {{ totalPages() }}</span>
+        <button type="button" (click)="nextPage()" [disabled]="isLastPage() || isLoading()">
+          Proxima
+        </button>
+      </nav>
+    }
+  }
+</section>

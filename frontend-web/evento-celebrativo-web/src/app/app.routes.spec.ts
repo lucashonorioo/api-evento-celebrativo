@@ -5,6 +5,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
@@ -122,6 +123,16 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appScheduleRoute?.component).toBe(EucharistScheduleListComponent);
+  });
+
+  it('should render authenticated monthly schedules inside the protected app route', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appScheduleRoute = appRoute?.children?.find((route) => route.path === 'escalas');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appScheduleRoute?.component).toBe(EventScheduleListComponent);
+    expect(appScheduleRoute?.canActivate).toBeUndefined();
   });
 
   it('should render locations inside the protected app route', () => {

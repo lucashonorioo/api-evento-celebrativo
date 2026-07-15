@@ -54,7 +54,7 @@ describe('HomeComponent', () => {
     expect(text).toContain('Pessoas');
     expect(text).toContain('Locais');
     expect(linkTargets).toContain('/app/eventos');
-    expect(linkTargets).toContain('/app/escala/eucaristia');
+    expect(linkTargets).toContain('/app/escalas');
     expect(linkTargets).toContain('/app/pessoas');
     expect(linkTargets).toContain('/app/locais');
   });

@@ -29,8 +29,8 @@ export class HomeComponent {
     },
     {
       label: 'Consultar escala',
-      description: 'Acesse a escala publica de Eucaristia.',
-      path: '/app/escala/eucaristia',
+      description: 'Acesse a consulta mensal de escalas.',
+      path: '/app/escalas',
     },
     {
       label: 'Pessoas',
