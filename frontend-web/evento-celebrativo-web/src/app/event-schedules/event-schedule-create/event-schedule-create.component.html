@@ -1,0 +1,278 @@
+<section class="event-schedule-create page-shell" aria-labelledby="event-schedule-create-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Escalas</p>
+      <h1 id="event-schedule-create-title">Novo evento com escala</h1>
+      <p>Cadastre o evento e defina os participantes da escala inicial.</p>
+    </div>
+
+    <a class="page-action" routerLink="/app/escalas">Voltar para Escalas</a>
+  </header>
+
+  @if (isLoading()) {
+    <p class="event-schedule-create__status" role="status" aria-live="polite">
+      Carregando dados do formulario...
+    </p>
+  } @else if (loadErrorMessage()) {
+    <div class="event-schedule-create__feedback event-schedule-create__feedback--error" role="alert">
+      <p>{{ loadErrorMessage() }}</p>
+
+      <div class="event-schedule-create__actions">
+        <button class="event-schedule-create__button" type="button" (click)="retry()">
+          Tentar novamente
+        </button>
+
+        <a class="event-schedule-create__link" routerLink="/app/escalas">Voltar para Escalas</a>
+      </div>
+    </div>
+  } @else {
+    <form class="event-schedule-create__form" [formGroup]="form" (ngSubmit)="onSubmit()">
+      @if (successMessage()) {
+        <p class="event-schedule-create__feedback event-schedule-create__feedback--success" aria-live="polite">
+          {{ successMessage() }}
+        </p>
+      }
+
+      @if (saveErrorMessage()) {
+        <p class="event-schedule-create__feedback event-schedule-create__feedback--error" role="alert">
+          {{ saveErrorMessage() }}
+        </p>
+      }
+
+      <section class="event-schedule-create__section surface-card" aria-labelledby="event-data-title">
+        <h2 id="event-data-title">Dados do evento</h2>
+
+        <div class="event-schedule-create__grid">
+          <div class="event-schedule-create__field event-schedule-create__field--wide">
+            <label for="nameMassOrEvent">Nome</label>
+            <input id="nameMassOrEvent" type="text" formControlName="nameMassOrEvent" autocomplete="off" />
+
+            @if (form.controls.nameMassOrEvent.invalid && form.controls.nameMassOrEvent.touched) {
+              <p class="event-schedule-create__error" role="alert">Informe o nome do evento.</p>
+            }
+          </div>
+
+          <div class="event-schedule-create__field">
+            <label for="eventDate">Data</label>
+            <input id="eventDate" type="date" formControlName="eventDate" [min]="today" />
+
+            @if (form.controls.eventDate.invalid && form.controls.eventDate.touched) {
+              <p class="event-schedule-create__error" role="alert">Informe a data do evento.</p>
+            }
+          </div>
+
+          <div class="event-schedule-create__field">
+            <label for="eventTime">Horario</label>
+            <input id="eventTime" type="time" formControlName="eventTime" />
+
+            @if (form.controls.eventTime.invalid && form.controls.eventTime.touched) {
+              <p class="event-schedule-create__error" role="alert">Informe o horario do evento.</p>
+            }
+          </div>
+        </div>
+
+        <fieldset class="event-schedule-create__choice">
+          <legend>Tipo do evento</legend>
+
+          <label>
+            <input type="radio" formControlName="massOrCelebration" [value]="true" />
+            <span>Missa</span>
+          </label>
+
+          <label>
+            <input type="radio" formControlName="massOrCelebration" [value]="false" />
+            <span>Celebracao</span>
+          </label>
+        </fieldset>
+      </section>
+
+      <section class="event-schedule-create__section surface-card" aria-labelledby="event-location-title">
+        <h2 id="event-location-title">Local e padre</h2>
+
+        <div class="event-schedule-create__grid">
+          <div class="event-schedule-create__field">
+            <label for="locationId">Local</label>
+            <select id="locationId" formControlName="locationId">
+              <option [ngValue]="null">Selecione um local</option>
+              @for (location of locations(); track location.id) {
+                <option [ngValue]="location.id">{{ location.churchName }}</option>
+              }
+            </select>
+
+            @if (locations().length === 0) {
+              <p class="event-schedule-create__hint">Nenhum local cadastrado.</p>
+            }
+
+            @if (form.controls.locationId.invalid && form.controls.locationId.touched) {
+              <p class="event-schedule-create__error" role="alert">Informe um local para a escala.</p>
+            }
+          </div>
+
+          <div class="event-schedule-create__field">
+            <label for="priestId">Padre</label>
+            <select id="priestId" formControlName="priestId">
+              <option [ngValue]="null">Nenhum padre selecionado</option>
+              @for (priest of priests(); track priest.id) {
+                <option [ngValue]="priest.id">{{ priest.name }}</option>
+              }
+            </select>
+
+            @if (priests().length === 0) {
+              <p class="event-schedule-create__hint">Nenhum padre cadastrado.</p>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="event-schedule-create__groups" aria-label="Participantes da escala">
+        <fieldset class="event-schedule-create__group surface-card">
+          <legend>Leitores</legend>
+          <label class="event-schedule-create__search" for="readerSearch">Pesquisar leitores</label>
+          <input
+            id="readerSearch"
+            type="search"
+            [value]="readerSearch()"
+            (input)="setSearch('readers', $event)"
+          />
+
+          @if (readers().length === 0) {
+            <p class="event-schedule-create__hint">Nenhum leitor cadastrado.</p>
+          } @else {
+            <div class="event-schedule-create__options">
+              @for (reader of filteredReaders(); track reader.id) {
+                <label class="event-schedule-create__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('readerIds', reader.id)"
+                    (change)="onSelectionChange('readerIds', reader.id, $event)"
+                  />
+                  <span>{{ reader.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-create__count">{{ selectedCount('readerIds') }} selecionado(s)</p>
+        </fieldset>
+
+        <fieldset class="event-schedule-create__group surface-card">
+          <legend>Comentaristas</legend>
+          <label class="event-schedule-create__search" for="commentatorSearch">
+            Pesquisar comentaristas
+          </label>
+          <input
+            id="commentatorSearch"
+            type="search"
+            [value]="commentatorSearch()"
+            (input)="setSearch('commentators', $event)"
+          />
+
+          @if (commentators().length === 0) {
+            <p class="event-schedule-create__hint">Nenhum comentarista cadastrado.</p>
+          } @else {
+            <div class="event-schedule-create__options">
+              @for (commentator of filteredCommentators(); track commentator.id) {
+                <label class="event-schedule-create__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('commentatorIds', commentator.id)"
+                    (change)="onSelectionChange('commentatorIds', commentator.id, $event)"
+                  />
+                  <span>{{ commentator.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-create__count">
+            {{ selectedCount('commentatorIds') }} selecionado(s)
+          </p>
+        </fieldset>
+
+        <fieldset class="event-schedule-create__group surface-card">
+          <legend>Ministros da Palavra</legend>
+          <label class="event-schedule-create__search" for="ministerOfTheWordSearch">
+            Pesquisar ministros da Palavra
+          </label>
+          <input
+            id="ministerOfTheWordSearch"
+            type="search"
+            [value]="ministerOfTheWordSearch()"
+            (input)="setSearch('ministersOfTheWord', $event)"
+          />
+
+          @if (ministersOfTheWord().length === 0) {
+            <p class="event-schedule-create__hint">Nenhum ministro da Palavra cadastrado.</p>
+          } @else {
+            <div class="event-schedule-create__options">
+              @for (minister of filteredMinistersOfTheWord(); track minister.id) {
+                <label class="event-schedule-create__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('ministerOfTheWordIds', minister.id)"
+                    (change)="onSelectionChange('ministerOfTheWordIds', minister.id, $event)"
+                  />
+                  <span>{{ minister.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-create__count">
+            {{ selectedCount('ministerOfTheWordIds') }} selecionado(s)
+          </p>
+        </fieldset>
+
+        <fieldset class="event-schedule-create__group surface-card">
+          <legend>Ministros da Eucaristia</legend>
+          <label class="event-schedule-create__search" for="eucharisticMinisterSearch">
+            Pesquisar ministros da Eucaristia
+          </label>
+          <input
+            id="eucharisticMinisterSearch"
+            type="search"
+            [value]="eucharisticMinisterSearch()"
+            (input)="setSearch('eucharisticMinisters', $event)"
+          />
+
+          @if (eucharisticMinisters().length === 0) {
+            <p class="event-schedule-create__hint">Nenhum ministro da Eucaristia cadastrado.</p>
+          } @else {
+            <div class="event-schedule-create__options">
+              @for (minister of filteredEucharisticMinisters(); track minister.id) {
+                <label class="event-schedule-create__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('eucharisticMinisterIds', minister.id)"
+                    (change)="onSelectionChange('eucharisticMinisterIds', minister.id, $event)"
+                  />
+                  <span>{{ minister.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-create__count">
+            {{ selectedCount('eucharisticMinisterIds') }} selecionado(s)
+          </p>
+        </fieldset>
+      </section>
+
+      <div class="event-schedule-create__actions">
+        <button
+          class="event-schedule-create__button"
+          type="submit"
+          [disabled]="isSaving() || form.invalid"
+        >
+          @if (isSaving()) {
+            Salvando...
+          } @else {
+            Salvar evento com escala
+          }
+        </button>
+
+        <a class="event-schedule-create__link" routerLink="/app/escalas">Cancelar</a>
+      </div>
+    </form>
+  }
+</section>

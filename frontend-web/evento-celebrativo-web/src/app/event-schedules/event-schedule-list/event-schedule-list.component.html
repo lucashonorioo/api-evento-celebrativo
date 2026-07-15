@@ -5,6 +5,12 @@
       <h1 id="event-schedules-title">Consulta mensal de escalas</h1>
       <p>Consulte os participantes escalados por tipo e por mes.</p>
     </div>
+
+    @if (isAdmin()) {
+      <a class="page-action" routerLink="/app/admin/escalas/novo-evento">
+        Novo evento com escala
+      </a>
+    }
   </header>
 
   <form class="schedule-filter surface-card" (ngSubmit)="onSubmit()">

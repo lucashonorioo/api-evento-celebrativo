@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import {
   EventSchedulePage,
   EventScheduleQuery,
@@ -14,12 +15,18 @@ import { EventScheduleListComponent } from './event-schedule-list.component';
 describe('EventScheduleListComponent', () => {
   let component: EventScheduleListComponent;
   let fixture: ComponentFixture<EventScheduleListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eventScheduleService: jasmine.SpyObj<EventScheduleService>;
 
   async function setup(
     response: EventSchedulePage = createPage(),
     queryParams: Record<string, string> = {},
+    isAdmin = false,
   ): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     eventScheduleService = jasmine.createSpyObj<EventScheduleService>('EventScheduleService', [
       'findMonthlySchedules',
     ]);
@@ -29,6 +36,7 @@ describe('EventScheduleListComponent', () => {
       imports: [EventScheduleListComponent],
       providers: [
         provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventScheduleService, useValue: eventScheduleService },
         {
           provide: ActivatedRoute,
@@ -86,6 +94,33 @@ describe('EventScheduleListComponent', () => {
     expect(text).toContain('19:00');
     expect(text).toContain('Maria da Silva');
     expect(text).toContain('Leitores');
+  });
+
+  it('should render the event with schedule creation action for administrators', async () => {
+    await setup(createPage(), {}, true);
+
+    fixture.detectChanges();
+
+    const createLink = Array.from(
+      fixture.nativeElement.querySelectorAll('.page-action'),
+    ) as HTMLAnchorElement[];
+    const createAction = createLink.find((link) =>
+      link.textContent?.includes('Novo evento com escala'),
+    ) as
+      | HTMLAnchorElement
+      | undefined;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledWith('ROLE_ADMIN');
+    expect(createAction).toBeDefined();
+    expect(createAction?.getAttribute('href')).toContain('/app/admin/escalas/novo-evento');
+  });
+
+  it('should not render the event with schedule creation action for operators', async () => {
+    await setup(createPage(), {}, false);
+
+    fixture.detectChanges();
+
+    expect(textContent()).not.toContain('Novo evento com escala');
   });
 
   it('should render a link to the full schedule detail without showing ids as text', async () => {

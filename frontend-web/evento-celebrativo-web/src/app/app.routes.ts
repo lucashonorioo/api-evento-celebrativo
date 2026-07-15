@@ -6,6 +6,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
 import { EventScheduleEditComponent } from './event-schedules/event-schedule-edit/event-schedule-edit.component';
 import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
@@ -37,6 +38,11 @@ export const routes: Routes = [
       { path: 'eventos/:id', component: EventDetailComponent },
       { path: 'escalas', component: EventScheduleListComponent },
       { path: 'escalas/eventos/:id', component: EventScheduleDetailComponent },
+      {
+        path: 'admin/escalas/novo-evento',
+        component: EventScheduleCreateComponent,
+        canActivate: [adminGuard],
+      },
       {
         path: 'admin/escalas/eventos/:id/editar',
         component: EventScheduleEditComponent,

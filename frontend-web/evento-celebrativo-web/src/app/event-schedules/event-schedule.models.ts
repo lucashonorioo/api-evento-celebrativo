@@ -89,3 +89,18 @@ export interface UpdateEventScheduleResponse {
   readonly ministersOfTheWord: EventSchedulePersonSummary[];
   readonly eucharisticMinisters: EventSchedulePersonSummary[];
 }
+
+export interface CreateEventWithScheduleRequest {
+  readonly nameMassOrEvent: string;
+  readonly eventDate: string;
+  readonly eventTime: string;
+  readonly massOrCelebration: boolean;
+  readonly locationId: number;
+  readonly priestId: number | null;
+  readonly readerIds: number[];
+  readonly commentatorIds: number[];
+  readonly ministerOfTheWordIds: number[];
+  readonly eucharisticMinisterIds: number[];
+}
+
+export type CreateEventWithScheduleResponse = UpdateEventScheduleResponse;

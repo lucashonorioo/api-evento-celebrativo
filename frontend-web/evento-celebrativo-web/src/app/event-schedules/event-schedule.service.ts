@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
 import {
+  CreateEventWithScheduleRequest,
+  CreateEventWithScheduleResponse,
   EventScheduleDetailResponse,
   EventSchedulePage,
   EventScheduleQuery,
@@ -41,6 +43,15 @@ export class EventScheduleService {
   ): Observable<UpdateEventScheduleResponse> {
     return this.http.put<UpdateEventScheduleResponse>(
       `${API_BASE_URL}/eventos/${eventId}/escala`,
+      request,
+    );
+  }
+
+  createEventWithSchedule(
+    request: CreateEventWithScheduleRequest,
+  ): Observable<CreateEventWithScheduleResponse> {
+    return this.http.post<CreateEventWithScheduleResponse>(
+      `${API_BASE_URL}/eventos/com-escala`,
       request,
     );
   }
