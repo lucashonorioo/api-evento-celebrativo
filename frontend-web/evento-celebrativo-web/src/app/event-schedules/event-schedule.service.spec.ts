@@ -3,7 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { EventScheduleDetailResponse, EventSchedulePage } from './event-schedule.models';
+import {
+  EventScheduleDetailResponse,
+  EventSchedulePage,
+  UpdateEventScheduleRequest,
+  UpdateEventScheduleResponse,
+} from './event-schedule.models';
 import { EventScheduleService } from './event-schedule.service';
 
 describe('EventScheduleService', () => {
@@ -51,6 +56,39 @@ describe('EventScheduleService', () => {
     commentators: [{ id: 1, name: 'Luana Odinson' }],
     ministersOfTheWord: [{ id: 7, name: 'Davi Gomes' }],
     eucharisticMinisters: [{ id: 10, name: 'Mariana Ferraz' }],
+  };
+  const updateRequest: UpdateEventScheduleRequest = {
+    locationId: 2,
+    priestId: 14,
+    readerIds: [5, 6],
+    commentatorIds: [2],
+    ministerOfTheWordIds: [8],
+    eucharisticMinisterIds: [11, 12],
+  };
+  const updateResponse: UpdateEventScheduleResponse = {
+    eventId: 1,
+    nameMassOrEvent: 'Missa atualizada',
+    eventDate: '2025-07-13',
+    eventTime: '10:00:00',
+    massOrCelebration: true,
+    location: {
+      id: 2,
+      churchName: 'Capela Sao Jose',
+    },
+    priest: {
+      id: 14,
+      name: 'Padre Antonio',
+    },
+    readers: [
+      { id: 5, name: 'Alice Lima' },
+      { id: 6, name: 'Arthur Costa' },
+    ],
+    commentators: [{ id: 2, name: 'Luana Odinson' }],
+    ministersOfTheWord: [{ id: 8, name: 'Davi Gomes' }],
+    eucharisticMinisters: [
+      { id: 11, name: 'Mariana Ferraz' },
+      { id: 12, name: 'Carlos Mendes' },
+    ],
   };
 
   beforeEach(() => {
@@ -230,6 +268,138 @@ describe('EventScheduleService', () => {
       {
         status: 403,
         statusText: 'Forbidden',
+      },
+    );
+  });
+
+  it('should update an event schedule with the expected body', () => {
+    service.updateEventSchedule(1, updateRequest).subscribe((response) => {
+      expect(response).toEqual(updateResponse);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(updateRequest);
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(updateResponse);
+  });
+
+  it('should send empty participant lists and nullable priest when updating', () => {
+    const emptyRequest: UpdateEventScheduleRequest = {
+      locationId: 2,
+      priestId: null,
+      readerIds: [],
+      commentatorIds: [],
+      ministerOfTheWordIds: [],
+      eucharisticMinisterIds: [],
+    };
+    const emptyResponse: UpdateEventScheduleResponse = {
+      ...updateResponse,
+      priest: null,
+      readers: [],
+      commentators: [],
+      ministersOfTheWord: [],
+      eucharisticMinisters: [],
+    };
+
+    service.updateEventSchedule(2, emptyRequest).subscribe((response) => {
+      expect(response.priest).toBeNull();
+      expect(response.readers).toEqual([]);
+      expect(response.commentators).toEqual([]);
+      expect(response.ministersOfTheWord).toEqual([]);
+      expect(response.eucharisticMinisters).toEqual([]);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/2/escala`);
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual(emptyRequest);
+
+    request.flush(emptyResponse);
+  });
+
+  it('should propagate bad request errors from the update endpoint', (done) => {
+    service.updateEventSchedule(1, updateRequest).subscribe({
+      next: () => {
+        fail('Expected update request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+    request.flush(
+      { message: 'Invalid data' },
+      {
+        status: 400,
+        statusText: 'Bad Request',
+      },
+    );
+  });
+
+  it('should propagate forbidden errors from the update endpoint', (done) => {
+    service.updateEventSchedule(1, updateRequest).subscribe({
+      next: () => {
+        fail('Expected update request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+    request.flush(
+      { message: 'Forbidden' },
+      {
+        status: 403,
+        statusText: 'Forbidden',
+      },
+    );
+  });
+
+  it('should propagate not found errors from the update endpoint', (done) => {
+    service.updateEventSchedule(404, updateRequest).subscribe({
+      next: () => {
+        fail('Expected update request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/404/escala`);
+    request.flush(
+      { message: 'Not found' },
+      {
+        status: 404,
+        statusText: 'Not Found',
+      },
+    );
+  });
+
+  it('should propagate conflict errors from the update endpoint', (done) => {
+    service.updateEventSchedule(1, updateRequest).subscribe({
+      next: () => {
+        fail('Expected update request to fail');
+      },
+      error: (error: unknown) => {
+        expect(error).toBeTruthy();
+        done();
+      },
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/eventos/1/escala`);
+    request.flush(
+      { message: 'Conflict' },
+      {
+        status: 409,
+        statusText: 'Conflict',
       },
     );
   });

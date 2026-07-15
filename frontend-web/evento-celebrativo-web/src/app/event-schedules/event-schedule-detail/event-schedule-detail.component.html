@@ -6,9 +6,21 @@
       <p>Consulte todas as pessoas escaladas para esta celebracao.</p>
     </div>
 
-    <a class="page-action" routerLink="/app/escalas" [queryParams]="backQueryParams()">
-      Voltar para Escalas
-    </a>
+    <div class="event-schedule-detail__header-actions">
+      @if (isAdmin() && eventId(); as currentEventId) {
+        <a
+          class="page-action"
+          [routerLink]="editLinkFor(currentEventId)"
+          [queryParams]="backQueryParams()"
+        >
+          Editar escala
+        </a>
+      }
+
+      <a class="page-action" routerLink="/app/escalas" [queryParams]="backQueryParams()">
+        Voltar para Escalas
+      </a>
+    </div>
   </header>
 
   @if (isLoading()) {

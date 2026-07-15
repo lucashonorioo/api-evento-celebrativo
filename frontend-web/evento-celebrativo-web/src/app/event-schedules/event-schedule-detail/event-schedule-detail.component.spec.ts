@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { EventScheduleDetailResponse } from '../event-schedule.models';
 import { EventScheduleService } from '../event-schedule.service';
 import { EventScheduleDetailComponent } from './event-schedule-detail.component';
@@ -10,13 +11,19 @@ import { EventScheduleDetailComponent } from './event-schedule-detail.component'
 describe('EventScheduleDetailComponent', () => {
   let component: EventScheduleDetailComponent;
   let fixture: ComponentFixture<EventScheduleDetailComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eventScheduleService: jasmine.SpyObj<EventScheduleService>;
 
   async function setup(
     routeId: string | null = '1',
     response: EventScheduleDetailResponse = createDetail(),
     queryParams: Record<string, string> = {},
+    isAdmin = false,
   ): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     eventScheduleService = jasmine.createSpyObj<EventScheduleService>('EventScheduleService', [
       'findByEventId',
     ]);
@@ -26,6 +33,7 @@ describe('EventScheduleDetailComponent', () => {
       imports: [EventScheduleDetailComponent],
       providers: [
         provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventScheduleService, useValue: eventScheduleService },
         {
           provide: ActivatedRoute,
@@ -302,6 +310,49 @@ describe('EventScheduleDetailComponent', () => {
     expect(href).toContain('month=2026-07');
     expect(href).toContain('includeUnassigned=false');
     expect(href).toContain('page=2');
+  });
+
+  it('should render edit action for administrators preserving query params', async () => {
+    await setup(
+      '1',
+      createDetail(),
+      {
+        type: 'READER',
+        month: '2026-07',
+        includeUnassigned: 'false',
+        page: '2',
+      },
+      true,
+    );
+
+    fixture.detectChanges();
+
+    const links = Array.from(
+      fixture.nativeElement.querySelectorAll('.page-action'),
+    ) as HTMLAnchorElement[];
+    const editLink = links.find((link) => link.textContent?.includes('Editar escala')) as
+      | HTMLAnchorElement
+      | undefined;
+    const href = editLink?.getAttribute('href') ?? '';
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledWith('ROLE_ADMIN');
+    expect(editLink).toBeDefined();
+    expect(href).toContain('/app/admin/escalas/eventos/1/editar');
+    expect(href).toContain('type=READER');
+    expect(href).toContain('month=2026-07');
+    expect(href).toContain('includeUnassigned=false');
+    expect(href).toContain('page=2');
+  });
+
+  it('should hide edit action for operators while keeping the detail visible', async () => {
+    await setup('1', createDetail(), {}, false);
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Missa de Domingo da manha');
+    expect(text).not.toContain('Editar escala');
   });
 
   it('should ignore invalid query params in the return link', async () => {

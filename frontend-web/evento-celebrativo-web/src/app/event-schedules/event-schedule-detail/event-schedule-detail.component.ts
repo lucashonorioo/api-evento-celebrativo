@@ -9,6 +9,7 @@ import {
   EventScheduleType,
 } from '../event-schedule.models';
 import { EventScheduleService } from '../event-schedule.service';
+import { AuthSessionService } from '../../auth-session.service';
 
 interface ParticipantSection {
   readonly title: string;
@@ -26,6 +27,7 @@ interface ParticipantSection {
 })
 export class EventScheduleDetailComponent implements OnInit {
   private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly eventScheduleService = inject(EventScheduleService);
 
   readonly schedule = signal<EventScheduleDetailResponse | null>(null);
@@ -72,6 +74,10 @@ export class EventScheduleDetailComponent implements OnInit {
     return massOrCelebration ? 'Missa' : 'Celebracao';
   }
 
+  isAdmin(): boolean {
+    return this.authSessionService.hasAuthority('ROLE_ADMIN');
+  }
+
   participantSections(schedule: EventScheduleDetailResponse): readonly ParticipantSection[] {
     return [
       {
@@ -95,6 +101,10 @@ export class EventScheduleDetailComponent implements OnInit {
         people: schedule.eucharisticMinisters,
       },
     ];
+  }
+
+  editLinkFor(eventId: number): readonly string[] {
+    return ['/app/admin/escalas/eventos', String(eventId), 'editar'];
   }
 
   private loadSchedule(eventId: number): void {

@@ -6,6 +6,7 @@ import { CommentatorListComponent } from './commentators/commentator-list/commen
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
+import { EventScheduleEditComponent } from './event-schedules/event-schedule-edit/event-schedule-edit.component';
 import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
@@ -103,6 +104,14 @@ describe('routes', () => {
     expect(publicScheduleDetailRoute).toBeUndefined();
   });
 
+  it('should not expose schedule editing as a public route', () => {
+    const publicScheduleEditRoute = routes.find(
+      (route) => route.path === 'admin/escalas/eventos/:id/editar',
+    );
+
+    expect(publicScheduleEditRoute).toBeUndefined();
+  });
+
   it('should render authenticated events inside the protected app route', () => {
     const appRoute = routes.find((route) => route.path === 'app');
     const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
@@ -151,6 +160,22 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appScheduleDetailRoute?.component).toBe(EventScheduleDetailComponent);
+    expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render schedule editing inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const appScheduleEditRoute = appRoute?.children?.find(
+      (route) => route.path === 'admin/escalas/eventos/:id/editar',
+    );
+    const appScheduleDetailRoute = appRoute?.children?.find(
+      (route) => route.path === 'escalas/eventos/:id',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(appScheduleEditRoute?.component).toBe(EventScheduleEditComponent);
+    expect(appScheduleEditRoute?.canActivate).toEqual([adminGuard]);
     expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
   });
 

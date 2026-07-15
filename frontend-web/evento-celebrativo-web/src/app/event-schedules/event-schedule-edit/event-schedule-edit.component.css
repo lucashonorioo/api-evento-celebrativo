@@ -1,0 +1,216 @@
+.event-schedule-edit {
+  color: var(--color-text);
+}
+
+.event-schedule-edit__status,
+.event-schedule-edit__feedback,
+.event-schedule-edit__summary,
+.event-schedule-edit__assignment,
+.event-schedule-edit__group {
+  padding: 1rem;
+}
+
+.event-schedule-edit__status,
+.event-schedule-edit__feedback {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.event-schedule-edit__feedback {
+  margin: 0;
+}
+
+.event-schedule-edit__feedback--success {
+  border-color: #b9dfc7;
+  background: #f2fbf5;
+  color: var(--color-success);
+}
+
+.event-schedule-edit__feedback--error {
+  border-color: #f0b6b6;
+  background: #fff7f7;
+  color: var(--color-danger);
+}
+
+.event-schedule-edit__summary {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-schedule-edit__summary header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.event-schedule-edit__summary p,
+.event-schedule-edit__hint,
+.event-schedule-edit__count {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.event-schedule-edit__summary header p {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.event-schedule-edit__summary h2,
+.event-schedule-edit__assignment h2 {
+  margin: 0;
+}
+
+.event-schedule-edit__summary dl,
+.event-schedule-edit__grid,
+.event-schedule-edit__groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-schedule-edit__summary dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.event-schedule-edit__summary dt {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.event-schedule-edit__summary dd {
+  margin: 0.25rem 0 0;
+}
+
+.event-schedule-edit__form,
+.event-schedule-edit__assignment,
+.event-schedule-edit__field,
+.event-schedule-edit__group {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-schedule-edit__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.event-schedule-edit__field label,
+.event-schedule-edit__search {
+  font-weight: 800;
+}
+
+.event-schedule-edit__field select,
+.event-schedule-edit__group input[type='search'] {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.event-schedule-edit__field select:focus-visible,
+.event-schedule-edit__group input[type='search']:focus-visible,
+.event-schedule-edit__option input:focus-visible,
+.event-schedule-edit__button:focus-visible,
+.event-schedule-edit__link:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.event-schedule-edit__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.event-schedule-edit__groups {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.event-schedule-edit__group {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--color-border);
+}
+
+.event-schedule-edit__group legend {
+  padding: 0 0.35rem;
+  font-weight: 800;
+}
+
+.event-schedule-edit__options {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.event-schedule-edit__option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.55rem;
+  overflow-wrap: anywhere;
+}
+
+.event-schedule-edit__option input {
+  margin-top: 0.15rem;
+}
+
+.event-schedule-edit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.event-schedule-edit__button,
+.event-schedule-edit__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.event-schedule-edit__button {
+  background: var(--color-primary);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.event-schedule-edit__button--secondary,
+.event-schedule-edit__link {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.event-schedule-edit__button:hover {
+  background: #173f73;
+}
+
+.event-schedule-edit__button--secondary:hover,
+.event-schedule-edit__link:hover {
+  background: var(--color-primary-soft);
+}
+
+.event-schedule-edit__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+@media (max-width: 48rem) {
+  .event-schedule-edit__summary dl,
+  .event-schedule-edit__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-schedule-edit__button,
+  .event-schedule-edit__link {
+    width: 100%;
+  }
+}

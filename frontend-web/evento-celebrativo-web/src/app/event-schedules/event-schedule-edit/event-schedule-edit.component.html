@@ -1,0 +1,261 @@
+<section class="event-schedule-edit page-shell" aria-labelledby="event-schedule-edit-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Escalas</p>
+      <h1 id="event-schedule-edit-title">Editar escala</h1>
+      <p>Atualize somente local e participantes da escala do evento.</p>
+    </div>
+
+    <a class="page-action" [routerLink]="detailLink()" [queryParams]="backQueryParams()">
+      Voltar para o detalhe
+    </a>
+  </header>
+
+  @if (isLoading()) {
+    <p class="event-schedule-edit__status" role="status" aria-live="polite">
+      Carregando dados da escala...
+    </p>
+  } @else if (loadErrorMessage()) {
+    <div class="event-schedule-edit__feedback event-schedule-edit__feedback--error" role="alert">
+      <p>{{ loadErrorMessage() }}</p>
+
+      <div class="event-schedule-edit__actions">
+        @if (eventId() !== null) {
+          <button class="event-schedule-edit__button" type="button" (click)="retry()">
+            Tentar novamente
+          </button>
+        }
+
+        <a class="event-schedule-edit__link" routerLink="/app/escalas" [queryParams]="backQueryParams()">
+          Voltar para Escalas
+        </a>
+      </div>
+    </div>
+  } @else if (schedule(); as schedule) {
+    <article class="event-schedule-edit__summary surface-card" aria-labelledby="event-summary-title">
+      <header>
+        <p>{{ eventKind(schedule.massOrCelebration) }}</p>
+        <h2 id="event-summary-title">{{ schedule.eventName }}</h2>
+      </header>
+
+      <dl>
+        <div>
+          <dt>Data</dt>
+          <dd>{{ formatDate(schedule.eventDate) }}</dd>
+        </div>
+        <div>
+          <dt>Horario</dt>
+          <dd>{{ formatTime(schedule.eventTime) }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <form class="event-schedule-edit__form" [formGroup]="form" (ngSubmit)="onSubmit()">
+      @if (successMessage()) {
+        <p class="event-schedule-edit__feedback event-schedule-edit__feedback--success" aria-live="polite">
+          {{ successMessage() }}
+        </p>
+      }
+
+      @if (saveErrorMessage()) {
+        <p class="event-schedule-edit__feedback event-schedule-edit__feedback--error" role="alert">
+          {{ saveErrorMessage() }}
+        </p>
+      }
+
+      <section class="event-schedule-edit__assignment surface-card" aria-labelledby="schedule-location-title">
+        <h2 id="schedule-location-title">Local e padre</h2>
+
+        <div class="event-schedule-edit__grid">
+          <div class="event-schedule-edit__field">
+            <label for="locationId">Local</label>
+            <select id="locationId" formControlName="locationId">
+              <option [ngValue]="null">Selecione um local</option>
+              @for (location of locations(); track location.id) {
+                <option [ngValue]="location.id">{{ location.churchName }}</option>
+              }
+            </select>
+
+            @if (locations().length === 0) {
+              <p class="event-schedule-edit__hint">Nenhum local cadastrado.</p>
+            }
+
+            @if (form.controls.locationId.invalid && form.controls.locationId.touched) {
+              <p class="event-schedule-edit__error" role="alert">Informe um local para a escala.</p>
+            }
+          </div>
+
+          <div class="event-schedule-edit__field">
+            <label for="priestId">Padre</label>
+            <select id="priestId" formControlName="priestId">
+              <option [ngValue]="null">Nenhum padre selecionado</option>
+              @for (priest of priests(); track priest.id) {
+                <option [ngValue]="priest.id">{{ priest.name }}</option>
+              }
+            </select>
+
+            @if (priests().length === 0) {
+              <p class="event-schedule-edit__hint">Nenhum padre cadastrado.</p>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="event-schedule-edit__groups" aria-label="Participantes da escala">
+        <fieldset class="event-schedule-edit__group surface-card">
+          <legend>Leitores</legend>
+          <label class="event-schedule-edit__search" for="readerSearch">Pesquisar leitores</label>
+          <input
+            id="readerSearch"
+            type="search"
+            [value]="readerSearch()"
+            (input)="setSearch('readers', $event)"
+          />
+
+          @if (readers().length === 0) {
+            <p class="event-schedule-edit__hint">Nenhum leitor cadastrado.</p>
+          } @else {
+            <div class="event-schedule-edit__options">
+              @for (reader of filteredReaders(); track reader.id) {
+                <label class="event-schedule-edit__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('readerIds', reader.id)"
+                    (change)="onSelectionChange('readerIds', reader.id, $event)"
+                  />
+                  <span>{{ reader.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-edit__count">{{ selectedCount('readerIds') }} selecionado(s)</p>
+        </fieldset>
+
+        <fieldset class="event-schedule-edit__group surface-card">
+          <legend>Comentaristas</legend>
+          <label class="event-schedule-edit__search" for="commentatorSearch">
+            Pesquisar comentaristas
+          </label>
+          <input
+            id="commentatorSearch"
+            type="search"
+            [value]="commentatorSearch()"
+            (input)="setSearch('commentators', $event)"
+          />
+
+          @if (commentators().length === 0) {
+            <p class="event-schedule-edit__hint">Nenhum comentarista cadastrado.</p>
+          } @else {
+            <div class="event-schedule-edit__options">
+              @for (commentator of filteredCommentators(); track commentator.id) {
+                <label class="event-schedule-edit__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('commentatorIds', commentator.id)"
+                    (change)="onSelectionChange('commentatorIds', commentator.id, $event)"
+                  />
+                  <span>{{ commentator.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-edit__count">
+            {{ selectedCount('commentatorIds') }} selecionado(s)
+          </p>
+        </fieldset>
+
+        <fieldset class="event-schedule-edit__group surface-card">
+          <legend>Ministros da Palavra</legend>
+          <label class="event-schedule-edit__search" for="ministerOfTheWordSearch">
+            Pesquisar ministros da Palavra
+          </label>
+          <input
+            id="ministerOfTheWordSearch"
+            type="search"
+            [value]="ministerOfTheWordSearch()"
+            (input)="setSearch('ministersOfTheWord', $event)"
+          />
+
+          @if (ministersOfTheWord().length === 0) {
+            <p class="event-schedule-edit__hint">Nenhum ministro da Palavra cadastrado.</p>
+          } @else {
+            <div class="event-schedule-edit__options">
+              @for (minister of filteredMinistersOfTheWord(); track minister.id) {
+                <label class="event-schedule-edit__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('ministerOfTheWordIds', minister.id)"
+                    (change)="onSelectionChange('ministerOfTheWordIds', minister.id, $event)"
+                  />
+                  <span>{{ minister.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-edit__count">
+            {{ selectedCount('ministerOfTheWordIds') }} selecionado(s)
+          </p>
+        </fieldset>
+
+        <fieldset class="event-schedule-edit__group surface-card">
+          <legend>Ministros da Eucaristia</legend>
+          <label class="event-schedule-edit__search" for="eucharisticMinisterSearch">
+            Pesquisar ministros da Eucaristia
+          </label>
+          <input
+            id="eucharisticMinisterSearch"
+            type="search"
+            [value]="eucharisticMinisterSearch()"
+            (input)="setSearch('eucharisticMinisters', $event)"
+          />
+
+          @if (eucharisticMinisters().length === 0) {
+            <p class="event-schedule-edit__hint">Nenhum ministro da Eucaristia cadastrado.</p>
+          } @else {
+            <div class="event-schedule-edit__options">
+              @for (minister of filteredEucharisticMinisters(); track minister.id) {
+                <label class="event-schedule-edit__option">
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected('eucharisticMinisterIds', minister.id)"
+                    (change)="onSelectionChange('eucharisticMinisterIds', minister.id, $event)"
+                  />
+                  <span>{{ minister.name }}</span>
+                </label>
+              }
+            </div>
+          }
+
+          <p class="event-schedule-edit__count">
+            {{ selectedCount('eucharisticMinisterIds') }} selecionado(s)
+          </p>
+        </fieldset>
+      </section>
+
+      <div class="event-schedule-edit__actions">
+        <button
+          class="event-schedule-edit__button"
+          type="submit"
+          [disabled]="isSaving() || form.invalid"
+        >
+          @if (isSaving()) {
+            Salvando...
+          } @else {
+            Salvar alteracoes
+          }
+        </button>
+
+        <button
+          class="event-schedule-edit__button event-schedule-edit__button--secondary"
+          type="button"
+          (click)="cancel()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  }
+</section>
