@@ -61,6 +61,12 @@ class EndpointSecurityTest {
         mockMvc.perform(get("/locais"))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/pessoas/1"))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/leitores"))
                 .andExpect(status().isUnauthorized());
 
@@ -107,6 +113,12 @@ class EndpointSecurityTest {
                         .content(rolePayload()))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/pessoas/1"))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/eventos/com-escala")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEventWithScalePayload()))
@@ -138,6 +150,12 @@ class EndpointSecurityTest {
         mockMvc.perform(put("/pessoas/1/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(rolePayload()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas/1"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/eventos/com-escala")
