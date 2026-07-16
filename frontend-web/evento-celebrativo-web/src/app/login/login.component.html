@@ -1,22 +1,106 @@
-<div class="login-container">
-    <h2>Login</h2>
-    <h4 *ngIf="errorMessage" class="error-message">{{errorMessage}}</h4>
-    <form (ngSubmit)="onSubmit()">
-        <div class="form-group">
+<main class="login-page">
+  <section class="login-panel" aria-labelledby="login-title">
+    <aside class="login-visual" aria-label="Mensagem inspiradora">
+      <div class="login-visual__overlay">
+        <blockquote>
+          <p>Ide, portanto, e fazei discípulos de todas as nações.</p>
+          <cite>Mateus 28:19</cite>
+        </blockquote>
+      </div>
+    </aside>
+
+    <section class="login-content">
+      <div class="login-content__inner">
+        <header class="login-brand">
+          <div class="login-brand__mark" aria-hidden="true">EC</div>
+          <p class="login-brand__eyebrow">Evento Celebrativo</p>
+          <h1 id="login-title">Evento Celebrativo</h1>
+          <p>Sistema de gestão de missas e escalas</p>
+        </header>
+
+        <form
+          #loginForm="ngForm"
+          class="login-form"
+          (ngSubmit)="onSubmit(loginForm)"
+          novalidate
+        >
+          <div class="login-form__intro">
+            <h2>Acesse sua conta</h2>
+            <p>Informe suas credenciais para entrar no sistema</p>
+          </div>
+
+          @if (errorMessage) {
+            <p class="error-message" role="alert" aria-live="assertive">{{ errorMessage }}</p>
+          }
+
+          <div class="form-group">
             <label for="phone">Telefone</label>
-            <input type="text" id="phone" [(ngModel)]="phone" name="phone" required>
-        </div>
+            <div class="login-field">
+              <span class="login-field__icon login-field__icon--phone" aria-hidden="true"></span>
+              <input
+                #phoneControl="ngModel"
+                type="tel"
+                id="phone"
+                [(ngModel)]="phone"
+                name="phone"
+                autocomplete="username"
+                inputmode="tel"
+                required
+                aria-describedby="phone-error"
+              />
+            </div>
 
-        <div class="form-group">
+            @if (phoneControl.invalid && phoneControl.touched) {
+              <p id="phone-error" class="field-error">Informe seu telefone.</p>
+            }
+          </div>
+
+          <div class="form-group">
             <label for="password">Senha</label>
-            <input type="password" id="password" [(ngModel)]="password" name="password" required>
-        </div>
+            <div class="login-field login-field--password">
+              <span class="login-field__icon login-field__icon--password" aria-hidden="true"></span>
+              <input
+                #passwordControl="ngModel"
+                [type]="passwordInputType"
+                id="password"
+                [(ngModel)]="password"
+                name="password"
+                autocomplete="current-password"
+                required
+                aria-describedby="password-error"
+              />
+              <button
+                class="password-toggle"
+                type="button"
+                (click)="togglePasswordVisibility()"
+                [attr.aria-label]="passwordToggleLabel"
+                [attr.aria-pressed]="isPasswordVisible"
+              >
+                {{ isPasswordVisible ? 'Ocultar' : 'Mostrar' }}
+              </button>
+            </div>
 
-        <button type="submit">Entrar</button>
-    </form>
+            @if (passwordControl.invalid && passwordControl.touched) {
+              <p id="password-error" class="field-error">Informe sua senha.</p>
+            }
+          </div>
 
-    <a class="login-secondary-link" routerLink="/eventos">Consultar eventos</a>
-    <a class="login-secondary-link" routerLink="/escala/eucaristia">
-        Consultar escala de Eucaristia
-    </a>
-</div>
+          <button class="login-submit" type="submit" [disabled]="isSubmitting || loginForm.invalid">
+            {{ isSubmitting ? 'Entrando...' : 'Entrar' }}
+          </button>
+        </form>
+
+        <nav class="login-public-links" aria-label="Consultas públicas">
+          <a class="login-secondary-link" routerLink="/eventos">Consultar eventos</a>
+          <a class="login-secondary-link" routerLink="/escala/eucaristia">
+            Consultar escala de Eucaristia
+          </a>
+        </nav>
+
+        <footer class="login-footer">
+          © {{ currentYear }} Evento Celebrativo. Todos os direitos reservados.
+        </footer>
+      </div>
+    </section>
+  </section>
+</main>
