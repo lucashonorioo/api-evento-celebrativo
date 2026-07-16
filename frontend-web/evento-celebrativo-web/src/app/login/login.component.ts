@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthSessionService } from '../auth-session.service';
@@ -18,6 +18,9 @@ export class LoginComponent {
   phone: string = '';
   password: string = '';
   errorMessage: string = '';
+  isSubmitting: boolean = false;
+  isPasswordVisible: boolean = false;
+  readonly currentYear = new Date().getFullYear();
 
   constructor(
     private readonly authService: AuthService,
@@ -25,13 +28,33 @@ export class LoginComponent {
     private readonly router: Router,
   ) {}
 
-  onSubmit(): void {
+  get passwordInputType(): 'password' | 'text' {
+    return this.isPasswordVisible ? 'text' : 'password';
+  }
+
+  get passwordToggleLabel(): string {
+    return this.isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha';
+  }
+
+  onSubmit(form?: NgForm): void {
     this.errorMessage = '';
+
+    if (this.isSubmitting) {
+      return;
+    }
+
+    if (form?.invalid) {
+      form.form.markAllAsTouched();
+
+      return;
+    }
 
     const request: LoginRequest = {
       username: this.phone,
       password: this.password,
     };
+
+    this.isSubmitting = true;
 
     this.authService.login(request).subscribe({
       next: (response) => {
@@ -40,6 +63,8 @@ export class LoginComponent {
         void this.router.navigate(['/app/inicio']);
       },
       error: (error: HttpErrorResponse) => {
+        this.isSubmitting = false;
+
         if (error.status === 401) {
           this.errorMessage = 'Credenciais inválidas. Por favor, tente novamente.';
         } else {
@@ -47,5 +72,9 @@ export class LoginComponent {
         }
       },
     });
+  }
+
+  togglePasswordVisibility(): void {
+    this.isPasswordVisible = !this.isPasswordVisible;
   }
 }
