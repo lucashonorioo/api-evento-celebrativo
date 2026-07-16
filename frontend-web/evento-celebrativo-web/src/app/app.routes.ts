@@ -19,6 +19,7 @@ import { LoginComponent } from './login/login.component';
 import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
+import { MinisterOfTheWordManagementComponent } from './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component';
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
@@ -72,6 +73,11 @@ export const routes: Routes = [
       },
       { path: 'padres', component: PriestListComponent },
       { path: 'ministros-palavra', component: MinisterOfTheWordListComponent },
+      {
+        path: 'admin/ministros-palavra',
+        component: MinisterOfTheWordManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: 'ministros-eucaristia', component: EucharisticMinisterListComponent },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],

@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { MinisterOfTheWordResponse } from '../minister-of-the-word.models';
 import { MinisterOfTheWordService } from '../minister-of-the-word.service';
 import { MinisterOfTheWordListComponent } from './minister-of-the-word-list.component';
@@ -9,6 +11,7 @@ import { MinisterOfTheWordListComponent } from './minister-of-the-word-list.comp
 describe('MinisterOfTheWordListComponent', () => {
   let component: MinisterOfTheWordListComponent;
   let fixture: ComponentFixture<MinisterOfTheWordListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let ministerOfTheWordService: jasmine.SpyObj<MinisterOfTheWordService>;
 
   const ministers: MinisterOfTheWordResponse[] = [
@@ -26,7 +29,11 @@ describe('MinisterOfTheWordListComponent', () => {
     },
   ];
 
-  async function setup(response = of(ministers)): Promise<void> {
+  async function setup(response = of(ministers), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     ministerOfTheWordService = jasmine.createSpyObj<MinisterOfTheWordService>(
       'MinisterOfTheWordService',
       ['findAll'],
@@ -35,7 +42,11 @@ describe('MinisterOfTheWordListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [MinisterOfTheWordListComponent],
-      providers: [{ provide: MinisterOfTheWordService, useValue: ministerOfTheWordService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: MinisterOfTheWordService, useValue: ministerOfTheWordService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MinisterOfTheWordListComponent);
@@ -84,6 +95,40 @@ describe('MinisterOfTheWordListComponent', () => {
 
     expect(pageText).toContain('Maria Ministra');
     expect(pageText).toContain('José Ministro');
+  });
+
+  it('should show minister of the Word management link for administrators', async () => {
+    await setup(of(ministers), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar ministros da Palavra');
+    expect(link.getAttribute('href')).toBe('/app/admin/ministros-palavra');
+  });
+
+  it('should hide minister of the Word management link for operators', async () => {
+    await setup(of(ministers), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar ministros da Palavra');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Maria Ministra');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render minister identifiers', async () => {

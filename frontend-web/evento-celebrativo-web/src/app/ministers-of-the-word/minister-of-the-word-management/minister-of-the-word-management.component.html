@@ -1,0 +1,227 @@
+<section
+  class="minister-of-the-word-management"
+  aria-labelledby="minister-of-the-word-management-title"
+>
+  <header class="minister-of-the-word-management__header">
+    <h1 id="minister-of-the-word-management-title">Gerenciar ministros da Palavra</h1>
+    <p>Cadastre, edite e exclua ministros da Palavra disponiveis para as escalas.</p>
+  </header>
+
+  <form
+    class="minister-of-the-word-management__form"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <h2>{{ isEditing ? 'Editar ministro da Palavra' : 'Cadastrar ministro da Palavra' }}</h2>
+
+    <div class="minister-of-the-word-management__field">
+      <label for="name">Nome</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'name-error' : null"
+      />
+
+      @if (fieldErrorMessage('name'); as message) {
+        <p id="name-error" class="minister-of-the-word-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="minister-of-the-word-management__field">
+      <label for="phoneNumber">Telefone</label>
+      <input
+        id="phoneNumber"
+        type="tel"
+        formControlName="phoneNumber"
+        autocomplete="tel"
+        inputmode="numeric"
+        maxlength="11"
+        [attr.aria-invalid]="fieldErrorMessage('phoneNumber') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('phoneNumber') !== null ? 'phoneNumber-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('phoneNumber'); as message) {
+        <p id="phoneNumber-error" class="minister-of-the-word-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="minister-of-the-word-management__field">
+      <label for="birthdayDate">Data de nascimento</label>
+      <input
+        id="birthdayDate"
+        type="date"
+        formControlName="birthdayDate"
+        autocomplete="bday"
+        [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('birthdayDate') !== null ? 'birthdayDate-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('birthdayDate'); as message) {
+        <p id="birthdayDate-error" class="minister-of-the-word-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="minister-of-the-word-management__field">
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
+      />
+
+      @if (fieldErrorMessage('password'); as message) {
+        <p id="password-error" class="minister-of-the-word-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="minister-of-the-word-management__actions">
+      <button
+        class="minister-of-the-word-management__button"
+        type="submit"
+        [disabled]="isSaving()"
+      >
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="minister-of-the-word-management__button minister-of-the-word-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="minister-of-the-word-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p
+        class="minister-of-the-word-management__feedback minister-of-the-word-management__feedback--success"
+      >
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p
+        class="minister-of-the-word-management__feedback minister-of-the-word-management__feedback--error"
+        role="alert"
+      >
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section
+    class="minister-of-the-word-management__list-section"
+    aria-labelledby="minister-list-title"
+  >
+    <h2 id="minister-list-title">Ministros da Palavra cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="minister-of-the-word-management__status" role="status">
+        Carregando ministros da Palavra...
+      </p>
+    } @else if (errorMessage() && ministers().length === 0) {
+      <button
+        class="minister-of-the-word-management__button"
+        type="button"
+        (click)="loadMinisters()"
+      >
+        Tentar novamente
+      </button>
+    } @else if (ministers().length === 0) {
+      <p class="minister-of-the-word-management__feedback">
+        Nenhum ministro da Palavra cadastrado foi encontrado.
+      </p>
+    } @else {
+      <ul
+        class="minister-of-the-word-management__list"
+        aria-label="Lista de ministros da Palavra cadastrados"
+      >
+        @for (minister of ministers(); track minister.id) {
+          <li class="minister-of-the-word-management__item">
+            <div class="minister-of-the-word-management__item-content">
+              <h3>{{ minister.name }}</h3>
+
+              @if (minister.phoneNumber) {
+                <p>Telefone: {{ minister.phoneNumber }}</p>
+              }
+
+              @if (minister.birthdayDate) {
+                <p>Nascimento: {{ minister.birthdayDate }}</p>
+              }
+            </div>
+
+            <div class="minister-of-the-word-management__item-actions">
+              <button
+                class="minister-of-the-word-management__button minister-of-the-word-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(minister)"
+              >
+                Editar
+              </button>
+              <button
+                class="minister-of-the-word-management__button minister-of-the-word-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(minister)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as minister) {
+    <section
+      class="minister-of-the-word-management__confirmation"
+      aria-labelledby="delete-confirmation-title"
+    >
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este ministro da Palavra?</h2>
+      <p>{{ minister.name }}</p>
+
+      <div class="minister-of-the-word-management__actions">
+        <button
+          class="minister-of-the-word-management__button minister-of-the-word-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === minister.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="minister-of-the-word-management__button minister-of-the-word-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === minister.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>
