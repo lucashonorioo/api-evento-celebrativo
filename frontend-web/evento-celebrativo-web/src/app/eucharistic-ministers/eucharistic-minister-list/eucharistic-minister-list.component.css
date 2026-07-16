@@ -34,6 +34,27 @@
   line-height: 1.6;
 }
 
+.eucharistic-ministers__admin-link {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 1rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.5rem;
+  background: #202124;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.eucharistic-ministers__admin-link:hover {
+  background: #34383d;
+}
+
+.eucharistic-ministers__admin-link:focus-visible {
+  outline: 3px solid #7aa7ff;
+  outline-offset: 3px;
+}
+
 .eucharistic-ministers__status,
 .eucharistic-ministers__feedback,
 .eucharistic-ministers__list {

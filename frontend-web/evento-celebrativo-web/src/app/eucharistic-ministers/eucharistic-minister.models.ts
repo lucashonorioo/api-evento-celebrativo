@@ -4,3 +4,10 @@ export interface EucharisticMinisterResponse {
   phoneNumber: string | null;
   birthdayDate: string | null;
 }
+
+export interface EucharisticMinisterRequest {
+  name: string;
+  phoneNumber: string;
+  birthdayDate: string;
+  password: string;
+}

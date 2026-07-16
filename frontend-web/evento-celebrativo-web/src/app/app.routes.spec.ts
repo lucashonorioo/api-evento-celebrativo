@@ -5,6 +5,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
+import { EucharisticMinisterManagementComponent } from './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
@@ -120,6 +121,14 @@ describe('routes', () => {
     const publicMinisterRoute = routes.find((route) => route.path === 'ministros-eucaristia');
 
     expect(publicMinisterRoute).toBeUndefined();
+  });
+
+  it('should not expose eucharistic minister management as a public route', () => {
+    const publicManagementRoute = routes.find(
+      (route) => route.path === 'admin/ministros-eucaristia',
+    );
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose full schedule details as a public route', () => {
@@ -347,6 +356,18 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appMinisterRoute?.component).toBe(EucharisticMinisterListComponent);
+  });
+
+  it('should render eucharistic minister management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find(
+      (route) => route.path === 'admin/ministros-eucaristia',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(EucharisticMinisterManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should preserve the authenticated home route', () => {
