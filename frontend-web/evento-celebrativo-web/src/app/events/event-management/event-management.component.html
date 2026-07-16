@@ -1,0 +1,225 @@
+<section class="event-management page-shell" aria-labelledby="event-management-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Eventos</p>
+      <h1 id="event-management-title">Gerenciar eventos</h1>
+      <p>Cadastre, edite e exclua os dados principais dos eventos celebrativos.</p>
+    </div>
+
+    <a class="page-action" routerLink="/app/eventos">Voltar para Eventos</a>
+  </header>
+
+  <form class="event-management__form" [formGroup]="form" (ngSubmit)="submit()">
+    <h2>{{ isEditing ? 'Editar evento' : 'Cadastrar evento' }}</h2>
+
+    <div class="event-management__field">
+      <label for="nameMassOrEvent">Nome do evento</label>
+      <input
+        id="nameMassOrEvent"
+        type="text"
+        formControlName="nameMassOrEvent"
+        autocomplete="off"
+        [attr.aria-invalid]="fieldErrorMessage('nameMassOrEvent') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('nameMassOrEvent') !== null ? 'nameMassOrEvent-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('nameMassOrEvent'); as message) {
+        <p id="nameMassOrEvent-error" class="event-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="event-management__form-grid">
+      <div class="event-management__field">
+        <label for="eventDate">Data</label>
+        <input
+          id="eventDate"
+          type="date"
+          formControlName="eventDate"
+          [min]="today"
+          [attr.aria-invalid]="fieldErrorMessage('eventDate') !== null"
+          [attr.aria-describedby]="
+            fieldErrorMessage('eventDate') !== null ? 'eventDate-error' : null
+          "
+        />
+
+        @if (fieldErrorMessage('eventDate'); as message) {
+          <p id="eventDate-error" class="event-management__field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="event-management__field">
+        <label for="eventTime">Horario</label>
+        <input
+          id="eventTime"
+          type="time"
+          formControlName="eventTime"
+          [attr.aria-invalid]="fieldErrorMessage('eventTime') !== null"
+          [attr.aria-describedby]="
+            fieldErrorMessage('eventTime') !== null ? 'eventTime-error' : null
+          "
+        />
+
+        @if (fieldErrorMessage('eventTime'); as message) {
+          <p id="eventTime-error" class="event-management__field-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="event-management__field">
+        <label for="massOrCelebration">Tipo</label>
+        <select
+          id="massOrCelebration"
+          formControlName="massOrCelebration"
+          [attr.aria-invalid]="fieldErrorMessage('massOrCelebration') !== null"
+          [attr.aria-describedby]="
+            fieldErrorMessage('massOrCelebration') !== null ? 'massOrCelebration-error' : null
+          "
+        >
+          <option [ngValue]="null">Selecione</option>
+          <option [ngValue]="true">Missa</option>
+          <option [ngValue]="false">Celebracao</option>
+        </select>
+
+        @if (fieldErrorMessage('massOrCelebration'); as message) {
+          <p id="massOrCelebration-error" class="event-management__field-error">{{ message }}</p>
+        }
+      </div>
+    </div>
+
+    <p class="event-management__hint">
+      Local e participantes pertencem a escala do evento e devem ser mantidos nas telas de escala.
+    </p>
+
+    <div class="event-management__actions">
+      <button class="event-management__button" type="submit" [disabled]="isSaving()">
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="event-management__button event-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="event-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="event-management__feedback event-management__feedback--success">
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p class="event-management__feedback event-management__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="event-management__list-section" aria-labelledby="event-list-title">
+    <h2 id="event-list-title">Eventos cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="event-management__status" role="status">Carregando eventos...</p>
+    } @else if (errorMessage() && events().length === 0) {
+      <button class="event-management__button" type="button" (click)="loadEvents()">
+        Tentar novamente
+      </button>
+    } @else if (events().length === 0) {
+      <p class="event-management__feedback">Nenhum evento cadastrado foi encontrado.</p>
+    } @else {
+      <ul class="event-management__list" aria-label="Lista de eventos cadastrados">
+        @for (event of events(); track event.id) {
+          <li class="event-management__item">
+            <div class="event-management__item-content">
+              <h3>{{ event.nameMassOrEvent }}</h3>
+
+              <dl class="event-management__details">
+                <div>
+                  <dt>Data</dt>
+                  <dd>{{ event.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+                </div>
+                <div>
+                  <dt>Horario</dt>
+                  <dd>{{ formatTime(event.eventTime) }}</dd>
+                </div>
+                <div>
+                  <dt>Tipo</dt>
+                  <dd>{{ getEventType(event) }}</dd>
+                </div>
+                <div>
+                  <dt>Local</dt>
+                  <dd>Definido na escala</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="event-management__item-actions">
+              <a
+                class="event-management__link"
+                [routerLink]="['/app/escalas/eventos', event.id]"
+              >
+                Ver escala
+              </a>
+              <a
+                class="event-management__link"
+                [routerLink]="['/app/admin/escalas/eventos', event.id, 'editar']"
+              >
+                Editar escala
+              </a>
+              <button
+                class="event-management__button event-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(event)"
+              >
+                Editar
+              </button>
+              <button
+                class="event-management__button event-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(event)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as event) {
+    <section class="event-management__confirmation" aria-labelledby="delete-confirmation-title">
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este evento?</h2>
+      <p>{{ event.nameMassOrEvent }}</p>
+
+      <div class="event-management__actions">
+        <button
+          class="event-management__button event-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === event.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="event-management__button event-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === event.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>

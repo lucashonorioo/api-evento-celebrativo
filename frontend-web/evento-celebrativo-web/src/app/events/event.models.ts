@@ -5,3 +5,10 @@ export interface CelebrationEventResponse {
   eventTime: string;
   massOrCelebration: boolean;
 }
+
+export interface CelebrationEventRequest {
+  nameMassOrEvent: string;
+  eventDate: string;
+  eventTime: string;
+  massOrCelebration: boolean;
+}
