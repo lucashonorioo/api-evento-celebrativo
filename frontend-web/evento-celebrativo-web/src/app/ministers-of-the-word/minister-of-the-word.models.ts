@@ -4,3 +4,10 @@ export interface MinisterOfTheWordResponse {
   phoneNumber: string | null;
   birthdayDate: string | null;
 }
+
+export interface MinisterOfTheWordRequest {
+  name: string;
+  phoneNumber: string;
+  birthdayDate: string;
+  password: string;
+}

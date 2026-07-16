@@ -18,6 +18,7 @@ import { LoginComponent } from './login/login.component';
 import { LocationManagementComponent } from './locations/location-management/location-management.component';
 import { LocationListComponent } from './locations/location-list/location-list.component';
 import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
+import { MinisterOfTheWordManagementComponent } from './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component';
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
@@ -105,6 +106,14 @@ describe('routes', () => {
     const publicMinisterRoute = routes.find((route) => route.path === 'ministros-palavra');
 
     expect(publicMinisterRoute).toBeUndefined();
+  });
+
+  it('should not expose minister of the Word management as a public route', () => {
+    const publicManagementRoute = routes.find(
+      (route) => route.path === 'admin/ministros-palavra',
+    );
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose eucharistic ministers as a public route', () => {
@@ -315,6 +324,18 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appMinisterRoute?.component).toBe(MinisterOfTheWordListComponent);
+  });
+
+  it('should render minister of the Word management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find(
+      (route) => route.path === 'admin/ministros-palavra',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(MinisterOfTheWordManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render eucharistic ministers inside the protected app route', () => {

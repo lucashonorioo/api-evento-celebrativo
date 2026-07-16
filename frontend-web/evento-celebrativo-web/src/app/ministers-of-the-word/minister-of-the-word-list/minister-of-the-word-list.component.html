@@ -1,7 +1,16 @@
-<section class="ministers-of-the-word" aria-labelledby="ministers-of-the-word-title">
-  <header class="ministers-of-the-word__header">
-    <h1 id="ministers-of-the-word-title">Ministros da Palavra</h1>
-    <p>Consulte os ministros da Palavra cadastrados no sistema.</p>
+<section class="ministers-of-the-word page-shell" aria-labelledby="ministers-of-the-word-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Pessoas</p>
+      <h1 id="ministers-of-the-word-title">Ministros da Palavra</h1>
+      <p>Consulte os ministros da Palavra cadastrados no sistema.</p>
+    </div>
+
+    @if (isAdmin) {
+      <a class="page-action" routerLink="/app/admin/ministros-palavra">
+        Gerenciar ministros da Palavra
+      </a>
+    }
   </header>
 
   @if (isLoading()) {
