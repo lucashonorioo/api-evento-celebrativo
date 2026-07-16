@@ -4,3 +4,10 @@ export interface CommentatorResponse {
   phoneNumber: string | null;
   birthdayDate: string | null;
 }
+
+export interface CommentatorRequest {
+  name: string;
+  phoneNumber: string;
+  birthdayDate: string;
+  password: string;
+}

@@ -1,0 +1,191 @@
+<section class="commentator-management" aria-labelledby="commentator-management-title">
+  <header class="commentator-management__header">
+    <h1 id="commentator-management-title">Gerenciar comentaristas</h1>
+    <p>Cadastre, edite e exclua comentaristas disponiveis para as escalas.</p>
+  </header>
+
+  <form class="commentator-management__form" [formGroup]="form" (ngSubmit)="submit()">
+    <h2>{{ isEditing ? 'Editar comentarista' : 'Cadastrar comentarista' }}</h2>
+
+    <div class="commentator-management__field">
+      <label for="name">Nome</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'name-error' : null"
+      />
+
+      @if (fieldErrorMessage('name'); as message) {
+        <p id="name-error" class="commentator-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="commentator-management__field">
+      <label for="phoneNumber">Telefone</label>
+      <input
+        id="phoneNumber"
+        type="tel"
+        formControlName="phoneNumber"
+        autocomplete="tel"
+        inputmode="numeric"
+        maxlength="11"
+        [attr.aria-invalid]="fieldErrorMessage('phoneNumber') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('phoneNumber') !== null ? 'phoneNumber-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('phoneNumber'); as message) {
+        <p id="phoneNumber-error" class="commentator-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="commentator-management__field">
+      <label for="birthdayDate">Data de nascimento</label>
+      <input
+        id="birthdayDate"
+        type="date"
+        formControlName="birthdayDate"
+        autocomplete="bday"
+        [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('birthdayDate') !== null ? 'birthdayDate-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('birthdayDate'); as message) {
+        <p id="birthdayDate-error" class="commentator-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="commentator-management__field">
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
+      />
+
+      @if (fieldErrorMessage('password'); as message) {
+        <p id="password-error" class="commentator-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="commentator-management__actions">
+      <button class="commentator-management__button" type="submit" [disabled]="isSaving()">
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="commentator-management__button commentator-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="commentator-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="commentator-management__feedback commentator-management__feedback--success">
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p class="commentator-management__feedback commentator-management__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="commentator-management__list-section" aria-labelledby="commentator-list-title">
+    <h2 id="commentator-list-title">Comentaristas cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="commentator-management__status" role="status">Carregando comentaristas...</p>
+    } @else if (errorMessage() && commentators().length === 0) {
+      <button class="commentator-management__button" type="button" (click)="loadCommentators()">
+        Tentar novamente
+      </button>
+    } @else if (commentators().length === 0) {
+      <p class="commentator-management__feedback">Nenhum comentarista cadastrado foi encontrado.</p>
+    } @else {
+      <ul class="commentator-management__list" aria-label="Lista de comentaristas cadastrados">
+        @for (commentator of commentators(); track commentator.id) {
+          <li class="commentator-management__item">
+            <div class="commentator-management__item-content">
+              <h3>{{ commentator.name }}</h3>
+
+              @if (commentator.phoneNumber) {
+                <p>Telefone: {{ commentator.phoneNumber }}</p>
+              }
+
+              @if (commentator.birthdayDate) {
+                <p>Nascimento: {{ commentator.birthdayDate }}</p>
+              }
+            </div>
+
+            <div class="commentator-management__item-actions">
+              <button
+                class="commentator-management__button commentator-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(commentator)"
+              >
+                Editar
+              </button>
+              <button
+                class="commentator-management__button commentator-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(commentator)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as commentator) {
+    <section
+      class="commentator-management__confirmation"
+      aria-labelledby="delete-confirmation-title"
+    >
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este comentarista?</h2>
+      <p>{{ commentator.name }}</p>
+
+      <div class="commentator-management__actions">
+        <button
+          class="commentator-management__button commentator-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === commentator.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="commentator-management__button commentator-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === commentator.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>

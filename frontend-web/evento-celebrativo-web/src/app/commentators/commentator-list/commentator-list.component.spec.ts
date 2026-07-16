@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { CommentatorResponse } from '../commentator.models';
 import { CommentatorService } from '../commentator.service';
 import { CommentatorListComponent } from './commentator-list.component';
@@ -9,6 +11,7 @@ import { CommentatorListComponent } from './commentator-list.component';
 describe('CommentatorListComponent', () => {
   let component: CommentatorListComponent;
   let fixture: ComponentFixture<CommentatorListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let commentatorService: jasmine.SpyObj<CommentatorService>;
 
   const commentators: CommentatorResponse[] = [
@@ -26,7 +29,11 @@ describe('CommentatorListComponent', () => {
     },
   ];
 
-  async function setup(response = of(commentators)): Promise<void> {
+  async function setup(response = of(commentators), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     commentatorService = jasmine.createSpyObj<CommentatorService>('CommentatorService', [
       'findAll',
     ]);
@@ -34,7 +41,11 @@ describe('CommentatorListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [CommentatorListComponent],
-      providers: [{ provide: CommentatorService, useValue: commentatorService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: CommentatorService, useValue: commentatorService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CommentatorListComponent);
@@ -83,6 +94,40 @@ describe('CommentatorListComponent', () => {
 
     expect(pageText).toContain('Maria Comentarista');
     expect(pageText).toContain('João Comentarista');
+  });
+
+  it('should show commentator management link for administrators', async () => {
+    await setup(of(commentators), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar comentaristas');
+    expect(link.getAttribute('href')).toBe('/app/admin/comentaristas');
+  });
+
+  it('should hide commentator management link for operators', async () => {
+    await setup(of(commentators), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar comentaristas');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Maria Comentarista');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render commentator identifiers', async () => {

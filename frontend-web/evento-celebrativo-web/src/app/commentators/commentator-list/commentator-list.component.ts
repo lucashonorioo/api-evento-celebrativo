@@ -1,21 +1,25 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { CommentatorResponse } from '../commentator.models';
 import { CommentatorService } from '../commentator.service';
 
 @Component({
   selector: 'app-commentator-list',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './commentator-list.component.html',
   styleUrl: './commentator-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CommentatorListComponent implements OnInit {
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly commentatorService = inject(CommentatorService);
 
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly commentators = signal<CommentatorResponse[]>([]);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);

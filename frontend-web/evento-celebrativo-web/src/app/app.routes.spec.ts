@@ -3,6 +3,7 @@ import { adminGuard } from './admin.guard';
 import { AccessDeniedComponent } from './access-denied/access-denied.component';
 import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
+import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
@@ -86,6 +87,12 @@ describe('routes', () => {
     const publicCommentatorRoute = routes.find((route) => route.path === 'comentaristas');
 
     expect(publicCommentatorRoute).toBeUndefined();
+  });
+
+  it('should not expose commentator management as a public route', () => {
+    const publicManagementRoute = routes.find((route) => route.path === 'admin/comentaristas');
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose priests as a public route', () => {
@@ -276,6 +283,18 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appCommentatorRoute?.component).toBe(CommentatorListComponent);
+  });
+
+  it('should render commentator management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find(
+      (route) => route.path === 'admin/comentaristas',
+    );
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(CommentatorManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render priests inside the protected app route', () => {
