@@ -23,6 +23,7 @@ import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister
 import { MinisterOfTheWordManagementComponent } from './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component';
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
+import { PriestManagementComponent } from './priests/priest-management/priest-management.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
 import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 
@@ -73,6 +74,11 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       { path: 'padres', component: PriestListComponent },
+      {
+        path: 'admin/padres',
+        component: PriestManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: 'ministros-palavra', component: MinisterOfTheWordListComponent },
       {
         path: 'admin/ministros-palavra',

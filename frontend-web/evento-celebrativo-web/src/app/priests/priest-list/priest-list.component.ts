@@ -1,21 +1,25 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { PriestResponse } from '../priest.models';
 import { PriestService } from '../priest.service';
 
 @Component({
   selector: 'app-priest-list',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './priest-list.component.html',
   styleUrl: './priest-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PriestListComponent implements OnInit {
+  private readonly authSessionService = inject(AuthSessionService);
   private readonly priestService = inject(PriestService);
 
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly priests = signal<PriestResponse[]>([]);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);

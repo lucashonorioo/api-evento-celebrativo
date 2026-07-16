@@ -1,7 +1,14 @@
-<section class="priests" aria-labelledby="priests-title">
-  <header class="priests__header">
-    <h1 id="priests-title">Padres</h1>
-    <p>Consulte os padres cadastrados no sistema.</p>
+<section class="priests page-shell" aria-labelledby="priests-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Pessoas</p>
+      <h1 id="priests-title">Padres</h1>
+      <p>Consulte os padres cadastrados no sistema.</p>
+    </div>
+
+    @if (isAdmin) {
+      <a class="page-action" routerLink="/app/admin/padres">Gerenciar padres</a>
+    }
   </header>
 
   @if (isLoading()) {

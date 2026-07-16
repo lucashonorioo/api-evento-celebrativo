@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { PriestResponse } from '../priest.models';
 import { PriestService } from '../priest.service';
 import { PriestListComponent } from './priest-list.component';
@@ -9,6 +11,7 @@ import { PriestListComponent } from './priest-list.component';
 describe('PriestListComponent', () => {
   let component: PriestListComponent;
   let fixture: ComponentFixture<PriestListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let priestService: jasmine.SpyObj<PriestService>;
 
   const priests: PriestResponse[] = [
@@ -26,13 +29,21 @@ describe('PriestListComponent', () => {
     },
   ];
 
-  async function setup(response = of(priests)): Promise<void> {
+  async function setup(response = of(priests), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     priestService = jasmine.createSpyObj<PriestService>('PriestService', ['findAll']);
     priestService.findAll.and.returnValue(response);
 
     await TestBed.configureTestingModule({
       imports: [PriestListComponent],
-      providers: [{ provide: PriestService, useValue: priestService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: PriestService, useValue: priestService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PriestListComponent);
@@ -81,6 +92,40 @@ describe('PriestListComponent', () => {
 
     expect(pageText).toContain('Padre João');
     expect(pageText).toContain('Padre Pedro');
+  });
+
+  it('should show priest management link for administrators', async () => {
+    await setup(of(priests), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar padres');
+    expect(link.getAttribute('href')).toBe('/app/admin/padres');
+  });
+
+  it('should hide priest management link for operators', async () => {
+    await setup(of(priests), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar padres');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Padre Pedro');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render priest identifiers', async () => {

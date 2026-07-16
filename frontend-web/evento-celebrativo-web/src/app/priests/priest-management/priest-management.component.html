@@ -1,0 +1,188 @@
+<section class="priest-management" aria-labelledby="priest-management-title">
+  <header class="priest-management__header">
+    <h1 id="priest-management-title">Gerenciar padres</h1>
+    <p>Cadastre, edite e exclua padres disponiveis para as escalas.</p>
+  </header>
+
+  <form class="priest-management__form" [formGroup]="form" (ngSubmit)="submit()">
+    <h2>{{ isEditing ? 'Editar padre' : 'Cadastrar padre' }}</h2>
+
+    <div class="priest-management__field">
+      <label for="name">Nome</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'name-error' : null"
+      />
+
+      @if (fieldErrorMessage('name'); as message) {
+        <p id="name-error" class="priest-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="priest-management__field">
+      <label for="phoneNumber">Telefone</label>
+      <input
+        id="phoneNumber"
+        type="tel"
+        formControlName="phoneNumber"
+        autocomplete="tel"
+        inputmode="numeric"
+        maxlength="11"
+        [attr.aria-invalid]="fieldErrorMessage('phoneNumber') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('phoneNumber') !== null ? 'phoneNumber-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('phoneNumber'); as message) {
+        <p id="phoneNumber-error" class="priest-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="priest-management__field">
+      <label for="birthdayDate">Data de nascimento</label>
+      <input
+        id="birthdayDate"
+        type="date"
+        formControlName="birthdayDate"
+        autocomplete="bday"
+        [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('birthdayDate') !== null ? 'birthdayDate-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('birthdayDate'); as message) {
+        <p id="birthdayDate-error" class="priest-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="priest-management__field">
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
+      />
+
+      @if (fieldErrorMessage('password'); as message) {
+        <p id="password-error" class="priest-management__field-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="priest-management__actions">
+      <button class="priest-management__button" type="submit" [disabled]="isSaving()">
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="priest-management__button priest-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="priest-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="priest-management__feedback priest-management__feedback--success">
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p class="priest-management__feedback priest-management__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="priest-management__list-section" aria-labelledby="priest-list-title">
+    <h2 id="priest-list-title">Padres cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="priest-management__status" role="status">Carregando padres...</p>
+    } @else if (errorMessage() && priests().length === 0) {
+      <button class="priest-management__button" type="button" (click)="loadPriests()">
+        Tentar novamente
+      </button>
+    } @else if (priests().length === 0) {
+      <p class="priest-management__feedback">Nenhum padre cadastrado foi encontrado.</p>
+    } @else {
+      <ul class="priest-management__list" aria-label="Lista de padres cadastrados">
+        @for (priest of priests(); track priest.id) {
+          <li class="priest-management__item">
+            <div class="priest-management__item-content">
+              <h3>{{ priest.name }}</h3>
+
+              @if (priest.phoneNumber) {
+                <p>Telefone: {{ priest.phoneNumber }}</p>
+              }
+
+              @if (priest.birthdayDate) {
+                <p>Nascimento: {{ priest.birthdayDate }}</p>
+              }
+            </div>
+
+            <div class="priest-management__item-actions">
+              <button
+                class="priest-management__button priest-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(priest)"
+              >
+                Editar
+              </button>
+              <button
+                class="priest-management__button priest-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(priest)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as priest) {
+    <section class="priest-management__confirmation" aria-labelledby="delete-confirmation-title">
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este padre?</h2>
+      <p>{{ priest.name }}</p>
+
+      <div class="priest-management__actions">
+        <button
+          class="priest-management__button priest-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === priest.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="priest-management__button priest-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === priest.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>
