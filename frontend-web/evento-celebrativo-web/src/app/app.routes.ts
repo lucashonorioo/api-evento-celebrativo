@@ -4,6 +4,7 @@ import { adminGuard } from './admin.guard';
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
+import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
@@ -64,6 +65,11 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       { path: 'comentaristas', component: CommentatorListComponent },
+      {
+        path: 'admin/comentaristas',
+        component: CommentatorManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: 'padres', component: PriestListComponent },
       { path: 'ministros-palavra', component: MinisterOfTheWordListComponent },
       { path: 'ministros-eucaristia', component: EucharisticMinisterListComponent },

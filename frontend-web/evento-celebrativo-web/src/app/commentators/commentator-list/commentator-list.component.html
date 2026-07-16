@@ -1,7 +1,14 @@
-<section class="commentators" aria-labelledby="commentators-title">
-  <header class="commentators__header">
-    <h1 id="commentators-title">Comentaristas</h1>
-    <p>Consulte os comentaristas cadastrados no sistema.</p>
+<section class="commentators page-shell" aria-labelledby="commentators-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Pessoas</p>
+      <h1 id="commentators-title">Comentaristas</h1>
+      <p>Consulte os comentaristas cadastrados no sistema.</p>
+    </div>
+
+    @if (isAdmin) {
+      <a class="page-action" routerLink="/app/admin/comentaristas">Gerenciar comentaristas</a>
+    }
   </header>
 
   @if (isLoading()) {
