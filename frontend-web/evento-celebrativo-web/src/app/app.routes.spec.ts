@@ -1,6 +1,10 @@
-import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
-import { adminGuard } from './admin.guard';
+import { Type } from '@angular/core';
+import { Route } from '@angular/router';
+import { firstValueFrom, isObservable } from 'rxjs';
+
 import { AccessDeniedComponent } from './access-denied/access-denied.component';
+import { adminGuard } from './admin.guard';
+import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
@@ -27,370 +31,290 @@ import { ReaderListComponent } from './readers/reader-list/reader-list.component
 import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 import { routes } from './app.routes';
 
-describe('routes', () => {
-  it('should keep the login route public for guests only', () => {
-    const loginRoute = routes.find((route) => route.path === 'login');
+type LazyLoadedComponent = Type<unknown> | { default: Type<unknown> };
 
-    expect(loginRoute?.component).toBe(LoginComponent);
+describe('routes', () => {
+  it('should keep the login route public for guests only', async () => {
+    const loginRoute = findPublicRoute('login');
+
+    await expectLazyComponent(loginRoute, LoginComponent);
     expect(loginRoute?.canActivate).toEqual([guestGuard]);
   });
 
-  it('should expose the public events route without guards', () => {
-    const eventsRoute = routes.find((route) => route.path === 'eventos');
+  it('should expose the public events route without guards', async () => {
+    const eventsRoute = findPublicRoute('eventos');
 
-    expect(eventsRoute?.component).toBe(EventListComponent);
+    await expectLazyComponent(eventsRoute, EventListComponent);
     expect(eventsRoute?.canActivate).toBeUndefined();
   });
 
-  it('should expose the public event detail route without guards', () => {
-    const eventDetailRoute = routes.find((route) => route.path === 'eventos/:id');
+  it('should expose the public event detail route without guards', async () => {
+    const eventDetailRoute = findPublicRoute('eventos/:id');
 
-    expect(eventDetailRoute?.component).toBe(EventDetailComponent);
+    await expectLazyComponent(eventDetailRoute, EventDetailComponent);
     expect(eventDetailRoute?.canActivate).toBeUndefined();
   });
 
-  it('should expose the public Eucharist schedule route without guards', () => {
-    const eucharistScheduleRoute = routes.find((route) => route.path === 'escala/eucaristia');
+  it('should expose the public Eucharist schedule route without guards', async () => {
+    const eucharistScheduleRoute = findPublicRoute('escala/eucaristia');
 
-    expect(eucharistScheduleRoute?.component).toBe(EucharistScheduleListComponent);
+    await expectLazyComponent(eucharistScheduleRoute, EucharistScheduleListComponent);
     expect(eucharistScheduleRoute?.canActivate).toBeUndefined();
   });
 
-  it('should not expose locations as a public route', () => {
-    const publicLocationRoute = routes.find((route) => route.path === 'locais');
+  it('should not expose authenticated-only routes as public routes', () => {
+    const privatePaths = [
+      'locais',
+      'admin/locais',
+      'pessoas',
+      'leitores',
+      'admin/leitores',
+      'comentaristas',
+      'admin/comentaristas',
+      'padres',
+      'admin/padres',
+      'ministros-palavra',
+      'admin/ministros-palavra',
+      'ministros-eucaristia',
+      'admin/ministros-eucaristia',
+      'escalas/eventos/:id',
+      'admin/escalas/eventos/:id/editar',
+      'admin/escalas/novo-evento',
+    ];
 
-    expect(publicLocationRoute).toBeUndefined();
+    for (const path of privatePaths) {
+      expect(findPublicRoute(path)).toBeUndefined();
+    }
   });
 
-  it('should not expose location management as a public route', () => {
-    const publicManagementRoute = routes.find((route) => route.path === 'admin/locais');
+  it('should render authenticated events inside the protected app route', async () => {
+    const appEventsRoute = findAppChildRoute('eventos');
 
-    expect(publicManagementRoute).toBeUndefined();
+    expectAppRouteProtection();
+    await expectLazyComponent(appEventsRoute, EventListComponent);
   });
 
-  it('should not expose people as a public route', () => {
-    const publicPeopleRoute = routes.find((route) => route.path === 'pessoas');
+  it('should render authenticated event details inside the protected app route', async () => {
+    const appEventDetailRoute = findAppChildRoute('eventos/:id');
 
-    expect(publicPeopleRoute).toBeUndefined();
+    expectAppRouteProtection();
+    await expectLazyComponent(appEventDetailRoute, EventDetailComponent);
   });
 
-  it('should not expose readers as a public route', () => {
-    const publicReaderRoute = routes.find((route) => route.path === 'leitores');
+  it('should render authenticated Eucharist schedule inside the protected app route', async () => {
+    const appScheduleRoute = findAppChildRoute('escala/eucaristia');
 
-    expect(publicReaderRoute).toBeUndefined();
+    expectAppRouteProtection();
+    await expectLazyComponent(appScheduleRoute, EucharistScheduleListComponent);
   });
 
-  it('should not expose reader management as a public route', () => {
-    const publicManagementRoute = routes.find((route) => route.path === 'admin/leitores');
+  it('should render authenticated monthly schedules inside the protected app route', async () => {
+    const appScheduleRoute = findAppChildRoute('escalas');
 
-    expect(publicManagementRoute).toBeUndefined();
-  });
-
-  it('should not expose commentators as a public route', () => {
-    const publicCommentatorRoute = routes.find((route) => route.path === 'comentaristas');
-
-    expect(publicCommentatorRoute).toBeUndefined();
-  });
-
-  it('should not expose commentator management as a public route', () => {
-    const publicManagementRoute = routes.find((route) => route.path === 'admin/comentaristas');
-
-    expect(publicManagementRoute).toBeUndefined();
-  });
-
-  it('should not expose priests as a public route', () => {
-    const publicPriestRoute = routes.find((route) => route.path === 'padres');
-
-    expect(publicPriestRoute).toBeUndefined();
-  });
-
-  it('should not expose priest management as a public route', () => {
-    const publicManagementRoute = routes.find((route) => route.path === 'admin/padres');
-
-    expect(publicManagementRoute).toBeUndefined();
-  });
-
-  it('should not expose ministers of the Word as a public route', () => {
-    const publicMinisterRoute = routes.find((route) => route.path === 'ministros-palavra');
-
-    expect(publicMinisterRoute).toBeUndefined();
-  });
-
-  it('should not expose minister of the Word management as a public route', () => {
-    const publicManagementRoute = routes.find(
-      (route) => route.path === 'admin/ministros-palavra',
-    );
-
-    expect(publicManagementRoute).toBeUndefined();
-  });
-
-  it('should not expose eucharistic ministers as a public route', () => {
-    const publicMinisterRoute = routes.find((route) => route.path === 'ministros-eucaristia');
-
-    expect(publicMinisterRoute).toBeUndefined();
-  });
-
-  it('should not expose eucharistic minister management as a public route', () => {
-    const publicManagementRoute = routes.find(
-      (route) => route.path === 'admin/ministros-eucaristia',
-    );
-
-    expect(publicManagementRoute).toBeUndefined();
-  });
-
-  it('should not expose full schedule details as a public route', () => {
-    const publicScheduleDetailRoute = routes.find((route) => route.path === 'escalas/eventos/:id');
-
-    expect(publicScheduleDetailRoute).toBeUndefined();
-  });
-
-  it('should not expose schedule editing as a public route', () => {
-    const publicScheduleEditRoute = routes.find(
-      (route) => route.path === 'admin/escalas/eventos/:id/editar',
-    );
-
-    expect(publicScheduleEditRoute).toBeUndefined();
-  });
-
-  it('should not expose event with schedule creation as a public route', () => {
-    const publicScheduleCreateRoute = routes.find(
-      (route) => route.path === 'admin/escalas/novo-evento',
-    );
-
-    expect(publicScheduleCreateRoute).toBeUndefined();
-  });
-
-  it('should render authenticated events inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appEventsRoute = appRoute?.children?.find((route) => route.path === 'eventos');
-
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appEventsRoute?.component).toBe(EventListComponent);
-  });
-
-  it('should render authenticated event details inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appEventDetailRoute = appRoute?.children?.find((route) => route.path === 'eventos/:id');
-
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appEventDetailRoute?.component).toBe(EventDetailComponent);
-  });
-
-  it('should render authenticated Eucharist schedule inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appScheduleRoute = appRoute?.children?.find(
-      (route) => route.path === 'escala/eucaristia',
-    );
-
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appScheduleRoute?.component).toBe(EucharistScheduleListComponent);
-  });
-
-  it('should render authenticated monthly schedules inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appScheduleRoute = appRoute?.children?.find((route) => route.path === 'escalas');
-
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appScheduleRoute?.component).toBe(EventScheduleListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appScheduleRoute, EventScheduleListComponent);
     expect(appScheduleRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render authenticated full schedule detail inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appScheduleDetailRoute = appRoute?.children?.find(
-      (route) => route.path === 'escalas/eventos/:id',
-    );
+  it('should render authenticated full schedule detail inside the protected app route', async () => {
+    const appScheduleDetailRoute = findAppChildRoute('escalas/eventos/:id');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appScheduleDetailRoute?.component).toBe(EventScheduleDetailComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appScheduleDetailRoute, EventScheduleDetailComponent);
     expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render schedule editing inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appScheduleEditRoute = appRoute?.children?.find(
-      (route) => route.path === 'admin/escalas/eventos/:id/editar',
-    );
-    const appScheduleDetailRoute = appRoute?.children?.find(
-      (route) => route.path === 'escalas/eventos/:id',
-    );
+  it('should render schedule editing inside the protected app route for admins only', async () => {
+    const appScheduleEditRoute = findAppChildRoute('admin/escalas/eventos/:id/editar');
+    const appScheduleDetailRoute = findAppChildRoute('escalas/eventos/:id');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appScheduleEditRoute?.component).toBe(EventScheduleEditComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appScheduleEditRoute, EventScheduleEditComponent);
     expect(appScheduleEditRoute?.canActivate).toEqual([adminGuard]);
     expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render event with schedule creation inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appScheduleCreateRoute = appRoute?.children?.find(
-      (route) => route.path === 'admin/escalas/novo-evento',
-    );
+  it('should render event with schedule creation inside the protected app route for admins only', async () => {
+    const appScheduleCreateRoute = findAppChildRoute('admin/escalas/novo-evento');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appScheduleCreateRoute?.component).toBe(EventScheduleCreateComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appScheduleCreateRoute, EventScheduleCreateComponent);
     expect(appScheduleCreateRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render locations inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appLocationRoute = appRoute?.children?.find((route) => route.path === 'locais');
+  it('should render locations inside the protected app route', async () => {
+    const appLocationRoute = findAppChildRoute('locais');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appLocationRoute?.component).toBe(LocationListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appLocationRoute, LocationListComponent);
     expect(appLocationRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render access denied inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const accessDeniedRoute = appRoute?.children?.find((route) => route.path === 'acesso-negado');
+  it('should render access denied inside the protected app route', async () => {
+    const accessDeniedRoute = findAppChildRoute('acesso-negado');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(accessDeniedRoute?.component).toBe(AccessDeniedComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(accessDeniedRoute, AccessDeniedComponent);
     expect(accessDeniedRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render people hub inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const peopleRoute = appRoute?.children?.find((route) => route.path === 'pessoas');
+  it('should render people hub inside the protected app route', async () => {
+    const peopleRoute = findAppChildRoute('pessoas');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(peopleRoute?.component).toBe(PeopleHubComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(peopleRoute, PeopleHubComponent);
     expect(peopleRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render location management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/locais');
+  it('should render location management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/locais');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(LocationManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, LocationManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render readers inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appReaderRoute = appRoute?.children?.find((route) => route.path === 'leitores');
+  it('should render readers inside the protected app route', async () => {
+    const appReaderRoute = findAppChildRoute('leitores');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appReaderRoute?.component).toBe(ReaderListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appReaderRoute, ReaderListComponent);
     expect(appReaderRoute?.canActivate).toBeUndefined();
   });
 
-  it('should render reader management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/leitores');
+  it('should render reader management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/leitores');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(ReaderManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, ReaderManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render commentators inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appCommentatorRoute = appRoute?.children?.find(
-      (route) => route.path === 'comentaristas',
-    );
+  it('should render commentators inside the protected app route', async () => {
+    const appCommentatorRoute = findAppChildRoute('comentaristas');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appCommentatorRoute?.component).toBe(CommentatorListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appCommentatorRoute, CommentatorListComponent);
   });
 
-  it('should render commentator management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find(
-      (route) => route.path === 'admin/comentaristas',
-    );
+  it('should render commentator management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/comentaristas');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(CommentatorManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, CommentatorManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render priests inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appPriestRoute = appRoute?.children?.find((route) => route.path === 'padres');
+  it('should render priests inside the protected app route', async () => {
+    const appPriestRoute = findAppChildRoute('padres');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appPriestRoute?.component).toBe(PriestListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appPriestRoute, PriestListComponent);
   });
 
-  it('should render priest management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/padres');
+  it('should render priest management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/padres');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(PriestManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, PriestManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render ministers of the Word inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appMinisterRoute = appRoute?.children?.find(
-      (route) => route.path === 'ministros-palavra',
-    );
+  it('should render ministers of the Word inside the protected app route', async () => {
+    const appMinisterRoute = findAppChildRoute('ministros-palavra');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appMinisterRoute?.component).toBe(MinisterOfTheWordListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appMinisterRoute, MinisterOfTheWordListComponent);
   });
 
-  it('should render minister of the Word management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find(
-      (route) => route.path === 'admin/ministros-palavra',
-    );
+  it('should render minister of the Word management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/ministros-palavra');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(MinisterOfTheWordManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, MinisterOfTheWordManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should render eucharistic ministers inside the protected app route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const appMinisterRoute = appRoute?.children?.find(
-      (route) => route.path === 'ministros-eucaristia',
-    );
+  it('should render eucharistic ministers inside the protected app route', async () => {
+    const appMinisterRoute = findAppChildRoute('ministros-eucaristia');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(appMinisterRoute?.component).toBe(EucharisticMinisterListComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(appMinisterRoute, EucharisticMinisterListComponent);
   });
 
-  it('should render eucharistic minister management inside the protected app route for admins only', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const managementRoute = appRoute?.children?.find(
-      (route) => route.path === 'admin/ministros-eucaristia',
-    );
+  it('should render eucharistic minister management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/ministros-eucaristia');
 
-    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
-    expect(appRoute?.canActivate).toEqual([authGuard]);
-    expect(managementRoute?.component).toBe(EucharisticMinisterManagementComponent);
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, EucharisticMinisterManagementComponent);
     expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
-  it('should preserve the authenticated home route', () => {
-    const appRoute = routes.find((route) => route.path === 'app');
-    const homeRoute = appRoute?.children?.find((route) => route.path === 'inicio');
+  it('should preserve the authenticated home route', async () => {
+    const homeRoute = findAppChildRoute('inicio');
 
-    expect(homeRoute?.component).toBe(HomeComponent);
+    await expectLazyComponent(homeRoute, HomeComponent);
   });
+
+  function findPublicRoute(path: string): Route | undefined {
+    return routes.find((route) => route.path === path);
+  }
+
+  function findAppRoute(): Route | undefined {
+    return findPublicRoute('app');
+  }
+
+  function findAppChildRoute(path: string): Route | undefined {
+    return findAppRoute()?.children?.find((route) => route.path === path);
+  }
+
+  function expectAppRouteProtection(): void {
+    const appRoute = findAppRoute();
+
+    expect(appRoute?.component).toBeUndefined();
+    expect(appRoute?.loadComponent).toEqual(jasmine.any(Function));
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+  }
+
+  async function expectLazyComponent(
+    route: Route | undefined,
+    expectedComponent: Type<unknown>,
+  ): Promise<void> {
+    expect(route?.component).toBeUndefined();
+    expect(route?.loadComponent).toEqual(jasmine.any(Function));
+
+    const component = await resolveLazyComponent(route);
+
+    expect(component).toBe(expectedComponent);
+  }
+
+  async function resolveLazyComponent(route: Route | undefined): Promise<Type<unknown> | null> {
+    const component = route?.loadComponent?.();
+
+    if (!component) {
+      return null;
+    }
+
+    if (isObservable(component)) {
+      const resolvedComponent = await firstValueFrom(component);
+
+      return unwrapLazyComponent(resolvedComponent);
+    }
+
+    const resolvedComponent = component instanceof Promise ? await component : component;
+
+    return unwrapLazyComponent(resolvedComponent);
+  }
+
+  function unwrapLazyComponent(component: LazyLoadedComponent): Type<unknown> {
+    if (isDefaultExport(component)) {
+      return component.default;
+    }
+
+    return component;
+  }
+
+  function isDefaultExport(component: LazyLoadedComponent): component is { default: Type<unknown> } {
+    return typeof component === 'object' && 'default' in component;
+  }
 });

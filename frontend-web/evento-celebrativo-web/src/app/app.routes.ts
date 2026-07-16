@@ -1,94 +1,208 @@
 import { Routes } from '@angular/router';
-import { AccessDeniedComponent } from './access-denied/access-denied.component';
+
 import { adminGuard } from './admin.guard';
-import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
-import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
-import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
-import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
-import { EucharisticMinisterManagementComponent } from './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component';
-import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
-import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
-import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
-import { EventScheduleEditComponent } from './event-schedules/event-schedule-edit/event-schedule-edit.component';
-import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
-import { EventDetailComponent } from './events/event-detail/event-detail.component';
-import { EventListComponent } from './events/event-list/event-list.component';
 import { guestGuard } from './guest.guard';
-import { HomeComponent } from './home/home.component';
-import { LoginComponent } from './login/login.component';
-import { LocationManagementComponent } from './locations/location-management/location-management.component';
-import { LocationListComponent } from './locations/location-list/location-list.component';
-import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component';
-import { MinisterOfTheWordManagementComponent } from './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component';
-import { PeopleHubComponent } from './people/people-hub.component';
-import { PriestListComponent } from './priests/priest-list/priest-list.component';
-import { PriestManagementComponent } from './priests/priest-management/priest-management.component';
-import { ReaderListComponent } from './readers/reader-list/reader-list.component';
-import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 
 export const routes: Routes = [
-  { path: 'login', component: LoginComponent, canActivate: [guestGuard] },
-  { path: 'eventos', component: EventListComponent },
-  { path: 'eventos/:id', component: EventDetailComponent },
-  { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./login/login.component').then(({ LoginComponent }) => LoginComponent),
+    canActivate: [guestGuard],
+  },
+  {
+    path: 'eventos',
+    loadComponent: () =>
+      import('./events/event-list/event-list.component').then(
+        ({ EventListComponent }) => EventListComponent,
+      ),
+  },
+  {
+    path: 'eventos/:id',
+    loadComponent: () =>
+      import('./events/event-detail/event-detail.component').then(
+        ({ EventDetailComponent }) => EventDetailComponent,
+      ),
+  },
+  {
+    path: 'escala/eucaristia',
+    loadComponent: () =>
+      import('./eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component').then(
+        ({ EucharistScheduleListComponent }) => EucharistScheduleListComponent,
+      ),
+  },
   {
     path: 'app',
-    component: AuthenticatedLayoutComponent,
+    loadComponent: () =>
+      import('./authenticated-layout/authenticated-layout.component').then(
+        ({ AuthenticatedLayoutComponent }) => AuthenticatedLayoutComponent,
+      ),
     canActivate: [authGuard],
     children: [
-      { path: 'inicio', component: HomeComponent },
-      { path: 'acesso-negado', component: AccessDeniedComponent },
-      { path: 'eventos', component: EventListComponent },
-      { path: 'eventos/:id', component: EventDetailComponent },
-      { path: 'escalas', component: EventScheduleListComponent },
-      { path: 'escalas/eventos/:id', component: EventScheduleDetailComponent },
+      {
+        path: 'inicio',
+        loadComponent: () =>
+          import('./home/home.component').then(({ HomeComponent }) => HomeComponent),
+      },
+      {
+        path: 'acesso-negado',
+        loadComponent: () =>
+          import('./access-denied/access-denied.component').then(
+            ({ AccessDeniedComponent }) => AccessDeniedComponent,
+          ),
+      },
+      {
+        path: 'eventos',
+        loadComponent: () =>
+          import('./events/event-list/event-list.component').then(
+            ({ EventListComponent }) => EventListComponent,
+          ),
+      },
+      {
+        path: 'eventos/:id',
+        loadComponent: () =>
+          import('./events/event-detail/event-detail.component').then(
+            ({ EventDetailComponent }) => EventDetailComponent,
+          ),
+      },
+      {
+        path: 'escalas',
+        loadComponent: () =>
+          import('./event-schedules/event-schedule-list/event-schedule-list.component').then(
+            ({ EventScheduleListComponent }) => EventScheduleListComponent,
+          ),
+      },
+      {
+        path: 'escalas/eventos/:id',
+        loadComponent: () =>
+          import('./event-schedules/event-schedule-detail/event-schedule-detail.component').then(
+            ({ EventScheduleDetailComponent }) => EventScheduleDetailComponent,
+          ),
+      },
       {
         path: 'admin/escalas/novo-evento',
-        component: EventScheduleCreateComponent,
+        loadComponent: () =>
+          import('./event-schedules/event-schedule-create/event-schedule-create.component').then(
+            ({ EventScheduleCreateComponent }) => EventScheduleCreateComponent,
+          ),
         canActivate: [adminGuard],
       },
       {
         path: 'admin/escalas/eventos/:id/editar',
-        component: EventScheduleEditComponent,
+        loadComponent: () =>
+          import('./event-schedules/event-schedule-edit/event-schedule-edit.component').then(
+            ({ EventScheduleEditComponent }) => EventScheduleEditComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'escala/eucaristia', component: EucharistScheduleListComponent },
-      { path: 'locais', component: LocationListComponent },
-      { path: 'pessoas', component: PeopleHubComponent },
+      {
+        path: 'escala/eucaristia',
+        loadComponent: () =>
+          import(
+            './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component'
+          ).then(({ EucharistScheduleListComponent }) => EucharistScheduleListComponent),
+      },
+      {
+        path: 'locais',
+        loadComponent: () =>
+          import('./locations/location-list/location-list.component').then(
+            ({ LocationListComponent }) => LocationListComponent,
+          ),
+      },
+      {
+        path: 'pessoas',
+        loadComponent: () =>
+          import('./people/people-hub.component').then(
+            ({ PeopleHubComponent }) => PeopleHubComponent,
+          ),
+      },
       {
         path: 'admin/locais',
-        component: LocationManagementComponent,
+        loadComponent: () =>
+          import('./locations/location-management/location-management.component').then(
+            ({ LocationManagementComponent }) => LocationManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'leitores', component: ReaderListComponent },
+      {
+        path: 'leitores',
+        loadComponent: () =>
+          import('./readers/reader-list/reader-list.component').then(
+            ({ ReaderListComponent }) => ReaderListComponent,
+          ),
+      },
       {
         path: 'admin/leitores',
-        component: ReaderManagementComponent,
+        loadComponent: () =>
+          import('./readers/reader-management/reader-management.component').then(
+            ({ ReaderManagementComponent }) => ReaderManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'comentaristas', component: CommentatorListComponent },
+      {
+        path: 'comentaristas',
+        loadComponent: () =>
+          import('./commentators/commentator-list/commentator-list.component').then(
+            ({ CommentatorListComponent }) => CommentatorListComponent,
+          ),
+      },
       {
         path: 'admin/comentaristas',
-        component: CommentatorManagementComponent,
+        loadComponent: () =>
+          import('./commentators/commentator-management/commentator-management.component').then(
+            ({ CommentatorManagementComponent }) => CommentatorManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'padres', component: PriestListComponent },
+      {
+        path: 'padres',
+        loadComponent: () =>
+          import('./priests/priest-list/priest-list.component').then(
+            ({ PriestListComponent }) => PriestListComponent,
+          ),
+      },
       {
         path: 'admin/padres',
-        component: PriestManagementComponent,
+        loadComponent: () =>
+          import('./priests/priest-management/priest-management.component').then(
+            ({ PriestManagementComponent }) => PriestManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'ministros-palavra', component: MinisterOfTheWordListComponent },
+      {
+        path: 'ministros-palavra',
+        loadComponent: () =>
+          import(
+            './ministers-of-the-word/minister-of-the-word-list/minister-of-the-word-list.component'
+          ).then(({ MinisterOfTheWordListComponent }) => MinisterOfTheWordListComponent),
+      },
       {
         path: 'admin/ministros-palavra',
-        component: MinisterOfTheWordManagementComponent,
+        loadComponent: () =>
+          import(
+            './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component'
+          ).then(
+            ({ MinisterOfTheWordManagementComponent }) => MinisterOfTheWordManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
-      { path: 'ministros-eucaristia', component: EucharisticMinisterListComponent },
+      {
+        path: 'ministros-eucaristia',
+        loadComponent: () =>
+          import(
+            './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component'
+          ).then(({ EucharisticMinisterListComponent }) => EucharisticMinisterListComponent),
+      },
       {
         path: 'admin/ministros-eucaristia',
-        component: EucharisticMinisterManagementComponent,
+        loadComponent: () =>
+          import(
+            './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component'
+          ).then(
+            ({ EucharisticMinisterManagementComponent }) =>
+              EucharisticMinisterManagementComponent,
+          ),
         canActivate: [adminGuard],
       },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
