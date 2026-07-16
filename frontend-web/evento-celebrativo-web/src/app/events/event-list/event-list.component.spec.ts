@@ -4,6 +4,7 @@ import { provideRouter, RouterOutlet } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { CelebrationEventResponse } from '../event.models';
 import { EventService } from '../event.service';
 import { EventListComponent } from './event-list.component';
@@ -26,6 +27,7 @@ class EmptyTestComponent {}
 describe('EventListComponent', () => {
   let fixture: ComponentFixture<EventListComponent>;
   let component: EventListComponent;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eventService: jasmine.SpyObj<EventService>;
 
   const events: CelebrationEventResponse[] = [
@@ -45,13 +47,21 @@ describe('EventListComponent', () => {
     },
   ];
 
-  async function setup(response = of(events)): Promise<void> {
+  async function setup(response = of(events), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValue(response);
 
     await TestBed.configureTestingModule({
       imports: [EventListComponent],
-      providers: [provideRouter([]), { provide: EventService, useValue: eventService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: EventService, useValue: eventService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventListComponent);
@@ -153,6 +163,10 @@ describe('EventListComponent', () => {
   });
 
   it('should retry loading events when the retry button is clicked', async () => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(false);
     eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValues(
       throwError(() => new Error('Request failed')),
@@ -161,7 +175,11 @@ describe('EventListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [EventListComponent],
-      providers: [provideRouter([]), { provide: EventService, useValue: eventService }],
+      providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: EventService, useValue: eventService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventListComponent);
@@ -179,6 +197,10 @@ describe('EventListComponent', () => {
   });
 
   it('should render public detail links relative to the public list route', async () => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(true);
     eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValue(of(events));
 
@@ -188,6 +210,7 @@ describe('EventListComponent', () => {
           { path: 'eventos', component: EventListComponent },
           { path: 'eventos/:id', component: EmptyTestComponent },
         ]),
+        { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventService, useValue: eventService },
       ],
     }).compileComponents();
@@ -199,9 +222,14 @@ describe('EventListComponent', () => {
 
     expect(link?.getAttribute('href')).toBe('/eventos/1');
     expect(link?.textContent).toContain('Ver detalhes');
+    expect(harness.routeNativeElement?.querySelector('.page-action')).toBeNull();
   });
 
   it('should render authenticated detail links relative to the authenticated list route', async () => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(false);
     eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValue(of(events));
 
@@ -217,6 +245,7 @@ describe('EventListComponent', () => {
             ],
           },
         ]),
+        { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventService, useValue: eventService },
       ],
     }).compileComponents();
@@ -227,5 +256,65 @@ describe('EventListComponent', () => {
     ) as HTMLAnchorElement | null;
 
     expect(link?.getAttribute('href')).toBe('/app/eventos/1');
+  });
+
+  it('should render event management action for admins in the authenticated list route', async () => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(true);
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
+    eventService.findAll.and.returnValue(of(events));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EventListComponent },
+              { path: 'admin/eventos', component: EmptyTestComponent },
+            ],
+          },
+        ]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos');
+    const link = harness.routeNativeElement?.querySelector('.page-action') as HTMLAnchorElement;
+
+    expect(link.textContent).toContain('Gerenciar eventos');
+    expect(link.getAttribute('href')).toBe('/app/admin/eventos');
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+  });
+
+  it('should hide event management action for operators in the authenticated list route', async () => {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(false);
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
+    eventService.findAll.and.returnValue(of(events));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [{ path: 'eventos', component: EventListComponent }],
+          },
+        ]),
+        { provide: AuthSessionService, useValue: authSessionService },
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos');
+
+    expect(harness.routeNativeElement?.querySelector('.page-action')).toBeNull();
   });
 });

@@ -67,6 +67,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/eventos',
+        loadComponent: () =>
+          import('./events/event-management/event-management.component').then(
+            ({ EventManagementComponent }) => EventManagementComponent,
+          ),
+        canActivate: [adminGuard],
+      },
+      {
         path: 'escalas',
         loadComponent: () =>
           import('./event-schedules/event-schedule-list/event-schedule-list.component').then(

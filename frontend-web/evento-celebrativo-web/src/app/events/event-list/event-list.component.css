@@ -6,6 +6,10 @@
 }
 
 .events__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
@@ -132,6 +136,10 @@
 }
 
 @media (max-width: 36rem) {
+  .events__header {
+    flex-direction: column;
+  }
+
   .event-card__main,
   .event-card__details {
     grid-template-columns: 1fr;

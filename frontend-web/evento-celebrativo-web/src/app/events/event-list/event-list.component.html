@@ -1,7 +1,13 @@
 <section class="events" aria-labelledby="events-title">
   <header class="events__header">
-    <h1 id="events-title">Eventos</h1>
-    <p>Consulte os próximos eventos celebrativos.</p>
+    <div>
+      <h1 id="events-title">Eventos</h1>
+      <p>Consulte os próximos eventos celebrativos.</p>
+    </div>
+
+    @if (canManageEvents()) {
+      <a class="page-action" routerLink="/app/admin/eventos">Gerenciar eventos</a>
+    }
   </header>
 
   @if (isLoading()) {

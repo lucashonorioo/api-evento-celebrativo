@@ -17,6 +17,7 @@ import { EventScheduleEditComponent } from './event-schedules/event-schedule-edi
 import { EventScheduleListComponent } from './event-schedules/event-schedule-list/event-schedule-list.component';
 import { EventDetailComponent } from './events/event-detail/event-detail.component';
 import { EventListComponent } from './events/event-list/event-list.component';
+import { EventManagementComponent } from './events/event-management/event-management.component';
 import { guestGuard } from './guest.guard';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
@@ -65,6 +66,7 @@ describe('routes', () => {
   it('should not expose authenticated-only routes as public routes', () => {
     const privatePaths = [
       'locais',
+      'admin/eventos',
       'admin/locais',
       'pessoas',
       'leitores',
@@ -99,6 +101,14 @@ describe('routes', () => {
 
     expectAppRouteProtection();
     await expectLazyComponent(appEventDetailRoute, EventDetailComponent);
+  });
+
+  it('should render event management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/eventos');
+
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, EventManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render authenticated Eucharist schedule inside the protected app route', async () => {
