@@ -16,7 +16,13 @@
   <form class="schedule-filter surface-card" (ngSubmit)="onSubmit()">
     <div class="schedule-filter__field">
       <label for="schedule-type">Tipo de escala</label>
-      <select id="schedule-type" name="scheduleType" [(ngModel)]="selectedType" required>
+      <select
+        class="schedule-filter__control"
+        id="schedule-type"
+        name="scheduleType"
+        [(ngModel)]="selectedType"
+        required
+      >
         @for (option of scheduleTypeOptions; track option.value) {
           <option [ngValue]="option.value">{{ option.label }}</option>
         }
@@ -25,11 +31,23 @@
 
     <div class="schedule-filter__field">
       <label for="schedule-month">Mes</label>
-      <input id="schedule-month" type="month" name="selectedMonth" [(ngModel)]="selectedMonth" required />
+      <input
+        class="schedule-filter__control"
+        id="schedule-month"
+        type="month"
+        name="selectedMonth"
+        [(ngModel)]="selectedMonth"
+        required
+      />
     </div>
 
     <label class="schedule-filter__checkbox">
-      <input type="checkbox" name="includeUnassigned" [(ngModel)]="includeUnassigned" />
+      <input
+        class="schedule-filter__checkbox-input"
+        type="checkbox"
+        name="includeUnassigned"
+        [(ngModel)]="includeUnassigned"
+      />
       <span>Incluir eventos sem pessoas escaladas</span>
     </label>
 
@@ -40,7 +58,7 @@
       <button class="schedule-filter__secondary-button" type="button" (click)="nextMonth()">
         Proximo mes
       </button>
-      <button class="schedule-filter__button" type="submit">Consultar</button>
+      <button class="schedule-filter__button primary-button" type="submit">Consultar</button>
     </div>
   </form>
 
@@ -54,7 +72,7 @@
     <div class="event-schedules__feedback event-schedules__feedback--error" role="alert">
       <p>{{ errorMessage() }}</p>
 
-      <button class="event-schedules__button" type="button" (click)="retry()">
+      <button class="event-schedules__button primary-button" type="button" (click)="retry()">
         Tentar novamente
       </button>
     </div>
@@ -72,24 +90,30 @@
         <li class="schedule-card surface-card">
           <header class="schedule-card__header">
             <div>
-              <p class="schedule-card__eyebrow">{{ eventKind(schedule.massOrCelebration) }}</p>
+              <p class="schedule-card__eyebrow schedule-text-strong">
+                {{ eventKind(schedule.massOrCelebration) }}
+              </p>
               <h2>{{ schedule.eventName }}</h2>
             </div>
-            <span>{{ assignmentTypeLabel(schedule.assignmentType) }}</span>
+            <span class="schedule-card__type schedule-text-strong">
+              {{ assignmentTypeLabel(schedule.assignmentType) }}
+            </span>
           </header>
 
           <dl class="schedule-card__details">
             <div>
-              <dt>Data</dt>
-              <dd>{{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+              <dt class="schedule-card__detail-label schedule-text-strong">Data</dt>
+              <dd class="schedule-card__detail-value">
+                {{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}
+              </dd>
             </div>
             <div>
-              <dt>Horario</dt>
-              <dd>{{ formatTime(schedule.eventTime) }}</dd>
+              <dt class="schedule-card__detail-label schedule-text-strong">Horario</dt>
+              <dd class="schedule-card__detail-value">{{ formatTime(schedule.eventTime) }}</dd>
             </div>
             <div>
-              <dt>Local</dt>
-              <dd>{{ schedule.churchName }}</dd>
+              <dt class="schedule-card__detail-label schedule-text-strong">Local</dt>
+              <dd class="schedule-card__detail-value">{{ schedule.churchName }}</dd>
             </div>
           </dl>
 
@@ -120,11 +144,23 @@
 
     @if (totalPages() > 0) {
       <nav class="schedule-pagination" aria-label="Paginacao das escalas">
-        <button type="button" (click)="previousPage()" [disabled]="isFirstPage() || isLoading()">
+        <button
+          class="schedule-pagination__button"
+          type="button"
+          (click)="previousPage()"
+          [disabled]="isFirstPage() || isLoading()"
+        >
           Anterior
         </button>
-        <span>Pagina {{ currentPage() + 1 }} de {{ totalPages() }}</span>
-        <button type="button" (click)="nextPage()" [disabled]="isLastPage() || isLoading()">
+        <span class="schedule-text-strong">
+          Pagina {{ currentPage() + 1 }} de {{ totalPages() }}
+        </span>
+        <button
+          class="schedule-pagination__button"
+          type="button"
+          (click)="nextPage()"
+          [disabled]="isLastPage() || isLoading()"
+        >
           Proxima
         </button>
       </nav>
