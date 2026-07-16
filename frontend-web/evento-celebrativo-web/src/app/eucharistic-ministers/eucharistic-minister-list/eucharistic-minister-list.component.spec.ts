@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
+import { AuthSessionService } from '../../auth-session.service';
 import { EucharisticMinisterResponse } from '../eucharistic-minister.models';
 import { EucharisticMinisterService } from '../eucharistic-minister.service';
 import { EucharisticMinisterListComponent } from './eucharistic-minister-list.component';
@@ -9,6 +11,7 @@ import { EucharisticMinisterListComponent } from './eucharistic-minister-list.co
 describe('EucharisticMinisterListComponent', () => {
   let component: EucharisticMinisterListComponent;
   let fixture: ComponentFixture<EucharisticMinisterListComponent>;
+  let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eucharisticMinisterService: jasmine.SpyObj<EucharisticMinisterService>;
 
   const ministers: EucharisticMinisterResponse[] = [
@@ -26,7 +29,11 @@ describe('EucharisticMinisterListComponent', () => {
     },
   ];
 
-  async function setup(response = of(ministers)): Promise<void> {
+  async function setup(response = of(ministers), isAdmin = false): Promise<void> {
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'hasAuthority',
+    ]);
+    authSessionService.hasAuthority.and.returnValue(isAdmin);
     eucharisticMinisterService = jasmine.createSpyObj<EucharisticMinisterService>(
       'EucharisticMinisterService',
       ['findAll'],
@@ -36,6 +43,8 @@ describe('EucharisticMinisterListComponent', () => {
     await TestBed.configureTestingModule({
       imports: [EucharisticMinisterListComponent],
       providers: [
+        provideRouter([]),
+        { provide: AuthSessionService, useValue: authSessionService },
         { provide: EucharisticMinisterService, useValue: eucharisticMinisterService },
       ],
     }).compileComponents();
@@ -86,6 +95,42 @@ describe('EucharisticMinisterListComponent', () => {
 
     expect(pageText).toContain('Ana Ministra');
     expect(pageText).toContain('Carlos Ministro');
+  });
+
+  it('should show eucharistic minister management link for administrators', async () => {
+    await setup(of(ministers), true);
+
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector(
+      '.eucharistic-ministers__admin-link',
+    ) as HTMLAnchorElement;
+
+    expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
+    expect(link.textContent).toContain('Gerenciar ministros da Eucaristia');
+    expect(link.getAttribute('href')).toBe('/app/admin/ministros-eucaristia');
+  });
+
+  it('should hide eucharistic minister management link for operators', async () => {
+    await setup(of(ministers), false);
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.eucharistic-ministers__admin-link')).toBeNull();
+    expect(textContent()).not.toContain('Gerenciar ministros da Eucaristia');
+  });
+
+  it('should keep the common listing without administrative operations', async () => {
+    await setup();
+
+    fixture.detectChanges();
+
+    const text = textContent();
+
+    expect(text).toContain('Ana Ministra');
+    expect(text).not.toContain('Cadastrar');
+    expect(text).not.toContain('Editar');
+    expect(text).not.toContain('Excluir');
   });
 
   it('should not render minister identifiers', async () => {

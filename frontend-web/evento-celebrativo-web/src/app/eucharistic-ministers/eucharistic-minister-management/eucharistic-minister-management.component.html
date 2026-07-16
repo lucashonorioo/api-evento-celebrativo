@@ -1,0 +1,229 @@
+<section
+  class="eucharistic-minister-management"
+  aria-labelledby="eucharistic-minister-management-title"
+>
+  <header class="eucharistic-minister-management__header">
+    <h1 id="eucharistic-minister-management-title">Gerenciar ministros da Eucaristia</h1>
+    <p>Cadastre, edite e exclua ministros da Eucaristia disponiveis para as escalas.</p>
+  </header>
+
+  <form
+    class="eucharistic-minister-management__form"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <h2>{{ isEditing ? 'Editar ministro da Eucaristia' : 'Cadastrar ministro da Eucaristia' }}</h2>
+
+    <div class="eucharistic-minister-management__field">
+      <label for="name">Nome</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        autocomplete="name"
+        [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'name-error' : null"
+      />
+
+      @if (fieldErrorMessage('name'); as message) {
+        <p id="name-error" class="eucharistic-minister-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="eucharistic-minister-management__field">
+      <label for="phoneNumber">Telefone</label>
+      <input
+        id="phoneNumber"
+        type="tel"
+        formControlName="phoneNumber"
+        autocomplete="tel"
+        inputmode="numeric"
+        maxlength="11"
+        [attr.aria-invalid]="fieldErrorMessage('phoneNumber') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('phoneNumber') !== null ? 'phoneNumber-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('phoneNumber'); as message) {
+        <p id="phoneNumber-error" class="eucharistic-minister-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="eucharistic-minister-management__field">
+      <label for="birthdayDate">Data de nascimento</label>
+      <input
+        id="birthdayDate"
+        type="date"
+        formControlName="birthdayDate"
+        autocomplete="bday"
+        [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('birthdayDate') !== null ? 'birthdayDate-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('birthdayDate'); as message) {
+        <p id="birthdayDate-error" class="eucharistic-minister-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="eucharistic-minister-management__field">
+      <label for="password">Senha</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="new-password"
+        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
+      />
+
+      @if (fieldErrorMessage('password'); as message) {
+        <p id="password-error" class="eucharistic-minister-management__field-error">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="eucharistic-minister-management__actions">
+      <button
+        class="eucharistic-minister-management__button"
+        type="submit"
+        [disabled]="isSaving()"
+      >
+        {{ isEditing ? 'Salvar alteracoes' : 'Cadastrar' }}
+      </button>
+
+      @if (isEditing) {
+        <button
+          class="eucharistic-minister-management__button eucharistic-minister-management__button--secondary"
+          type="button"
+          [disabled]="isSaving()"
+          (click)="cancelEditing()"
+        >
+          Cancelar edicao
+        </button>
+      }
+    </div>
+  </form>
+
+  <div class="eucharistic-minister-management__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p
+        class="eucharistic-minister-management__feedback eucharistic-minister-management__feedback--success"
+      >
+        {{ successMessage() }}
+      </p>
+    }
+
+    @if (errorMessage()) {
+      <p
+        class="eucharistic-minister-management__feedback eucharistic-minister-management__feedback--error"
+        role="alert"
+      >
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section
+    class="eucharistic-minister-management__list-section"
+    aria-labelledby="eucharistic-minister-list-title"
+  >
+    <h2 id="eucharistic-minister-list-title">Ministros da Eucaristia cadastrados</h2>
+
+    @if (isLoading()) {
+      <p class="eucharistic-minister-management__status" role="status">
+        Carregando ministros da Eucaristia...
+      </p>
+    } @else if (errorMessage() && ministers().length === 0) {
+      <button
+        class="eucharistic-minister-management__button"
+        type="button"
+        (click)="loadMinisters()"
+      >
+        Tentar novamente
+      </button>
+    } @else if (ministers().length === 0) {
+      <p class="eucharistic-minister-management__feedback">
+        Nenhum ministro da Eucaristia cadastrado foi encontrado.
+      </p>
+    } @else {
+      <ul
+        class="eucharistic-minister-management__list"
+        aria-label="Lista de ministros da Eucaristia cadastrados"
+      >
+        @for (minister of ministers(); track minister.id) {
+          <li class="eucharistic-minister-management__item">
+            <div class="eucharistic-minister-management__item-content">
+              <h3>{{ minister.name }}</h3>
+
+              @if (minister.phoneNumber) {
+                <p>Telefone: {{ minister.phoneNumber }}</p>
+              }
+
+              @if (minister.birthdayDate) {
+                <p>Nascimento: {{ minister.birthdayDate }}</p>
+              }
+            </div>
+
+            <div class="eucharistic-minister-management__item-actions">
+              <button
+                class="eucharistic-minister-management__button eucharistic-minister-management__button--secondary"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="startEditing(minister)"
+              >
+                Editar
+              </button>
+              <button
+                class="eucharistic-minister-management__button eucharistic-minister-management__button--danger"
+                type="button"
+                [disabled]="isSaving() || deletingId() !== null"
+                (click)="requestDeletion(minister)"
+              >
+                Excluir
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  @if (pendingDeletion(); as minister) {
+    <section
+      class="eucharistic-minister-management__confirmation"
+      aria-labelledby="delete-confirmation-title"
+    >
+      <h2 id="delete-confirmation-title">Deseja realmente excluir este ministro da Eucaristia?</h2>
+      <p>{{ minister.name }}</p>
+
+      <div class="eucharistic-minister-management__actions">
+        <button
+          class="eucharistic-minister-management__button eucharistic-minister-management__button--danger"
+          type="button"
+          [disabled]="deletingId() === minister.id"
+          (click)="confirmDeletion()"
+        >
+          Confirmar exclusao
+        </button>
+        <button
+          class="eucharistic-minister-management__button eucharistic-minister-management__button--secondary"
+          type="button"
+          [disabled]="deletingId() === minister.id"
+          (click)="cancelDeletion()"
+        >
+          Cancelar
+        </button>
+      </div>
+    </section>
+  }
+</section>

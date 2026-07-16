@@ -6,6 +6,15 @@
       <p class="eucharistic-ministers__description">
         Consulte os ministros da Eucaristia cadastrados no sistema.
       </p>
+
+      @if (isAdmin) {
+        <a
+          class="eucharistic-ministers__admin-link"
+          routerLink="/app/admin/ministros-eucaristia"
+        >
+          Gerenciar ministros da Eucaristia
+        </a>
+      }
     </header>
 
     @if (isLoading()) {

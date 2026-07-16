@@ -6,6 +6,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
+import { EucharisticMinisterManagementComponent } from './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
 import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
@@ -79,6 +80,11 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       { path: 'ministros-eucaristia', component: EucharisticMinisterListComponent },
+      {
+        path: 'admin/ministros-eucaristia',
+        component: EucharisticMinisterManagementComponent,
+        canActivate: [adminGuard],
+      },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],
   },
