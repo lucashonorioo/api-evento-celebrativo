@@ -22,6 +22,7 @@ import { MinisterOfTheWordListComponent } from './ministers-of-the-word/minister
 import { MinisterOfTheWordManagementComponent } from './ministers-of-the-word/minister-of-the-word-management/minister-of-the-word-management.component';
 import { PeopleHubComponent } from './people/people-hub.component';
 import { PriestListComponent } from './priests/priest-list/priest-list.component';
+import { PriestManagementComponent } from './priests/priest-management/priest-management.component';
 import { ReaderListComponent } from './readers/reader-list/reader-list.component';
 import { ReaderManagementComponent } from './readers/reader-management/reader-management.component';
 import { routes } from './app.routes';
@@ -101,6 +102,12 @@ describe('routes', () => {
     const publicPriestRoute = routes.find((route) => route.path === 'padres');
 
     expect(publicPriestRoute).toBeUndefined();
+  });
+
+  it('should not expose priest management as a public route', () => {
+    const publicManagementRoute = routes.find((route) => route.path === 'admin/padres');
+
+    expect(publicManagementRoute).toBeUndefined();
   });
 
   it('should not expose ministers of the Word as a public route', () => {
@@ -322,6 +329,16 @@ describe('routes', () => {
     expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
     expect(appRoute?.canActivate).toEqual([authGuard]);
     expect(appPriestRoute?.component).toBe(PriestListComponent);
+  });
+
+  it('should render priest management inside the protected app route for admins only', () => {
+    const appRoute = routes.find((route) => route.path === 'app');
+    const managementRoute = appRoute?.children?.find((route) => route.path === 'admin/padres');
+
+    expect(appRoute?.component).toBe(AuthenticatedLayoutComponent);
+    expect(appRoute?.canActivate).toEqual([authGuard]);
+    expect(managementRoute?.component).toBe(PriestManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render ministers of the Word inside the protected app route', () => {

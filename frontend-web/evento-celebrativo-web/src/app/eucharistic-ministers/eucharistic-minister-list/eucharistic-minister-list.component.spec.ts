@@ -102,9 +102,7 @@ describe('EucharisticMinisterListComponent', () => {
 
     fixture.detectChanges();
 
-    const link = fixture.nativeElement.querySelector(
-      '.eucharistic-ministers__admin-link',
-    ) as HTMLAnchorElement;
+    const link = fixture.nativeElement.querySelector('.page-action') as HTMLAnchorElement;
 
     expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
     expect(link.textContent).toContain('Gerenciar ministros da Eucaristia');
@@ -116,7 +114,7 @@ describe('EucharisticMinisterListComponent', () => {
 
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.eucharistic-ministers__admin-link')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.page-action')).toBeNull();
     expect(textContent()).not.toContain('Gerenciar ministros da Eucaristia');
   });
 
