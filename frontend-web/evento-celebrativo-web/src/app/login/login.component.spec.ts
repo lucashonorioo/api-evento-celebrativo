@@ -147,7 +147,77 @@ describe('LoginComponent', () => {
 
     component.onSubmit();
 
-    expect(component.errorMessage).toBe('Credenciais inválidas. Por favor, tente novamente.');
+    expect(component.errorMessage).toBe('Usuário ou senha inválidos.');
+    expect(component.isSubmitting).toBeFalse();
+  });
+
+  it('should show an invalid credentials message after an invalid_grant response', () => {
+    authService.login.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: {
+              error:
+                '{"error_description":"Invalid credentials","error":"invalid_grant","error_uri":"https://datatracker.ietf.org/doc/html/rfc6749#section-5.2"}',
+            },
+          }),
+      ),
+    );
+
+    component.phone = '34989374748';
+    component.password = 'wrong-password';
+    component.onSubmit();
+
+    expect(component.errorMessage).toBe('Usuário ou senha inválidos.');
+    expect(component.isSubmitting).toBeFalse();
+    expect(component.password).toBe('wrong-password');
+  });
+
+  it('should show the same invalid credentials message for an unknown user', () => {
+    authService.login.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: {
+              error: '{"error":"invalid_grant","error_description":"Invalid credentials"}',
+            },
+          }),
+      ),
+    );
+
+    component.phone = '00000000000';
+    component.password = 'wrong-password';
+    component.onSubmit();
+
+    expect(component.errorMessage).toBe('Usuário ou senha inválidos.');
+    expect(component.password).toBe('wrong-password');
+  });
+
+  it('should show an unavailable message after a server error', () => {
+    authService.login.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+    );
+
+    component.onSubmit();
+
+    expect(component.errorMessage).toBe(
+      'Não foi possível acessar o sistema no momento. Tente novamente mais tarde.',
+    );
+    expect(component.isSubmitting).toBeFalse();
+  });
+
+  it('should show an unavailable message after a network error', () => {
+    authService.login.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 0, statusText: 'Unknown Error' })),
+    );
+
+    component.onSubmit();
+
+    expect(component.errorMessage).toBe(
+      'Não foi possível acessar o sistema no momento. Tente novamente mais tarde.',
+    );
     expect(component.isSubmitting).toBeFalse();
   });
 
