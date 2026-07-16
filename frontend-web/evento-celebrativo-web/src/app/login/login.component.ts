@@ -65,11 +65,7 @@ export class LoginComponent {
       error: (error: HttpErrorResponse) => {
         this.isSubmitting = false;
 
-        if (error.status === 401) {
-          this.errorMessage = 'Credenciais inválidas. Por favor, tente novamente.';
-        } else {
-          this.errorMessage = 'Ocorreu um erro no servidor. Tente mais tarde.';
-        }
+        this.errorMessage = loginErrorMessageFor(error);
       },
     });
   }
@@ -77,4 +73,52 @@ export class LoginComponent {
   togglePasswordVisibility(): void {
     this.isPasswordVisible = !this.isPasswordVisible;
   }
+}
+
+function loginErrorMessageFor(error: unknown): string {
+  return isInvalidCredentialsError(error)
+    ? 'Usuário ou senha inválidos.'
+    : 'Não foi possível acessar o sistema no momento. Tente novamente mais tarde.';
+}
+
+function isInvalidCredentialsError(error: unknown): boolean {
+  if (!(error instanceof HttpErrorResponse)) {
+    return false;
+  }
+
+  if (error.status === 401) {
+    return true;
+  }
+
+  return error.status === 400 && hasOAuthErrorCode(error.error, 'invalid_grant');
+}
+
+function hasOAuthErrorCode(value: unknown, expectedCode: string): boolean {
+  if (typeof value === 'string') {
+    return hasOAuthErrorCode(parseJson(value), expectedCode);
+  }
+
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const error = value['error'];
+
+  if (error === expectedCode) {
+    return true;
+  }
+
+  return typeof error === 'string' && hasOAuthErrorCode(parseJson(error), expectedCode);
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
