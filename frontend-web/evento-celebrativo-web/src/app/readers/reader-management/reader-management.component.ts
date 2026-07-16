@@ -1,16 +1,35 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import {
-  AbstractControl,
-  NonNullableFormBuilder,
-  ReactiveFormsModule,
-  ValidationErrors,
-  Validators,
-} from '@angular/forms';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 
+import { normalizePersonManagementRequest } from '../../people/person-form.helpers';
+import {
+  notBlankValidator,
+  pastDateValidator,
+  personPasswordValidators,
+  personPhoneNumberValidators,
+} from '../../people/person-form.validators';
+import {
+  PersonManagementLabels,
+  deleteErrorMessageFor,
+  deletedSuccessMessageFor,
+  createdSuccessMessageFor,
+  fieldErrorMessageFor,
+  loadingErrorMessageFor,
+  saveErrorMessageFor,
+  updatedSuccessMessageFor,
+} from '../../people/person-management-messages';
 import { ReaderRequest, ReaderResponse } from '../reader.models';
 import { ReaderService } from '../reader.service';
+
+const READER_LABELS: PersonManagementLabels = {
+  singular: 'leitor',
+  singularCapitalized: 'Leitor',
+  singularWithArticle: 'O leitor',
+  pluralWithArticle: 'os leitores',
+  demonstrativeSingular: 'este leitor',
+};
 
 @Component({
   selector: 'app-reader-management',
@@ -26,9 +45,9 @@ export class ReaderManagementComponent implements OnInit {
 
   readonly form = this.formBuilder.group({
     name: ['', [Validators.required, notBlankValidator]],
-    phoneNumber: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(11)]],
+    phoneNumber: ['', personPhoneNumberValidators()],
     birthdayDate: ['', [Validators.required, pastDateValidator]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
+    password: ['', personPasswordValidators()],
   });
   readonly readers = signal<ReaderResponse[]>([]);
   readonly isLoading = signal(false);
@@ -62,7 +81,7 @@ export class ReaderManagementComponent implements OnInit {
           this.readers.set(readers);
         },
         error: () => {
-          this.errorMessage.set('Nao foi possivel carregar os leitores. Tente novamente.');
+          this.errorMessage.set(loadingErrorMessageFor(READER_LABELS));
         },
       });
   }
@@ -92,18 +111,18 @@ export class ReaderManagementComponent implements OnInit {
       next: (reader) => {
         if (editingReaderId === null) {
           this.readers.update((readers) => [...readers, reader]);
-          this.successMessage.set('Leitor cadastrado com sucesso.');
+          this.successMessage.set(createdSuccessMessageFor(READER_LABELS));
         } else {
           this.readers.update((readers) =>
             readers.map((currentReader) => (currentReader.id === reader.id ? reader : currentReader)),
           );
-          this.successMessage.set('Leitor atualizado com sucesso.');
+          this.successMessage.set(updatedSuccessMessageFor(READER_LABELS));
         }
 
         this.resetForm();
       },
       error: (error: unknown) => {
-        this.errorMessage.set(saveErrorMessageFor(error));
+        this.errorMessage.set(saveErrorMessageFor(error, READER_LABELS));
 
         if (error instanceof HttpErrorResponse && error.status === 404) {
           this.loadReaders(false);
@@ -164,10 +183,10 @@ export class ReaderManagementComponent implements OnInit {
           }
 
           this.pendingDeletion.set(null);
-          this.successMessage.set('Leitor excluido com sucesso.');
+          this.successMessage.set(deletedSuccessMessageFor(READER_LABELS));
         },
         error: (error: unknown) => {
-          this.errorMessage.set(deleteErrorMessageFor(error));
+          this.errorMessage.set(deleteErrorMessageFor(error, READER_LABELS));
 
           if (error instanceof HttpErrorResponse && error.status === 404) {
             this.pendingDeletion.set(null);
@@ -178,43 +197,11 @@ export class ReaderManagementComponent implements OnInit {
   }
 
   fieldErrorMessage(controlName: keyof ReaderRequest): string | null {
-    const control = this.form.controls[controlName];
-
-    if (!control.touched || control.valid) {
-      return null;
-    }
-
-    if (control.hasError('required') || control.hasError('blank')) {
-      return requiredFieldMessageFor(controlName);
-    }
-
-    if (
-      controlName === 'phoneNumber' &&
-      (control.hasError('minlength') || control.hasError('maxlength'))
-    ) {
-      return 'Informe um telefone com 11 digitos.';
-    }
-
-    if (controlName === 'birthdayDate' && control.hasError('pastDate')) {
-      return 'Informe uma data de nascimento no passado.';
-    }
-
-    if (controlName === 'password' && control.hasError('minlength')) {
-      return 'Informe uma senha com pelo menos 6 caracteres.';
-    }
-
-    return null;
+    return fieldErrorMessageFor(this.form.controls[controlName], controlName, READER_LABELS);
   }
 
   private readerRequest(): ReaderRequest {
-    const value = this.form.getRawValue();
-
-    return {
-      name: value.name.trim(),
-      phoneNumber: value.phoneNumber.trim(),
-      birthdayDate: value.birthdayDate,
-      password: value.password,
-    };
+    return normalizePersonManagementRequest(this.form.getRawValue());
   }
 
   private resetForm(): void {
@@ -242,78 +229,4 @@ export class ReaderManagementComponent implements OnInit {
 
     this.form.enable({ emitEvent: false });
   }
-}
-
-function notBlankValidator(control: AbstractControl): ValidationErrors | null {
-  return typeof control.value === 'string' && control.value.trim().length === 0
-    ? { blank: true }
-    : null;
-}
-
-function pastDateValidator(control: AbstractControl): ValidationErrors | null {
-  if (typeof control.value !== 'string' || control.value.length === 0) {
-    return null;
-  }
-
-  return control.value < todayLocalDate() ? null : { pastDate: true };
-}
-
-function todayLocalDate(): string {
-  const today = new Date();
-  const month = `${today.getMonth() + 1}`.padStart(2, '0');
-  const day = `${today.getDate()}`.padStart(2, '0');
-
-  return `${today.getFullYear()}-${month}-${day}`;
-}
-
-function requiredFieldMessageFor(controlName: keyof ReaderRequest): string {
-  if (controlName === 'name') {
-    return 'Informe o nome do leitor.';
-  }
-
-  if (controlName === 'phoneNumber') {
-    return 'Informe o telefone.';
-  }
-
-  if (controlName === 'birthdayDate') {
-    return 'Informe a data de nascimento.';
-  }
-
-  return 'Informe a senha.';
-}
-
-function saveErrorMessageFor(error: unknown): string {
-  if (error instanceof HttpErrorResponse) {
-    if (error.status === 400) {
-      return 'Verifique os dados informados e tente novamente.';
-    }
-
-    if (error.status === 403) {
-      return 'Voce nao possui permissao para realizar esta operacao.';
-    }
-
-    if (error.status === 404) {
-      return 'O leitor solicitado nao foi encontrado.';
-    }
-  }
-
-  return 'Nao foi possivel concluir a operacao. Tente novamente.';
-}
-
-function deleteErrorMessageFor(error: unknown): string {
-  if (error instanceof HttpErrorResponse) {
-    if (error.status === 403) {
-      return 'Voce nao possui permissao para realizar esta operacao.';
-    }
-
-    if (error.status === 404) {
-      return 'O leitor solicitado nao foi encontrado.';
-    }
-
-    if (error.status === 409) {
-      return 'Nao e possivel excluir este leitor porque ele esta vinculado a eventos.';
-    }
-  }
-
-  return 'Nao foi possivel concluir a operacao. Tente novamente.';
 }
