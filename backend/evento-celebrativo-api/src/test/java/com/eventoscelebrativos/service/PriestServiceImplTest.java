@@ -6,10 +6,13 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PriestMapper;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.PriestServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,12 @@ class PriestServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
+
+    @Mock
+    private MinistryTypeResolver ministryTypeResolver;
+
     @InjectMocks
     private PriestServiceImpl service;
 
@@ -60,6 +69,7 @@ class PriestServiceImplTest {
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(repository.save(any(Priest.class))).thenReturn(saved);
+        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.PRIEST);
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createPriest(request));
@@ -69,6 +79,7 @@ class PriestServiceImplTest {
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.PRIEST);
     }
 
     @Test
@@ -114,13 +125,17 @@ class PriestServiceImplTest {
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(repository.save(entity)).thenReturn(entity);
+        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.PRIEST);
         when(mapper.toDto(entity)).thenReturn(response);
         assertSame(response, service.updatePriest(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
+        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.PRIEST);
 
         when(repository.existsById(1L)).thenReturn(true);
         service.deletePriestById(1L);
-        verify(repository).deleteById(1L);
+        var inOrder = inOrder(personMinistryCompatibilityService, repository);
+        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
+        inOrder.verify(repository).deleteById(1L);
     }
 
     @Test

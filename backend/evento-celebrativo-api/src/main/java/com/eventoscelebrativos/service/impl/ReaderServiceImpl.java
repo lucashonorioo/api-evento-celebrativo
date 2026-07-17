@@ -4,10 +4,13 @@ import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.ReaderRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -27,12 +30,16 @@ public class ReaderServiceImpl implements ReaderService {
 
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
+    private final MinistryTypeResolver ministryTypeResolver;
 
-    public ReaderServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public ReaderServiceImpl(ReaderRepository readerRepository, ReaderMapper readerMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
         this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
+        this.ministryTypeResolver = ministryTypeResolver;
     }
 
 
@@ -49,6 +56,7 @@ public class ReaderServiceImpl implements ReaderService {
         reader.addRole(operatorRole);
 
         reader = readerRepository.save(reader);
+        ensureLegacyMinistry(reader);
         return readerMapper.toDto(reader);
     }
 
@@ -82,6 +90,7 @@ public class ReaderServiceImpl implements ReaderService {
             reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
 
             Reader readerSalvo = readerRepository.save(reader);
+            ensureLegacyMinistry(readerSalvo);
 
             return readerMapper.toDto(readerSalvo);
         }catch (EntityNotFoundException e){
@@ -99,6 +108,7 @@ public class ReaderServiceImpl implements ReaderService {
             throw new ResourceNotFoundException("Leitor", id);
         }
         try {
+            personMinistryCompatibilityService.deleteAllForPerson(id);
             readerRepository.deleteById(id);
             readerRepository.flush();
         }
@@ -106,5 +116,10 @@ public class ReaderServiceImpl implements ReaderService {
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
 
+    }
+
+    private void ensureLegacyMinistry(Reader reader) {
+        MinistryType ministryType = ministryTypeResolver.resolve(reader);
+        personMinistryCompatibilityService.ensureMinistry(reader, ministryType);
     }
 }

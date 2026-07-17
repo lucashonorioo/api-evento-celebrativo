@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles e `V3` para as estruturas paralelas do novo dominio. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles e `V3` para as estruturas paralelas do novo dominio. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar leituras ou contratos HTTP.
 
 ## Fases
 
@@ -38,6 +38,11 @@ Resultado aprovado:
 - Banco existente deve ser auditado e receber baseline manual na versao `2`.
 - `baseline-on-migrate` nao deve ser habilitado automaticamente.
 - `V3` cria colunas preparatorias em `tb_person` e estruturas paralelas do novo dominio.
+- A camada Java de `PersonMinistry` ja existe, com enum `MinistryType`, entidade, repository e servico interno de compatibilidade.
+- Os CRUDs legados de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia agora garantem o vinculo ministerial correspondente em criacao e atualizacao.
+- Deletes legados removem os vinculos de `tb_person_ministry` antes da exclusao fisica da pessoa.
+- As leituras continuam usando o modelo legado por subtipo e `person_type`; nenhuma consulta funcional depende de `tb_person_ministry` ainda.
+- Pessoas antigas continuam sem vinculo ministerial ate o backfill `V4`; updates legados corrigem gradualmente vinculos ausentes.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
 - Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
@@ -54,7 +59,7 @@ Pre-condicoes para backfills:
 
 Saidas esperadas da proxima fase:
 
-- Backfill de funcoes ministeriais a partir de `person_type`.
+- `V4` de backfill de funcoes ministeriais a partir de `person_type`.
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
 - Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
@@ -82,7 +87,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Criar backfills versionados para estruturas paralelas.
+1. Criar `V4` para backfill de `tb_person_ministry` e adaptar seeds somente quando essa migration estiver validada.
 2. Executar backfill em ambiente descartavel.
 3. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
 
@@ -269,3 +274,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - `V3` e aditiva: nao copia pessoas, contas, roles ou atribuicoes; apenas adiciona colunas, tabelas, constraints e indices.
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
+- `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, mas pessoas antigas dependem do futuro backfill `V4`.
