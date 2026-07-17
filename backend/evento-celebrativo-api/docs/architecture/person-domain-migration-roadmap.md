@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles. O seed global `import.sql` foi removido e substituido por seeds explicitos por ambiente. O profile `local` ja usa Flyway para criar schema, roles obrigatorias e dados demonstrativos.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas.
 
 ## Fases
 
@@ -25,13 +25,13 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 11. Depreciar contratos antigos | Fase 10 | Frontend migrado | Politica de deprecacao publicada |
 | 12. Remover legado | Fase 11 | Periodo de estabilizacao concluido | Estruturas antigas removidas com migration destrutiva aprovada |
 
-## Proxima fase: Definicao do banco-alvo e estrategia de Flyway/baseline
+## Estado do Flyway e proxima fase: Tabelas paralelas
 
 Resultado aprovado:
 
 - Banco persistente-alvo: MySQL 8.4 LTS.
 - H2 permanece temporariamente nos profiles `local` e `test`.
-- Flyway nao substitui ainda o Hibernate nos profiles `local` e `test`.
+- Flyway substitui o Hibernate na criacao de schema dos profiles `local` e `test`.
 - `V1` representa o schema atual.
 - `V2` insere apenas `ROLE_OPERATOR` e `ROLE_ADMIN`.
 - Banco novo executa migrations desde `V1`.
@@ -39,53 +39,51 @@ Resultado aprovado:
 - `baseline-on-migrate` nao deve ser habilitado automaticamente.
 - Proximas migrations do novo dominio comecam em `V3`.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
-- O Hibernate no profile `local` usa `ddl-auto=validate`.
-- A suite principal de testes ainda usa Hibernate `ddl-auto=create`, Flyway desabilitado e fixtures em `db/seed/import-test.sql`.
-- As roles permanecem temporariamente duplicadas apenas no seed `test`, porque a suite principal ainda nao executa a migration `V2`.
+- O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
+- Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
+- As roles deixaram de ser duplicadas nas fixtures do profile `test`.
 
-Pre-condicoes:
+Pre-condicoes para `V3`:
 
-- Confirmar qual banco sera usado fora de testes.
-- Conferir compatibilidade entre H2 e banco-alvo.
-- Definir a estrategia de baseline do schema existente.
-- Definir como `ddl-auto` sera usado em local, testes e futuro ambiente real.
-- Confirmar que nenhuma migration destrutiva sera criada nesta etapa.
+- `V1` e `V2` validadas em H2 e MySQL.
+- Profiles `local`, `test`, `mysql` e `flyway-test` usando Flyway com localizacoes isoladas.
+- Hibernate usando `ddl-auto=validate` nos profiles migrados.
+- Fixtures de teste separadas de dados locais.
+- Confirmacao explicita de que a proxima migration sera aditiva.
 
-Saidas esperadas:
+Saidas esperadas da proxima fase:
 
-- Banco-alvo documentado.
-- Diferencas relevantes entre H2 e banco-alvo registradas.
-- Estrategia de baseline aprovada.
-- Politica inicial de `ddl-auto` por ambiente definida.
-- Plano de rollback para a introducao de Flyway.
+- Tabelas paralelas do novo dominio criadas por `V3`.
+- Nenhuma remocao de tabelas ou colunas legadas.
+- Aplicacao atual ainda compativel com schema expandido.
+- Testes cobrindo existencia das novas estruturas sem alterar contratos HTTP.
 
-Fora do escopo desta proxima fase:
+Fora do escopo da proxima fase:
 
-- Criar tabelas novas de dominio.
 - Migrar dados.
 - Remover `person_type`, senha, roles ou vinculos atuais.
 - Criar migration destrutiva.
-- Migrar os profiles `local` e `test` atuais para Flyway nesta primeira entrega.
 
-## Separacao temporaria de seeds
+## Separacao de dados por profile
 
 O arquivo global `src/main/resources/import.sql` foi removido para evitar que o mesmo conjunto de dados seja carregado implicitamente por todos os ambientes.
 
-Estado temporario:
+Estado atual:
 
 - `src/main/resources/db/local/R__load_local_demo_data.sql` contem os dados demonstrativos do profile `local`, sem roles, incluindo usuarios de demonstracao, pessoas, locais, eventos e vinculos.
-- `src/test/resources/db/seed/import-test.sql` contem as fixtures globais da suite principal de testes, preservando os mesmos IDs implicitos utilizados pelos testes atuais.
+- `src/test/resources/db/test/R__load_test_fixtures.sql` contem as fixtures da suite principal de testes, sem roles, preservando os mesmos IDs implicitos utilizados pelos testes atuais.
 - `src/main/resources/db/migration/V2__insert_required_roles.sql` continua sendo a fonte dos dados obrigatorios para bancos novos gerenciados por Flyway.
 - O profile `mysql` continua isolado, com `spring.sql.init.mode=never`, Hibernate `validate` e Flyway habilitado.
 - O profile `flyway-test` continua validando apenas `V1` e `V2`, sem carregar pessoas, locais ou eventos demonstrativos.
-- O profile `local` esta isolado por `spring.flyway.locations=classpath:db/migration,classpath:db/local`, enquanto `mysql` e `flyway-test` continuam usando apenas `classpath:db/migration`.
+- O profile `local` esta isolado por `spring.flyway.locations=classpath:db/migration,classpath:db/local`.
+- O profile `test` esta isolado por `spring.flyway.locations=classpath:db/migration,classpath:db/test`.
+- Os profiles `mysql` e `flyway-test` continuam usando apenas `classpath:db/migration`.
 
 Proximas etapas planejadas:
 
-1. Habilitar Flyway na suite principal de testes.
-2. Mover roles do seed de testes para a migration `V2` nesse profile.
-3. Migrar fixtures de teste para mecanismo explicito por teste ou por perfil.
-4. Remover a duplicacao temporaria das roles no seed `test`.
+1. Criar a migration `V3` com as estruturas paralelas do novo dominio.
+2. Executar backfill em ambiente descartavel.
+3. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
 
 ## Dependencias criticas
 
@@ -135,7 +133,7 @@ Entrada:
 
 - Flyway configurado.
 - Baseline validado.
-- Profiles `local` e `test` ainda preservados com Flyway desabilitado temporariamente.
+- Baseline validado com Flyway nos profiles `local`, `test`, `mysql` e `flyway-test`.
 
 Saida:
 
@@ -241,8 +239,8 @@ Estes itens nao bloqueiam a primeira migracao:
 
 1. ADR aprovado.
 2. Definir banco-alvo e estrategia de Flyway/baseline.
-3. Introduzir Flyway com `V1` para schema atual, `V2` para roles obrigatorias e profile MySQL seguro.
-4. Criar tabelas paralelas.
+3. Introduzir Flyway com `V1` para schema atual, `V2` para roles obrigatorias e profiles isolados.
+4. Criar tabelas paralelas a partir de `V3`.
 5. Executar backfill em ambiente descartavel.
 6. Comparar contagens e historico.
 7. Migrar escala para atribuicao explicita.
@@ -264,4 +262,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - A versao anterior da aplicacao deve continuar compativel com o schema expandido.
 - Hashes devem ser copiados sem alteracao.
 - Backfills deverao possuir consultas de auditoria.
-- Profiles `local` e `test` permanecem temporariamente fora do Flyway ate uma etapa especifica de migracao da suite e dos dados demonstrativos.
+- Profiles `local`, `test`, `mysql` e `flyway-test` usam localizacoes Flyway separadas para evitar carga cruzada de dados.
