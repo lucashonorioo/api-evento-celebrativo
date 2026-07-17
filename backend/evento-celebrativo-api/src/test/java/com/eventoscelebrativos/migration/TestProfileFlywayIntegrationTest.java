@@ -30,6 +30,7 @@ class TestProfileFlywayIntegrationTest {
         assertSuccessfulVersionedMigration("1");
         assertSuccessfulVersionedMigration("2");
         assertSuccessfulVersionedMigration("3");
+        assertSuccessfulVersionedMigration("4");
         assertSuccessfulScript("R__load_test_fixtures.sql");
 
         assertEquals(2, countRows("tb_role"));
@@ -52,7 +53,8 @@ class TestProfileFlywayIntegrationTest {
         assertEquals(21, countRows("tb_event_person"));
         assertEquals(3, countRows("tb_event_location"));
         assertEquals(15, countPeopleWithFilledParallelColumns());
-        assertParallelTablesAreEmpty();
+        assertPersonMinistryFixtures();
+        assertFutureParallelTablesAreEmpty();
     }
 
     @Test
@@ -121,11 +123,64 @@ class TestProfileFlywayIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private void assertParallelTablesAreEmpty() {
-        assertEquals(0, countRows("tb_person_ministry"));
+    private void assertPersonMinistryFixtures() {
+        assertEquals(15, countRows("tb_person_ministry"));
+        assertEquals(15, countActivePersonMinistries());
+        assertEquals(0, countDuplicatedPersonMinistries());
+        assertEquals(0, countPeopleWithoutExpectedMinistry());
+    }
+
+    private void assertFutureParallelTablesAreEmpty() {
         assertEquals(0, countRows("tb_user_account"));
         assertEquals(0, countRows("tb_user_account_role"));
         assertEquals(0, countRows("tb_event_assignment"));
+    }
+
+    private int countActivePersonMinistries() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_person_ministry WHERE active = TRUE",
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countDuplicatedPersonMinistries() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT person_id, ministry_type
+                    FROM tb_person_ministry
+                    GROUP BY person_id, ministry_type
+                    HAVING COUNT(*) > 1
+                ) duplicated
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPeopleWithoutExpectedMinistry() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person p
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM tb_person_ministry pm
+                    WHERE pm.person_id = p.id
+                      AND pm.ministry_type = CASE p.person_type
+                          WHEN 'reader' THEN 'READER'
+                          WHEN 'commentator' THEN 'COMMENTATOR'
+                          WHEN 'priest' THEN 'PRIEST'
+                          WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
+                          WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
+                      END
+                )
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
     }
 
     private int countRows(String tableName, String idColumn, Long id, String valueColumn, String value) {

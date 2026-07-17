@@ -12,7 +12,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,6 +49,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("1");
         assertSuccessfulMigration("2");
         assertSuccessfulMigration("3");
+        assertSuccessfulMigration("4");
         assertTableExists("flyway_schema_history");
 
         for (String table : CURRENT_TABLES) {
@@ -88,15 +88,15 @@ class FlywayMigrationIntegrationTest {
         assertEquals(0, countRows("tb_celebration_event"));
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3') AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4') AND success = TRUE",
                 Integer.class
         );
-        assertEquals(3, successfulVersions);
+        assertEquals(4, successfulVersions);
     }
 
     @Test
     void shouldKeepMigrationsStableWhenMigrateRunsAgain() {
-        Map<String, Integer> checksumsBefore = migrationChecksums();
+        Map<String, String> checksumsBefore = migrationChecksums();
 
         MigrateResult result = flyway.migrate();
 
@@ -105,6 +105,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("1");
         assertSuccessfulMigration("2");
         assertSuccessfulMigration("3");
+        assertSuccessfulMigration("4");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         for (String table : PARALLEL_DOMAIN_TABLES) {
@@ -173,12 +174,12 @@ class FlywayMigrationIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private Map<String, Integer> migrationChecksums() {
+    private Map<String, String> migrationChecksums() {
         return Arrays.stream(flyway.info().applied())
                 .filter(info -> info.getVersion() != null)
                 .collect(Collectors.toMap(
                         info -> info.getVersion().getVersion(),
-                        info -> Objects.requireNonNull(info.getChecksum())
+                        info -> String.valueOf(info.getChecksum())
                 ));
     }
 }

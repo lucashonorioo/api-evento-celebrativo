@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles e `V3` para as estruturas paralelas do novo dominio. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar leituras ou contratos HTTP.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar leituras ou contratos HTTP.
 
 ## Fases
 
@@ -16,7 +16,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 2. Definicao do banco-alvo e estrategia de Flyway/baseline | Fase 1 | Decisoes de dominio aprovadas | Concluida: MySQL 8.4 LTS aprovado, baseline manual definido e migrations iniciais planejadas |
 | 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
 | 4. Tabelas paralelas | Fase 3 | Baseline validado | Concluida: colunas preparatorias em `tb_person` e tabelas `tb_person_ministry`, `tb_user_account`, `tb_user_account_role`, `tb_event_assignment` criadas de forma aditiva |
-| 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Dados copiados, contagens comparadas e divergencias registradas |
+| 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Em andamento: `V4` garante funcoes ministeriais derivadas de `person_type`; proximos backfills ainda pendentes |
 | 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Consultas e escrita de escala usando atribuicao explicita |
 | 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Login lendo conta e preservando JWT atual |
 | 8. Reduzir dependencia de subclasses | Fases 6 e 7 | Escalas e contas migradas | Services deixam de depender de subtipo como regra principal |
@@ -25,7 +25,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 11. Depreciar contratos antigos | Fase 10 | Frontend migrado | Politica de deprecacao publicada |
 | 12. Remover legado | Fase 11 | Periodo de estabilizacao concluido | Estruturas antigas removidas com migration destrutiva aprovada |
 
-## Estado do Flyway e proxima fase: Backfills versionados
+## Estado do Flyway e backfill de PersonMinistry
 
 Resultado aprovado:
 
@@ -42,9 +42,13 @@ Resultado aprovado:
 - Os CRUDs legados de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia agora garantem o vinculo ministerial correspondente em criacao e atualizacao.
 - Deletes legados removem os vinculos de `tb_person_ministry` antes da exclusao fisica da pessoa.
 - As leituras continuam usando o modelo legado por subtipo e `person_type`; nenhuma consulta funcional depende de `tb_person_ministry` ainda.
-- Pessoas antigas continuam sem vinculo ministerial ate o backfill `V4`; updates legados corrigem gradualmente vinculos ausentes.
+- `V4` realiza o backfill de `tb_person_ministry` a partir do discriminator legado `person_type`.
+- O mapeamento aplicado por `V4` e: `reader` -> `READER`, `commentator` -> `COMMENTATOR`, `priest` -> `PRIEST`, `minister_of_the_word` -> `MINISTER_OF_THE_WORD`, `eucharistic_minister` -> `EUCHARISTIC_MINISTER`.
+- Vinculos ministeriais ja existentes nao sao duplicados; vinculos inativos da funcao legada sao reativados; funcoes adicionais sao preservadas.
+- O write-through dos CRUDs legados e o backfill `V4` coexistem durante a transicao.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
+- Os seeds `local` e `test` criam os vinculos em `tb_person_ministry` depois de inserir as pessoas demonstrativas, porque `V4` executa antes das migrations repeatable de cada profile.
 - Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
 - As roles deixaram de ser duplicadas nas fixtures do profile `test`.
 
@@ -57,12 +61,12 @@ Pre-condicoes para backfills:
 - Fixtures de teste separadas de dados locais.
 - Confirmacao explicita de que os proximos backfills preservarao hashes, IDs e vinculos existentes.
 
-Saidas esperadas da proxima fase:
+Saidas esperadas das proximas fases:
 
-- `V4` de backfill de funcoes ministeriais a partir de `person_type`.
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
 - Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
+- Leitura paralela ou auditoria de compatibilidade entre `person_type` e `tb_person_ministry`, sem trocar ainda os contratos HTTP.
 
 Fora do escopo da proxima fase:
 
@@ -87,9 +91,10 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Criar `V4` para backfill de `tb_person_ministry` e adaptar seeds somente quando essa migration estiver validada.
-2. Executar backfill em ambiente descartavel.
-3. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
+1. Introduzir leitura paralela ou auditoria de compatibilidade entre `person_type` e `tb_person_ministry`.
+2. Planejar backfill versionado de `UserAccount`.
+3. Planejar backfill versionado de `EventAssignment`.
+4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
 
 ## Dependencias criticas
 
@@ -156,8 +161,7 @@ Entrada:
 
 Saida:
 
-- Pessoas copiadas.
-- Funcoes ministeriais derivadas de `person_type`.
+- Funcoes ministeriais derivadas de `person_type` ja cobertas por `V4`.
 - Contas derivadas de `Person.password`, `phoneNumber` e `roles`.
 - Atribuicoes derivadas de `tb_event_person` e `person_type`.
 - Contagens e amostras conferidas.
@@ -274,4 +278,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - `V3` e aditiva: nao copia pessoas, contas, roles ou atribuicoes; apenas adiciona colunas, tabelas, constraints e indices.
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
-- `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, mas pessoas antigas dependem do futuro backfill `V4`.
+- `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as leituras continuam no modelo legado ate a proxima etapa.
