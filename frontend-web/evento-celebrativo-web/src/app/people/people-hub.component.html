@@ -9,14 +9,16 @@
 
   <div class="people-hub__grid">
     @for (link of peopleLinks; track link.path) {
-      <article class="people-hub__card surface-card">
-        <div>
-          <h2>{{ link.title }}</h2>
-          <p>{{ link.description }}</p>
-        </div>
+      @if (!link.adminOnly || isAdmin) {
+        <article class="people-hub__card surface-card">
+          <div>
+            <h2>{{ link.title }}</h2>
+            <p>{{ link.description }}</p>
+          </div>
 
-        <a class="people-hub__link" [routerLink]="link.path">Consultar</a>
-      </article>
+          <a class="people-hub__link" [routerLink]="link.path">Consultar</a>
+        </article>
+      }
     }
   </div>
 </section>

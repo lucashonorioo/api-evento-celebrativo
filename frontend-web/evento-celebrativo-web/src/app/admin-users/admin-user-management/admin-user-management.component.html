@@ -1,0 +1,238 @@
+<section class="admin-users page-shell" aria-labelledby="admin-users-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Administração</p>
+      <h1 id="admin-users-title">Usuários do sistema</h1>
+      <p>Gerencie os perfis de acesso das pessoas cadastradas.</p>
+    </div>
+  </header>
+
+  <form class="admin-users__filters surface-card" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
+    <div class="admin-users__field">
+      <label for="user-name">Nome</label>
+      <input id="user-name" type="text" formControlName="name" autocomplete="off" />
+    </div>
+
+    <div class="admin-users__field">
+      <label for="user-phone">Telefone</label>
+      <input id="user-phone" type="text" formControlName="phoneNumber" autocomplete="off" />
+    </div>
+
+    <div class="admin-users__field">
+      <label for="user-person-type">Categoria da pessoa</label>
+      <select id="user-person-type" formControlName="personType">
+        <option value="">Todas</option>
+        @for (option of personTypeOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="admin-users__field">
+      <label for="user-role">Perfil de acesso</label>
+      <select id="user-role" formControlName="role">
+        <option value="">Todos</option>
+        @for (option of roleOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="admin-users__filter-actions">
+      <button class="admin-users__button" type="submit" [disabled]="isLoading()">Filtrar</button>
+      <button
+        class="admin-users__button admin-users__button--secondary"
+        type="button"
+        [disabled]="isLoading()"
+        (click)="clearFilters()"
+      >
+        Limpar filtros
+      </button>
+    </div>
+  </form>
+
+  <div class="admin-users__messages" aria-live="polite">
+    @if (successMessage()) {
+      <p class="admin-users__feedback admin-users__feedback--success">{{ successMessage() }}</p>
+    }
+
+    @if (errorMessage()) {
+      <p class="admin-users__feedback admin-users__feedback--error" role="alert">
+        {{ errorMessage() }}
+      </p>
+    }
+  </div>
+
+  <section class="admin-users__list surface-card" aria-labelledby="admin-users-list-title">
+    <div class="admin-users__list-header">
+      <div>
+        <h2 id="admin-users-list-title">Pessoas cadastradas</h2>
+        <p>{{ totalElements() }} resultado(s) encontrado(s).</p>
+      </div>
+    </div>
+
+    @if (isLoading()) {
+      <p class="admin-users__status" role="status">Carregando usuários...</p>
+    } @else if (errorMessage() && people().length === 0) {
+      <div class="admin-users__empty-state">
+        <p>Não foi possível exibir a lista de usuários.</p>
+        <button class="admin-users__button" type="button" (click)="retry()">Tentar novamente</button>
+      </div>
+    } @else if (people().length === 0) {
+      <p class="admin-users__empty-state">
+        {{
+          hasActiveFilters()
+            ? 'Nenhuma pessoa foi encontrada com os filtros informados.'
+            : 'Nenhuma pessoa cadastrada foi encontrada.'
+        }}
+      </p>
+    } @else {
+      <div class="admin-users__table-wrapper">
+        <table class="admin-users__table">
+          <thead>
+            <tr>
+              <th scope="col">Nome</th>
+              <th scope="col">Telefone</th>
+              <th scope="col">Categoria da pessoa</th>
+              <th scope="col">Perfil de acesso atual</th>
+              <th scope="col">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (person of people(); track person.id) {
+              <tr [class.admin-users__row--selected]="isRoleChangeOpen(person)">
+                <td data-label="Nome">{{ person.name }}</td>
+                <td data-label="Telefone">{{ formatPhone(person.phoneNumber) }}</td>
+                <td data-label="Categoria da pessoa">{{ personTypeLabel(person.personType) }}</td>
+                <td data-label="Perfil de acesso atual">{{ rolesLabel(person.roles) }}</td>
+                <td data-label="Ações">
+                  <button
+                    #roleChangeButton
+                    class="admin-users__button admin-users__button--secondary"
+                    type="button"
+                    [attr.aria-controls]="roleChangePanelId(person)"
+                    [attr.aria-expanded]="isRoleChangeOpen(person)"
+                    [disabled]="isSaving() || isLoading()"
+                    (click)="openRoleChange(person, roleChangeButton)"
+                  >
+                    Alterar perfil
+                  </button>
+                </td>
+              </tr>
+
+              @if (isRoleChangeOpen(person)) {
+                <tr class="admin-users__details-row">
+                  <td colspan="5">
+                    <section
+                      [id]="roleChangePanelId(person)"
+                      class="admin-users__confirmation"
+                      [attr.aria-labelledby]="roleChangeTitleId(person)"
+                    >
+                      <div>
+                        <p class="admin-users__panel-eyebrow">Perfil de acesso</p>
+                        <h3 [id]="roleChangeTitleId(person)">
+                          Alterar perfil de acesso de {{ person.name }}
+                        </h3>
+                      </div>
+
+                      <dl class="admin-users__person-summary">
+                        <div>
+                          <dt>Nome da pessoa</dt>
+                          <dd>{{ person.name }}</dd>
+                        </div>
+                        <div>
+                          <dt>Categoria da pessoa</dt>
+                          <dd>{{ personTypeLabel(person.personType) }}</dd>
+                        </div>
+                        <div>
+                          <dt>Perfil de acesso atual</dt>
+                          <dd>{{ rolesLabel(person.roles) }}</dd>
+                        </div>
+                      </dl>
+
+                      <p>
+                        Ao salvar, todos os perfis atuais serão substituídos pelo novo perfil
+                        selecionado.
+                      </p>
+
+                      @if (roleChangeErrorMessage()) {
+                        <p class="admin-users__feedback admin-users__feedback--error" role="alert">
+                          {{ roleChangeErrorMessage() }}
+                        </p>
+                      }
+
+                      @if (isSelfAdmin(person)) {
+                        <p class="admin-users__hint">
+                          O próprio perfil administrativo não pode ser removido.
+                        </p>
+                      }
+
+                      <fieldset class="admin-users__role-options" [disabled]="isSaving()">
+                        <legend>Novo perfil de acesso</legend>
+
+                        @for (option of roleOptions; track option.value) {
+                          <label class="admin-users__role-option">
+                            <input
+                              type="radio"
+                              name="selectedRole-{{ person.id }}"
+                              [value]="option.value"
+                              [checked]="selectedRole() === option.value"
+                              [disabled]="isSelfAdminDemotionOption(person, option.value)"
+                              (change)="selectRole(option.value)"
+                            />
+                            <span>{{ option.label }}</span>
+                          </label>
+                        }
+                      </fieldset>
+
+                      <div class="admin-users__confirmation-actions">
+                        <button
+                          class="admin-users__button"
+                          type="button"
+                          [disabled]="isConfirmDisabled(person)"
+                          (click)="confirmRoleChange()"
+                        >
+                          Salvar perfil
+                        </button>
+                        <button
+                          class="admin-users__button admin-users__button--secondary"
+                          type="button"
+                          [disabled]="isSaving()"
+                          (click)="cancelRoleChange()"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </section>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="admin-users__pagination" aria-label="Paginação">
+      <button
+        class="admin-users__button admin-users__button--secondary"
+        type="button"
+        [disabled]="isFirstPage() || isLoading()"
+        (click)="previousPage()"
+      >
+        Página anterior
+      </button>
+
+      <span>Página {{ currentPage() + 1 }} de {{ totalPages() || 1 }}</span>
+
+      <button
+        class="admin-users__button admin-users__button--secondary"
+        type="button"
+        [disabled]="isLastPage() || isLoading()"
+        (click)="nextPage()"
+      >
+        Próxima página
+      </button>
+    </div>
+  </section>
+</section>

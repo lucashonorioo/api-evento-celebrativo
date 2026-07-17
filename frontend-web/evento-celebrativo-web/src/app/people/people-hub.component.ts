@@ -1,10 +1,13 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
+import { AuthSessionService } from '../auth-session.service';
 
 interface PeopleLink {
   readonly title: string;
   readonly description: string;
   readonly path: string;
+  readonly adminOnly?: boolean;
 }
 
 @Component({
@@ -16,6 +19,8 @@ interface PeopleLink {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PeopleHubComponent {
+  private readonly authSessionService = inject(AuthSessionService);
+
   readonly peopleLinks: readonly PeopleLink[] = [
     {
       title: 'Leitores',
@@ -42,5 +47,13 @@ export class PeopleHubComponent {
       description: 'Consulte os ministros da Eucaristia.',
       path: '/app/ministros-eucaristia',
     },
+    {
+      title: 'Usuários',
+      description: 'Gerencie os perfis de acesso das pessoas cadastradas.',
+      path: '/app/admin/usuarios',
+      adminOnly: true,
+    },
   ];
+
+  readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
 }

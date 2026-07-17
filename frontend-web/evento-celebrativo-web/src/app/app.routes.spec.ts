@@ -3,6 +3,7 @@ import { Route } from '@angular/router';
 import { firstValueFrom, isObservable } from 'rxjs';
 
 import { AccessDeniedComponent } from './access-denied/access-denied.component';
+import { AdminUserManagementComponent } from './admin-users/admin-user-management/admin-user-management.component';
 import { adminGuard } from './admin.guard';
 import { AuthenticatedLayoutComponent } from './authenticated-layout/authenticated-layout.component';
 import { authGuard } from './auth.guard';
@@ -67,6 +68,7 @@ describe('routes', () => {
     const privatePaths = [
       'locais',
       'admin/eventos',
+      'admin/usuarios',
       'admin/locais',
       'pessoas',
       'leitores',
@@ -174,6 +176,14 @@ describe('routes', () => {
     expectAppRouteProtection();
     await expectLazyComponent(peopleRoute, PeopleHubComponent);
     expect(peopleRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render user management inside the protected app route for admins only', async () => {
+    const managementRoute = findAppChildRoute('admin/usuarios');
+
+    expectAppRouteProtection();
+    await expectLazyComponent(managementRoute, AdminUserManagementComponent);
+    expect(managementRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render location management inside the protected app route for admins only', async () => {
