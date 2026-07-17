@@ -6,15 +6,15 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. A proxima fase e `Definicao do banco-alvo e estrategia de Flyway/baseline`.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles.
 
 ## Fases
 
 | Fase | Dependencias | Entrada | Saida |
 | ---- | ------------ | ------- | ----- |
 | 1. ADR e decisoes | Nenhuma | Codigo atual analisado | Concluida: ADR aceito em 2026-07-17 |
-| 2. Definicao do banco-alvo e estrategia de Flyway/baseline | Fase 1 | Decisoes de dominio aprovadas | Banco escolhido, compatibilidade H2 avaliada e estrategia de baseline definida |
-| 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | Baseline versionado sem alterar modelo funcional |
+| 2. Definicao do banco-alvo e estrategia de Flyway/baseline | Fase 1 | Decisoes de dominio aprovadas | Concluida: MySQL 8.4 LTS aprovado, baseline manual definido e migrations iniciais planejadas |
+| 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
 | 4. Tabelas paralelas | Fase 3 | Baseline validado | `person_ministry`, `user_account`, `user_account_role`, `event_assignment` criadas de forma aditiva |
 | 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Dados copiados, contagens comparadas e divergencias registradas |
 | 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Consultas e escrita de escala usando atribuicao explicita |
@@ -26,6 +26,18 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. A proxima fa
 | 12. Remover legado | Fase 11 | Periodo de estabilizacao concluido | Estruturas antigas removidas com migration destrutiva aprovada |
 
 ## Proxima fase: Definicao do banco-alvo e estrategia de Flyway/baseline
+
+Resultado aprovado:
+
+- Banco persistente-alvo: MySQL 8.4 LTS.
+- H2 permanece temporariamente nos profiles `local` e `test`.
+- Flyway nao substitui ainda o Hibernate nos profiles `local` e `test`.
+- `V1` representa o schema atual.
+- `V2` insere apenas `ROLE_OPERATOR` e `ROLE_ADMIN`.
+- Banco novo executa migrations desde `V1`.
+- Banco existente deve ser auditado e receber baseline manual na versao `2`.
+- `baseline-on-migrate` nao deve ser habilitado automaticamente.
+- Proximas migrations do novo dominio comecam em `V3`.
 
 Pre-condicoes:
 
@@ -49,10 +61,12 @@ Fora do escopo desta proxima fase:
 - Migrar dados.
 - Remover `person_type`, senha, roles ou vinculos atuais.
 - Criar migration destrutiva.
+- Migrar os profiles `local` e `test` atuais para Flyway nesta primeira entrega.
 
 ## Dependencias criticas
 
 - A fase de Flyway depende da definicao do banco-alvo e da estrategia de baseline.
+- As migrations de novo dominio dependem da estabilizacao de `V1` e `V2`; a primeira versao disponivel para elas e `V3`.
 - Backfill depende de migrations aditivas.
 - Migracao de escalas depende de `EventAssignment`.
 - Migracao de autenticacao depende de `UserAccount`.
@@ -83,11 +97,13 @@ Entrada:
 Saida:
 
 - Banco-alvo escolhido.
+- Banco-alvo aprovado: MySQL 8.4 LTS.
 - Compatibilidade entre H2 e banco-alvo avaliada.
 - Estrategia de baseline do schema existente definida.
 - Uso de `ddl-auto` definido para local, testes e futuro ambiente real.
 - Politica de rollback definida.
 - Confirmacao explicita de que nao havera migration destrutiva nesta etapa.
+- Baseline de banco existente definido como manual na versao `2`, apos auditoria.
 
 ### Schema paralelo
 
@@ -95,6 +111,7 @@ Entrada:
 
 - Flyway configurado.
 - Baseline validado.
+- Profiles `local` e `test` ainda preservados com Flyway desabilitado temporariamente.
 
 Saida:
 
@@ -170,6 +187,7 @@ Estes itens nao bloqueiam a primeira migracao:
 
 - `docs/person-domain-evolution`: ADR e roadmap.
 - `feature/backend-flyway-baseline`: configuracao de Flyway e baseline.
+- `chore/add-flyway-baseline`: dependencias Flyway, migrations `V1`/`V2`, profile MySQL e teste isolado de migrations.
 - `feature/backend-person-domain-parallel-schema`: tabelas paralelas.
 - `feature/backend-person-domain-backfill`: scripts e validacoes de backfill.
 - `feature/backend-event-assignment`: leitura e escrita de escalas por `EventAssignment`.
@@ -199,7 +217,7 @@ Estes itens nao bloqueiam a primeira migracao:
 
 1. ADR aprovado.
 2. Definir banco-alvo e estrategia de Flyway/baseline.
-3. Introduzir Flyway com baseline.
+3. Introduzir Flyway com `V1` para schema atual, `V2` para roles obrigatorias e profile MySQL seguro.
 4. Criar tabelas paralelas.
 5. Executar backfill em ambiente descartavel.
 6. Comparar contagens e historico.
@@ -222,3 +240,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - A versao anterior da aplicacao deve continuar compativel com o schema expandido.
 - Hashes devem ser copiados sem alteracao.
 - Backfills deverao possuir consultas de auditoria.
+- Profiles `local` e `test` permanecem temporariamente fora do Flyway ate uma etapa especifica de migracao da suite e dos dados demonstrativos.
