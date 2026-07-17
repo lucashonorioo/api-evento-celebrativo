@@ -6,10 +6,13 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.ReaderRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.ReaderServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,12 @@ class ReaderServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
+
+    @Mock
+    private MinistryTypeResolver ministryTypeResolver;
+
     @InjectMocks
     private ReaderServiceImpl service;
 
@@ -61,6 +70,7 @@ class ReaderServiceImplTest {
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(readerRepository.save(any(Reader.class))).thenReturn(saved);
+        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.READER);
         when(readerMapper.toDto(saved)).thenReturn(response);
 
         ReaderResponseDTO result = service.createReader(request);
@@ -72,6 +82,7 @@ class ReaderServiceImplTest {
         assertEquals("encoded-password", readerToSave.getPassword());
         assertNotEquals("raw-password", readerToSave.getPassword());
         assertTrue(readerToSave.hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.READER);
     }
 
     @Test
@@ -135,11 +146,13 @@ class ReaderServiceImplTest {
         when(readerRepository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(readerRepository.save(entity)).thenReturn(saved);
+        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.READER);
         when(readerMapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));
         verify(readerMapper).updateReaderFromDto(request, entity);
         assertEquals("encoded-password", entity.getPassword());
+        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.READER);
     }
 
     @Test
@@ -156,7 +169,9 @@ class ReaderServiceImplTest {
 
         service.deleteReaderById(1L);
 
-        verify(readerRepository).deleteById(1L);
+        var inOrder = inOrder(personMinistryCompatibilityService, readerRepository);
+        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
+        inOrder.verify(readerRepository).deleteById(1L);
     }
 
     @Test

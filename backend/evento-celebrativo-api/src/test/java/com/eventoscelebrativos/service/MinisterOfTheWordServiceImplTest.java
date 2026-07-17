@@ -7,9 +7,12 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.MinisterOfTheWordServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,12 @@ class MinisterOfTheWordServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
+
+    @Mock
+    private MinistryTypeResolver ministryTypeResolver;
+
     @InjectMocks
     private MinisterOfTheWordServiceImpl service;
 
@@ -60,6 +69,7 @@ class MinisterOfTheWordServiceImplTest {
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(repository.save(any(MinisterOfTheWord.class))).thenReturn(saved);
+        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.MINISTER_OF_THE_WORD);
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createMinisterOfTheWord(request));
@@ -69,6 +79,7 @@ class MinisterOfTheWordServiceImplTest {
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.MINISTER_OF_THE_WORD);
     }
 
     @Test
@@ -119,13 +130,17 @@ class MinisterOfTheWordServiceImplTest {
         }).when(mapper).updateMinisterOfTheWordFromDto(any(), eq(entity));
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(repository.save(entity)).thenReturn(entity);
+        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.MINISTER_OF_THE_WORD);
         when(mapper.toDto(entity)).thenReturn(response);
         assertSame(response, service.updateMinisterOfTheWord(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
+        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.MINISTER_OF_THE_WORD);
 
         when(repository.existsById(1L)).thenReturn(true);
         service.deleteMinisterOfTheWord(1L);
-        verify(repository).deleteById(1L);
+        var inOrder = inOrder(personMinistryCompatibilityService, repository);
+        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
+        inOrder.verify(repository).deleteById(1L);
     }
 
     @Test

@@ -7,9 +7,12 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.CommentatorServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,12 @@ class CommentatorServiceImplTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
+
+    @Mock
+    private MinistryTypeResolver ministryTypeResolver;
+
     @InjectMocks
     private CommentatorServiceImpl service;
 
@@ -60,6 +69,7 @@ class CommentatorServiceImplTest {
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(repository.save(any(Commentator.class))).thenReturn(saved);
+        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.COMMENTATOR);
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createCommentator(request));
@@ -69,6 +79,7 @@ class CommentatorServiceImplTest {
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.COMMENTATOR);
     }
 
     @Test
@@ -114,13 +125,17 @@ class CommentatorServiceImplTest {
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(repository.save(entity)).thenReturn(entity);
+        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.COMMENTATOR);
         when(mapper.toDto(entity)).thenReturn(response);
         assertSame(response, service.updateCommentator(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
+        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.COMMENTATOR);
 
         when(repository.existsById(1L)).thenReturn(true);
         service.deleteCommentatorById(1L);
-        verify(repository).deleteById(1L);
+        var inOrder = inOrder(personMinistryCompatibilityService, repository);
+        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
+        inOrder.verify(repository).deleteById(1L);
     }
 
     @Test

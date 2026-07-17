@@ -8,10 +8,13 @@ import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
 import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -29,12 +32,16 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     private final EucharisticMinisterMapper eucharisticMinisterMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
+    private final MinistryTypeResolver ministryTypeResolver;
 
-    public EucharisticMinisterServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public EucharisticMinisterServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
         this.eucharisticMinisterRepository = eucharisticMinisterRepository;
         this.eucharisticMinisterMapper = eucharisticMinisterMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
+        this.ministryTypeResolver = ministryTypeResolver;
     }
 
 
@@ -51,6 +58,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         eucharisticMinister.addRole(operatorRole);
 
         eucharisticMinister = eucharisticMinisterRepository.save(eucharisticMinister);
+        ensureLegacyMinistry(eucharisticMinister);
         return eucharisticMinisterMapper.toDto(eucharisticMinister);
     }
 
@@ -86,6 +94,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
             eucharisticMinister.setPassword(passwordEncoder.encode(eucharisticMinisterRequestDTO.getPassword()));
 
             EucharisticMinister eucharisticMinisterSalvo = eucharisticMinisterRepository.save(eucharisticMinister);
+            ensureLegacyMinistry(eucharisticMinisterSalvo);
 
             return eucharisticMinisterMapper.toDto(eucharisticMinisterSalvo);
         }catch (EntityNotFoundException e){
@@ -103,6 +112,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
             throw new ResourceNotFoundException("Ministro de Eucaristia", id);
         }
         try {
+            personMinistryCompatibilityService.deleteAllForPerson(id);
             eucharisticMinisterRepository.deleteById(id);
             eucharisticMinisterRepository.flush();
         }
@@ -110,5 +120,10 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
 
+    }
+
+    private void ensureLegacyMinistry(EucharisticMinister eucharisticMinister) {
+        MinistryType ministryType = ministryTypeResolver.resolve(eucharisticMinister);
+        personMinistryCompatibilityService.ensureMinistry(eucharisticMinister, ministryType);
     }
 }

@@ -8,9 +8,12 @@ import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -29,12 +32,16 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
+    private final MinistryTypeResolver ministryTypeResolver;
 
-    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
+        this.ministryTypeResolver = ministryTypeResolver;
     }
 
 
@@ -51,6 +58,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         ministerOfTheWord.addRole(operatorRole);
 
         ministerOfTheWord = ministerOfTheWordRepository.save(ministerOfTheWord);
+        ensureLegacyMinistry(ministerOfTheWord);
 
         return ministerOfTheWordMapper.toDto(ministerOfTheWord);
     }
@@ -85,6 +93,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
             ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWord.getPassword()));
 
             MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
+            ensureLegacyMinistry(ministerOfTheWordSalvo);
             return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
         }catch (EntityNotFoundException e){
             throw new ResourceNotFoundException("Ministro da Palavra", id);
@@ -101,11 +110,17 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
             throw new ResourceNotFoundException("Ministro da Palavra", id);
         }
         try {
+            personMinistryCompatibilityService.deleteAllForPerson(id);
             ministerOfTheWordRepository.deleteById(id);
             ministerOfTheWordRepository.flush();
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
+    }
+
+    private void ensureLegacyMinistry(MinisterOfTheWord ministerOfTheWord) {
+        MinistryType ministryType = ministryTypeResolver.resolve(ministerOfTheWord);
+        personMinistryCompatibilityService.ensureMinistry(ministerOfTheWord, ministryType);
     }
 }

@@ -8,10 +8,13 @@ import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.PriestMapper;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.MinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -30,12 +33,16 @@ public class PriestServiceImpl implements PriestService {
     private final PriestMapper priestMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
+    private final MinistryTypeResolver ministryTypeResolver;
 
-    public PriestServiceImpl(PriestRepository priestRepository, PriestMapper priestMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+    public PriestServiceImpl(PriestRepository priestRepository, PriestMapper priestMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
         this.priestRepository = priestRepository;
         this.priestMapper = priestMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
+        this.ministryTypeResolver = ministryTypeResolver;
     }
 
 
@@ -52,6 +59,7 @@ public class PriestServiceImpl implements PriestService {
         priest.addRole(operatorRole);
 
         priest = priestRepository.save(priest);
+        ensureLegacyMinistry(priest);
         return priestMapper.toDto(priest);
     }
 
@@ -85,6 +93,7 @@ public class PriestServiceImpl implements PriestService {
             priest.setPassword(passwordEncoder.encode(priestRequestDTO.getPassword()));
 
             Priest priestSalvo = priestRepository.save(priest);
+            ensureLegacyMinistry(priestSalvo);
             return priestMapper.toDto(priestSalvo);
 
         }catch (EntityNotFoundException e){
@@ -102,6 +111,7 @@ public class PriestServiceImpl implements PriestService {
             throw new ResourceNotFoundException("Padre", id);
         }
         try {
+            personMinistryCompatibilityService.deleteAllForPerson(id);
             priestRepository.deleteById(id);
             priestRepository.flush();
         }
@@ -109,5 +119,10 @@ public class PriestServiceImpl implements PriestService {
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
 
+    }
+
+    private void ensureLegacyMinistry(Priest priest) {
+        MinistryType ministryType = ministryTypeResolver.resolve(priest);
+        personMinistryCompatibilityService.ensureMinistry(priest, ministryType);
     }
 }
