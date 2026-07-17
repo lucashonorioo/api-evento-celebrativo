@@ -32,11 +32,11 @@ class FlywayMigrationIntegrationTest {
             "tb_person_role"
     };
 
-    private static final String[] FUTURE_TABLES = {
-            "person_ministry",
-            "user_account",
-            "user_account_role",
-            "event_assignment"
+    private static final String[] PARALLEL_DOMAIN_TABLES = {
+            "tb_person_ministry",
+            "tb_user_account",
+            "tb_user_account_role",
+            "tb_event_assignment"
     };
 
     @Autowired
@@ -49,26 +49,49 @@ class FlywayMigrationIntegrationTest {
     void shouldApplyCurrentSchemaAndRequiredRolesOnly() {
         assertSuccessfulMigration("1");
         assertSuccessfulMigration("2");
+        assertSuccessfulMigration("3");
         assertTableExists("flyway_schema_history");
 
         for (String table : CURRENT_TABLES) {
             assertTableExists(table);
         }
 
+        for (String table : PARALLEL_DOMAIN_TABLES) {
+            assertTableExists(table);
+            assertEquals(0, countRows(table));
+        }
+
+        assertColumnExists("tb_person", "active");
+        assertColumnExists("tb_person", "created_at");
+        assertColumnExists("tb_person", "updated_at");
+
+        assertMainConstraintExists("tb_person_ministry", "pk_tb_person_ministry");
+        assertMainConstraintExists("tb_person_ministry", "uk_tb_person_ministry_person_type");
+        assertMainConstraintExists("tb_person_ministry", "chk_tb_person_ministry_type");
+        assertMainConstraintExists("tb_person_ministry", "fk_tb_person_ministry_person");
+        assertMainConstraintExists("tb_user_account", "pk_tb_user_account");
+        assertMainConstraintExists("tb_user_account", "uk_tb_user_account_person_id");
+        assertMainConstraintExists("tb_user_account", "uk_tb_user_account_username");
+        assertMainConstraintExists("tb_user_account", "fk_tb_user_account_person");
+        assertMainConstraintExists("tb_user_account_role", "pk_tb_user_account_role");
+        assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_user_account");
+        assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_role");
+        assertMainConstraintExists("tb_event_assignment", "pk_tb_event_assignment");
+        assertMainConstraintExists("tb_event_assignment", "uk_tb_event_assignment_event_person");
+        assertMainConstraintExists("tb_event_assignment", "chk_tb_event_assignment_type");
+        assertMainConstraintExists("tb_event_assignment", "fk_tb_event_assignment_event");
+        assertMainConstraintExists("tb_event_assignment", "fk_tb_event_assignment_person");
+
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         assertEquals(0, countRows("tb_person"));
         assertEquals(0, countRows("tb_celebration_event"));
 
-        for (String table : FUTURE_TABLES) {
-            assertTableDoesNotExist(table);
-        }
-
         Integer successfulVersions = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2') AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3') AND success = TRUE",
                 Integer.class
         );
-        assertEquals(2, successfulVersions);
+        assertEquals(3, successfulVersions);
     }
 
     @Test
@@ -81,8 +104,12 @@ class FlywayMigrationIntegrationTest {
         assertEquals(checksumsBefore, migrationChecksums());
         assertSuccessfulMigration("1");
         assertSuccessfulMigration("2");
+        assertSuccessfulMigration("3");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
+        for (String table : PARALLEL_DOMAIN_TABLES) {
+            assertEquals(0, countRows(table));
+        }
     }
 
     private void assertSuccessfulMigration(String version) {
@@ -101,6 +128,26 @@ class FlywayMigrationIntegrationTest {
 
     private void assertTableDoesNotExist(String tableName) {
         assertEquals(0, countInformationSchemaTables(tableName));
+    }
+
+    private void assertColumnExists(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
+                Integer.class,
+                tableName,
+                columnName
+        );
+        assertEquals(1, count);
+    }
+
+    private void assertMainConstraintExists(String tableName, String constraintName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.table_constraints WHERE LOWER(table_name) = LOWER(?) AND LOWER(constraint_name) = LOWER(?)",
+                Integer.class,
+                tableName,
+                constraintName
+        );
+        assertEquals(1, count);
     }
 
     private int countInformationSchemaTables(String tableName) {
