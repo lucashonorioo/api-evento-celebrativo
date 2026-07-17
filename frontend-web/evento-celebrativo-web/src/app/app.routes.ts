@@ -126,6 +126,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/usuarios',
+        loadComponent: () =>
+          import('./admin-users/admin-user-management/admin-user-management.component').then(
+            ({ AdminUserManagementComponent }) => AdminUserManagementComponent,
+          ),
+        canActivate: [adminGuard],
+      },
+      {
         path: 'admin/locais',
         loadComponent: () =>
           import('./locations/location-management/location-management.component').then(
