@@ -29,6 +29,7 @@ class LocalFlywayMigrationIntegrationTest {
     void shouldApplyCurrentSchemaRequiredRolesAndLocalDemoData() {
         assertSuccessfulVersionedMigration("1");
         assertSuccessfulVersionedMigration("2");
+        assertSuccessfulVersionedMigration("3");
         assertSuccessfulScript("R__load_local_demo_data.sql");
 
         assertEquals(2, countRows("tb_role"));
@@ -49,6 +50,8 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(20, countRows("tb_person_role"));
         assertEquals(21, countRows("tb_event_person"));
         assertEquals(3, countRows("tb_event_location"));
+        assertEquals(15, countPeopleWithFilledParallelColumns());
+        assertParallelTablesAreEmpty();
     }
 
     @Test
@@ -60,6 +63,10 @@ class LocalFlywayMigrationIntegrationTest {
         int personRolesBefore = countRows("tb_person_role");
         int eventPeopleBefore = countRows("tb_event_person");
         int eventLocationsBefore = countRows("tb_event_location");
+        int personMinistriesBefore = countRows("tb_person_ministry");
+        int userAccountsBefore = countRows("tb_user_account");
+        int userAccountRolesBefore = countRows("tb_user_account_role");
+        int eventAssignmentsBefore = countRows("tb_event_assignment");
 
         MigrateResult result = flyway.migrate();
 
@@ -71,6 +78,10 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(personRolesBefore, countRows("tb_person_role"));
         assertEquals(eventPeopleBefore, countRows("tb_event_person"));
         assertEquals(eventLocationsBefore, countRows("tb_event_location"));
+        assertEquals(personMinistriesBefore, countRows("tb_person_ministry"));
+        assertEquals(userAccountsBefore, countRows("tb_user_account"));
+        assertEquals(userAccountRolesBefore, countRows("tb_user_account_role"));
+        assertEquals(eventAssignmentsBefore, countRows("tb_event_assignment"));
         assertEquals(1, countSuccessfulScript("R__load_local_demo_data.sql"));
     }
 
@@ -99,6 +110,21 @@ class LocalFlywayMigrationIntegrationTest {
     private int countRows(String tableName) {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Integer.class);
         return count == null ? 0 : count;
+    }
+
+    private int countPeopleWithFilledParallelColumns() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_person WHERE active = TRUE AND created_at IS NOT NULL AND updated_at IS NOT NULL",
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private void assertParallelTablesAreEmpty() {
+        assertEquals(0, countRows("tb_person_ministry"));
+        assertEquals(0, countRows("tb_user_account"));
+        assertEquals(0, countRows("tb_user_account_role"));
+        assertEquals(0, countRows("tb_event_assignment"));
     }
 
     private int countRows(String tableName, String idColumn, Long id, String valueColumn, String value) {

@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles e `V3` para as estruturas paralelas do novo dominio. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas.
 
 ## Fases
 
@@ -15,7 +15,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 1. ADR e decisoes | Nenhuma | Codigo atual analisado | Concluida: ADR aceito em 2026-07-17 |
 | 2. Definicao do banco-alvo e estrategia de Flyway/baseline | Fase 1 | Decisoes de dominio aprovadas | Concluida: MySQL 8.4 LTS aprovado, baseline manual definido e migrations iniciais planejadas |
 | 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
-| 4. Tabelas paralelas | Fase 3 | Baseline validado | `person_ministry`, `user_account`, `user_account_role`, `event_assignment` criadas de forma aditiva |
+| 4. Tabelas paralelas | Fase 3 | Baseline validado | Concluida: colunas preparatorias em `tb_person` e tabelas `tb_person_ministry`, `tb_user_account`, `tb_user_account_role`, `tb_event_assignment` criadas de forma aditiva |
 | 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Dados copiados, contagens comparadas e divergencias registradas |
 | 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Consultas e escrita de escala usando atribuicao explicita |
 | 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Login lendo conta e preservando JWT atual |
@@ -25,7 +25,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 11. Depreciar contratos antigos | Fase 10 | Frontend migrado | Politica de deprecacao publicada |
 | 12. Remover legado | Fase 11 | Periodo de estabilizacao concluido | Estruturas antigas removidas com migration destrutiva aprovada |
 
-## Estado do Flyway e proxima fase: Tabelas paralelas
+## Estado do Flyway e proxima fase: Backfills versionados
 
 Resultado aprovado:
 
@@ -37,30 +37,31 @@ Resultado aprovado:
 - Banco novo executa migrations desde `V1`.
 - Banco existente deve ser auditado e receber baseline manual na versao `2`.
 - `baseline-on-migrate` nao deve ser habilitado automaticamente.
-- Proximas migrations do novo dominio comecam em `V3`.
+- `V3` cria colunas preparatorias em `tb_person` e estruturas paralelas do novo dominio.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
 - Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
 - As roles deixaram de ser duplicadas nas fixtures do profile `test`.
 
-Pre-condicoes para `V3`:
+Pre-condicoes para backfills:
 
 - `V1` e `V2` validadas em H2 e MySQL.
+- `V3` validada em H2 e MySQL.
 - Profiles `local`, `test`, `mysql` e `flyway-test` usando Flyway com localizacoes isoladas.
 - Hibernate usando `ddl-auto=validate` nos profiles migrados.
 - Fixtures de teste separadas de dados locais.
-- Confirmacao explicita de que a proxima migration sera aditiva.
+- Confirmacao explicita de que os proximos backfills preservarao hashes, IDs e vinculos existentes.
 
 Saidas esperadas da proxima fase:
 
-- Tabelas paralelas do novo dominio criadas por `V3`.
-- Nenhuma remocao de tabelas ou colunas legadas.
-- Aplicacao atual ainda compativel com schema expandido.
-- Testes cobrindo existencia das novas estruturas sem alterar contratos HTTP.
+- Backfill de funcoes ministeriais a partir de `person_type`.
+- Backfill de contas a partir de `phone_number`, `password` e roles atuais.
+- Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
+- Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
 
 Fora do escopo da proxima fase:
 
-- Migrar dados.
+- Remover estruturas legadas.
 - Remover `person_type`, senha, roles ou vinculos atuais.
 - Criar migration destrutiva.
 
@@ -81,7 +82,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Criar a migration `V3` com as estruturas paralelas do novo dominio.
+1. Criar backfills versionados para estruturas paralelas.
 2. Executar backfill em ambiente descartavel.
 3. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
 
@@ -139,6 +140,7 @@ Saida:
 
 - Novas tabelas criadas sem remover colunas ou tabelas atuais.
 - Aplicacao antiga ainda inicia com schema expandido.
+- `V3` concluida sem migrar dados e sem alterar o modelo legado ativo.
 
 ### Backfill
 
@@ -193,6 +195,7 @@ Saida:
 - Migrations destrutivas antes do periodo de estabilizacao.
 - Escolha de banco-alvo tardia atrasar Flyway e backfill.
 - Baseline incorreto impedir rollback simples.
+- Restricao `UNIQUE(event_id, person_id)` em `tb_event_assignment` precisar ser revista se o dominio passar a permitir multiplas funcoes da mesma pessoa no mesmo evento.
 
 ## Decisoes adiadas
 
@@ -241,7 +244,7 @@ Estes itens nao bloqueiam a primeira migracao:
 2. Definir banco-alvo e estrategia de Flyway/baseline.
 3. Introduzir Flyway com `V1` para schema atual, `V2` para roles obrigatorias e profiles isolados.
 4. Criar tabelas paralelas a partir de `V3`.
-5. Executar backfill em ambiente descartavel.
+5. Executar backfills versionados em ambiente descartavel.
 6. Comparar contagens e historico.
 7. Migrar escala para atribuicao explicita.
 8. Migrar autenticacao para conta.
@@ -263,3 +266,6 @@ Estes itens nao bloqueiam a primeira migracao:
 - Hashes devem ser copiados sem alteracao.
 - Backfills deverao possuir consultas de auditoria.
 - Profiles `local`, `test`, `mysql` e `flyway-test` usam localizacoes Flyway separadas para evitar carga cruzada de dados.
+- `V3` e aditiva: nao copia pessoas, contas, roles ou atribuicoes; apenas adiciona colunas, tabelas, constraints e indices.
+- O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
+- `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
