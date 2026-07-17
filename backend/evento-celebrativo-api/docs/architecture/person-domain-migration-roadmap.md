@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles. O seed global `import.sql` foi removido e substituido por seeds explicitos por ambiente.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual e `V2` para os dados obrigatorios de roles. O seed global `import.sql` foi removido e substituido por seeds explicitos por ambiente. O profile `local` ja usa Flyway para criar schema, roles obrigatorias e dados demonstrativos.
 
 ## Fases
 
@@ -38,9 +38,10 @@ Resultado aprovado:
 - Banco existente deve ser auditado e receber baseline manual na versao `2`.
 - `baseline-on-migrate` nao deve ser habilitado automaticamente.
 - Proximas migrations do novo dominio comecam em `V3`.
-- O profile `local` ainda usa Hibernate `ddl-auto=create`, Flyway desabilitado e seed demonstrativo em `db/seed/import-local.sql`.
+- O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
+- O Hibernate no profile `local` usa `ddl-auto=validate`.
 - A suite principal de testes ainda usa Hibernate `ddl-auto=create`, Flyway desabilitado e fixtures em `db/seed/import-test.sql`.
-- As roles permanecem temporariamente duplicadas nos seeds `local` e `test` porque esses profiles ainda nao executam a migration `V2`.
+- As roles permanecem temporariamente duplicadas apenas no seed `test`, porque a suite principal ainda nao executa a migration `V2`.
 
 Pre-condicoes:
 
@@ -72,20 +73,19 @@ O arquivo global `src/main/resources/import.sql` foi removido para evitar que o 
 
 Estado temporario:
 
-- `src/main/resources/db/seed/import-local.sql` contem os dados demonstrativos do profile `local`, incluindo roles, usuarios de demonstracao, pessoas, locais, eventos e vinculos.
+- `src/main/resources/db/local/R__load_local_demo_data.sql` contem os dados demonstrativos do profile `local`, sem roles, incluindo usuarios de demonstracao, pessoas, locais, eventos e vinculos.
 - `src/test/resources/db/seed/import-test.sql` contem as fixtures globais da suite principal de testes, preservando os mesmos IDs implicitos utilizados pelos testes atuais.
 - `src/main/resources/db/migration/V2__insert_required_roles.sql` continua sendo a fonte dos dados obrigatorios para bancos novos gerenciados por Flyway.
 - O profile `mysql` continua isolado, com `spring.sql.init.mode=never`, Hibernate `validate` e Flyway habilitado.
 - O profile `flyway-test` continua validando apenas `V1` e `V2`, sem carregar pessoas, locais ou eventos demonstrativos.
+- O profile `local` esta isolado por `spring.flyway.locations=classpath:db/migration,classpath:db/local`, enquanto `mysql` e `flyway-test` continuam usando apenas `classpath:db/migration`.
 
 Proximas etapas planejadas:
 
-1. Habilitar Flyway no profile `local`.
-2. Mover roles do seed local para a migration `V2` nesse profile.
-3. Separar dados demonstrativos locais de dados obrigatorios.
-4. Habilitar Flyway na suite principal de testes.
-5. Migrar fixtures de teste para mecanismo explicito por teste ou por perfil.
-6. Remover a duplicacao temporaria das roles nos seeds `local` e `test`.
+1. Habilitar Flyway na suite principal de testes.
+2. Mover roles do seed de testes para a migration `V2` nesse profile.
+3. Migrar fixtures de teste para mecanismo explicito por teste ou por perfil.
+4. Remover a duplicacao temporaria das roles no seed `test`.
 
 ## Dependencias criticas
 

@@ -18,11 +18,6 @@ INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) 
 INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
 INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
 
-
-
-INSERT INTO tb_role (authority) VALUES ('ROLE_OPERATOR');
-INSERT INTO tb_role (authority) VALUES ('ROLE_ADMIN');
-
 INSERT INTO tb_person_role (person_id, role_id) VALUES (1, 1);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (1, 2);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (2, 1);
@@ -48,7 +43,6 @@ INSERT INTO tb_person_role (person_id, role_id) VALUES (13, 2);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (14, 2);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (15, 1);
 
-
 INSERT INTO tb_location(church_name, address) VALUES ('Igreja Matriz Nossa Senhora do Rosário', 'Praça Rui Barbosa, Centro, Ibiá - MG');
 INSERT INTO tb_location(church_name, address) VALUES ('Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG');
 INSERT INTO tb_location(church_name, address) VALUES ('Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG');
@@ -56,7 +50,6 @@ INSERT INTO tb_location(church_name, address) VALUES ('Santuário de Santo Antô
 INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Missa de Domingo da manhã', '2025-07-13', '10:00:00', TRUE);
 INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Celebração da Palavra de Sábado', '2025-07-12', '19:30:00', FALSE);
 INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Missa de Ação de Graças', '2025-07-20', '08:00:00', TRUE);
-
 
 INSERT INTO tb_event_person (event_id, person_id) VALUES (1, 13);
 INSERT INTO tb_event_person (event_id, person_id) VALUES (1, 10);
