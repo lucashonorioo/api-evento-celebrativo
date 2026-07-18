@@ -2,6 +2,8 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.PersonMinistryReadServiceImpl;
@@ -53,10 +55,29 @@ class PersonMinistryReadServiceImplTest {
     }
 
     @Test
+    void shouldFindAllActivePeopleByMinistryUsingSingleRepositoryQuery() {
+        List<Person> people = List.of(person(1L), person(2L));
+
+        when(personMinistryRepository.findActivePeopleByMinistryType(MinistryType.READER)).thenReturn(people);
+
+        assertEquals(people, service.findAllActivePeopleByMinistry(MinistryType.READER));
+        verify(personMinistryRepository).findActivePeopleByMinistryType(MinistryType.READER);
+        verify(personRepository, never()).findAllByIdIn(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void shouldRejectInvalidArguments() {
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(null, PageRequest.of(0, 10)));
+        assertThrows(BusinessException.class, () -> service.findAllActivePeopleByMinistry(null));
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, null));
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, Pageable.unpaged()));
         assertThrows(BusinessException.class, () -> service.findActiveMinistriesByPersonIds(null));
+    }
+
+    private Person person(Long id) {
+        Reader reader = new Reader();
+        reader.setId(id);
+        reader.setName("Reader " + id);
+        return reader;
     }
 }

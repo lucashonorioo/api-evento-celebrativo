@@ -38,16 +38,13 @@ public class PersonMinistryShadowReadExecutor {
         }
 
         List<? extends Person> legacySnapshot = List.copyOf(legacyPeople);
-        PageRequest pageable = PageRequest.of(0, Math.max(legacySnapshot.size(), 1));
-        Page<? extends Person> legacyPage = new PageImpl<>(legacySnapshot, pageable, legacySnapshot.size());
+        Page<? extends Person> legacyPage = pageFrom(legacySnapshot, Math.max(legacySnapshot.size(), 1));
 
         try {
-            Page<Person> parallelPage = personMinistryReadService.findActivePeopleByMinistry(ministryType, pageable);
-            if (shouldReloadFullParallelList(options, parallelPage)) {
-                pageable = PageRequest.of(0, Math.toIntExact(parallelPage.getTotalElements()));
-                legacyPage = new PageImpl<>(legacySnapshot, pageable, legacySnapshot.size());
-                parallelPage = personMinistryReadService.findActivePeopleByMinistry(ministryType, pageable);
-            }
+            List<Person> parallelPeople = personMinistryReadService.findAllActivePeopleByMinistry(ministryType);
+            int pageSize = Math.max(Math.max(legacySnapshot.size(), parallelPeople.size()), 1);
+            legacyPage = pageFrom(legacySnapshot, pageSize);
+            Page<Person> parallelPage = pageFrom(parallelPeople, pageSize);
             PersonMinistryShadowReadReport report = personMinistryShadowReadComparator.compare(
                     ministryType,
                     legacyPage,
@@ -115,12 +112,7 @@ public class PersonMinistryShadowReadExecutor {
         );
     }
 
-    private boolean shouldReloadFullParallelList(
-            PersonMinistryShadowReadComparisonOptions options,
-            Page<Person> parallelPage
-    ) {
-        return !options.comparePageMetadata()
-                && parallelPage.getTotalElements() > parallelPage.getNumberOfElements()
-                && parallelPage.getTotalElements() <= Integer.MAX_VALUE;
+    private <T extends Person> Page<T> pageFrom(List<T> people, int pageSize) {
+        return new PageImpl<>(people, PageRequest.of(0, pageSize), people.size());
     }
 }

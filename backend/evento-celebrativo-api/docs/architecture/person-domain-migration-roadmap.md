@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno: o modelo legado continua sendo a fonte oficial da resposta, enquanto a leitura por `tb_person_ministry` compara resultados internamente quando cada flag estiver habilitada.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. A listagem `GET /leitores` tambem esta preparada para origem oficial configuravel entre `LEGACY` e `PARALLEL`, com default `LEGACY`.
 
 ## Fases
 
@@ -41,7 +41,7 @@ Resultado aprovado:
 - A camada Java de `PersonMinistry` ja existe, com enum `MinistryType`, entidade, repository e servico interno de compatibilidade.
 - Os CRUDs legados de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia agora garantem o vinculo ministerial correspondente em criacao e atualizacao.
 - Deletes legados removem os vinculos de `tb_person_ministry` antes da exclusao fisica da pessoa.
-- As leituras continuam usando o modelo legado por subtipo e `person_type`; nenhuma consulta funcional depende de `tb_person_ministry` ainda.
+- As leituras de comentaristas, padres, ministros da Palavra e ministros da Eucaristia continuam usando o modelo legado por subtipo e `person_type` como fonte oficial.
 - `V4` realiza o backfill de `tb_person_ministry` a partir do discriminator legado `person_type`.
 - O mapeamento aplicado por `V4` e: `reader` -> `READER`, `commentator` -> `COMMENTATOR`, `priest` -> `PRIEST`, `minister_of_the_word` -> `MINISTER_OF_THE_WORD`, `eucharistic_minister` -> `EUCHARISTIC_MINISTER`.
 - Vinculos ministeriais ja existentes nao sao duplicados; vinculos inativos da funcao legada sao reativados; funcoes adicionais sao preservadas.
@@ -53,7 +53,13 @@ Resultado aprovado:
 - A equivalencia entre repositories legados e leitura paralela foi comprovada para os dados migrados atuais dos cinco ministerios.
 - As listagens de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia possuem shadow read interno por `tb_person_ministry`.
 - As flags de shadow read permanecem desabilitadas por padrao: `reader-enabled`, `commentator-enabled`, `priest-enabled`, `minister-of-the-word-enabled` e `eucharistic-minister-enabled`.
-- O resultado HTTP das listagens ministeriais continua vindo exclusivamente dos repositories legados.
+- `GET /leitores` possui origem oficial configuravel por `app.person-ministry.read-source.reader`, com valores `LEGACY` e `PARALLEL`; o default continua `LEGACY`.
+- No modo `LEGACY`, `GET /leitores` preserva o `ReaderRepository.findAll()` como fonte oficial e pode executar o shadow read quando a flag de leitores estiver habilitada.
+- No modo `PARALLEL`, `GET /leitores` usa vinculos ativos `READER` em `tb_person_ministry` como fonte oficial, ordenando por `name ASC, id ASC`.
+- O modo `PARALLEL` pode incluir pessoas de outros subtipos legados quando elas tiverem funcao adicional `READER` ativa; isso faz parte do modelo novo de multiplas funcoes.
+- O rollback operacional da leitura de leitores pode ser feito voltando `app.person-ministry.read-source.reader` para `LEGACY`.
+- A leitura oficial `PARALLEL` de leitores nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
+- O resultado HTTP das quatro demais listagens ministeriais continua vindo exclusivamente dos repositories legados.
 - A comparacao do shadow read nas listagens atuais usa composicao de IDs e totais; a ordem de `findAll()` nao e considerada divergencia porque esses endpoints nao possuem contrato publico de ordenacao.
 - Funcoes adicionais podem aparecer como `additionalInParallelIds` no shadow read de uma listagem legada. Isso pode representar uma capacidade valida do novo modelo, nao necessariamente corrupcao.
 - Divergencias entre a leitura legada e a paralela sao apenas registradas; nenhuma correcao automatica e executada.
@@ -78,7 +84,7 @@ Saidas esperadas das proximas fases:
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
 - Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
-- Avaliar a migracao das primeiras leituras internas para `tb_person_ministry`, mantendo contratos HTTP estaveis.
+- Avaliar a migracao controlada de leituras oficiais para `tb_person_ministry`, mantendo contratos HTTP estaveis.
 
 Fora do escopo da proxima fase:
 
@@ -103,7 +109,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Avaliar os resultados do shadow read das cinco funcoes antes de migrar uma primeira leitura oficial para `tb_person_ministry`.
+1. Avaliar o cutover configuravel de `GET /leitores` antes de expandir origem oficial `PARALLEL` para as outras quatro funcoes.
 2. Planejar backfill versionado de `UserAccount`.
 3. Planejar backfill versionado de `EventAssignment`.
 4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
@@ -290,5 +296,5 @@ Estes itens nao bloqueiam a primeira migracao:
 - `V3` e aditiva: nao copia pessoas, contas, roles ou atribuicoes; apenas adiciona colunas, tabelas, constraints e indices.
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
-- `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as leituras continuam no modelo legado ate a proxima etapa.
-- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes e shadow read das cinco funcoes ministeriais. Nenhuma resposta de endpoint depende dela como fonte oficial.
+- `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as demais leituras continuam no modelo legado ate proxima aprovacao.
+- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores`. As demais respostas de endpoint ainda nao dependem dela como fonte oficial.

@@ -43,6 +43,17 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
     );
 
     @Query("""
+            SELECT pm.person
+            FROM PersonMinistry pm
+            WHERE pm.ministryType = :ministryType
+              AND pm.active = TRUE
+            ORDER BY pm.person.name ASC, pm.person.id ASC
+            """)
+    List<com.eventoscelebrativos.model.Person> findActivePeopleByMinistryType(
+            @Param("ministryType") MinistryType ministryType
+    );
+
+    @Query("""
             SELECT pm.person.id AS personId,
                    pm.ministryType AS ministryType
             FROM PersonMinistry pm

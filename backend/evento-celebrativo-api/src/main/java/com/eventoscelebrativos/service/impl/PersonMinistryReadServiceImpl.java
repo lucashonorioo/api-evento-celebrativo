@@ -63,6 +63,13 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
 
     @Override
     @Transactional(readOnly = true)
+    public List<Person> findAllActivePeopleByMinistry(MinistryType ministryType) {
+        validateMinistryType(ministryType);
+        return personMinistryRepository.findActivePeopleByMinistryType(ministryType);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Map<Long, Set<MinistryType>> findActiveMinistriesByPersonIds(Collection<Long> personIds) {
         if (personIds == null) {
             throw new BusinessException("Ids de pessoas sao obrigatorios");
