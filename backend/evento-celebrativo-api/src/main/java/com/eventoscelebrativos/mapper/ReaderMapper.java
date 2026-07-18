@@ -2,6 +2,7 @@ package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -18,6 +19,21 @@ public interface ReaderMapper {
     ReaderResponseDTO toDto(Reader reader);
 
     List<ReaderResponseDTO> toDtoList(List<Reader> readers);
+
+    default ReaderResponseDTO toDtoFromPerson(Person person) {
+        return new ReaderResponseDTO(
+                person.getId(),
+                person.getName(),
+                person.getPhoneNumber(),
+                person.getBirthdayDate()
+        );
+    }
+
+    default List<ReaderResponseDTO> toDtoPersonList(List<? extends Person> people) {
+        return people.stream()
+                .map(this::toDtoFromPerson)
+                .toList();
+    }
 
     @Mapping(target = "id", ignore = true)
     void updateReaderFromDto(ReaderRequestDTO readerRequestDTO, @MappingTarget Reader reader);

@@ -126,6 +126,33 @@ class PersonMinistryParallelReadIntegrationTest {
     }
 
     @Test
+    void shouldFindAllActivePeopleByMinistryOrderedWithoutDuplicates() {
+        Reader first = savePerson(new Reader(), "000 Full Read Alpha", "34973000011");
+        Reader second = savePerson(new Reader(), "000 Full Read Beta", "34973000012");
+        Reader third = savePerson(new Reader(), "000 Full Read Beta", "34973000013");
+        Reader inactive = savePerson(new Reader(), "000 Full Read Inactive", "34973000014");
+
+        saveMinistry(first, MinistryType.READER, true);
+        saveMinistry(second, MinistryType.READER, true);
+        saveMinistry(second, MinistryType.COMMENTATOR, true);
+        saveMinistry(third, MinistryType.READER, true);
+        saveMinistry(inactive, MinistryType.READER, false);
+
+        List<Person> result = readService.findAllActivePeopleByMinistry(MinistryType.READER);
+        List<Long> resultIds = result.stream().map(Person::getId).toList();
+
+        assertTrue(resultIds.contains(first.getId()));
+        assertTrue(resultIds.contains(second.getId()));
+        assertTrue(resultIds.contains(third.getId()));
+        assertFalse(resultIds.contains(inactive.getId()));
+        assertEquals(1, resultIds.stream().filter(second.getId()::equals).count());
+        assertEquals(result.stream()
+                .sorted(Comparator.comparing(Person::getName).thenComparing(Person::getId))
+                .map(Person::getId)
+                .toList(), resultIds);
+    }
+
+    @Test
     void shouldReturnEmptyPageWhenMinistryHasNoActivePeople() {
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE ministry_type = ?", MinistryType.PRIEST.name());
 

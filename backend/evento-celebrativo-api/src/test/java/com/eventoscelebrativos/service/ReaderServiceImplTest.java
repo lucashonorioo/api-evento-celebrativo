@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
@@ -7,7 +9,9 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
+import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.ReaderRepository;
@@ -54,7 +58,13 @@ class ReaderServiceImplTest {
     private MinistryTypeResolver ministryTypeResolver;
 
     @Mock
+    private PersonMinistryReadService personMinistryReadService;
+
+    @Mock
     private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryReadSourceProperties readSourceProperties;
 
     @Mock
     private PersonMinistryShadowReadProperties shadowReadProperties;
@@ -145,6 +155,7 @@ class ReaderServiceImplTest {
                 readers,
                 PersonMinistryShadowReadComparisonOptions.unorderedList()
         );
+        verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
@@ -163,6 +174,7 @@ class ReaderServiceImplTest {
                 readers,
                 PersonMinistryShadowReadComparisonOptions.unorderedList()
         );
+        verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
@@ -181,6 +193,52 @@ class ReaderServiceImplTest {
 
         verify(readerMapper).toDtoList(readers);
         assertEquals(List.of(2L, 1L), readers.stream().map(Reader::getId).toList());
+    }
+
+    @Test
+    void shouldUseParallelReaderReadSourceWithoutCallingLegacyRepository() {
+        Reader reader = reader(1L, "encoded-password");
+        Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
+        List<Person> people = List.of(reader, commentatorWithReaderMinistry);
+        List<ReaderResponseDTO> responses = List.of(response(1L), response(2L));
+
+        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenReturn(people);
+        when(readerMapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllReaders());
+
+        verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.READER);
+        verify(readerMapper).toDtoPersonList(people);
+        verifyNoInteractions(readerRepository, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPreserveParallelReadOrderReturnedByPersonMinistryReadService() {
+        Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
+        Reader reader = reader(1L, "encoded-password");
+        List<Person> people = List.of(commentatorWithReaderMinistry, reader);
+        List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
+
+        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenReturn(people);
+        when(readerMapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllReaders());
+
+        verify(readerMapper).toDtoPersonList(people);
+        assertEquals(List.of(2L, 1L), people.stream().map(Person::getId).toList());
+    }
+
+    @Test
+    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
+        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+
+        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenThrow(parallelFailure);
+
+        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
+        verifyNoInteractions(readerRepository, personMinistryShadowReadExecutor, readerMapper);
     }
 
     @Test
@@ -263,5 +321,15 @@ class ReaderServiceImplTest {
 
     private ReaderResponseDTO response(Long id) {
         return new ReaderResponseDTO(id, "Reader", "34999999991", BIRTHDAY);
+    }
+
+    private Commentator commentator(Long id, String password) {
+        Commentator commentator = new Commentator();
+        commentator.setId(id);
+        commentator.setName("Commentator");
+        commentator.setPhoneNumber("34999999992");
+        commentator.setBirthdayDate(BIRTHDAY);
+        commentator.setPassword(password);
+        return commentator;
     }
 }
