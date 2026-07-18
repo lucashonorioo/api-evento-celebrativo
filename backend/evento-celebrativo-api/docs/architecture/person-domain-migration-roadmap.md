@@ -60,6 +60,12 @@ Resultado aprovado:
 - O modo `PARALLEL` pode incluir pessoas de outros subtipos legados quando elas tiverem funcao adicional `READER` ativa; isso faz parte do modelo novo de multiplas funcoes.
 - O rollback operacional local da leitura de leitores pode ser feito definindo `PERSON_MINISTRY_READ_SOURCE_READER=LEGACY`, sem alteracao de codigo.
 - A leitura oficial `PARALLEL` de leitores nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
+- O ciclo de vida de leitores foi validado com leitura oficial `PARALLEL`: criacao, atualizacao, reativacao de vinculo `READER`, preservacao de funcoes adicionais e exclusao.
+- O write-through mantem a consistencia em tempo real entre `Reader` legado e `tb_person_ministry` durante criacao e atualizacao.
+- Updates consecutivos preservam um unico vinculo `READER`; quando o vinculo esperado estiver inativo, o update reativa o mesmo registro sem criar duplicidade.
+- Funcoes adicionais da pessoa sao preservadas por updates do CRUD legado de leitores.
+- Deletes de leitores removem os vinculos de `tb_person_ministry` antes da pessoa, evitando vinculos orfaos.
+- O rollback operacional para `LEGACY` continua disponivel mesmo apos validar o ciclo completo em `PARALLEL`.
 - O resultado HTTP das quatro demais listagens ministeriais continua vindo exclusivamente dos repositories legados.
 - A comparacao do shadow read nas listagens atuais usa composicao de IDs e totais; a ordem de `findAll()` nao e considerada divergencia porque esses endpoints nao possuem contrato publico de ordenacao.
 - Funcoes adicionais podem aparecer como `additionalInParallelIds` no shadow read de uma listagem legada. Isso pode representar uma capacidade valida do novo modelo, nao necessariamente corrupcao.
@@ -111,7 +117,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Avaliar o comportamento funcional do profile `local` com `GET /leitores` em `PARALLEL` antes de qualquer ativacao persistente ou expansao para outras funcoes.
+1. Avaliar se a validacao funcional de `GET /leitores` em `PARALLEL` no profile `local` e suficiente para ativacao persistente ou se a proxima migracao controlada deve cobrir outra funcao ministerial.
 2. Planejar backfill versionado de `UserAccount`.
 3. Planejar backfill versionado de `EventAssignment`.
 4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
