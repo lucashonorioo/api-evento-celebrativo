@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -15,6 +16,8 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -34,14 +37,27 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
-    public EucharisticMinisterServiceImpl(EucharisticMinisterRepository eucharisticMinisterRepository, EucharisticMinisterMapper eucharisticMinisterMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
+    public EucharisticMinisterServiceImpl(
+            EucharisticMinisterRepository eucharisticMinisterRepository,
+            EucharisticMinisterMapper eucharisticMinisterMapper,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            PersonMinistryCompatibilityService personMinistryCompatibilityService,
+            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryShadowReadProperties shadowReadProperties
+    ) {
         this.eucharisticMinisterRepository = eucharisticMinisterRepository;
         this.eucharisticMinisterMapper = eucharisticMinisterMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -66,6 +82,12 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     @Transactional(readOnly = true)
     public List<EucharisticMinisterResponseDTO> findAllEucharisticMinisters() {
         List<EucharisticMinister> ministrosDeEucaristia = eucharisticMinisterRepository.findAll();
+        personMinistryShadowReadExecutor.execute(
+                shadowReadProperties.isEucharisticMinisterEnabled(),
+                MinistryType.EUCHARISTIC_MINISTER,
+                ministrosDeEucaristia,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
         return eucharisticMinisterMapper.toDtoList(ministrosDeEucaristia);
     }
 
