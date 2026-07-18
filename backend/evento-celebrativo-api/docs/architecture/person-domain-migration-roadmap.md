@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar leituras ou contratos HTTP.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar leituras ou contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao, mas as consultas funcionais dos endpoints continuam usando o modelo legado.
 
 ## Fases
 
@@ -46,6 +46,11 @@ Resultado aprovado:
 - O mapeamento aplicado por `V4` e: `reader` -> `READER`, `commentator` -> `COMMENTATOR`, `priest` -> `PRIEST`, `minister_of_the_word` -> `MINISTER_OF_THE_WORD`, `eucharistic_minister` -> `EUCHARISTIC_MINISTER`.
 - Vinculos ministeriais ja existentes nao sao duplicados; vinculos inativos da funcao legada sao reativados; funcoes adicionais sao preservadas.
 - O write-through dos CRUDs legados e o backfill `V4` coexistem durante a transicao.
+- A leitura paralela permite consultar pessoas por funcao ativa em `tb_person_ministry` e carregar funcoes ativas em lote, sem substituir `ReaderRepository`, `CommentatorRepository`, `PriestRepository`, `MinisterOfTheWordRepository` ou `EucharisticMinisterRepository`.
+- A auditoria interna compara o subtipo legado com o vinculo ministerial esperado, nao modifica dados e nao roda automaticamente no startup.
+- Funcoes adicionais ativas sao consideradas validas. Exemplo: uma pessoa legada `Reader` pode ter `READER` e `COMMENTATOR`; isso nao e divergencia.
+- A auditoria detecta vinculo esperado ausente, vinculo esperado inativo e subtipo legado sem mapeamento ministerial suportado.
+- A equivalencia entre repositories legados e leitura paralela foi comprovada para os dados migrados atuais dos cinco ministerios.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
 - Os seeds `local` e `test` criam os vinculos em `tb_person_ministry` depois de inserir as pessoas demonstrativas, porque `V4` executa antes das migrations repeatable de cada profile.
@@ -66,7 +71,7 @@ Saidas esperadas das proximas fases:
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
 - Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
-- Leitura paralela ou auditoria de compatibilidade entre `person_type` e `tb_person_ministry`, sem trocar ainda os contratos HTTP.
+- Avaliar a migracao das primeiras leituras internas para `tb_person_ministry`, mantendo contratos HTTP estaveis.
 
 Fora do escopo da proxima fase:
 
@@ -91,7 +96,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Introduzir leitura paralela ou auditoria de compatibilidade entre `person_type` e `tb_person_ministry`.
+1. Avaliar a migracao das primeiras leituras internas para `tb_person_ministry`.
 2. Planejar backfill versionado de `UserAccount`.
 3. Planejar backfill versionado de `EventAssignment`.
 4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
@@ -279,3 +284,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
 - `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as leituras continuam no modelo legado ate a proxima etapa.
+- A leitura paralela de `PersonMinistry` esta disponivel apenas para validacao interna e testes; endpoints e services legados ainda nao foram migrados para ela.
