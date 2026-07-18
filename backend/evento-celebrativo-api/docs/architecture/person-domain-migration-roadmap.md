@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. A listagem `GET /leitores` tambem esta preparada para origem oficial configuravel entre `LEGACY` e `PARALLEL`, com default `LEGACY`.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. A listagem `GET /leitores` esta preparada para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada.
 
 ## Fases
 
@@ -53,11 +53,12 @@ Resultado aprovado:
 - A equivalencia entre repositories legados e leitura paralela foi comprovada para os dados migrados atuais dos cinco ministerios.
 - As listagens de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia possuem shadow read interno por `tb_person_ministry`.
 - As flags de shadow read permanecem desabilitadas por padrao: `reader-enabled`, `commentator-enabled`, `priest-enabled`, `minister-of-the-word-enabled` e `eucharistic-minister-enabled`.
-- `GET /leitores` possui origem oficial configuravel por `app.person-ministry.read-source.reader`, com valores `LEGACY` e `PARALLEL`; o default continua `LEGACY`.
+- `GET /leitores` possui origem oficial configuravel por `app.person-ministry.read-source.reader`, com valores `LEGACY` e `PARALLEL`; o default global continua `LEGACY`.
+- O profile `local` define `app.person-ministry.read-source.reader=${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}` para validar a leitura oficial por `tb_person_ministry` sem ativar o mesmo comportamento em outros ambientes.
 - No modo `LEGACY`, `GET /leitores` preserva o `ReaderRepository.findAll()` como fonte oficial e pode executar o shadow read quando a flag de leitores estiver habilitada.
 - No modo `PARALLEL`, `GET /leitores` usa vinculos ativos `READER` em `tb_person_ministry` como fonte oficial, ordenando por `name ASC, id ASC`.
 - O modo `PARALLEL` pode incluir pessoas de outros subtipos legados quando elas tiverem funcao adicional `READER` ativa; isso faz parte do modelo novo de multiplas funcoes.
-- O rollback operacional da leitura de leitores pode ser feito voltando `app.person-ministry.read-source.reader` para `LEGACY`.
+- O rollback operacional local da leitura de leitores pode ser feito definindo `PERSON_MINISTRY_READ_SOURCE_READER=LEGACY`, sem alteracao de codigo.
 - A leitura oficial `PARALLEL` de leitores nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
 - O resultado HTTP das quatro demais listagens ministeriais continua vindo exclusivamente dos repositories legados.
 - A comparacao do shadow read nas listagens atuais usa composicao de IDs e totais; a ordem de `findAll()` nao e considerada divergencia porque esses endpoints nao possuem contrato publico de ordenacao.
@@ -66,6 +67,7 @@ Resultado aprovado:
 - Falhas na leitura paralela nao derrubam as listagens legadas e nao usam a leitura paralela como fallback.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
+- Os profiles `test` e `mysql` nao ativam `PARALLEL` para leitores implicitamente; ambos continuam herdando o default global `LEGACY` salvo configuracao explicita.
 - Os seeds `local` e `test` criam os vinculos em `tb_person_ministry` depois de inserir as pessoas demonstrativas, porque `V4` executa antes das migrations repeatable de cada profile.
 - Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
 - As roles deixaram de ser duplicadas nas fixtures do profile `test`.
@@ -109,7 +111,7 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Avaliar o cutover configuravel de `GET /leitores` antes de expandir origem oficial `PARALLEL` para as outras quatro funcoes.
+1. Avaliar o comportamento funcional do profile `local` com `GET /leitores` em `PARALLEL` antes de qualquer ativacao persistente ou expansao para outras funcoes.
 2. Planejar backfill versionado de `UserAccount`.
 3. Planejar backfill versionado de `EventAssignment`.
 4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
@@ -297,4 +299,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
 - `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as demais leituras continuam no modelo legado ate proxima aprovacao.
-- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores`. As demais respostas de endpoint ainda nao dependem dela como fonte oficial.
+- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores`. No profile `local`, leitores usam `PARALLEL`; nos demais perfis o default global permanece `LEGACY`. As demais respostas de endpoint ainda nao dependem dela como fonte oficial.
