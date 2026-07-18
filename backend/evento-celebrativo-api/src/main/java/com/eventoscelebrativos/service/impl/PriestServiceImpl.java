@@ -4,6 +4,7 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -15,6 +16,8 @@ import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -35,14 +38,27 @@ public class PriestServiceImpl implements PriestService {
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
-    public PriestServiceImpl(PriestRepository priestRepository, PriestMapper priestMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
+    public PriestServiceImpl(
+            PriestRepository priestRepository,
+            PriestMapper priestMapper,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            PersonMinistryCompatibilityService personMinistryCompatibilityService,
+            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryShadowReadProperties shadowReadProperties
+    ) {
         this.priestRepository = priestRepository;
         this.priestMapper = priestMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -67,6 +83,12 @@ public class PriestServiceImpl implements PriestService {
     @Transactional(readOnly = true)
     public List<PriestResponseDTO> findAllPriests() {
         List<Priest> priests = priestRepository.findAll();
+        personMinistryShadowReadExecutor.execute(
+                shadowReadProperties.isPriestEnabled(),
+                MinistryType.PRIEST,
+                priests,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
         return priestMapper.toDtoList(priests);
     }
 

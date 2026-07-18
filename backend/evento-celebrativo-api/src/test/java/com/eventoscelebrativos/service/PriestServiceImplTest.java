@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -53,6 +54,12 @@ class PriestServiceImplTest {
 
     @Mock
     private MinistryTypeResolver ministryTypeResolver;
+
+    @Mock
+    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private PriestServiceImpl service;
@@ -121,6 +128,12 @@ class PriestServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllPriests());
+        verify(personMinistryShadowReadExecutor).execute(
+                false,
+                MinistryType.PRIEST,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -136,6 +149,36 @@ class PriestServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
+    }
+
+    @Test
+    void shouldRunPriestShadowReadWhenEnabledAndKeepLegacyResponse() {
+        Priest entity = priest(1L, "encoded-password");
+        PriestResponseDTO response = response(1L);
+        List<Priest> entities = List.of(entity);
+        List<PriestResponseDTO> responses = List.of(response);
+
+        when(shadowReadProperties.isPriestEnabled()).thenReturn(true);
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllPriests());
+        verify(personMinistryShadowReadExecutor).execute(
+                true,
+                MinistryType.PRIEST,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
+    }
+
+    @Test
+    void shouldPropagateLegacyPriestListFailureWithoutUsingShadowReadAsFallback() {
+        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
+
+        when(repository.findAll()).thenThrow(legacyFailure);
+
+        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllPriests()));
+        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -53,6 +54,12 @@ class MinisterOfTheWordServiceImplTest {
 
     @Mock
     private MinistryTypeResolver ministryTypeResolver;
+
+    @Mock
+    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private MinisterOfTheWordServiceImpl service;
@@ -121,6 +128,12 @@ class MinisterOfTheWordServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllMinistersOfTheWord());
+        verify(personMinistryShadowReadExecutor).execute(
+                false,
+                MinistryType.MINISTER_OF_THE_WORD,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         doAnswer(invocation -> {
@@ -141,6 +154,36 @@ class MinisterOfTheWordServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
+    }
+
+    @Test
+    void shouldRunMinisterOfTheWordShadowReadWhenEnabledAndKeepLegacyResponse() {
+        MinisterOfTheWord entity = minister(1L, "encoded-password");
+        MinisterOfTheWordResponseDTO response = response(1L);
+        List<MinisterOfTheWord> entities = List.of(entity);
+        List<MinisterOfTheWordResponseDTO> responses = List.of(response);
+
+        when(shadowReadProperties.isMinisterOfTheWordEnabled()).thenReturn(true);
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllMinistersOfTheWord());
+        verify(personMinistryShadowReadExecutor).execute(
+                true,
+                MinistryType.MINISTER_OF_THE_WORD,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
+    }
+
+    @Test
+    void shouldPropagateLegacyMinisterOfTheWordListFailureWithoutUsingShadowReadAsFallback() {
+        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
+
+        when(repository.findAll()).thenThrow(legacyFailure);
+
+        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
+        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
     }
 
     @Test

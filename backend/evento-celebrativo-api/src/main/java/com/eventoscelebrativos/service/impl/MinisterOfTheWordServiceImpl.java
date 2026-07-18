@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -14,6 +15,8 @@ import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -34,14 +37,27 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
-    public MinisterOfTheWordServiceImpl(MinisterOfTheWordRepository ministerOfTheWordRepository, MinisterOfTheWordMapper ministerOfTheWordMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
+    public MinisterOfTheWordServiceImpl(
+            MinisterOfTheWordRepository ministerOfTheWordRepository,
+            MinisterOfTheWordMapper ministerOfTheWordMapper,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            PersonMinistryCompatibilityService personMinistryCompatibilityService,
+            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryShadowReadProperties shadowReadProperties
+    ) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -67,6 +83,12 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Transactional(readOnly = true)
     public List<MinisterOfTheWordResponseDTO> findAllMinistersOfTheWord() {
         List<MinisterOfTheWord> ministrosDaPalavra = ministerOfTheWordRepository.findAll();
+        personMinistryShadowReadExecutor.execute(
+                shadowReadProperties.isMinisterOfTheWordEnabled(),
+                MinistryType.MINISTER_OF_THE_WORD,
+                ministrosDaPalavra,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
         return ministerOfTheWordMapper.toDtoList(ministrosDaPalavra);
     }
 

@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -53,6 +54,12 @@ class CommentatorServiceImplTest {
 
     @Mock
     private MinistryTypeResolver ministryTypeResolver;
+
+    @Mock
+    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private CommentatorServiceImpl service;
@@ -121,6 +128,12 @@ class CommentatorServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllCommentators());
+        verify(personMinistryShadowReadExecutor).execute(
+                false,
+                MinistryType.COMMENTATOR,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -136,6 +149,36 @@ class CommentatorServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
+    }
+
+    @Test
+    void shouldRunCommentatorShadowReadWhenEnabledAndKeepLegacyResponse() {
+        Commentator entity = commentator(1L, "encoded-password");
+        CommentatorResponseDTO response = response(1L);
+        List<Commentator> entities = List.of(entity);
+        List<CommentatorResponseDTO> responses = List.of(response);
+
+        when(shadowReadProperties.isCommentatorEnabled()).thenReturn(true);
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllCommentators());
+        verify(personMinistryShadowReadExecutor).execute(
+                true,
+                MinistryType.COMMENTATOR,
+                entities,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
+    }
+
+    @Test
+    void shouldPropagateLegacyCommentatorListFailureWithoutUsingShadowReadAsFallback() {
+        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
+
+        when(repository.findAll()).thenThrow(legacyFailure);
+
+        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
+        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
     }
 
     @Test

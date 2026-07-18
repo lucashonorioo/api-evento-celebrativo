@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
+import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Role;
@@ -13,6 +14,8 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
+import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,14 +35,27 @@ public class CommentatorServiceImpl implements CommentatorService {
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
-    public CommentatorServiceImpl(CommentatorRepository commentatorRepository, CommentatorMapper commentatorMapper, RoleRepository roleRepository, PasswordEncoder passwordEncoder, PersonMinistryCompatibilityService personMinistryCompatibilityService, MinistryTypeResolver ministryTypeResolver) {
+    public CommentatorServiceImpl(
+            CommentatorRepository commentatorRepository,
+            CommentatorMapper commentatorMapper,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            PersonMinistryCompatibilityService personMinistryCompatibilityService,
+            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryShadowReadProperties shadowReadProperties
+    ) {
         this.commentatorRepository = commentatorRepository;
         this.commentatorMapper = commentatorMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.shadowReadProperties = shadowReadProperties;
     }
 
     @Override
@@ -63,6 +79,12 @@ public class CommentatorServiceImpl implements CommentatorService {
     @Transactional(readOnly = true)
     public List<CommentatorResponseDTO> findAllCommentators() {
         List<Commentator> commentators = commentatorRepository.findAll();
+        personMinistryShadowReadExecutor.execute(
+                shadowReadProperties.isCommentatorEnabled(),
+                MinistryType.COMMENTATOR,
+                commentators,
+                PersonMinistryShadowReadComparisonOptions.unorderedList()
+        );
         return commentatorMapper.toDtoList(commentators);
     }
 
