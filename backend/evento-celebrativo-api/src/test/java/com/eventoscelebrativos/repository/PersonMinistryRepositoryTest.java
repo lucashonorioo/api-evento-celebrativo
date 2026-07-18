@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
@@ -126,6 +128,70 @@ class PersonMinistryRepositoryTest {
         assertNotNull(entityManager.find(Reader.class, reader.getId()));
     }
 
+    @Test
+    void shouldPageDistinctActivePersonIdsByMinistryOrderedByNameAndId() {
+        Reader first = saveReader("000 Ministry Page Same", "34971000101");
+        Reader second = saveReader("000 Ministry Page Same", "34971000102");
+        Reader inactive = saveReader("000 Ministry Page Inactive", "34971000103");
+
+        personMinistryRepository.save(new PersonMinistry(first, MinistryType.READER));
+        personMinistryRepository.save(new PersonMinistry(second, MinistryType.READER));
+        personMinistryRepository.save(new PersonMinistry(second, MinistryType.COMMENTATOR));
+        PersonMinistry inactiveMinistry = new PersonMinistry(inactive, MinistryType.READER);
+        inactiveMinistry.setActive(false);
+        personMinistryRepository.save(inactiveMinistry);
+        personMinistryRepository.flush();
+
+        Page<Long> result = personMinistryRepository.findActivePersonIdsByMinistryType(
+                MinistryType.READER,
+                PageRequest.of(0, 2)
+        );
+
+        assertEquals(List.of(first.getId(), second.getId()), result.getContent());
+        assertEquals(countActivePeopleByMinistry(MinistryType.READER), result.getTotalElements());
+        assertFalse(result.getContent().contains(inactive.getId()));
+    }
+
+    @Test
+    void shouldLoadActiveMinistryTypesByPersonIdsInOneBatchProjection() {
+        Reader reader = saveReader("Batch Active Ministry Reader", "34971000104");
+        personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
+        PersonMinistry inactiveCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        inactiveCommentator.setActive(false);
+        personMinistryRepository.save(inactiveCommentator);
+        personMinistryRepository.flush();
+
+        List<PersonMinistryRepository.PersonMinistryTypeView> result =
+                personMinistryRepository.findActiveMinistryTypesByPersonIds(List.of(reader.getId()));
+
+        assertEquals(1, result.size());
+        assertEquals(reader.getId(), result.get(0).getPersonId());
+        assertEquals(MinistryType.READER, result.get(0).getMinistryType());
+    }
+
+    @Test
+    void shouldLoadAllMinistryStatusesByPersonIdsInOneBatchProjection() {
+        Reader reader = saveReader("Batch Status Ministry Reader", "34971000105");
+        personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
+        PersonMinistry inactiveCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        inactiveCommentator.setActive(false);
+        personMinistryRepository.save(inactiveCommentator);
+        personMinistryRepository.flush();
+
+        List<PersonMinistryRepository.PersonMinistryStatusView> result =
+                personMinistryRepository.findAllMinistryStatusesByPersonIds(List.of(reader.getId()));
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(row ->
+                row.getPersonId().equals(reader.getId())
+                        && row.getMinistryType() == MinistryType.READER
+                        && Boolean.TRUE.equals(row.getActive())));
+        assertTrue(result.stream().anyMatch(row ->
+                row.getPersonId().equals(reader.getId())
+                        && row.getMinistryType() == MinistryType.COMMENTATOR
+                        && Boolean.FALSE.equals(row.getActive())));
+    }
+
     private Reader saveReader(String name, String phoneNumber) {
         Reader reader = new Reader();
         reader.setName(name);
@@ -135,5 +201,19 @@ class PersonMinistryRepositoryTest {
         entityManager.persist(reader);
         entityManager.flush();
         return reader;
+    }
+
+    private long countActivePeopleByMinistry(MinistryType ministryType) {
+        Long count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(DISTINCT person_id)
+                FROM tb_person_ministry
+                WHERE ministry_type = ?
+                  AND active = TRUE
+                """,
+                Long.class,
+                ministryType.name()
+        );
+        return count == null ? 0 : count;
     }
 }

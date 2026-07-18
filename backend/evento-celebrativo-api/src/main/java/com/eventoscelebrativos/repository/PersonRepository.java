@@ -63,6 +63,19 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     @Query("SELECT DISTINCT p FROM Person p LEFT JOIN FETCH p.roles WHERE p.id IN :ids")
     List<Person> findAllByIdInWithRoles(@Param("ids") Collection<Long> ids);
 
+    @Query("SELECT p FROM Person p WHERE p.id IN :ids")
+    List<Person> findAllByIdIn(@Param("ids") Collection<Long> ids);
+
+    @Query(
+            value = """
+                    SELECT p.id
+                    FROM Person p
+                    ORDER BY p.name ASC, p.id ASC
+                    """,
+            countQuery = "SELECT COUNT(p.id) FROM Person p"
+    )
+    Page<Long> findPersonIdsForMinistryAudit(Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT DISTINCT p
