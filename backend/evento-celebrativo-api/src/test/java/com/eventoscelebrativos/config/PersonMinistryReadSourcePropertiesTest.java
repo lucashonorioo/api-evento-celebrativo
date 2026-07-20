@@ -27,6 +27,7 @@ class PersonMinistryReadSourcePropertiesTest {
             PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
 
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
+            assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
         });
     }
 
@@ -38,6 +39,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_READER:LEGACY}",
                 properties.getProperty("app.person-ministry.read-source.reader")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:LEGACY}",
+                properties.getProperty("app.person-ministry.read-source.commentator")
+        );
     }
 
     @Test
@@ -48,6 +53,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}",
                 properties.getProperty("app.person-ministry.read-source.reader")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}",
+                properties.getProperty("app.person-ministry.read-source.commentator")
+        );
     }
 
     @Test
@@ -55,6 +64,7 @@ class PersonMinistryReadSourcePropertiesTest {
         Properties properties = loadProperties("application-test.properties");
 
         assertFalse(properties.containsKey("app.person-ministry.read-source.reader"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
     }
 
     @Test
@@ -62,6 +72,7 @@ class PersonMinistryReadSourcePropertiesTest {
         Properties properties = loadProperties("application-mysql.properties");
 
         assertFalse(properties.containsKey("app.person-ministry.read-source.reader"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
     }
 
     @Test
@@ -72,6 +83,34 @@ class PersonMinistryReadSourcePropertiesTest {
                     PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
 
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+                });
+    }
+
+    @Test
+    void shouldBindCommentatorReadSourceIndependentlyFromReader() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.commentator=parallel")
+                .run(context -> {
+                    PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
+
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getCommentator());
+                });
+    }
+
+    @Test
+    void shouldBindReaderReadSourceIndependentlyFromCommentator() {
+        contextRunner
+                .withPropertyValues(
+                        "app.person-ministry.read-source.reader=parallel",
+                        "app.person-ministry.read-source.commentator=legacy"
+                )
+                .run(context -> {
+                    PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
+
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
                 });
     }
 
@@ -79,6 +118,19 @@ class PersonMinistryReadSourcePropertiesTest {
     void shouldFailContextWhenReaderReadSourceIsInvalid() {
         contextRunner
                 .withPropertyValues("app.person-ministry.read-source.reader=invalid")
+                .run(context -> {
+                    Throwable failure = context.getStartupFailure();
+
+                    assertNotNull(failure);
+                    assertTrue(hasMessageContaining(failure, "app.person-ministry.read-source"));
+                    assertTrue(hasMessageContaining(failure, "invalid"));
+                });
+    }
+
+    @Test
+    void shouldFailContextWhenCommentatorReadSourceIsInvalid() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.commentator=invalid")
                 .run(context -> {
                     Throwable failure = context.getStartupFailure();
 
