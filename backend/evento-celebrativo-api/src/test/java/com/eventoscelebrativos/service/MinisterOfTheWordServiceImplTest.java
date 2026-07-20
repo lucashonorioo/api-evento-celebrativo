@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
@@ -9,6 +11,8 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
@@ -56,7 +60,13 @@ class MinisterOfTheWordServiceImplTest {
     private MinistryTypeResolver ministryTypeResolver;
 
     @Mock
+    private PersonMinistryReadService personMinistryReadService;
+
+    @Mock
     private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryReadSourceProperties readSourceProperties;
 
     @Mock
     private PersonMinistryShadowReadProperties shadowReadProperties;
@@ -128,12 +138,7 @@ class MinisterOfTheWordServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllMinistersOfTheWord());
-        verify(personMinistryShadowReadExecutor).execute(
-                false,
-                MinistryType.MINISTER_OF_THE_WORD,
-                entities,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         doAnswer(invocation -> {
@@ -174,6 +179,78 @@ class MinisterOfTheWordServiceImplTest {
                 entities,
                 PersonMinistryShadowReadComparisonOptions.unorderedList()
         );
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldListMinistersOfTheWordWithShadowReadDisabledUsingLegacyRepository() {
+        MinisterOfTheWord entity = minister(1L, "encoded-password");
+        MinisterOfTheWordResponseDTO response = response(1L);
+        List<MinisterOfTheWord> entities = List.of(entity);
+        List<MinisterOfTheWordResponseDTO> responses = List.of(response);
+
+        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.LEGACY);
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllMinistersOfTheWord());
+
+        verify(repository).findAll();
+        verify(mapper).toDtoList(entities);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldUseParallelMinisterOfTheWordReadSourceWithoutCallingLegacyRepository() {
+        Reader readerWithMinisterOfTheWordMinistry = reader(2L, "encoded-password");
+        MinisterOfTheWordResponseDTO response = new MinisterOfTheWordResponseDTO(
+                2L,
+                "Minister",
+                "34999999994",
+                BIRTHDAY
+        );
+        List<Person> people = List.of(readerWithMinisterOfTheWordMinistry);
+        List<MinisterOfTheWordResponseDTO> responses = List.of(response);
+
+        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
+                .thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllMinistersOfTheWord());
+
+        verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD);
+        verify(mapper).toDtoPersonList(people);
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPreserveParallelMinisterOfTheWordOrderReturnedByPersonMinistryReadService() {
+        MinisterOfTheWord first = minister(1L, "encoded-password");
+        Reader second = reader(2L, "encoded-password");
+        List<Person> people = List.of(first, second);
+        List<MinisterOfTheWordResponseDTO> responses = List.of(response(1L), response(2L));
+
+        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
+                .thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllMinistersOfTheWord());
+
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
+        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+
+        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
+                .thenThrow(parallelFailure);
+
+        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
+        verifyNoInteractions(repository, mapper, personMinistryShadowReadExecutor);
     }
 
     @Test
@@ -183,7 +260,7 @@ class MinisterOfTheWordServiceImplTest {
         when(repository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
-        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor, mapper);
     }
 
     @Test
@@ -215,6 +292,16 @@ class MinisterOfTheWordServiceImplTest {
         minister.setBirthdayDate(BIRTHDAY);
         minister.setPassword(password);
         return minister;
+    }
+
+    private Reader reader(Long id, String password) {
+        Reader reader = new Reader();
+        reader.setId(id);
+        reader.setName("Minister");
+        reader.setPhoneNumber("34999999994");
+        reader.setBirthdayDate(BIRTHDAY);
+        reader.setPassword(password);
+        return reader;
     }
 
     private MinisterOfTheWordResponseDTO response(Long id) {
