@@ -28,6 +28,7 @@ class PersonMinistryReadSourcePropertiesTest {
 
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+            assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
         });
     }
 
@@ -43,6 +44,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:LEGACY}",
                 properties.getProperty("app.person-ministry.read-source.commentator")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_PRIEST:LEGACY}",
+                properties.getProperty("app.person-ministry.read-source.priest")
+        );
     }
 
     @Test
@@ -57,6 +62,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}",
                 properties.getProperty("app.person-ministry.read-source.commentator")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_PRIEST:PARALLEL}",
+                properties.getProperty("app.person-ministry.read-source.priest")
+        );
     }
 
     @Test
@@ -65,6 +74,7 @@ class PersonMinistryReadSourcePropertiesTest {
 
         assertFalse(properties.containsKey("app.person-ministry.read-source.reader"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.priest"));
     }
 
     @Test
@@ -73,6 +83,7 @@ class PersonMinistryReadSourcePropertiesTest {
 
         assertFalse(properties.containsKey("app.person-ministry.read-source.reader"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.priest"));
     }
 
     @Test
@@ -84,6 +95,7 @@ class PersonMinistryReadSourcePropertiesTest {
 
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getReader());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                 });
     }
 
@@ -96,21 +108,37 @@ class PersonMinistryReadSourcePropertiesTest {
 
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                 });
     }
 
     @Test
-    void shouldBindReaderReadSourceIndependentlyFromCommentator() {
+    void shouldBindPriestReadSourceIndependentlyFromReaderAndCommentator() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.priest=parallel")
+                .run(context -> {
+                    PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
+
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getPriest());
+                });
+    }
+
+    @Test
+    void shouldBindReaderReadSourceIndependentlyFromCommentatorAndPriest() {
         contextRunner
                 .withPropertyValues(
                         "app.person-ministry.read-source.reader=parallel",
-                        "app.person-ministry.read-source.commentator=legacy"
+                        "app.person-ministry.read-source.commentator=legacy",
+                        "app.person-ministry.read-source.priest=legacy"
                 )
                 .run(context -> {
                     PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
 
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getReader());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                 });
     }
 
@@ -131,6 +159,19 @@ class PersonMinistryReadSourcePropertiesTest {
     void shouldFailContextWhenCommentatorReadSourceIsInvalid() {
         contextRunner
                 .withPropertyValues("app.person-ministry.read-source.commentator=invalid")
+                .run(context -> {
+                    Throwable failure = context.getStartupFailure();
+
+                    assertNotNull(failure);
+                    assertTrue(hasMessageContaining(failure, "app.person-ministry.read-source"));
+                    assertTrue(hasMessageContaining(failure, "invalid"));
+                });
+    }
+
+    @Test
+    void shouldFailContextWhenPriestReadSourceIsInvalid() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.priest=invalid")
                 .run(context -> {
                     Throwable failure = context.getStartupFailure();
 

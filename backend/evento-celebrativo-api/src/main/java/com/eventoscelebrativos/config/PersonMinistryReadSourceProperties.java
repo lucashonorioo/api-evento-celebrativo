@@ -9,6 +9,7 @@ public class PersonMinistryReadSourceProperties {
 
     private PersonMinistryReadSource reader = PersonMinistryReadSource.LEGACY;
     private PersonMinistryReadSource commentator = PersonMinistryReadSource.LEGACY;
+    private PersonMinistryReadSource priest = PersonMinistryReadSource.LEGACY;
 
     public PersonMinistryReadSource getReader() {
         return reader;
@@ -24,5 +25,13 @@ public class PersonMinistryReadSourceProperties {
 
     public void setCommentator(PersonMinistryReadSource commentator) {
         this.commentator = commentator;
+    }
+
+    public PersonMinistryReadSource getPriest() {
+        return priest;
+    }
+
+    public void setPriest(PersonMinistryReadSource priest) {
+        this.priest = priest;
     }
 }

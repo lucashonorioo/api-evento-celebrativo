@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
@@ -8,7 +10,9 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
+import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
@@ -56,7 +60,13 @@ class PriestServiceImplTest {
     private MinistryTypeResolver ministryTypeResolver;
 
     @Mock
+    private PersonMinistryReadService personMinistryReadService;
+
+    @Mock
     private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryReadSourceProperties readSourceProperties;
 
     @Mock
     private PersonMinistryShadowReadProperties shadowReadProperties;
@@ -128,12 +138,7 @@ class PriestServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllPriests());
-        verify(personMinistryShadowReadExecutor).execute(
-                false,
-                MinistryType.PRIEST,
-                entities,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -149,6 +154,23 @@ class PriestServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
+    }
+
+    @Test
+    void shouldListPriestsWithShadowReadDisabledUsingLegacyRepository() {
+        Priest entity = priest(1L, "encoded-password");
+        PriestResponseDTO response = response(1L);
+        List<Priest> entities = List.of(entity);
+        List<PriestResponseDTO> responses = List.of(response);
+
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllPriests());
+
+        verify(repository).findAll();
+        verify(mapper).toDtoList(entities);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
     }
 
     @Test
@@ -169,6 +191,54 @@ class PriestServiceImplTest {
                 entities,
                 PersonMinistryShadowReadComparisonOptions.unorderedList()
         );
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldUseParallelPriestReadSourceWithoutCallingLegacyRepository() {
+        Priest priest = priest(1L, "encoded-password");
+        Reader readerWithPriestMinistry = reader(2L, "encoded-password");
+        List<Person> people = List.of(priest, readerWithPriestMinistry);
+        List<PriestResponseDTO> responses = List.of(response(1L), response(2L));
+
+        when(readSourceProperties.getPriest()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.PRIEST)).thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllPriests());
+
+        verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.PRIEST);
+        verify(mapper).toDtoPersonList(people);
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPreserveParallelPriestOrderReturnedByPersonMinistryReadService() {
+        Reader readerWithPriestMinistry = reader(2L, "encoded-password");
+        Priest priest = priest(1L, "encoded-password");
+        List<Person> people = List.of(readerWithPriestMinistry, priest);
+        List<PriestResponseDTO> responses = List.of(response(2L), response(1L));
+
+        when(readSourceProperties.getPriest()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.PRIEST)).thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllPriests());
+
+        verify(mapper).toDtoPersonList(people);
+        assertEquals(List.of(2L, 1L), people.stream().map(Person::getId).toList());
+    }
+
+    @Test
+    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
+        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+
+        when(readSourceProperties.getPriest()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.PRIEST))
+                .thenThrow(parallelFailure);
+
+        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllPriests()));
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor, mapper);
     }
 
     @Test
@@ -178,7 +248,7 @@ class PriestServiceImplTest {
         when(repository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllPriests()));
-        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor, mapper);
     }
 
     @Test
@@ -214,5 +284,15 @@ class PriestServiceImplTest {
 
     private PriestResponseDTO response(Long id) {
         return new PriestResponseDTO(id, "Priest", "34999999995", BIRTHDAY);
+    }
+
+    private Reader reader(Long id, String password) {
+        Reader reader = new Reader();
+        reader.setId(id);
+        reader.setName("Reader");
+        reader.setPhoneNumber("34999999991");
+        reader.setBirthdayDate(BIRTHDAY);
+        reader.setPassword(password);
+        return reader;
     }
 }

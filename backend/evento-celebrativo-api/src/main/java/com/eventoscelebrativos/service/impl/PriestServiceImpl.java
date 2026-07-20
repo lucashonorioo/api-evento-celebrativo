@@ -4,18 +4,22 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PriestRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.PriestService;
@@ -23,6 +27,8 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,13 +38,17 @@ import java.util.List;
 @Service
 public class PriestServiceImpl implements PriestService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PriestServiceImpl.class);
+
     private final PriestRepository priestRepository;
     private final PriestMapper priestMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryReadSourceProperties readSourceProperties;
     private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public PriestServiceImpl(
@@ -48,7 +58,9 @@ public class PriestServiceImpl implements PriestService {
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryReadService personMinistryReadService,
             PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryReadSourceProperties readSourceProperties,
             PersonMinistryShadowReadProperties shadowReadProperties
     ) {
         this.priestRepository = priestRepository;
@@ -57,7 +69,9 @@ public class PriestServiceImpl implements PriestService {
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryReadService = personMinistryReadService;
         this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.readSourceProperties = readSourceProperties;
         this.shadowReadProperties = shadowReadProperties;
     }
 
@@ -82,13 +96,22 @@ public class PriestServiceImpl implements PriestService {
     @Override
     @Transactional(readOnly = true)
     public List<PriestResponseDTO> findAllPriests() {
+        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getPriest())) {
+            LOGGER.debug("priest read source={}", PersonMinistryReadSource.PARALLEL);
+            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.PRIEST);
+            return priestMapper.toDtoPersonList(people);
+        }
+
+        LOGGER.debug("priest read source={}", PersonMinistryReadSource.LEGACY);
         List<Priest> priests = priestRepository.findAll();
-        personMinistryShadowReadExecutor.execute(
-                shadowReadProperties.isPriestEnabled(),
-                MinistryType.PRIEST,
-                priests,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        if (shadowReadProperties.isPriestEnabled()) {
+            personMinistryShadowReadExecutor.execute(
+                    true,
+                    MinistryType.PRIEST,
+                    priests,
+                    PersonMinistryShadowReadComparisonOptions.unorderedList()
+            );
+        }
         return priestMapper.toDtoList(priests);
     }
 
