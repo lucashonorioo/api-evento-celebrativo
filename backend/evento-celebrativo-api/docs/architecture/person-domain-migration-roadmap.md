@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores` e `GET /comentaristas` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas duas categorias.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas` e `GET /padres` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas tres categorias.
 
 ## Fases
 
@@ -41,7 +41,7 @@ Resultado aprovado:
 - A camada Java de `PersonMinistry` ja existe, com enum `MinistryType`, entidade, repository e servico interno de compatibilidade.
 - Os CRUDs legados de leitores, comentaristas, padres, ministros da Palavra e ministros da Eucaristia agora garantem o vinculo ministerial correspondente em criacao e atualizacao.
 - Deletes legados removem os vinculos de `tb_person_ministry` antes da exclusao fisica da pessoa.
-- As leituras de padres, ministros da Palavra e ministros da Eucaristia continuam usando o modelo legado por subtipo e `person_type` como fonte oficial.
+- As leituras de ministros da Palavra e ministros da Eucaristia continuam usando o modelo legado por subtipo e `person_type` como fonte oficial.
 - `V4` realiza o backfill de `tb_person_ministry` a partir do discriminator legado `person_type`.
 - O mapeamento aplicado por `V4` e: `reader` -> `READER`, `commentator` -> `COMMENTATOR`, `priest` -> `PRIEST`, `minister_of_the_word` -> `MINISTER_OF_THE_WORD`, `eucharistic_minister` -> `EUCHARISTIC_MINISTER`.
 - Vinculos ministeriais ja existentes nao sao duplicados; vinculos inativos da funcao legada sao reativados; funcoes adicionais sao preservadas.
@@ -55,7 +55,8 @@ Resultado aprovado:
 - As flags de shadow read permanecem desabilitadas por padrao: `reader-enabled`, `commentator-enabled`, `priest-enabled`, `minister-of-the-word-enabled` e `eucharistic-minister-enabled`.
 - `GET /leitores` possui origem oficial configuravel por `app.person-ministry.read-source.reader`, com valores `LEGACY` e `PARALLEL`; o default global continua `LEGACY`.
 - `GET /comentaristas` possui origem oficial configuravel por `app.person-ministry.read-source.commentator`, com valores `LEGACY` e `PARALLEL`; o default global continua `LEGACY`.
-- O profile `local` define `app.person-ministry.read-source.reader=${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}` e `app.person-ministry.read-source.commentator=${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}` para validar a leitura oficial por `tb_person_ministry` sem ativar o mesmo comportamento em outros ambientes.
+- `GET /padres` possui origem oficial configuravel por `app.person-ministry.read-source.priest`, com valores `LEGACY` e `PARALLEL`; o default global continua `LEGACY`.
+- O profile `local` define `app.person-ministry.read-source.reader=${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}`, `app.person-ministry.read-source.commentator=${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}` e `app.person-ministry.read-source.priest=${PERSON_MINISTRY_READ_SOURCE_PRIEST:PARALLEL}` para validar a leitura oficial por `tb_person_ministry` sem ativar o mesmo comportamento em outros ambientes.
 - No modo `LEGACY`, `GET /leitores` preserva o `ReaderRepository.findAll()` como fonte oficial e pode executar o shadow read quando a flag de leitores estiver habilitada.
 - No modo `PARALLEL`, `GET /leitores` usa vinculos ativos `READER` em `tb_person_ministry` como fonte oficial, ordenando por `name ASC, id ASC`.
 - O modo `PARALLEL` pode incluir pessoas de outros subtipos legados quando elas tiverem funcao adicional `READER` ativa; isso faz parte do modelo novo de multiplas funcoes.
@@ -68,19 +69,26 @@ Resultado aprovado:
 - O rollback operacional local da leitura de comentaristas pode ser feito definindo `PERSON_MINISTRY_READ_SOURCE_COMMENTATOR=LEGACY`, sem alteracao de codigo ou banco.
 - A leitura oficial `PARALLEL` de comentaristas nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
 - O ciclo de vida de comentaristas foi validado com leitura oficial `PARALLEL`: criacao, atualizacao, reativacao de vinculo `COMMENTATOR`, preservacao de funcoes adicionais e exclusao.
+- No modo `LEGACY`, `GET /padres` preserva o `PriestRepository.findAll()` como fonte oficial e pode executar o shadow read quando a flag de padres estiver habilitada.
+- No modo `PARALLEL`, `GET /padres` usa vinculos ativos `PRIEST` em `tb_person_ministry` como fonte oficial, ordenando por `name ASC, id ASC`.
+- O modo `PARALLEL` pode incluir pessoas de outros subtipos legados quando elas tiverem funcao adicional `PRIEST` ativa; isso faz parte do modelo novo de multiplas funcoes.
+- A associacao de padres em eventos ainda usa o modelo legado e valida `Priest.class` a partir do `priestId`. Assim, uma pessoa de outro subtipo com funcao adicional `PRIEST` pode aparecer em `GET /padres` paralelo, mas nao necessariamente pode ser associada a um evento pelo fluxo atual.
+- O rollback operacional local da leitura de padres pode ser feito definindo `PERSON_MINISTRY_READ_SOURCE_PRIEST=LEGACY`, sem alteracao de codigo ou banco.
+- A leitura oficial `PARALLEL` de padres nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
+- O ciclo de vida de padres foi validado com leitura oficial `PARALLEL`: criacao, atualizacao, reativacao de vinculo `PRIEST`, preservacao de funcoes adicionais, conflito de exclusao quando vinculado a evento e exclusao de padre isolado.
 - O write-through mantem a consistencia em tempo real entre `Reader` legado e `tb_person_ministry` durante criacao e atualizacao.
 - Updates consecutivos preservam um unico vinculo `READER`; quando o vinculo esperado estiver inativo, o update reativa o mesmo registro sem criar duplicidade.
 - Funcoes adicionais da pessoa sao preservadas por updates do CRUD legado de leitores.
 - Deletes de leitores removem os vinculos de `tb_person_ministry` antes da pessoa, evitando vinculos orfaos.
 - O rollback operacional para `LEGACY` continua disponivel mesmo apos validar o ciclo completo em `PARALLEL`.
-- O resultado HTTP de padres, ministros da Palavra e ministros da Eucaristia continua vindo exclusivamente dos repositories legados.
+- O resultado HTTP de ministros da Palavra e ministros da Eucaristia continua vindo exclusivamente dos repositories legados.
 - A comparacao do shadow read nas listagens atuais usa composicao de IDs e totais; a ordem de `findAll()` nao e considerada divergencia porque esses endpoints nao possuem contrato publico de ordenacao.
 - Funcoes adicionais podem aparecer como `additionalInParallelIds` no shadow read de uma listagem legada. Isso pode representar uma capacidade valida do novo modelo, nao necessariamente corrupcao.
 - Divergencias entre a leitura legada e a paralela sao apenas registradas; nenhuma correcao automatica e executada.
 - Falhas na leitura paralela nao derrubam as listagens legadas e nao usam a leitura paralela como fallback.
 - O profile `local` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e dados demonstrativos carregados apenas por `db/local/R__load_local_demo_data.sql`.
 - O profile `test` usa Flyway, com schema criado por `V1`, roles obrigatorias por `V2` e fixtures carregadas apenas por `db/test/R__load_test_fixtures.sql`.
-- Os profiles `test` e `mysql` nao ativam `PARALLEL` para leitores ou comentaristas implicitamente; ambos continuam herdando o default global `LEGACY` salvo configuracao explicita.
+- Os profiles `test` e `mysql` nao ativam `PARALLEL` para leitores, comentaristas ou padres implicitamente; ambos continuam herdando o default global `LEGACY` salvo configuracao explicita.
 - Os seeds `local` e `test` criam os vinculos em `tb_person_ministry` depois de inserir as pessoas demonstrativas, porque `V4` executa antes das migrations repeatable de cada profile.
 - Hibernate usa `ddl-auto=validate` nos profiles `local`, `test`, `mysql` e `flyway-test`.
 - As roles deixaram de ser duplicadas nas fixtures do profile `test`.
@@ -124,10 +132,11 @@ Estado atual:
 
 Proximas etapas planejadas:
 
-1. Avaliar se a validacao funcional de `GET /leitores` e `GET /comentaristas` em `PARALLEL` no profile `local` e suficiente para ativacao persistente ou se a proxima migracao controlada deve cobrir `GET /padres`.
+1. Avaliar a limitacao transitoria observada em `GET /padres`: a listagem paralela pode incluir pessoas com funcao adicional `PRIEST`, mas a associacao de eventos continua validando o subtipo legado `Priest`.
 2. Planejar backfill versionado de `UserAccount`.
 3. Planejar backfill versionado de `EventAssignment`.
 4. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
+5. Definir se o proximo cutover deve cobrir ministros da Palavra e ministros da Eucaristia ou se a associacao de eventos por padre precisa ser tratada primeiro.
 
 ## Dependencias criticas
 
@@ -312,4 +321,4 @@ Estes itens nao bloqueiam a primeira migracao:
 - O modelo legado continua ativo ate que backfills e mudancas funcionais sejam implementados em etapas posteriores.
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
 - `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as demais leituras continuam no modelo legado ate proxima aprovacao.
-- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores` e `GET /comentaristas`. No profile `local`, leitores e comentaristas usam `PARALLEL`; nos demais perfis o default global permanece `LEGACY`. Padres, ministros da Palavra e ministros da Eucaristia ainda nao dependem dela como fonte oficial.
+- A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores`, `GET /comentaristas` e `GET /padres`. No profile `local`, leitores, comentaristas e padres usam `PARALLEL`; nos demais perfis o default global permanece `LEGACY`. Ministros da Palavra e ministros da Eucaristia ainda nao dependem dela como fonte oficial.
