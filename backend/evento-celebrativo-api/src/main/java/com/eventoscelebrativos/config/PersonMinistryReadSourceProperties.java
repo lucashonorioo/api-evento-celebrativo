@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 public class PersonMinistryReadSourceProperties {
 
     private PersonMinistryReadSource reader = PersonMinistryReadSource.LEGACY;
+    private PersonMinistryReadSource commentator = PersonMinistryReadSource.LEGACY;
 
     public PersonMinistryReadSource getReader() {
         return reader;
@@ -15,5 +16,13 @@ public class PersonMinistryReadSourceProperties {
 
     public void setReader(PersonMinistryReadSource reader) {
         this.reader = reader;
+    }
+
+    public PersonMinistryReadSource getCommentator() {
+        return commentator;
+    }
+
+    public void setCommentator(PersonMinistryReadSource commentator) {
+        this.commentator = commentator;
     }
 }

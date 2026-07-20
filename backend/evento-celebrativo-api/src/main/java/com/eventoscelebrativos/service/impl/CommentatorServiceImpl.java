@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -8,17 +10,21 @@ import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +34,8 @@ import java.util.List;
 @Service
 public class CommentatorServiceImpl implements CommentatorService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CommentatorServiceImpl.class);
+
     private final CommentatorRepository commentatorRepository;
     private final CommentatorMapper commentatorMapper;
 
@@ -35,7 +43,9 @@ public class CommentatorServiceImpl implements CommentatorService {
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryReadSourceProperties readSourceProperties;
     private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public CommentatorServiceImpl(
@@ -45,7 +55,9 @@ public class CommentatorServiceImpl implements CommentatorService {
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryReadService personMinistryReadService,
             PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryReadSourceProperties readSourceProperties,
             PersonMinistryShadowReadProperties shadowReadProperties
     ) {
         this.commentatorRepository = commentatorRepository;
@@ -54,7 +66,9 @@ public class CommentatorServiceImpl implements CommentatorService {
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryReadService = personMinistryReadService;
         this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.readSourceProperties = readSourceProperties;
         this.shadowReadProperties = shadowReadProperties;
     }
 
@@ -78,13 +92,22 @@ public class CommentatorServiceImpl implements CommentatorService {
     @Override
     @Transactional(readOnly = true)
     public List<CommentatorResponseDTO> findAllCommentators() {
+        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getCommentator())) {
+            LOGGER.debug("commentator read source={}", PersonMinistryReadSource.PARALLEL);
+            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR);
+            return commentatorMapper.toDtoPersonList(people);
+        }
+
+        LOGGER.debug("commentator read source={}", PersonMinistryReadSource.LEGACY);
         List<Commentator> commentators = commentatorRepository.findAll();
-        personMinistryShadowReadExecutor.execute(
-                shadowReadProperties.isCommentatorEnabled(),
-                MinistryType.COMMENTATOR,
-                commentators,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        if (shadowReadProperties.isCommentatorEnabled()) {
+            personMinistryShadowReadExecutor.execute(
+                    true,
+                    MinistryType.COMMENTATOR,
+                    commentators,
+                    PersonMinistryShadowReadComparisonOptions.unorderedList()
+            );
+        }
         return commentatorMapper.toDtoList(commentators);
     }
 

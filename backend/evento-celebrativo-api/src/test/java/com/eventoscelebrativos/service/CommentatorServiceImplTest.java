@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
@@ -9,11 +11,14 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.impl.CommentatorServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -56,7 +61,13 @@ class CommentatorServiceImplTest {
     private MinistryTypeResolver ministryTypeResolver;
 
     @Mock
+    private PersonMinistryReadService personMinistryReadService;
+
+    @Mock
     private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+
+    @Mock
+    private PersonMinistryReadSourceProperties readSourceProperties;
 
     @Mock
     private PersonMinistryShadowReadProperties shadowReadProperties;
@@ -128,12 +139,7 @@ class CommentatorServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllCommentators());
-        verify(personMinistryShadowReadExecutor).execute(
-                false,
-                MinistryType.COMMENTATOR,
-                entities,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        verifyNoInteractions(personMinistryShadowReadExecutor, personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -149,6 +155,23 @@ class CommentatorServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
+    }
+
+    @Test
+    void shouldListCommentatorsWithShadowReadDisabledUsingLegacyRepository() {
+        Commentator entity = commentator(1L, "encoded-password");
+        CommentatorResponseDTO response = response(1L);
+        List<Commentator> entities = List.of(entity);
+        List<CommentatorResponseDTO> responses = List.of(response);
+
+        when(repository.findAll()).thenReturn(entities);
+        when(mapper.toDtoList(entities)).thenReturn(responses);
+
+        assertSame(responses, service.findAllCommentators());
+
+        verify(repository).findAll();
+        verify(mapper).toDtoList(entities);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
     }
 
     @Test
@@ -169,6 +192,54 @@ class CommentatorServiceImplTest {
                 entities,
                 PersonMinistryShadowReadComparisonOptions.unorderedList()
         );
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldUseParallelCommentatorReadSourceWithoutCallingLegacyRepository() {
+        Commentator commentator = commentator(1L, "encoded-password");
+        Reader readerWithCommentatorMinistry = reader(2L, "encoded-password");
+        List<Person> people = List.of(commentator, readerWithCommentatorMinistry);
+        List<CommentatorResponseDTO> responses = List.of(response(1L), response(2L));
+
+        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR)).thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllCommentators());
+
+        verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.COMMENTATOR);
+        verify(mapper).toDtoPersonList(people);
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPreserveParallelCommentatorOrderReturnedByPersonMinistryReadService() {
+        Reader readerWithCommentatorMinistry = reader(2L, "encoded-password");
+        Commentator commentator = commentator(1L, "encoded-password");
+        List<Person> people = List.of(readerWithCommentatorMinistry, commentator);
+        List<CommentatorResponseDTO> responses = List.of(response(2L), response(1L));
+
+        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR)).thenReturn(people);
+        when(mapper.toDtoPersonList(people)).thenReturn(responses);
+
+        assertSame(responses, service.findAllCommentators());
+
+        verify(mapper).toDtoPersonList(people);
+        assertEquals(List.of(2L, 1L), people.stream().map(Person::getId).toList());
+    }
+
+    @Test
+    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
+        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+
+        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR))
+                .thenThrow(parallelFailure);
+
+        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
+        verifyNoInteractions(repository, personMinistryShadowReadExecutor, mapper);
     }
 
     @Test
@@ -178,7 +249,7 @@ class CommentatorServiceImplTest {
         when(repository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
-        verifyNoInteractions(personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor, mapper);
     }
 
     @Test
@@ -214,5 +285,15 @@ class CommentatorServiceImplTest {
 
     private CommentatorResponseDTO response(Long id) {
         return new CommentatorResponseDTO(id, "Commentator", "34999999992", BIRTHDAY);
+    }
+
+    private Reader reader(Long id, String password) {
+        Reader reader = new Reader();
+        reader.setId(id);
+        reader.setName("Reader");
+        reader.setPhoneNumber("34999999991");
+        reader.setBirthdayDate(BIRTHDAY);
+        reader.setPassword(password);
+        return reader;
     }
 }
