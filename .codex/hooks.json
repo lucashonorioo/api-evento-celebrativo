@@ -1,0 +1,33 @@
+{
+  "description": "Guardrails leves e determinísticos do projeto Evento Celebrativo.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/pre-tool-guard.mjs\"",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/pre-tool-guard.mjs'); exit $LASTEXITCODE\"",
+            "timeout": 15,
+            "statusMessage": "Verificando segurança da operação"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/post-edit-check.mjs\"",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/post-edit-check.mjs'); exit $LASTEXITCODE\"",
+            "timeout": 20,
+            "statusMessage": "Verificando o diff"
+          }
+        ]
+      }
+    ]
+  }
+}

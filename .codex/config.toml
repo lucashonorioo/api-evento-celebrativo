@@ -1,0 +1,7 @@
+# Configuração específica do projeto.
+# Segurança, modelo, editor e busca web permanecem no ~/.codex/config.toml do usuário.
+
+[agents]
+max_threads = 5
+max_depth = 1
+interrupt_message = true

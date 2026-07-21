@@ -30,6 +30,7 @@ class PersonMinistryReadSourcePropertiesTest {
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
             assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+            assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
         });
     }
 
@@ -53,6 +54,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD:LEGACY}",
                 properties.getProperty("app.person-ministry.read-source.minister-of-the-word")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER:LEGACY}",
+                properties.getProperty("app.person-ministry.read-source.eucharistic-minister")
+        );
     }
 
     @Test
@@ -75,6 +80,10 @@ class PersonMinistryReadSourcePropertiesTest {
                 "${PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD:PARALLEL}",
                 properties.getProperty("app.person-ministry.read-source.minister-of-the-word")
         );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER:PARALLEL}",
+                properties.getProperty("app.person-ministry.read-source.eucharistic-minister")
+        );
     }
 
     @Test
@@ -85,6 +94,7 @@ class PersonMinistryReadSourcePropertiesTest {
         assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.priest"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.minister-of-the-word"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.eucharistic-minister"));
     }
 
     @Test
@@ -95,6 +105,7 @@ class PersonMinistryReadSourcePropertiesTest {
         assertFalse(properties.containsKey("app.person-ministry.read-source.commentator"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.priest"));
         assertFalse(properties.containsKey("app.person-ministry.read-source.minister-of-the-word"));
+        assertFalse(properties.containsKey("app.person-ministry.read-source.eucharistic-minister"));
     }
 
     @Test
@@ -108,6 +119,7 @@ class PersonMinistryReadSourcePropertiesTest {
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
                 });
     }
 
@@ -122,6 +134,7 @@ class PersonMinistryReadSourcePropertiesTest {
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getCommentator());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
                 });
     }
 
@@ -136,6 +149,7 @@ class PersonMinistryReadSourcePropertiesTest {
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getPriest());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
                 });
     }
 
@@ -150,6 +164,22 @@ class PersonMinistryReadSourcePropertiesTest {
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                     assertEquals(PersonMinistryReadSource.PARALLEL, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
+                });
+    }
+
+    @Test
+    void shouldBindEucharisticMinisterReadSourceIndependentlyFromOtherCategories() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.eucharistic-minister=parallel")
+                .run(context -> {
+                    PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
+
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getEucharisticMinister());
                 });
     }
 
@@ -160,7 +190,8 @@ class PersonMinistryReadSourcePropertiesTest {
                         "app.person-ministry.read-source.reader=parallel",
                         "app.person-ministry.read-source.commentator=legacy",
                         "app.person-ministry.read-source.priest=legacy",
-                        "app.person-ministry.read-source.minister-of-the-word=legacy"
+                        "app.person-ministry.read-source.minister-of-the-word=legacy",
+                        "app.person-ministry.read-source.eucharistic-minister=legacy"
                 )
                 .run(context -> {
                     PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
@@ -169,6 +200,28 @@ class PersonMinistryReadSourcePropertiesTest {
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getCommentator());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getPriest());
                     assertEquals(PersonMinistryReadSource.LEGACY, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalEucharisticMinisterRollbackWithoutChangingOtherLocalSources() {
+        contextRunner
+                .withPropertyValues(
+                        "app.person-ministry.read-source.reader=parallel",
+                        "app.person-ministry.read-source.commentator=parallel",
+                        "app.person-ministry.read-source.priest=parallel",
+                        "app.person-ministry.read-source.minister-of-the-word=parallel",
+                        "app.person-ministry.read-source.eucharistic-minister=legacy"
+                )
+                .run(context -> {
+                    PersonMinistryReadSourceProperties properties = context.getBean(PersonMinistryReadSourceProperties.class);
+
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getReader());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getCommentator());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getPriest());
+                    assertEquals(PersonMinistryReadSource.PARALLEL, properties.getMinisterOfTheWord());
+                    assertEquals(PersonMinistryReadSource.LEGACY, properties.getEucharisticMinister());
                 });
     }
 
@@ -215,6 +268,19 @@ class PersonMinistryReadSourcePropertiesTest {
     void shouldFailContextWhenMinisterOfTheWordReadSourceIsInvalid() {
         contextRunner
                 .withPropertyValues("app.person-ministry.read-source.minister-of-the-word=invalid")
+                .run(context -> {
+                    Throwable failure = context.getStartupFailure();
+
+                    assertNotNull(failure);
+                    assertTrue(hasMessageContaining(failure, "app.person-ministry.read-source"));
+                    assertTrue(hasMessageContaining(failure, "invalid"));
+                });
+    }
+
+    @Test
+    void shouldFailContextWhenEucharisticMinisterReadSourceIsInvalid() {
+        contextRunner
+                .withPropertyValues("app.person-ministry.read-source.eucharistic-minister=invalid")
                 .run(context -> {
                     Throwable failure = context.getStartupFailure();
 
