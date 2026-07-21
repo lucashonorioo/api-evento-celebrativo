@@ -3,6 +3,8 @@ package com.eventoscelebrativos.service.impl;
 
 
 
+import com.eventoscelebrativos.config.PersonMinistryReadSource;
+import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
@@ -10,18 +12,22 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
 import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
 import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,13 +37,17 @@ import java.util.List;
 @Service
 public class EucharisticMinisterServiceImpl implements EucharisticMinisterService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(EucharisticMinisterServiceImpl.class);
+
     private final EucharisticMinisterRepository eucharisticMinisterRepository;
     private final EucharisticMinisterMapper eucharisticMinisterMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
+    private final PersonMinistryReadSourceProperties readSourceProperties;
     private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public EucharisticMinisterServiceImpl(
@@ -47,7 +57,9 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryReadService personMinistryReadService,
             PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
+            PersonMinistryReadSourceProperties readSourceProperties,
             PersonMinistryShadowReadProperties shadowReadProperties
     ) {
         this.eucharisticMinisterRepository = eucharisticMinisterRepository;
@@ -56,7 +68,9 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         this.passwordEncoder = passwordEncoder;
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryReadService = personMinistryReadService;
         this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
+        this.readSourceProperties = readSourceProperties;
         this.shadowReadProperties = shadowReadProperties;
     }
 
@@ -81,13 +95,22 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     @Override
     @Transactional(readOnly = true)
     public List<EucharisticMinisterResponseDTO> findAllEucharisticMinisters() {
+        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getEucharisticMinister())) {
+            LOGGER.debug("eucharistic-minister read source={}", PersonMinistryReadSource.PARALLEL);
+            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER);
+            return eucharisticMinisterMapper.toDtoPersonList(people);
+        }
+
+        LOGGER.debug("eucharistic-minister read source={}", PersonMinistryReadSource.LEGACY);
         List<EucharisticMinister> ministrosDeEucaristia = eucharisticMinisterRepository.findAll();
-        personMinistryShadowReadExecutor.execute(
-                shadowReadProperties.isEucharisticMinisterEnabled(),
-                MinistryType.EUCHARISTIC_MINISTER,
-                ministrosDeEucaristia,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
+        if (shadowReadProperties.isEucharisticMinisterEnabled()) {
+            personMinistryShadowReadExecutor.execute(
+                    true,
+                    MinistryType.EUCHARISTIC_MINISTER,
+                    ministrosDeEucaristia,
+                    PersonMinistryShadowReadComparisonOptions.unorderedList()
+            );
+        }
         return eucharisticMinisterMapper.toDtoList(ministrosDeEucaristia);
     }
 

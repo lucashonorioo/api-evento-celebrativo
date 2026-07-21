@@ -11,6 +11,7 @@ public class PersonMinistryReadSourceProperties {
     private PersonMinistryReadSource commentator = PersonMinistryReadSource.LEGACY;
     private PersonMinistryReadSource priest = PersonMinistryReadSource.LEGACY;
     private PersonMinistryReadSource ministerOfTheWord = PersonMinistryReadSource.LEGACY;
+    private PersonMinistryReadSource eucharisticMinister = PersonMinistryReadSource.LEGACY;
 
     public PersonMinistryReadSource getReader() {
         return reader;
@@ -42,5 +43,13 @@ public class PersonMinistryReadSourceProperties {
 
     public void setMinisterOfTheWord(PersonMinistryReadSource ministerOfTheWord) {
         this.ministerOfTheWord = ministerOfTheWord;
+    }
+
+    public PersonMinistryReadSource getEucharisticMinister() {
+        return eucharisticMinister;
+    }
+
+    public void setEucharisticMinister(PersonMinistryReadSource eucharisticMinister) {
+        this.eucharisticMinister = eucharisticMinister;
     }
 }
