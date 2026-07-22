@@ -148,6 +148,34 @@ class EventAssignmentReadServiceImplTest {
     }
 
     @Test
+    void shouldRejectDuplicatedPersonWhenGrouping() {
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(1L, 10L, EventAssignmentType.READER),
+                snapshot(1L, 10L, EventAssignmentType.COMMENTATOR)
+        );
+
+        assertThrows(BusinessException.class, () -> EventAssignmentGroup.from(1L, snapshots));
+    }
+
+    @Test
+    void shouldRejectMissingAssignmentTypeWhenGrouping() {
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(1L, 10L, null)
+        );
+
+        assertThrows(BusinessException.class, () -> EventAssignmentGroup.from(1L, snapshots));
+    }
+
+    @Test
+    void shouldRejectAssignmentFromAnotherEventWhenGrouping() {
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(2L, 10L, EventAssignmentType.READER)
+        );
+
+        assertThrows(BusinessException.class, () -> EventAssignmentGroup.from(1L, snapshots));
+    }
+
+    @Test
     void shouldGroupEmptyEvent() {
         EventAssignmentGroup group = EventAssignmentGroup.from(1L, List.of());
 

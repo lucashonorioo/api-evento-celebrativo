@@ -9,6 +9,8 @@ import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.config.EventAssignmentReadSource;
+import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
@@ -34,6 +36,8 @@ import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
+import com.eventoscelebrativos.service.EventAssignmentGroup;
+import com.eventoscelebrativos.service.EventAssignmentReadService;
 import com.eventoscelebrativos.service.EventAssignmentShadowReadExecutor;
 import com.eventoscelebrativos.service.EventAssignmentSnapshot;
 import com.eventoscelebrativos.service.EventAssignmentTarget;
@@ -44,6 +48,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +68,7 @@ import java.util.stream.Collectors;
 @Service
 public class CelebrationEventServiceImpl implements CelebrationEventService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CelebrationEventServiceImpl.class);
     private static final int MAX_PAGE_SIZE = 100;
 
     private final CelebrationEventRepository celebrationEventRepository;
@@ -72,6 +79,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
     private final EventAssignmentTargetResolver eventAssignmentTargetResolver;
     private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
+    private final EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
+    private final EventAssignmentReadService eventAssignmentReadService;
     private final EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
     private final EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
 
@@ -84,6 +93,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
             EventAssignmentTargetResolver eventAssignmentTargetResolver,
             EventAssignmentCompatibilityService eventAssignmentCompatibilityService,
+            EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties,
+            EventAssignmentReadService eventAssignmentReadService,
             EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties,
             EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor
     ) {
@@ -95,6 +106,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
         this.eventAssignmentTargetResolver = eventAssignmentTargetResolver;
         this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
+        this.eventAssignmentReadSourceProperties = eventAssignmentReadSourceProperties;
+        this.eventAssignmentReadService = eventAssignmentReadService;
         this.eventAssignmentShadowReadProperties = eventAssignmentShadowReadProperties;
         this.eventAssignmentShadowReadExecutor = eventAssignmentShadowReadExecutor;
     }
@@ -204,6 +217,13 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     @Transactional(readOnly = true)
     public CelebrationEventScaleDetailResponseDTO findScaleByEventId(Long id) {
         validateId(id);
+        return switch (eventAssignmentReadSourceProperties.getEventScaleDetail()) {
+            case LEGACY -> findScaleByEventIdLegacy(id);
+            case PARALLEL -> findScaleByEventIdParallel(id);
+        };
+    }
+
+    private CelebrationEventScaleDetailResponseDTO findScaleByEventIdLegacy(Long id) {
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
         celebrationEventRepository.findByIdWithPeople(id)
@@ -229,6 +249,24 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 peopleByType(celebrationEvent, Commentator.class),
                 peopleByType(celebrationEvent, MinisterOfTheWord.class),
                 peopleByType(celebrationEvent, EucharisticMinister.class)
+        );
+    }
+
+    private CelebrationEventScaleDetailResponseDTO findScaleByEventIdParallel(Long id) {
+        LOGGER.debug("event-scale-detail source = {}", EventAssignmentReadSource.PARALLEL);
+        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
+
+        Location location = firstLocation(celebrationEvent);
+        EventAssignmentGroup assignments = EventAssignmentGroup.from(
+                celebrationEvent.getId(),
+                eventAssignmentReadService.findAllByEventId(id)
+        );
+
+        return celebrationEventScaleDetailMapper.toDto(
+                celebrationEvent,
+                location,
+                assignments
         );
     }
 

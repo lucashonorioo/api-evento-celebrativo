@@ -1,6 +1,8 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
+import com.eventoscelebrativos.config.EventAssignmentReadSource;
+import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
@@ -18,6 +20,7 @@ import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.EucharisticMinister;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
@@ -32,7 +35,9 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.CelebrationEventServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -82,6 +87,12 @@ class CelebrationEventServiceImplTest {
     private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
 
     @Mock
+    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
+
+    @Mock
+    private EventAssignmentReadService eventAssignmentReadService;
+
+    @Mock
     private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
 
     @Mock
@@ -89,6 +100,12 @@ class CelebrationEventServiceImplTest {
 
     @InjectMocks
     private CelebrationEventServiceImpl service;
+
+    @BeforeEach
+    void configureDefaultReadSource() {
+        lenient().when(eventAssignmentReadSourceProperties.getEventScaleDetail())
+                .thenReturn(EventAssignmentReadSource.LEGACY);
+    }
 
     @Test
     void shouldCreateEvent() {
@@ -342,6 +359,147 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verifyNoInteractions(scaleDetailMapper);
+    }
+
+    @Test
+    void shouldFindEventScaleFromParallelAssignmentsWithoutUsingLegacyPeopleOrShadow() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        event.getPeople().add(person(new Reader(), 99L, "Legacy Reader Not Used"));
+        CelebrationEventScaleDetailResponseDTO response = detailResponse();
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 13L, EventAssignmentType.PRIEST, "Padre", "priest"),
+                snapshot(101L, 1L, 5L, EventAssignmentType.READER, "Bruno", "reader"),
+                snapshot(102L, 1L, 4L, EventAssignmentType.READER, "Ana", "reader"),
+                snapshot(103L, 1L, 1L, EventAssignmentType.COMMENTATOR, "Luana", "commentator"),
+                snapshot(104L, 1L, 7L, EventAssignmentType.MINISTER_OF_THE_WORD, "Davi", "minister_of_the_word"),
+                snapshot(105L, 1L, 11L, EventAssignmentType.EUCHARISTIC_MINISTER, "Carlos", "eucharistic_minister"),
+                snapshot(106L, 1L, 10L, EventAssignmentType.EUCHARISTIC_MINISTER, "Mariana", "eucharistic_minister")
+        ));
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
+                .thenReturn(response);
+
+        assertSame(response, service.findScaleByEventId(1L));
+
+        ArgumentCaptor<EventAssignmentGroup> groupCaptor = ArgumentCaptor.forClass(EventAssignmentGroup.class);
+        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), groupCaptor.capture());
+        EventAssignmentGroup group = groupCaptor.getValue();
+        assertEquals(13L, group.priest().personId());
+        assertEquals(List.of(4L, 5L), group.readers().stream().map(EventAssignmentSnapshot::personId).toList());
+        assertEquals(List.of(1L), group.commentators().stream().map(EventAssignmentSnapshot::personId).toList());
+        assertEquals(List.of(7L), group.ministersOfTheWord().stream().map(EventAssignmentSnapshot::personId).toList());
+        assertEquals(List.of(11L, 10L), group.eucharisticMinisters().stream().map(EventAssignmentSnapshot::personId).toList());
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verify(eventAssignmentReadService).findAllByEventId(1L);
+        verifyNoInteractions(eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldGroupParallelEventScaleByAssignmentTypeInsteadOfPersonType() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 20L, EventAssignmentType.EUCHARISTIC_MINISTER, "Reader Serving Eucharist", "reader")
+        ));
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        ArgumentCaptor<EventAssignmentGroup> groupCaptor = ArgumentCaptor.forClass(EventAssignmentGroup.class);
+        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), groupCaptor.capture());
+        EventAssignmentGroup group = groupCaptor.getValue();
+        assertTrue(group.readers().isEmpty());
+        assertEquals(List.of(20L), group.eucharisticMinisters().stream().map(EventAssignmentSnapshot::personId).toList());
+        verify(repository, never()).findByIdWithPeople(anyLong());
+    }
+
+    @Test
+    void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEventScale() {
+        CelebrationEvent event = event(1L);
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L))
+                .thenThrow(new IllegalStateException("controlled parallel failure"));
+
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, () -> service.findScaleByEventId(1L));
+
+        assertEquals("controlled parallel failure", exception.getMessage());
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPreserveNotFoundBehaviorWhenParallelEventScaleEventDoesNotExist() {
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(eventAssignmentReadService, scaleDetailMapper, eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldRejectParallelEventScaleWithDuplicatedPersonAssignment() {
+        CelebrationEvent event = event(1L);
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader"),
+                snapshot(101L, 1L, 10L, EventAssignmentType.COMMENTATOR, "Pessoa", "reader")
+        ));
+
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldRejectParallelEventScaleWithMoreThanOnePriest() {
+        CelebrationEvent event = event(1L);
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 10L, EventAssignmentType.PRIEST, "Padre A", "priest"),
+                snapshot(101L, 1L, 11L, EventAssignmentType.PRIEST, "Padre B", "priest")
+        ));
+
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldRejectParallelEventScaleWithMissingAssignmentType() {
+        CelebrationEvent event = event(1L);
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 10L, null, "Pessoa", "reader")
+        ));
+
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldRejectParallelEventScaleWithAssignmentFromAnotherEvent() {
+        CelebrationEvent event = event(1L);
+        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 2L, 10L, EventAssignmentType.READER, "Pessoa", "reader")
+        ));
+
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verify(repository, never()).findByIdWithPeople(anyLong());
+        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -852,6 +1010,24 @@ class CelebrationEventServiceImplTest {
         person.setName(name);
         person.setPhoneNumber("34" + id);
         return person;
+    }
+
+    private EventAssignmentSnapshot snapshot(
+            Long assignmentId,
+            Long eventId,
+            Long personId,
+            EventAssignmentType assignmentType,
+            String personName,
+            String personType
+    ) {
+        return new EventAssignmentSnapshot(
+                assignmentId,
+                eventId,
+                personId,
+                assignmentType,
+                personName,
+                personType
+        );
     }
 
     private EventScheduleEventProjection scheduleEvent(Long eventId) {
