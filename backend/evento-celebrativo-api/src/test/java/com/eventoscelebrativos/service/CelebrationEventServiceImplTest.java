@@ -150,6 +150,38 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
+    void shouldFindEventByIdWithoutMandatoryAssignmentRead() {
+        CelebrationEvent entity = event(1L);
+        CelebrationEventResponseDTO response = response(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(mapper.toDto(entity)).thenReturn(response);
+
+        assertSame(response, service.findEventById(1L));
+
+        verify(repository).findById(1L);
+        verify(mapper).toDto(entity);
+        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
+                eq(false),
+                eq("event-detail"),
+                org.mockito.ArgumentMatchers.<Supplier<Optional<CelebrationEvent>>>any()
+        );
+        verifyNoInteractions(eventAssignmentReadService);
+        verify(repository, never()).findByIdWithLocations(anyLong());
+    }
+
+    @Test
+    void shouldPropagateLegacyFailureWithoutParallelFallbackWhenFindingEventById() {
+        when(repository.findById(1L)).thenThrow(new IllegalStateException("controlled legacy failure"));
+
+        IllegalStateException exception =
+                assertThrows(IllegalStateException.class, () -> service.findEventById(1L));
+
+        assertEquals("controlled legacy failure", exception.getMessage());
+        verifyNoInteractions(eventAssignmentReadService, eventAssignmentShadowReadExecutor);
+        verify(repository, never()).findByIdWithLocations(anyLong());
+    }
+
+    @Test
     void shouldThrowBusinessExceptionWhenEventIdIsInvalid() {
         assertAll(
                 () -> assertThrows(BusinessException.class, () -> service.findEventById(null)),
