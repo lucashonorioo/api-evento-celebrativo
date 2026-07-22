@@ -4,7 +4,9 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public record EventAssignmentGroup(
         Long eventId,
@@ -24,10 +26,11 @@ public record EventAssignmentGroup(
 
     public static EventAssignmentGroup from(Long eventId, Collection<EventAssignmentSnapshot> snapshots) {
         validateEventId(eventId);
+        Set<Long> personIds = new HashSet<>();
         List<EventAssignmentSnapshot> safeSnapshots = snapshots == null
                 ? List.of()
                 : snapshots.stream()
-                        .peek(snapshot -> validateSnapshotEvent(eventId, snapshot))
+                        .peek(snapshot -> validateSnapshot(eventId, snapshot, personIds))
                         .sorted(EventAssignmentSnapshot.deterministicOrder())
                         .toList();
 
@@ -62,9 +65,18 @@ public record EventAssignmentGroup(
         }
     }
 
-    private static void validateSnapshotEvent(Long eventId, EventAssignmentSnapshot snapshot) {
+    private static void validateSnapshot(Long eventId, EventAssignmentSnapshot snapshot, Set<Long> personIds) {
         if (snapshot == null || !eventId.equals(snapshot.eventId())) {
             throw new BusinessException("Atribuicao paralela pertence a outro evento");
+        }
+        if (snapshot.personId() == null || snapshot.personId() <= 0) {
+            throw new BusinessException("Pessoa da atribuicao paralela e obrigatoria");
+        }
+        if (snapshot.assignmentType() == null) {
+            throw new BusinessException("Tipo da atribuicao paralela e obrigatorio");
+        }
+        if (!personIds.add(snapshot.personId())) {
+            throw new BusinessException("A mesma pessoa possui mais de uma atribuicao paralela no evento");
         }
     }
 
