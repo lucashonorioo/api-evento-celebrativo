@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio, `V4` para o backfill auditavel de funcoes ministeriais legadas e `V5` para o backfill auditavel de atribuicoes de eventos. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias. A camada Java inicial de `EventAssignment` tambem ja existe e os fluxos legados de criacao de evento com escala, atualizacao de escala e exclusao de evento fazem write-through para `tb_event_assignment`; `V5` garante os assignments dos eventos legados a partir de `tb_event_person` e `person_type`; as leituras de eventos e escalas continuam totalmente legadas.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio, `V4` para o backfill auditavel de funcoes ministeriais legadas e `V5` para o backfill auditavel de atribuicoes de eventos. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias. A camada Java inicial de `EventAssignment` tambem ja existe e os fluxos legados de criacao de evento com escala, atualizacao de escala e exclusao de evento fazem write-through para `tb_event_assignment`; `V5` garante os assignments dos eventos legados a partir de `tb_event_person` e `person_type`; a leitura paralela interna e a auditoria de equivalencia de assignments ja estao disponiveis para validacao, mas as leituras de eventos e escalas continuam totalmente legadas e nenhum shadow read automatico foi ativado.
 
 ## Fases
 
@@ -17,7 +17,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
 | 4. Tabelas paralelas | Fase 3 | Baseline validado | Concluida: colunas preparatorias em `tb_person` e tabelas `tb_person_ministry`, `tb_user_account`, `tb_user_account_role`, `tb_event_assignment` criadas de forma aditiva |
 | 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Em andamento: `V4` garante funcoes ministeriais derivadas de `person_type` e `V5` garante atribuicoes de eventos derivadas de `tb_event_person` + `person_type`; backfill de contas ainda pendente |
-| 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Consultas e escrita de escala usando atribuicao explicita |
+| 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Em andamento: escrita em compatibilidade, backfill concluido, leitura paralela interna e auditoria disponiveis; endpoints ainda legados |
 | 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Login lendo conta e preservando JWT atual |
 | 8. Reduzir dependencia de subclasses | Fases 6 e 7 | Escalas e contas migradas | Services deixam de depender de subtipo como regra principal |
 | 9. API unificada | Fase 8 | Modelo novo estabilizado | Endpoints novos para pessoa, ministerios, conta e escala |
@@ -121,7 +121,7 @@ Saidas esperadas das proximas fases:
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
 - Backfill de atribuicoes de escala a partir de `tb_event_person` e `person_type` concluido por `V5`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
-- Auditoria de equivalencia entre leituras legadas de escala e `tb_event_assignment`.
+- Auditoria de equivalencia entre leituras legadas de escala e `tb_event_assignment` disponivel internamente, sem execucao automatica.
 - Avaliar a migracao controlada de leituras oficiais para `tb_person_ministry`, mantendo contratos HTTP estaveis.
 
 Fora do escopo da proxima fase:
@@ -149,7 +149,7 @@ Proximas etapas planejadas:
 
 1. Avaliar as limitacoes transitorias das listagens paralelas: pessoas com funcoes adicionais podem aparecer nas listagens, mas eventos e escalas ainda validam subtipos legados.
 2. Planejar backfill versionado de `UserAccount`.
-3. Auditar equivalencia entre leituras legadas de escala e `tb_event_assignment`.
+3. Planejar shadow read controlado nas consultas de escala usando a auditoria interna de `tb_event_assignment`.
 4. Planejar o cutover controlado das leituras de escala para atribuicoes explicitas.
 
 ## Dependencias criticas
@@ -230,7 +230,7 @@ Entrada:
 
 Saida:
 
-- Escalas passam a ler `EventAssignment`.
+- Escalas possuem leitura paralela interna por `EventAssignment`; o cutover oficial ainda depende de shadow read controlado.
 - Login passa a ler `UserAccount`.
 - Contratos antigos continuam respondendo.
 
@@ -349,4 +349,8 @@ Estes itens nao bloqueiam a primeira migracao:
 - Eventos antigos editados pelo fluxo legado continuam recebendo o conjunto completo de assignments correspondente a escala salva.
 - As leituras de detalhe de escala, consulta mensal, escala eucaristica, listagens publicas e mappers de resposta continuam usando `tb_event_person`, `CelebrationEvent.people` e subtipos legados.
 - As estruturas legadas permanecem como fonte das leituras e dos contratos HTTP atuais.
-- A proxima etapa de escalas sera criar auditoria de equivalencia e leitura paralela por `tb_event_assignment`, antes de qualquer cutover de leitura.
+- A leitura paralela interna de `EventAssignment` carrega assignments e pessoas por `JOIN FETCH`, inclusive em lote para multiplos eventos, sem N+1 e sem carregar colecoes desnecessarias.
+- A auditoria interna compara `tb_event_assignment` com o legado carregado por `CelebrationEvent.people`, identifica assignments ausentes, extras, tipos divergentes, duplicidades, multiplos padres e subtipos legados desconhecidos.
+- A auditoria de assignments e somente leitura: nao grava, nao corrige dados, nao executa automaticamente no startup, em controllers, em services de evento ou nos fluxos de criacao/edicao de escala.
+- Endpoints, DTOs, mappers de resposta, consulta mensal, escala eucaristica e detalhe de escala continuam usando o modelo legado.
+- A proxima etapa de escalas sera ativar shadow read controlado nas consultas de escala, antes de qualquer cutover de leitura.

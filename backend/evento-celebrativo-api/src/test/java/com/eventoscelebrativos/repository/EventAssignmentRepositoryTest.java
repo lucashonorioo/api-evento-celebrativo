@@ -1,11 +1,17 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.CelebrationEvent;
+import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -16,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +43,9 @@ class EventAssignmentRepositoryTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @Test
     void shouldPersistEventAssignmentWithEnumAsStringAndTimestamps() {
@@ -161,6 +171,79 @@ class EventAssignmentRepositoryTest {
         assertNotNull(entityManager.find(Reader.class, reader.getId()));
     }
 
+    @Test
+    void shouldFindEventAssignmentsWithPeopleForEventOrderedDeterministically() {
+        CelebrationEvent event = saveEvent("Assignment Read Event");
+        saveAssignment(event, saveEucharisticMinister("Zelia Minister", "34973000010"), EventAssignmentType.EUCHARISTIC_MINISTER);
+        saveAssignment(event, saveReader("Bruno Reader", "34973000011"), EventAssignmentType.READER);
+        saveAssignment(event, savePriest("Carlos Priest", "34973000012"), EventAssignmentType.PRIEST);
+        saveAssignment(event, saveCommentator("Ana Commentator", "34973000013"), EventAssignmentType.COMMENTATOR);
+        saveAssignment(event, saveMinisterOfTheWord("Dora Word", "34973000014"), EventAssignmentType.MINISTER_OF_THE_WORD);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<EventAssignment> result = eventAssignmentRepository.findAllByEventIdWithPerson(event.getId());
+
+        assertEquals(5, result.size());
+        assertEquals(
+                result.stream().sorted(repositoryOrder()).map(EventAssignment::getId).toList(),
+                result.stream().map(EventAssignment::getId).toList()
+        );
+        assertTrue(result.stream().allMatch(assignment -> assignment.getPerson().getName() != null));
+    }
+
+    @Test
+    void shouldReturnEmptyListForEventWithoutAssignments() {
+        CelebrationEvent event = saveEvent("Assignment Empty Event");
+        entityManager.flush();
+        entityManager.clear();
+
+        assertTrue(eventAssignmentRepository.findAllByEventIdWithPerson(event.getId()).isEmpty());
+    }
+
+    @Test
+    void shouldFindAssignmentsForSeveralEventsInSingleBatchQueryWithoutPersonNPlusOne() {
+        CelebrationEvent firstEvent = saveEvent("Assignment Batch First Event");
+        CelebrationEvent secondEvent = saveEvent("Assignment Batch Second Event");
+        Reader sharedReader = saveReader("Assignment Shared Reader", "34973000015");
+        Reader otherReader = saveReader("Assignment Other Reader", "34973000016");
+        saveAssignment(firstEvent, sharedReader, EventAssignmentType.READER);
+        saveAssignment(secondEvent, sharedReader, EventAssignmentType.READER);
+        saveAssignment(secondEvent, otherReader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = hibernateStatistics();
+        statistics.clear();
+
+        List<EventAssignment> result = eventAssignmentRepository.findAllByEventIdInWithPerson(
+                List.of(secondEvent.getId(), firstEvent.getId())
+        );
+        result.forEach(assignment -> assertNotNull(assignment.getPerson().getName()));
+
+        assertEquals(3, result.size());
+        assertEquals(1, statistics.getPrepareStatementCount());
+        assertEquals(List.of(firstEvent.getId(), secondEvent.getId(), secondEvent.getId()),
+                result.stream().map(assignment -> assignment.getEvent().getId()).toList());
+    }
+
+    @Test
+    void shouldNotDuplicateAssignmentsWhenReadingInBatch() {
+        CelebrationEvent event = saveEvent("Assignment Batch Duplicate Event");
+        Reader reader = saveReader("Assignment Batch Duplicate Reader", "34973000017");
+        Priest priest = savePriest("Assignment Batch Duplicate Priest", "34973000018");
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        saveAssignment(event, priest, EventAssignmentType.PRIEST);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Long> assignmentIds = eventAssignmentRepository.findAllByEventIdInWithPerson(List.of(event.getId())).stream()
+                .map(EventAssignment::getId)
+                .toList();
+
+        assertEquals(assignmentIds.stream().distinct().count(), assignmentIds.size());
+    }
+
     private CelebrationEvent saveEvent(String name) {
         CelebrationEvent event = new CelebrationEvent(
                 null,
@@ -190,10 +273,55 @@ class EventAssignmentRepositoryTest {
         return priest;
     }
 
+    private Commentator saveCommentator(String name, String phoneNumber) {
+        Commentator commentator = new Commentator();
+        populatePerson(commentator, name, phoneNumber);
+        entityManager.persist(commentator);
+        entityManager.flush();
+        return commentator;
+    }
+
+    private MinisterOfTheWord saveMinisterOfTheWord(String name, String phoneNumber) {
+        MinisterOfTheWord ministerOfTheWord = new MinisterOfTheWord();
+        populatePerson(ministerOfTheWord, name, phoneNumber);
+        entityManager.persist(ministerOfTheWord);
+        entityManager.flush();
+        return ministerOfTheWord;
+    }
+
+    private EucharisticMinister saveEucharisticMinister(String name, String phoneNumber) {
+        EucharisticMinister eucharisticMinister = new EucharisticMinister();
+        populatePerson(eucharisticMinister, name, phoneNumber);
+        entityManager.persist(eucharisticMinister);
+        entityManager.flush();
+        return eucharisticMinister;
+    }
+
+    private EventAssignment saveAssignment(CelebrationEvent event, Person person, EventAssignmentType assignmentType) {
+        EventAssignment assignment = new EventAssignment(event, person, assignmentType);
+        entityManager.persist(assignment);
+        return assignment;
+    }
+
     private void populatePerson(Person person, String name, String phoneNumber) {
         person.setName(name);
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(LocalDate.of(1990, 1, 10));
         person.setPassword("encoded-password");
+    }
+
+    private Statistics hibernateStatistics() {
+        SessionFactory sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
+        sessionFactory.getStatistics().setStatisticsEnabled(true);
+        return sessionFactory.getStatistics();
+    }
+
+    private Comparator<EventAssignment> repositoryOrder() {
+        return Comparator
+                .comparing((EventAssignment assignment) -> assignment.getEvent().getId())
+                .thenComparing(assignment -> assignment.getAssignmentType().name())
+                .thenComparing(assignment -> assignment.getPerson().getName().toLowerCase())
+                .thenComparing(assignment -> assignment.getPerson().getId())
+                .thenComparing(EventAssignment::getId);
     }
 }
