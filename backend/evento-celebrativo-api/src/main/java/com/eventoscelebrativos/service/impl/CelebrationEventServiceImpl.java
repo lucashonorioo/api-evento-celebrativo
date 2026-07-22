@@ -31,6 +31,9 @@ import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
+import com.eventoscelebrativos.service.EventAssignmentTarget;
+import com.eventoscelebrativos.service.EventAssignmentTargetResolver;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -63,6 +66,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventMapper celebrationEventMapper;
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
+    private final EventAssignmentTargetResolver eventAssignmentTargetResolver;
+    private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -70,7 +75,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             PersonRepository personRepository,
             CelebrationEventMapper celebrationEventMapper,
             CelebrationEventScaleMapper celebrationEventScaleMapper,
-            CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper
+            CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
+            EventAssignmentTargetResolver eventAssignmentTargetResolver,
+            EventAssignmentCompatibilityService eventAssignmentCompatibilityService
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
@@ -78,6 +85,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.celebrationEventMapper = celebrationEventMapper;
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
+        this.eventAssignmentTargetResolver = eventAssignmentTargetResolver;
+        this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
     }
 
     @Override
@@ -226,6 +235,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         applyScaleToEvent(celebrationEvent, celebrationEventScaleRequestDTO);
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
+        synchronizeAssignments(savedEvent);
 
         return celebrationEventScaleMapper.toDto(savedEvent);
     }
@@ -241,6 +251,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         applyScaleToEvent(celebrationEvent, toScaleRequest(celebrationEventWithScaleRequestDTO));
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
+        synchronizeAssignments(savedEvent);
 
         return celebrationEventScaleMapper.toDto(savedEvent);
     }
@@ -255,12 +266,18 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             throw new ResourceNotFoundException("Evento celebrativo", id);
         }
         try{
+            eventAssignmentCompatibilityService.deleteAllForEvent(id);
             celebrationEventRepository.deleteById(id);
             celebrationEventRepository.flush();
         }
         catch (DataIntegrityViolationException e){
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
+    }
+
+    private void synchronizeAssignments(CelebrationEvent event) {
+        List<EventAssignmentTarget> targets = eventAssignmentTargetResolver.resolve(event.getPeople());
+        eventAssignmentCompatibilityService.synchronizeAssignments(event, targets);
     }
 
     private void applyScaleToEvent(CelebrationEvent celebrationEvent, CelebrationEventScaleRequestDTO dto) {

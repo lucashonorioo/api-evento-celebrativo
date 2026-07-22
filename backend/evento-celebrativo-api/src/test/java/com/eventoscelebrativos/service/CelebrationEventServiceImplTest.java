@@ -73,6 +73,12 @@ class CelebrationEventServiceImplTest {
     @Mock
     private CelebrationEventScaleDetailMapper scaleDetailMapper;
 
+    @Mock
+    private EventAssignmentTargetResolver eventAssignmentTargetResolver;
+
+    @Mock
+    private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
+
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -88,6 +94,7 @@ class CelebrationEventServiceImplTest {
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createEvent(request));
+        verifyNoInteractions(eventAssignmentTargetResolver, eventAssignmentCompatibilityService);
     }
 
     @Test
@@ -459,6 +466,7 @@ class CelebrationEventServiceImplTest {
 
         assertSame(response, service.updateEvent(1L, request));
         verify(mapper).updateCelebrationEventMapperFromDto(request, entity);
+        verifyNoInteractions(eventAssignmentTargetResolver, eventAssignmentCompatibilityService);
     }
 
     @Test
@@ -474,6 +482,7 @@ class CelebrationEventServiceImplTest {
 
         service.deleteEventById(1L);
 
+        verify(eventAssignmentCompatibilityService).deleteAllForEvent(1L);
         verify(repository).deleteById(1L);
     }
 
@@ -483,6 +492,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class, () -> service.deleteEventById(99L));
         verify(repository, never()).deleteById(anyLong());
+        verifyNoInteractions(eventAssignmentCompatibilityService);
     }
 
     @Test
@@ -491,6 +501,7 @@ class CelebrationEventServiceImplTest {
         doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
 
         assertThrows(DatabaseException.class, () -> service.deleteEventById(1L));
+        verify(eventAssignmentCompatibilityService).deleteAllForEvent(1L);
     }
 
     @Test
@@ -504,6 +515,7 @@ class CelebrationEventServiceImplTest {
         EucharisticMinister eucharisticMinister = person(new EucharisticMinister(), 6L, "Ministro da Eucaristia");
         CelebrationEventScaleRequestDTO request = scaleRequest();
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+        List<EventAssignmentTarget> targets = List.of(new EventAssignmentTarget(priest, com.eventoscelebrativos.model.EventAssignmentType.PRIEST));
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -513,11 +525,13 @@ class CelebrationEventServiceImplTest {
         when(personRepository.findById(5L)).thenReturn(Optional.of(ministerOfTheWord));
         when(personRepository.findById(6L)).thenReturn(Optional.of(eucharisticMinister));
         when(repository.save(event)).thenReturn(event);
+        when(eventAssignmentTargetResolver.resolve(event.getPeople())).thenReturn(targets);
         when(scaleMapper.toDto(event)).thenReturn(response);
 
         assertSame(response, service.updateEventScale(1L, request));
         assertEquals(List.of(location), event.getLocations());
         assertEquals(List.of(priest, reader, commentator, ministerOfTheWord, eucharisticMinister), event.getPeople());
+        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, targets);
     }
 
     @Test
@@ -525,6 +539,7 @@ class CelebrationEventServiceImplTest {
         Location location = location(1L);
         Priest priest = person(new Priest(), 8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+        List<EventAssignmentTarget> targets = List.of(new EventAssignmentTarget(priest, com.eventoscelebrativos.model.EventAssignmentType.PRIEST));
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
@@ -533,6 +548,7 @@ class CelebrationEventServiceImplTest {
             event.setId(1L);
             return event;
         });
+        when(eventAssignmentTargetResolver.resolve(anyList())).thenReturn(targets);
         when(scaleMapper.toDto(any(CelebrationEvent.class))).thenReturn(response);
 
         assertSame(response, service.createEventWithScale(eventWithScaleRequest()));
@@ -543,6 +559,7 @@ class CelebrationEventServiceImplTest {
                         && event.getLocations().contains(location)
                         && event.getPeople().contains(priest)
         ));
+        verify(eventAssignmentCompatibilityService).synchronizeAssignments(any(CelebrationEvent.class), eq(targets));
     }
 
     @Test
@@ -557,12 +574,14 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
         when(repository.save(event)).thenReturn(event);
+        when(eventAssignmentTargetResolver.resolve(event.getPeople())).thenReturn(List.of());
         when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(newLocation), event.getLocations());
         assertTrue(event.getPeople().isEmpty());
+        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, List.of());
     }
 
     @Test
@@ -666,6 +685,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
+        verifyNoInteractions(eventAssignmentCompatibilityService);
     }
 
     private CelebrationEventRequestDTO request() {
