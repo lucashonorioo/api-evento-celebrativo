@@ -2,6 +2,7 @@ package com.eventoscelebrativos.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +23,9 @@ class EventAssignmentShadowReadPropertiesTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(Config.class);
+
+    private final ApplicationContextRunner applicationPropertiesContextRunner = contextRunner
+            .withInitializer(new ConfigDataApplicationContextInitializer());
 
     @Test
     void shouldKeepAllFlagsDisabledByDefault() {
@@ -59,8 +63,40 @@ class EventAssignmentShadowReadPropertiesTest {
     }
 
     @Test
-    void shouldNotOverrideShadowReadFlagsInLocalProfile() {
-        assertProfileDoesNotOverrideEventAssignmentShadowRead("application-local.properties");
+    void shouldEnableAllFlagsInLocalProfile() {
+        Properties properties = loadProperties("application-local.properties");
+
+        assertEquals(
+                "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_DETAIL_ENABLED:true}",
+                properties.getProperty(PREFIX + "event-detail-enabled")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED:true}",
+                properties.getProperty(PREFIX + "event-scale-detail-enabled")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_SHADOW_READ_MONTHLY_SCHEDULE_ENABLED:true}",
+                properties.getProperty(PREFIX + "monthly-schedule-enabled")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_SHADOW_READ_EUCHARIST_SCALE_ENABLED:true}",
+                properties.getProperty(PREFIX + "eucharist-scale-enabled")
+        );
+    }
+
+    @Test
+    void shouldBindAllFlagsEnabledInLocalProfile() {
+        applicationPropertiesContextRunner
+                .withPropertyValues("spring.profiles.active=local")
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertTrue(properties.isEventDetailEnabled());
+                    assertTrue(properties.isEventScaleDetailEnabled());
+                    assertTrue(properties.isMonthlyScheduleEnabled());
+                    assertTrue(properties.isEucharistScaleEnabled());
+                });
     }
 
     @Test
@@ -71,6 +107,41 @@ class EventAssignmentShadowReadPropertiesTest {
     @Test
     void shouldNotOverrideShadowReadFlagsInMysqlProfile() {
         assertProfileDoesNotOverrideEventAssignmentShadowRead("application-mysql.properties");
+    }
+
+    @Test
+    void shouldBindAllFlagsDisabledInTestProfile() {
+        applicationPropertiesContextRunner
+                .withPropertyValues("spring.profiles.active=test")
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertFalse(properties.isEventDetailEnabled());
+                    assertFalse(properties.isEventScaleDetailEnabled());
+                    assertFalse(properties.isMonthlyScheduleEnabled());
+                    assertFalse(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldBindAllFlagsDisabledInMysqlProfile() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertFalse(properties.isEventDetailEnabled());
+                    assertFalse(properties.isEventScaleDetailEnabled());
+                    assertFalse(properties.isMonthlyScheduleEnabled());
+                    assertFalse(properties.isEucharistScaleEnabled());
+                });
     }
 
     @Test
@@ -130,6 +201,99 @@ class EventAssignmentShadowReadPropertiesTest {
                     assertFalse(properties.isEventScaleDetailEnabled());
                     assertFalse(properties.isMonthlyScheduleEnabled());
                     assertTrue(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalEventDetailRollbackWithoutChangingOtherFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EVENT_DETAIL_ENABLED=false"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertFalse(properties.isEventDetailEnabled());
+                    assertTrue(properties.isEventScaleDetailEnabled());
+                    assertTrue(properties.isMonthlyScheduleEnabled());
+                    assertTrue(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalEventScaleDetailRollbackWithoutChangingOtherFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED=false"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertTrue(properties.isEventDetailEnabled());
+                    assertFalse(properties.isEventScaleDetailEnabled());
+                    assertTrue(properties.isMonthlyScheduleEnabled());
+                    assertTrue(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalMonthlyScheduleRollbackWithoutChangingOtherFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_MONTHLY_SCHEDULE_ENABLED=false"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertTrue(properties.isEventDetailEnabled());
+                    assertTrue(properties.isEventScaleDetailEnabled());
+                    assertFalse(properties.isMonthlyScheduleEnabled());
+                    assertTrue(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalEucharistScaleRollbackWithoutChangingOtherFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EUCHARIST_SCALE_ENABLED=false"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertTrue(properties.isEventDetailEnabled());
+                    assertTrue(properties.isEventScaleDetailEnabled());
+                    assertTrue(properties.isMonthlyScheduleEnabled());
+                    assertFalse(properties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalRollbackForAllFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EVENT_DETAIL_ENABLED=false",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED=false",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_MONTHLY_SCHEDULE_ENABLED=false",
+                        "EVENT_ASSIGNMENT_SHADOW_READ_EUCHARIST_SCALE_ENABLED=false"
+                )
+                .run(context -> {
+                    EventAssignmentShadowReadProperties properties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertFalse(properties.isEventDetailEnabled());
+                    assertFalse(properties.isEventScaleDetailEnabled());
+                    assertFalse(properties.isMonthlyScheduleEnabled());
+                    assertFalse(properties.isEucharistScaleEnabled());
                 });
     }
 
