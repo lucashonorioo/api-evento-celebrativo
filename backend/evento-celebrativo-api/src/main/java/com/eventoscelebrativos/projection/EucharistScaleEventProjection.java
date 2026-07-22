@@ -5,6 +5,7 @@ import java.time.LocalTime;
 
 public interface EucharistScaleEventProjection {
 
+    Long getEventId();
     String getNameMassOrEvent();
     LocalDate getEventDate();
     LocalTime getEventTime();

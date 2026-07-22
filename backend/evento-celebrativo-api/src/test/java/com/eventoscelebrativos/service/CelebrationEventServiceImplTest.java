@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
@@ -45,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -79,6 +81,12 @@ class CelebrationEventServiceImplTest {
     @Mock
     private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
 
+    @Mock
+    private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
+
+    @Mock
+    private EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
+
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -108,6 +116,23 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
+    void shouldInvokeEventDetailShadowReadAfterMappingWhenEnabled() {
+        CelebrationEvent entity = event(1L);
+        CelebrationEventResponseDTO response = response(1L);
+        when(eventAssignmentShadowReadProperties.isEventDetailEnabled()).thenReturn(true);
+        when(repository.findById(1L)).thenReturn(Optional.of(entity));
+        when(mapper.toDto(entity)).thenReturn(response);
+
+        assertSame(response, service.findEventById(1L));
+
+        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
+                eq(true),
+                eq("event-detail"),
+                org.mockito.ArgumentMatchers.<Supplier<Optional<CelebrationEvent>>>any()
+        );
+    }
+
+    @Test
     void shouldThrowBusinessExceptionWhenEventIdIsInvalid() {
         assertAll(
                 () -> assertThrows(BusinessException.class, () -> service.findEventById(null)),
@@ -121,6 +146,7 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findEventById(99L));
+        verifyNoInteractions(eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -140,6 +166,32 @@ class CelebrationEventServiceImplTest {
         )).thenReturn(response);
 
         assertSame(response, service.findScaleByEventId(1L));
+    }
+
+    @Test
+    void shouldInvokeEventScaleDetailShadowReadAfterLegacyScaleIsLoadedWhenEnabled() {
+        CelebrationEvent event = eventWithCompleteScale();
+        CelebrationEventScaleDetailResponseDTO response = detailResponse();
+        when(eventAssignmentShadowReadProperties.isEventScaleDetailEnabled()).thenReturn(true);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
+        when(scaleDetailMapper.toDto(
+                eq(event),
+                any(Location.class),
+                any(Priest.class),
+                anyList(),
+                anyList(),
+                anyList(),
+                anyList()
+        )).thenReturn(response);
+
+        assertSame(response, service.findScaleByEventId(1L));
+
+        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
+                true,
+                "event-scale-detail",
+                event
+        );
     }
 
     @Test
@@ -323,6 +375,27 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
+    void shouldInvokeEucharistScalePartialShadowReadWhenEnabled() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", "Ana");
+        when(eventAssignmentShadowReadProperties.isEucharistScaleEnabled()).thenReturn(true);
+        when(repository.findEucharistScale(pageable, startDate, endDate))
+                .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
+
+        service.findEucharistScale(pageable, startDate, endDate);
+
+        verify(eventAssignmentShadowReadExecutor).comparePartialAssignmentsIfEnabled(
+                eq(true),
+                eq("eucharist-scale"),
+                eq(List.of(1L)),
+                eq(com.eventoscelebrativos.model.EventAssignmentType.EUCHARISTIC_MINISTER),
+                org.mockito.ArgumentMatchers.<Supplier<List<EventAssignmentSnapshot>>>any()
+        );
+    }
+
+    @Test
     void shouldThrowBusinessExceptionWhenEucharistScalePeriodIsInvalid() {
         PageRequest pageable = PageRequest.of(0, 10);
 
@@ -396,6 +469,25 @@ class CelebrationEventServiceImplTest {
         assertEquals(EventScheduleType.READER, dto.getAssignmentType());
         assertEquals(10L, dto.getAssignments().get(0).getPersonId());
         assertEquals("Maria", dto.getAssignments().get(0).getPersonName());
+    }
+
+    @Test
+    void shouldInvokeMonthlySchedulePartialShadowReadWhenEnabled() {
+        when(eventAssignmentShadowReadProperties.isMonthlyScheduleEnabled()).thenReturn(true);
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
+                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.READER.getPersonType()))
+                .thenReturn(List.of(scheduleAssignment(1L, 10L, "Maria")));
+
+        service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
+
+        verify(eventAssignmentShadowReadExecutor).comparePartialAssignmentsIfEnabled(
+                eq(true),
+                eq("monthly-schedule"),
+                eq(List.of(1L)),
+                eq(com.eventoscelebrativos.model.EventAssignmentType.READER),
+                org.mockito.ArgumentMatchers.<Supplier<List<EventAssignmentSnapshot>>>any()
+        );
     }
 
     @Test
@@ -828,6 +920,11 @@ class CelebrationEventServiceImplTest {
             String ministerNames
     ) {
         return new EucharistScaleEventProjection() {
+            @Override
+            public Long getEventId() {
+                return 1L;
+            }
+
             @Override
             public String getNameMassOrEvent() {
                 return nameMassOrEvent;

@@ -38,6 +38,17 @@ public class EventAssignmentConsistencyServiceImpl implements EventAssignmentCon
         validateEvent(legacyEvent);
         Long eventId = legacyEvent.getId();
         List<EventAssignmentSnapshot> legacySnapshots = legacySnapshotResolver.resolve(legacyEvent);
+        return compareSnapshots(eventId, legacySnapshots, parallelAssignments);
+    }
+
+    @Override
+    public EventAssignmentConsistencyReport compareSnapshots(
+            Long eventId,
+            List<EventAssignmentSnapshot> legacyAssignments,
+            List<EventAssignmentSnapshot> parallelAssignments
+    ) {
+        validateEventId(eventId);
+        List<EventAssignmentSnapshot> legacySnapshots = safeSnapshots(legacyAssignments);
         List<EventAssignmentSnapshot> parallelSnapshots = safeSnapshots(parallelAssignments);
         List<EventAssignmentConsistencyIssue> issues = new ArrayList<>();
 
@@ -75,6 +86,38 @@ public class EventAssignmentConsistencyServiceImpl implements EventAssignmentCon
                 .forEach(event -> result.put(
                         event.getId(),
                         compareEvent(event, safeParallelAssignments.getOrDefault(event.getId(), List.of()))
+                ));
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
+    @Override
+    public Map<Long, EventAssignmentConsistencyReport> compareSnapshotGroups(
+            Collection<Long> eventIds,
+            Map<Long, List<EventAssignmentSnapshot>> legacyAssignments,
+            Map<Long, List<EventAssignmentSnapshot>> parallelAssignments
+    ) {
+        if (eventIds == null) {
+            throw new BusinessException("Ids de eventos sao obrigatorios para auditoria");
+        }
+        Map<Long, List<EventAssignmentSnapshot>> safeLegacyAssignments = legacyAssignments == null
+                ? Map.of()
+                : legacyAssignments;
+        Map<Long, List<EventAssignmentSnapshot>> safeParallelAssignments = parallelAssignments == null
+                ? Map.of()
+                : parallelAssignments;
+
+        Map<Long, EventAssignmentConsistencyReport> result = new LinkedHashMap<>();
+        eventIds.stream()
+                .distinct()
+                .sorted(Comparator.nullsLast(Long::compareTo))
+                .peek(this::validateEventId)
+                .forEach(eventId -> result.put(
+                        eventId,
+                        compareSnapshots(
+                                eventId,
+                                safeLegacyAssignments.getOrDefault(eventId, List.of()),
+                                safeParallelAssignments.getOrDefault(eventId, List.of())
+                        )
                 ));
         return java.util.Collections.unmodifiableMap(result);
     }
@@ -251,6 +294,12 @@ public class EventAssignmentConsistencyServiceImpl implements EventAssignmentCon
     private void validateEvent(CelebrationEvent event) {
         if (event == null || event.getId() == null || event.getId() <= 0) {
             throw new BusinessException("Evento legado valido e obrigatorio para auditoria");
+        }
+    }
+
+    private void validateEventId(Long eventId) {
+        if (eventId == null || eventId <= 0) {
+            throw new BusinessException("Id do evento e obrigatorio para auditoria");
         }
     }
 

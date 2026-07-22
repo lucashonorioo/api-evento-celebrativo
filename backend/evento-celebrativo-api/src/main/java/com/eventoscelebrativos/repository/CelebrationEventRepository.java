@@ -21,6 +21,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
     @Query(
             value = """
                     SELECT
+                        ce.id AS eventId,
                         ce.name_mass_or_event AS nameMassOrEvent,
                         ce.event_date AS eventDate,
                         ce.event_time AS eventTime,
