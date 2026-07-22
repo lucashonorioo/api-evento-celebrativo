@@ -29,7 +29,7 @@ class EventAssignmentReadSourcePropertiesTest {
             .withInitializer(new ConfigDataApplicationContextInitializer());
 
     @Test
-    void shouldUseLegacyAsDefaultEventScaleDetailReadSource() {
+    void shouldUseLegacyAsDefaultReadSources() {
         contextRunner.run(context -> {
             EventAssignmentReadSourceProperties properties =
                     context.getBean(EventAssignmentReadSourceProperties.class);
@@ -39,9 +39,10 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldDeclareBaseApplicationPropertyWithLegacyDefaultAndEnvironmentOverride() {
+    void shouldDeclareBaseApplicationPropertiesWithLegacyDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application.properties");
 
+        assertFalse(properties.containsKey(PREFIX + "event-detail"));
         assertEquals(
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:LEGACY}",
                 properties.getProperty(PREFIX + "event-scale-detail")
@@ -49,9 +50,10 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldDeclareLocalApplicationPropertyWithParallelDefaultAndEnvironmentOverride() {
+    void shouldDeclareLocalApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application-local.properties");
 
+        assertFalse(properties.containsKey(PREFIX + "event-detail"));
         assertEquals(
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:PARALLEL}",
                 properties.getProperty(PREFIX + "event-scale-detail")
@@ -59,7 +61,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldBindEventScaleDetailAsParallelInLocalProfile() {
+    void shouldBindReadSourcesAsParallelInLocalProfile() {
         applicationPropertiesContextRunner
                 .withPropertyValues("spring.profiles.active=local")
                 .run(context -> {
@@ -71,7 +73,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldBindEventScaleDetailAsLegacyInTestProfile() {
+    void shouldBindReadSourcesAsLegacyInTestProfile() {
         applicationPropertiesContextRunner
                 .withPropertyValues("spring.profiles.active=test")
                 .run(context -> {
@@ -83,7 +85,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldBindEventScaleDetailAsLegacyInMysqlProfile() {
+    void shouldBindReadSourcesAsLegacyInMysqlProfile() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -100,21 +102,21 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldNotOverrideEventScaleDetailReadSourceInTestProfile() {
+    void shouldNotOverrideReadSourcesInTestProfile() {
         Properties properties = loadProperties("application-test.properties");
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
     }
 
     @Test
-    void shouldNotOverrideEventScaleDetailReadSourceInMysqlProfile() {
+    void shouldNotOverrideReadSourcesInMysqlProfile() {
         Properties properties = loadProperties("application-mysql.properties");
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
     }
 
     @Test
-    void shouldAllowLocalRollbackWithoutChangingShadowReadFlags() {
+    void shouldAllowLocalEventScaleDetailRollbackWithoutChangingShadowReadFlags() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=local",
@@ -156,7 +158,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldBindEventScaleDetailIgnoringCase() {
+    void shouldBindReadSourcesIgnoringCase() {
         contextRunner
                 .withPropertyValues(PREFIX + "event-scale-detail=parallel")
                 .run(context -> {
@@ -184,6 +186,10 @@ class EventAssignmentReadSourcePropertiesTest {
     void shouldKeepShadowPropertiesDeclaredUnderTheirOwnPrefix() {
         Properties properties = loadProperties("application.properties");
 
+        assertEquals(
+                "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_DETAIL_ENABLED:false}",
+                properties.getProperty(SHADOW_PREFIX + "event-detail-enabled")
+        );
         assertEquals(
                 "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED:false}",
                 properties.getProperty(SHADOW_PREFIX + "event-scale-detail-enabled")

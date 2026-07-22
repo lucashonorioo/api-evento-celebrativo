@@ -77,6 +77,23 @@ class EventAssignmentShadowReadFailureHttpIntegrationTest {
         assertTrue(output.getOut().contains("IllegalStateException"));
     }
 
+    @Test
+    void shouldPreserveEventDetailResponseWhenShadowReadFails(CapturedOutput output) throws Exception {
+        properties.setEventDetailEnabled(false);
+        String expected = getPublicJson("/eventos/1");
+
+        when(eventAssignmentReadService.findAllByEventId(1L))
+                .thenThrow(new IllegalStateException("controlled event-detail shadow failure"));
+
+        properties.setEventDetailEnabled(true);
+        String actual = getPublicJson("/eventos/1");
+
+        assertEquals(expected, actual);
+        assertTrue(output.getOut().contains("EventAssignment shadow read failed"));
+        assertTrue(output.getOut().contains("event-detail"));
+        assertTrue(output.getOut().contains("IllegalStateException"));
+    }
+
     private String getPublicJson(String url) throws Exception {
         return mockMvc.perform(get(url))
                 .andExpect(status().isOk())
