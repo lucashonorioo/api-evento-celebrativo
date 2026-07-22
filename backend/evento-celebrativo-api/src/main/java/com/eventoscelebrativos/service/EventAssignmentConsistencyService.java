@@ -17,4 +17,16 @@ public interface EventAssignmentConsistencyService {
             Collection<CelebrationEvent> legacyEvents,
             Map<Long, List<EventAssignmentSnapshot>> parallelAssignments
     );
+
+    EventAssignmentConsistencyReport compareSnapshots(
+            Long eventId,
+            List<EventAssignmentSnapshot> legacyAssignments,
+            List<EventAssignmentSnapshot> parallelAssignments
+    );
+
+    Map<Long, EventAssignmentConsistencyReport> compareSnapshotGroups(
+            Collection<Long> eventIds,
+            Map<Long, List<EventAssignmentSnapshot>> legacyAssignments,
+            Map<Long, List<EventAssignmentSnapshot>> parallelAssignments
+    );
 }

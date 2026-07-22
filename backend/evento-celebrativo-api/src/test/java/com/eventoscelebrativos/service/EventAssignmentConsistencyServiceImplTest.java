@@ -147,6 +147,48 @@ class EventAssignmentConsistencyServiceImplTest {
         assertIssue(reports.get(2L), EventAssignmentConsistencyIssueType.MISSING_PARALLEL_ASSIGNMENT);
     }
 
+    @Test
+    void shouldComparePartialSnapshotsWithoutLegacyEventEntity() {
+        EventAssignmentSnapshot legacy = snapshot(null, 1L, 10L, EventAssignmentType.READER);
+        EventAssignmentSnapshot parallel = snapshot(100L, 1L, 10L, EventAssignmentType.READER);
+
+        EventAssignmentConsistencyReport report =
+                service.compareSnapshots(1L, List.of(legacy), List.of(parallel));
+
+        assertTrue(report.consistent());
+        assertEquals(1, report.legacyAssignmentCount());
+        assertEquals(1, report.parallelAssignmentCount());
+    }
+
+    @Test
+    void shouldReportPartialSnapshotMismatchAndExtraAssignments() {
+        EventAssignmentSnapshot legacy = snapshot(null, 1L, 10L, EventAssignmentType.READER);
+        List<EventAssignmentSnapshot> parallel = List.of(
+                snapshot(100L, 1L, 10L, EventAssignmentType.COMMENTATOR),
+                snapshot(101L, 1L, 11L, EventAssignmentType.READER)
+        );
+
+        EventAssignmentConsistencyReport report = service.compareSnapshots(1L, List.of(legacy), parallel);
+
+        assertIssue(report, EventAssignmentConsistencyIssueType.ASSIGNMENT_TYPE_MISMATCH);
+        assertIssue(report, EventAssignmentConsistencyIssueType.EXTRA_PARALLEL_ASSIGNMENT);
+    }
+
+    @Test
+    void shouldCompareSeveralPartialSnapshotGroupsIndependently() {
+        Map<Long, EventAssignmentConsistencyReport> reports = service.compareSnapshotGroups(
+                List.of(2L, 1L),
+                Map.of(1L, List.of(snapshot(null, 1L, 10L, EventAssignmentType.READER))),
+                Map.of(1L, List.of(snapshot(100L, 1L, 10L, EventAssignmentType.READER)))
+        );
+
+        assertEquals(List.of(1L, 2L), reports.keySet().stream().toList());
+        assertTrue(reports.get(1L).consistent());
+        assertTrue(reports.get(2L).consistent());
+        assertEquals(0, reports.get(2L).legacyAssignmentCount());
+        assertEquals(0, reports.get(2L).parallelAssignmentCount());
+    }
+
     private void assertIssue(EventAssignmentConsistencyReport report, EventAssignmentConsistencyIssueType issueType) {
         assertFalse(report.consistent());
         assertTrue(report.issues().stream().anyMatch(issue -> issue.issueType() == issueType));
