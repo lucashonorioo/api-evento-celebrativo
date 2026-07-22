@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
@@ -242,6 +243,57 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
     }
 
     @Test
+    void shouldUpdateBackfilledAssignmentsWithoutDuplicatingWhenEditingScale() {
+        Long eventId = null;
+        Long locationId = null;
+        List<Long> personIds = List.of();
+        try {
+            Priest priest = savePriest("Assignment Backfill Update Priest");
+            Reader keptReader = saveReader("Assignment Backfill Update Kept Reader");
+            Reader removedReader = saveReader("Assignment Backfill Update Removed Reader");
+            Commentator addedCommentator = saveCommentator("Assignment Backfill Update Added Commentator");
+            personIds = List.of(priest.getId(), keptReader.getId(), removedReader.getId(), addedCommentator.getId());
+            Location location = locationRepository.saveAndFlush(location("Assignment Backfill Update Church"));
+            locationId = location.getId();
+            eventId = insertLegacyEvent("Assignment Backfill Update Mass");
+            insertLegacyEventLocation(eventId, locationId);
+            insertLegacyEventPerson(eventId, priest.getId());
+            insertLegacyEventPerson(eventId, keptReader.getId());
+            insertLegacyEventPerson(eventId, removedReader.getId());
+            insertBackfilledAssignment(eventId, priest.getId(), EventAssignmentType.PRIEST);
+            insertBackfilledAssignment(eventId, keptReader.getId(), EventAssignmentType.READER);
+            insertBackfilledAssignment(eventId, removedReader.getId(), EventAssignmentType.READER);
+
+            AssignmentSnapshot keptReaderBefore = assignmentSnapshot(eventId, keptReader.getId());
+
+            celebrationEventService.updateEventScale(
+                    eventId,
+                    scaleRequest(
+                            locationId,
+                            priest.getId(),
+                            List.of(keptReader.getId()),
+                            List.of(addedCommentator.getId()),
+                            null,
+                            null
+                    )
+            );
+
+            assertEventAssignmentPeopleMatchEventPeople(eventId);
+            AssignmentSnapshot keptReaderAfter = assignmentSnapshot(eventId, keptReader.getId());
+            assertEquals(keptReaderBefore.id(), keptReaderAfter.id());
+            assertEquals(keptReaderBefore.createdAt(), keptReaderAfter.createdAt());
+            assertFalse(hasAssignment(eventId, removedReader.getId()));
+            assertAssignmentType(eventId, addedCommentator.getId(), EventAssignmentType.COMMENTATOR);
+            assertEquals(0, countDuplicatedAssignments(eventId));
+            assertEquals(3, countEventAssignments(eventId));
+        } finally {
+            cleanupEvent(eventId);
+            personIds.forEach(this::cleanupPerson);
+            cleanupLocation(locationId);
+        }
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN")
     void shouldDeleteAssignmentsWhenDeletingEvent() throws Exception {
         Long eventId = null;
@@ -428,6 +480,54 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                 "SELECT person_id FROM tb_event_person WHERE event_id = ? ORDER BY person_id",
                 Long.class,
                 eventId
+        );
+    }
+
+    private Long insertLegacyEvent(String name) {
+        String eventName = name + " " + UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                VALUES (?, ?, ?, TRUE)
+                """,
+                eventName,
+                LocalDate.now().plusDays(30),
+                LocalTime.of(19, 0)
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
+                Long.class,
+                eventName
+        );
+    }
+
+    private void insertLegacyEventLocation(Long eventId, Long locationId) {
+        jdbcTemplate.update(
+                "INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)",
+                eventId,
+                locationId
+        );
+    }
+
+    private void insertLegacyEventPerson(Long eventId, Long personId) {
+        jdbcTemplate.update(
+                "INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)",
+                eventId,
+                personId
+        );
+    }
+
+    private void insertBackfilledAssignment(Long eventId, Long personId, EventAssignmentType assignmentType) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                eventId,
+                personId,
+                assignmentType.name(),
+                Timestamp.valueOf(LocalDateTime.of(2026, 1, 1, 8, 0)),
+                Timestamp.valueOf(LocalDateTime.of(2026, 1, 1, 8, 30))
         );
     }
 

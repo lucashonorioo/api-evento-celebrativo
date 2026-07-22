@@ -31,6 +31,7 @@ class LocalFlywayMigrationIntegrationTest {
         assertSuccessfulVersionedMigration("2");
         assertSuccessfulVersionedMigration("3");
         assertSuccessfulVersionedMigration("4");
+        assertSuccessfulVersionedMigration("5");
         assertSuccessfulScript("R__load_local_demo_data.sql");
 
         assertEquals(2, countRows("tb_role"));
@@ -53,7 +54,8 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(3, countRows("tb_event_location"));
         assertEquals(15, countPeopleWithFilledParallelColumns());
         assertPersonMinistryFixtures();
-        assertFutureParallelTablesAreEmpty();
+        assertEventAssignmentFixtures();
+        assertFutureUserTablesAreEmpty();
     }
 
     @Test
@@ -129,10 +131,17 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(0, countPeopleWithoutExpectedMinistry());
     }
 
-    private void assertFutureParallelTablesAreEmpty() {
+    private void assertEventAssignmentFixtures() {
+        assertEquals(countRows("tb_event_person"), countRows("tb_event_assignment"));
+        assertEquals(0, countEventPeopleWithoutAssignment());
+        assertEquals(0, countAssignmentsWithoutLegacyEventPerson());
+        assertEquals(0, countDuplicatedEventAssignments());
+        assertEquals(0, countAssignmentsWithUnexpectedType());
+    }
+
+    private void assertFutureUserTablesAreEmpty() {
         assertEquals(0, countRows("tb_user_account"));
         assertEquals(0, countRows("tb_user_account_role"));
-        assertEquals(0, countRows("tb_event_assignment"));
     }
 
     private int countActivePersonMinistries() {
@@ -176,6 +185,75 @@ class LocalFlywayMigrationIntegrationTest {
                           WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
                       END
                 )
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countEventPeopleWithoutAssignment() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_event_person ep
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM tb_event_assignment ea
+                    WHERE ea.event_id = ep.event_id
+                      AND ea.person_id = ep.person_id
+                )
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countAssignmentsWithoutLegacyEventPerson() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_event_assignment ea
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM tb_event_person ep
+                    WHERE ep.event_id = ea.event_id
+                      AND ep.person_id = ea.person_id
+                )
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countDuplicatedEventAssignments() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT event_id, person_id
+                    FROM tb_event_assignment
+                    GROUP BY event_id, person_id
+                    HAVING COUNT(*) > 1
+                ) duplicated
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countAssignmentsWithUnexpectedType() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_event_assignment ea
+                INNER JOIN tb_person p ON p.id = ea.person_id
+                WHERE ea.assignment_type <> CASE p.person_type
+                    WHEN 'priest' THEN 'PRIEST'
+                    WHEN 'reader' THEN 'READER'
+                    WHEN 'commentator' THEN 'COMMENTATOR'
+                    WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
+                    WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
+                END
                 """,
                 Integer.class
         );

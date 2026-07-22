@@ -102,6 +102,28 @@ INSERT INTO tb_event_person (event_id, person_id) VALUES (3, 6);
 INSERT INTO tb_event_person (event_id, person_id) VALUES (3, 3);
 INSERT INTO tb_event_person (event_id, person_id) VALUES (3, 9);
 
+INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
+SELECT ep.event_id,
+       ep.person_id,
+       CASE p.person_type
+           WHEN 'priest' THEN 'PRIEST'
+           WHEN 'reader' THEN 'READER'
+           WHEN 'commentator' THEN 'COMMENTATOR'
+           WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
+           WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
+       END,
+       CURRENT_TIMESTAMP(6),
+       CURRENT_TIMESTAMP(6)
+FROM tb_event_person ep
+INNER JOIN tb_person p ON p.id = ep.person_id
+WHERE p.person_type IN ('priest', 'reader', 'commentator', 'minister_of_the_word', 'eucharistic_minister')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM tb_event_assignment ea
+      WHERE ea.event_id = ep.event_id
+        AND ea.person_id = ep.person_id
+  );
+
 INSERT INTO tb_event_location (event_id, location_id) VALUES (1, 1);
 INSERT INTO tb_event_location (event_id, location_id) VALUES (2, 2);
 INSERT INTO tb_event_location (event_id, location_id) VALUES (3, 3);

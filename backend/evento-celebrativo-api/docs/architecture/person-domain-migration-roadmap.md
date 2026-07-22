@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias. A camada Java inicial de `EventAssignment` tambem ja existe e os fluxos legados de criacao de evento com escala, atualizacao de escala e exclusao de evento fazem write-through para `tb_event_assignment`; as leituras de eventos e escalas continuam totalmente legadas.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio, `V4` para o backfill auditavel de funcoes ministeriais legadas e `V5` para o backfill auditavel de atribuicoes de eventos. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias. A camada Java inicial de `EventAssignment` tambem ja existe e os fluxos legados de criacao de evento com escala, atualizacao de escala e exclusao de evento fazem write-through para `tb_event_assignment`; `V5` garante os assignments dos eventos legados a partir de `tb_event_person` e `person_type`; as leituras de eventos e escalas continuam totalmente legadas.
 
 ## Fases
 
@@ -16,7 +16,7 @@ Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco pers
 | 2. Definicao do banco-alvo e estrategia de Flyway/baseline | Fase 1 | Decisoes de dominio aprovadas | Concluida: MySQL 8.4 LTS aprovado, baseline manual definido e migrations iniciais planejadas |
 | 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
 | 4. Tabelas paralelas | Fase 3 | Baseline validado | Concluida: colunas preparatorias em `tb_person` e tabelas `tb_person_ministry`, `tb_user_account`, `tb_user_account_role`, `tb_event_assignment` criadas de forma aditiva |
-| 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Em andamento: `V4` garante funcoes ministeriais derivadas de `person_type`; proximos backfills ainda pendentes |
+| 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Em andamento: `V4` garante funcoes ministeriais derivadas de `person_type` e `V5` garante atribuicoes de eventos derivadas de `tb_event_person` + `person_type`; backfill de contas ainda pendente |
 | 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Consultas e escrita de escala usando atribuicao explicita |
 | 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Login lendo conta e preservando JWT atual |
 | 8. Reduzir dependencia de subclasses | Fases 6 e 7 | Escalas e contas migradas | Services deixam de depender de subtipo como regra principal |
@@ -119,8 +119,9 @@ Pre-condicoes para backfills:
 Saidas esperadas das proximas fases:
 
 - Backfill de contas a partir de `phone_number`, `password` e roles atuais.
-- Backfill de atribuicoes de escala a partir de `tb_event_person` e subtipo/`person_type`.
+- Backfill de atribuicoes de escala a partir de `tb_event_person` e `person_type` concluido por `V5`.
 - Consultas de auditoria comparando contagens, IDs e vinculos antes/depois.
+- Auditoria de equivalencia entre leituras legadas de escala e `tb_event_assignment`.
 - Avaliar a migracao controlada de leituras oficiais para `tb_person_ministry`, mantendo contratos HTTP estaveis.
 
 Fora do escopo da proxima fase:
@@ -135,8 +136,8 @@ O arquivo global `src/main/resources/import.sql` foi removido para evitar que o 
 
 Estado atual:
 
-- `src/main/resources/db/local/R__load_local_demo_data.sql` contem os dados demonstrativos do profile `local`, sem roles, incluindo usuarios de demonstracao, pessoas, locais, eventos e vinculos.
-- `src/test/resources/db/test/R__load_test_fixtures.sql` contem as fixtures da suite principal de testes, sem roles, preservando os mesmos IDs implicitos utilizados pelos testes atuais.
+- `src/main/resources/db/local/R__load_local_demo_data.sql` contem os dados demonstrativos do profile `local`, sem roles, incluindo usuarios de demonstracao, pessoas, locais, eventos, vinculos legados e assignments derivados.
+- `src/test/resources/db/test/R__load_test_fixtures.sql` contem as fixtures da suite principal de testes, sem roles, preservando os mesmos IDs implicitos utilizados pelos testes atuais e criando assignments derivados dos vinculos legados.
 - `src/main/resources/db/migration/V2__insert_required_roles.sql` continua sendo a fonte dos dados obrigatorios para bancos novos gerenciados por Flyway.
 - O profile `mysql` continua isolado, com `spring.sql.init.mode=never`, Hibernate `validate` e Flyway habilitado.
 - O profile `flyway-test` continua validando apenas `V1` e `V2`, sem carregar pessoas, locais ou eventos demonstrativos.
@@ -147,10 +148,9 @@ Estado atual:
 Proximas etapas planejadas:
 
 1. Avaliar as limitacoes transitorias das listagens paralelas: pessoas com funcoes adicionais podem aparecer nas listagens, mas eventos e escalas ainda validam subtipos legados.
-2. Planejar o backfill auditavel dos eventos existentes para `tb_event_assignment`.
-3. Planejar backfill versionado de `UserAccount`.
-4. Auditar contagens e vinculos antes de alterar leituras de escala.
-5. Planejar o cutover controlado das leituras de escala para atribuicoes explicitas.
+2. Planejar backfill versionado de `UserAccount`.
+3. Auditar equivalencia entre leituras legadas de escala e `tb_event_assignment`.
+4. Planejar o cutover controlado das leituras de escala para atribuicoes explicitas.
 
 ## Dependencias criticas
 
@@ -219,7 +219,7 @@ Saida:
 
 - Funcoes ministeriais derivadas de `person_type` ja cobertas por `V4`.
 - Contas derivadas de `Person.password`, `phoneNumber` e `roles`.
-- Atribuicoes derivadas de `tb_event_person` e `person_type`.
+- Atribuicoes derivadas de `tb_event_person` e `person_type` ja cobertas por `V5`.
 - Contagens e amostras conferidas.
 
 ### Transicao funcional
@@ -341,8 +341,12 @@ Estes itens nao bloqueiam a primeira migracao:
 - O write-through de `EventAssignment` nao consulta `tb_person_ministry` e nao muda a validacao atual de `priestId`, `readerIds`, `commentatorIds`, `ministerOfTheWordIds` ou `eucharisticMinisterIds`.
 - A sincronizacao preserva assignments mantidos, incluindo `id` e `created_at`; cria participantes adicionados; remove participantes removidos; e atualiza `assignment_type` quando um registro existente muda de funcao.
 - A exclusao de evento remove assignments antes da exclusao fisica do evento, dentro da mesma transacao; falhas restauram assignments, evento e vinculos legados por rollback.
-- Nenhum backfill de `tb_event_assignment` foi criado nesta etapa. Eventos antigos podem permanecer sem assignments ate serem editados ou ate o backfill auditavel posterior.
-- Eventos antigos editados pelo fluxo legado passam a receber o conjunto completo de assignments correspondente a escala salva.
+- `V5` executa o backfill auditavel de `tb_event_assignment` usando `tb_event_person` + `tb_person.person_type` como fonte oficial, sem consultar `tb_person_ministry`.
+- O write-through de escalas e o backfill `V5` coexistem: eventos novos/editados sao mantidos em tempo real e eventos legados recebem assignments pela migration.
+- Assignments existentes corretos sao preservados com o mesmo `id`, `created_at` e `updated_at`; assignments existentes com tipo divergente sao reconciliados com o legado, preservando `id` e `created_at`.
+- Assignments extras sem vinculo correspondente em `tb_event_person` provocam falha da migration; eles nao sao excluidos silenciosamente.
+- Os seeds `local` e `test` criam assignments derivados em bases novas depois de inserir `tb_event_person`, porque `V5` executa antes das migrations repeatable de cada profile.
+- Eventos antigos editados pelo fluxo legado continuam recebendo o conjunto completo de assignments correspondente a escala salva.
 - As leituras de detalhe de escala, consulta mensal, escala eucaristica, listagens publicas e mappers de resposta continuam usando `tb_event_person`, `CelebrationEvent.people` e subtipos legados.
 - As estruturas legadas permanecem como fonte das leituras e dos contratos HTTP atuais.
-- A proxima etapa de escalas sera planejar e executar um backfill auditavel de eventos existentes para `tb_event_assignment`, antes de qualquer cutover de leitura.
+- A proxima etapa de escalas sera criar auditoria de equivalencia e leitura paralela por `tb_event_assignment`, antes de qualquer cutover de leitura.
