@@ -6,7 +6,7 @@ Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Minist
 
 Executar a migracao de forma incremental, preservando contratos existentes e evitando perda de historico, credenciais ou administradores.
 
-Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias.
+Estado atual: a fase de ADR e decisoes foi concluida em 2026-07-17. O banco persistente-alvo aprovado e MySQL 8.4 LTS. A introducao inicial do Flyway usa `V1` para o schema atual, `V2` para os dados obrigatorios de roles, `V3` para as estruturas paralelas do novo dominio e `V4` para o backfill auditavel de funcoes ministeriais legadas. O seed global `import.sql` foi removido e substituido por dados explicitos por ambiente. Os profiles `local` e `test` ja usam Flyway para criar schema e roles obrigatorias, com dados demonstrativos/fixtures em localizacoes isoladas. A camada Java inicial de `PersonMinistry` foi criada e os CRUDs ministeriais legados fazem write-through para `tb_person_ministry`, sem alterar contratos HTTP. A leitura paralela por `tb_person_ministry` e a auditoria interna de compatibilidade ja existem para validacao da migracao. As listagens ministeriais legadas possuem shadow read interno. As listagens `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia` estao preparadas para origem oficial configuravel entre `LEGACY` e `PARALLEL`; o default global permanece `LEGACY`, e o profile `local` usa `PARALLEL` para validacao funcional controlada dessas cinco categorias. A camada Java inicial de `EventAssignment` tambem ja existe e os fluxos legados de criacao de evento com escala, atualizacao de escala e exclusao de evento fazem write-through para `tb_event_assignment`; as leituras de eventos e escalas continuam totalmente legadas.
 
 ## Fases
 
@@ -147,10 +147,10 @@ Estado atual:
 Proximas etapas planejadas:
 
 1. Avaliar as limitacoes transitorias das listagens paralelas: pessoas com funcoes adicionais podem aparecer nas listagens, mas eventos e escalas ainda validam subtipos legados.
-2. Planejar a migracao das atribuicoes de escala para `tb_event_assignment`.
+2. Planejar o backfill auditavel dos eventos existentes para `tb_event_assignment`.
 3. Planejar backfill versionado de `UserAccount`.
-4. Planejar backfill versionado de `EventAssignment`.
-5. Auditar contagens e vinculos antes de alterar leitura/escrita funcional.
+4. Auditar contagens e vinculos antes de alterar leituras de escala.
+5. Planejar o cutover controlado das leituras de escala para atribuicoes explicitas.
 
 ## Dependencias criticas
 
@@ -336,3 +336,13 @@ Estes itens nao bloqueiam a primeira migracao:
 - `tb_event_assignment` preserva inicialmente a regra de uma unica funcao por pessoa no mesmo evento por meio de `UNIQUE(event_id, person_id)`.
 - `PersonMinistry` esta em modo de compatibilidade: novas escritas dos CRUDs ministeriais mantem a tabela paralela, `V4` garante o vinculo das pessoas legadas, e as demais leituras continuam no modelo legado ate proxima aprovacao.
 - A leitura paralela de `PersonMinistry` esta disponivel para validacao interna, testes, shadow read das cinco funcoes ministeriais e origem oficial configuravel de `GET /leitores`, `GET /comentaristas`, `GET /padres`, `GET /ministrosDaPalavra` e `GET /ministrosDeEucaristia`. No profile `local`, as cinco listagens ministeriais usam `PARALLEL`; nos demais perfis o default global permanece `LEGACY`. Eventos e escalas ainda usam o modelo legado ate a migracao posterior das atribuicoes.
+- A camada Java de `EventAssignment` foi introduzida com enum `EventAssignmentType`, entidade, repository e servico interno de compatibilidade.
+- A criacao de evento com escala e a atualizacao de escala mantem `tb_event_assignment` em paralelo com `tb_event_person`, usando os participantes ja aceitos pelas regras legadas de subtipo.
+- O write-through de `EventAssignment` nao consulta `tb_person_ministry` e nao muda a validacao atual de `priestId`, `readerIds`, `commentatorIds`, `ministerOfTheWordIds` ou `eucharisticMinisterIds`.
+- A sincronizacao preserva assignments mantidos, incluindo `id` e `created_at`; cria participantes adicionados; remove participantes removidos; e atualiza `assignment_type` quando um registro existente muda de funcao.
+- A exclusao de evento remove assignments antes da exclusao fisica do evento, dentro da mesma transacao; falhas restauram assignments, evento e vinculos legados por rollback.
+- Nenhum backfill de `tb_event_assignment` foi criado nesta etapa. Eventos antigos podem permanecer sem assignments ate serem editados ou ate o backfill auditavel posterior.
+- Eventos antigos editados pelo fluxo legado passam a receber o conjunto completo de assignments correspondente a escala salva.
+- As leituras de detalhe de escala, consulta mensal, escala eucaristica, listagens publicas e mappers de resposta continuam usando `tb_event_person`, `CelebrationEvent.people` e subtipos legados.
+- As estruturas legadas permanecem como fonte das leituras e dos contratos HTTP atuais.
+- A proxima etapa de escalas sera planejar e executar um backfill auditavel de eventos existentes para `tb_event_assignment`, antes de qualquer cutover de leitura.
