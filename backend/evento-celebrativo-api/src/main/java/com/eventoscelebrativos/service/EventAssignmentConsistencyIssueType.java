@@ -1,0 +1,10 @@
+package com.eventoscelebrativos.service;
+
+public enum EventAssignmentConsistencyIssueType {
+    MISSING_PARALLEL_ASSIGNMENT,
+    EXTRA_PARALLEL_ASSIGNMENT,
+    ASSIGNMENT_TYPE_MISMATCH,
+    DUPLICATE_PARALLEL_ASSIGNMENT,
+    MULTIPLE_PRIESTS,
+    UNKNOWN_LEGACY_PERSON_TYPE
+}
