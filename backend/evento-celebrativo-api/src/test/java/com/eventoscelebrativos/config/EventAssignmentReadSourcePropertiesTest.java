@@ -107,7 +107,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldBindReadSourcesAsLegacyInMysqlProfile() {
+    void shouldBindReadSourcesAsParallelInMysqlProfile() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -119,9 +119,9 @@ class EventAssignmentReadSourcePropertiesTest {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
 
-                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
-                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
-                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
                 });
     }
 
@@ -135,12 +135,21 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldNotOverrideReadSourcesInMysqlProfile() {
+    void shouldDeclareMysqlApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application-mysql.properties");
 
-        assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
-        assertFalse(properties.containsKey(PREFIX + "eucharist-scale"));
-        assertFalse(properties.containsKey(PREFIX + "monthly-schedule"));
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:PARALLEL}",
+                properties.getProperty(PREFIX + "event-scale-detail")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:PARALLEL}",
+                properties.getProperty(PREFIX + "eucharist-scale")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE:PARALLEL}",
+                properties.getProperty(PREFIX + "monthly-schedule")
+        );
     }
 
     @Test
@@ -209,6 +218,84 @@ class EventAssignmentReadSourcePropertiesTest {
                     assertTrue(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
                     assertTrue(shadowProperties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlEventScaleDetailRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL=LEGACY"
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    EventAssignmentShadowReadProperties shadowProperties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
+                    assertFalse(shadowProperties.isEventDetailEnabled());
+                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
+                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
+                    assertFalse(shadowProperties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlEucharistScaleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE=LEGACY"
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    EventAssignmentShadowReadProperties shadowProperties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
+                    assertFalse(shadowProperties.isEventDetailEnabled());
+                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
+                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
+                    assertFalse(shadowProperties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlMonthlyScheduleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE=LEGACY"
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    EventAssignmentShadowReadProperties shadowProperties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
+                    assertFalse(shadowProperties.isEventDetailEnabled());
+                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
+                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
+                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
