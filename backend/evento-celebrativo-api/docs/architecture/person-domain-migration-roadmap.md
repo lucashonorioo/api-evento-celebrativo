@@ -383,5 +383,8 @@ Estes itens nao bloqueiam a primeira migracao:
 - A paginacao paralela da consulta mensal usa consulta paginada para eventos elegiveis e consulta em lote para assignments/pessoas da pagina, sem consulta por evento, sem consulta por pessoa e sem paginacao em memoria.
 - O rollback operacional local da consulta mensal pode ser feito definindo `EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE=LEGACY`, sem alteracao de codigo ou banco e sem afetar detalhe da escala ou escala eucaristica.
 - A leitura oficial `PARALLEL` da consulta mensal nao possui fallback silencioso para o legado; falhas devem aparecer como falhas normais da aplicacao.
+- A validacao consolidada dos tres cutovers de escala (`GET /eventos/{id}/escala`, `GET /eventos/escala/eucaristia` e `GET /eventos/escalas`) confirma que o profile `local` pode executar os tres em `PARALLEL` simultaneamente, enquanto base, `test` e `mysql` permanecem em `LEGACY` por padrao.
+- Os rollbacks dos tres cutovers sao independentes por variavel de ambiente e nao alteram as flags de shadow read.
+- A validacao consolidada compara `LEGACY` e `PARALLEL` semanticamente, cobre dados de backfill e write-through, confirma ausencia de escrita em GET, ausencia de fallback silencioso e ausencia de uso de `tb_event_person` na montagem paralela das respostas.
 - Endpoints, DTOs, mappers de resposta e listagem geral continuam com contratos HTTP inalterados; `GET /eventos/{id}` e listagem geral de eventos continuam usando o modelo legado.
-- A proxima etapa devera observar a estabilidade dos cutovers oficiais de escala ja migrados por `tb_event_assignment` antes de remover estruturas ou dependencias legadas.
+- Nenhuma estrutura legada foi removida; a proxima decisao sera avaliar a ampliacao do cutover para o profile `mysql` ou manter um periodo adicional de observacao.
