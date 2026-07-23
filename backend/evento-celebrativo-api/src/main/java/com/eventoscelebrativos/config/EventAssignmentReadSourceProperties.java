@@ -9,6 +9,7 @@ public class EventAssignmentReadSourceProperties {
 
     private EventAssignmentReadSource eventScaleDetail = EventAssignmentReadSource.LEGACY;
     private EventAssignmentReadSource eucharistScale = EventAssignmentReadSource.LEGACY;
+    private EventAssignmentReadSource monthlySchedule = EventAssignmentReadSource.LEGACY;
 
     public EventAssignmentReadSource getEventScaleDetail() {
         return eventScaleDetail;
@@ -24,5 +25,13 @@ public class EventAssignmentReadSourceProperties {
 
     public void setEucharistScale(EventAssignmentReadSource eucharistScale) {
         this.eucharistScale = eucharistScale;
+    }
+
+    public EventAssignmentReadSource getMonthlySchedule() {
+        return monthlySchedule;
+    }
+
+    public void setMonthlySchedule(EventAssignmentReadSource monthlySchedule) {
+        this.monthlySchedule = monthlySchedule;
     }
 }

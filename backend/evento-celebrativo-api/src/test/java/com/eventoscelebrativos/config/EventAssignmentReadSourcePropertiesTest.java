@@ -36,6 +36,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
             assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
             assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+            assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
         });
     }
 
@@ -52,6 +53,10 @@ class EventAssignmentReadSourcePropertiesTest {
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:LEGACY}",
                 properties.getProperty(PREFIX + "eucharist-scale")
         );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE:LEGACY}",
+                properties.getProperty(PREFIX + "monthly-schedule")
+        );
     }
 
     @Test
@@ -67,6 +72,10 @@ class EventAssignmentReadSourcePropertiesTest {
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:PARALLEL}",
                 properties.getProperty(PREFIX + "eucharist-scale")
         );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE:PARALLEL}",
+                properties.getProperty(PREFIX + "monthly-schedule")
+        );
     }
 
     @Test
@@ -79,6 +88,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
                 });
     }
 
@@ -92,6 +102,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
                 });
     }
 
@@ -110,6 +121,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
                 });
     }
 
@@ -119,6 +131,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
         assertFalse(properties.containsKey(PREFIX + "eucharist-scale"));
+        assertFalse(properties.containsKey(PREFIX + "monthly-schedule"));
     }
 
     @Test
@@ -127,6 +140,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
         assertFalse(properties.containsKey(PREFIX + "eucharist-scale"));
+        assertFalse(properties.containsKey(PREFIX + "monthly-schedule"));
     }
 
     @Test
@@ -144,6 +158,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
                     assertTrue(shadowProperties.isEventDetailEnabled());
                     assertTrue(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
@@ -166,6 +181,30 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
+                    assertTrue(shadowProperties.isEventDetailEnabled());
+                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
+                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
+                    assertTrue(shadowProperties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalMonthlyScheduleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE=LEGACY"
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    EventAssignmentShadowReadProperties shadowProperties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
                     assertTrue(shadowProperties.isEventDetailEnabled());
                     assertTrue(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
@@ -188,6 +227,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
                     assertFalse(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isEventDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
@@ -205,6 +245,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
             assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
             assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+            assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
         });
     }
 
@@ -218,6 +259,21 @@ class EventAssignmentReadSourcePropertiesTest {
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
+                });
+    }
+
+    @Test
+    void shouldBindMonthlyScheduleReadSourceIgnoringCase() {
+        contextRunner
+                .withPropertyValues(PREFIX + "monthly-schedule=parallel")
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                 });
     }
 
@@ -225,6 +281,19 @@ class EventAssignmentReadSourcePropertiesTest {
     void shouldFailContextWhenEventScaleDetailReadSourceIsInvalid() {
         contextRunner
                 .withPropertyValues(PREFIX + "event-scale-detail=invalid")
+                .run(context -> {
+                    Throwable failure = context.getStartupFailure();
+
+                    assertNotNull(failure);
+                    assertTrue(hasMessageContaining(failure, "app.event-assignment.read-source"));
+                    assertTrue(hasMessageContaining(failure, "invalid"));
+                });
+    }
+
+    @Test
+    void shouldFailContextWhenMonthlyScheduleReadSourceIsInvalid() {
+        contextRunner
+                .withPropertyValues(PREFIX + "monthly-schedule=invalid")
                 .run(context -> {
                     Throwable failure = context.getStartupFailure();
 

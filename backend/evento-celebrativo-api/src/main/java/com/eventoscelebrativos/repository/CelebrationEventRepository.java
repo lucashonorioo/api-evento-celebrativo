@@ -192,6 +192,60 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
     @Query(
             value = """
                     SELECT
+                        ce.id AS eventId,
+                        ce.name_mass_or_event AS eventName,
+                        ce.event_date AS eventDate,
+                        ce.event_time AS eventTime,
+                        ce.mass_or_celebration AS massOrCelebration,
+                        MIN(l.id) AS locationId,
+                        MIN(l.church_name) AS churchName
+                    FROM tb_celebration_event ce
+                    LEFT JOIN tb_event_location el ON ce.id = el.event_id
+                    LEFT JOIN tb_location l ON l.id = el.location_id
+                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    AND (
+                        :includeUnassigned = TRUE
+                        OR EXISTS (
+                            SELECT 1
+                            FROM tb_event_assignment ea
+                            WHERE ea.event_id = ce.id
+                            AND ea.assignment_type = :assignmentType
+                        )
+                    )
+                    GROUP BY
+                        ce.id,
+                        ce.name_mass_or_event,
+                        ce.event_date,
+                        ce.event_time,
+                        ce.mass_or_celebration
+                    ORDER BY ce.event_date, ce.event_time, ce.id
+                    """,
+            countQuery = """
+                    SELECT COUNT(*)
+                    FROM tb_celebration_event ce
+                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    AND (
+                        :includeUnassigned = TRUE
+                        OR EXISTS (
+                            SELECT 1
+                            FROM tb_event_assignment ea
+                            WHERE ea.event_id = ce.id
+                            AND ea.assignment_type = :assignmentType
+                        )
+                    )
+                    """,
+            nativeQuery = true)
+    Page<EventScheduleEventProjection> findEventScheduleEventsByAssignments(
+            Pageable pageable,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("assignmentType") String assignmentType,
+            @Param("includeUnassigned") boolean includeUnassigned
+    );
+
+    @Query(
+            value = """
+                    SELECT
                         ep.event_id AS eventId,
                         p.id AS personId,
                         p.name AS personName
@@ -205,6 +259,24 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
     List<EventScheduleAssignmentProjection> findEventScheduleAssignments(
             @Param("eventIds") List<Long> eventIds,
             @Param("personType") String personType
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        ea.event_id AS eventId,
+                        p.id AS personId,
+                        p.name AS personName
+                    FROM tb_event_assignment ea
+                    INNER JOIN tb_person p ON p.id = ea.person_id
+                    WHERE ea.event_id IN (:eventIds)
+                    AND ea.assignment_type = :assignmentType
+                    ORDER BY ea.event_id, p.name, p.id
+                    """,
+            nativeQuery = true)
+    List<EventScheduleAssignmentProjection> findEventScheduleAssignmentsByAssignmentType(
+            @Param("eventIds") List<Long> eventIds,
+            @Param("assignmentType") String assignmentType
     );
 
     @Query("""
