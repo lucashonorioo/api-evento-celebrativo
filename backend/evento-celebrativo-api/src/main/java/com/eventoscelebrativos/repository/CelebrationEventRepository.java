@@ -4,6 +4,7 @@ import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
+import com.eventoscelebrativos.projection.LegacyEventAssignmentProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -277,6 +278,82 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
     List<EventScheduleAssignmentProjection> findEventScheduleAssignmentsByAssignmentType(
             @Param("eventIds") List<Long> eventIds,
             @Param("assignmentType") String assignmentType
+    );
+
+    @Query(
+            value = """
+                    SELECT ce.id
+                    FROM CelebrationEvent ce
+                    WHERE (:startDate IS NULL OR ce.eventDate >= :startDate)
+                    AND (:endDate IS NULL OR ce.eventDate <= :endDate)
+                    ORDER BY ce.eventDate, ce.eventTime, ce.id
+                    """,
+            countQuery = """
+                    SELECT COUNT(ce.id)
+                    FROM CelebrationEvent ce
+                    WHERE (:startDate IS NULL OR ce.eventDate >= :startDate)
+                    AND (:endDate IS NULL OR ce.eventDate <= :endDate)
+                    """)
+    Page<Long> findEventIdsForAssignmentAudit(
+            Pageable pageable,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(
+            value = """
+                    SELECT ce.id
+                    FROM CelebrationEvent ce
+                    WHERE ce.id = :eventId
+                    AND (:startDate IS NULL OR ce.eventDate >= :startDate)
+                    AND (:endDate IS NULL OR ce.eventDate <= :endDate)
+                    ORDER BY ce.eventDate, ce.eventTime, ce.id
+                    """,
+            countQuery = """
+                    SELECT COUNT(ce.id)
+                    FROM CelebrationEvent ce
+                    WHERE ce.id = :eventId
+                    AND (:startDate IS NULL OR ce.eventDate >= :startDate)
+                    AND (:endDate IS NULL OR ce.eventDate <= :endDate)
+                    """)
+    Page<Long> findEventIdForAssignmentAudit(
+            Pageable pageable,
+            @Param("eventId") Long eventId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    default List<LegacyEventAssignmentProjection> findLegacyEventAssignmentsForAudit(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return List.of();
+        }
+        return findLegacyEventAssignmentsForAuditInternal(eventIds);
+    }
+
+    @Query(
+            value = """
+                    SELECT
+                        ep.event_id AS eventId,
+                        p.id AS personId,
+                        p.person_type AS personType
+                    FROM tb_event_person ep
+                    INNER JOIN tb_person p ON p.id = ep.person_id
+                    WHERE ep.event_id IN (:eventIds)
+                    ORDER BY
+                        ep.event_id,
+                        CASE p.person_type
+                            WHEN 'priest' THEN 0
+                            WHEN 'reader' THEN 1
+                            WHEN 'commentator' THEN 2
+                            WHEN 'minister_of_the_word' THEN 3
+                            WHEN 'eucharistic_minister' THEN 4
+                            ELSE 99
+                        END,
+                        p.id
+                    """,
+            nativeQuery = true)
+    List<LegacyEventAssignmentProjection> findLegacyEventAssignmentsForAuditInternal(
+            @Param("eventIds") List<Long> eventIds
     );
 
     @Query("""

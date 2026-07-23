@@ -53,6 +53,7 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/eventos/escalas").authenticated()
 				.requestMatchers(HttpMethod.GET, "/eventos/*/escala").authenticated()
 				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
+				.requestMatchers(HttpMethod.GET, "/admin/event-assignments/consistency").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas", "/pessoas/*").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/roles").hasAuthority("ROLE_ADMIN")
 				.anyRequest().authenticated());
