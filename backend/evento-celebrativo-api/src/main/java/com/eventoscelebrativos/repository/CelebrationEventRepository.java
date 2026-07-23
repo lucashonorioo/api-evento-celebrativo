@@ -26,7 +26,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                         ce.event_date AS eventDate,
                         ce.event_time AS eventTime,
                         l.church_name AS churchName,
-                        GROUP_CONCAT(p.name) AS ministerNames
+                        GROUP_CONCAT(p.name ORDER BY p.name, p.id) AS ministerNames
                     FROM tb_celebration_event ce
                     INNER JOIN tb_event_location el ON ce.id = el.event_id
                     INNER JOIN tb_location l ON l.id = el.location_id
@@ -126,7 +126,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     INNER JOIN tb_person p ON p.id = ea.person_id
                     WHERE ea.event_id IN (:eventIds)
                     AND ea.assignment_type = 'EUCHARISTIC_MINISTER'
-                    ORDER BY ea.event_id, ea.id
+                    ORDER BY ea.event_id, p.name, p.id
                     """,
             nativeQuery = true)
     List<EventScheduleAssignmentProjection> findEucharistScaleAssignmentsByEventIds(
