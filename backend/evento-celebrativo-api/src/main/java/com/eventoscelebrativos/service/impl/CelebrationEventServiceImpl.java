@@ -190,6 +190,19 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         validateEventScheduleQuery(startDate, endDate, type, page, size);
 
         PageRequest pageable = PageRequest.of(page, size);
+        return switch (eventAssignmentReadSourceProperties.getMonthlySchedule()) {
+            case LEGACY -> findEventSchedulesLegacy(startDate, endDate, type, includeUnassigned, pageable);
+            case PARALLEL -> findEventSchedulesParallel(startDate, endDate, type, includeUnassigned, pageable);
+        };
+    }
+
+    private Page<EventScheduleQueryResponseDTO> findEventSchedulesLegacy(
+            LocalDate startDate,
+            LocalDate endDate,
+            EventScheduleType type,
+            boolean includeUnassigned,
+            PageRequest pageable
+    ) {
         Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEvents(
                 pageable,
                 startDate,
@@ -211,6 +224,37 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 .map(event -> toEventScheduleQueryResponse(event, type, assignmentsByEvent))
                 .toList();
         runMonthlyScheduleShadowRead(eventIds, type, assignmentsByEvent);
+
+        return new PageImpl<>(content, pageable, eventPage.getTotalElements());
+    }
+
+    private Page<EventScheduleQueryResponseDTO> findEventSchedulesParallel(
+            LocalDate startDate,
+            LocalDate endDate,
+            EventScheduleType type,
+            boolean includeUnassigned,
+            PageRequest pageable
+    ) {
+        LOGGER.debug("monthly-schedule source = {}", EventAssignmentReadSource.PARALLEL);
+        EventAssignmentType assignmentType = toAssignmentType(type);
+        Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEventsByAssignments(
+                pageable,
+                startDate,
+                endDate,
+                assignmentType.name(),
+                includeUnassigned
+        );
+
+        List<Long> eventIds = eventPage.getContent().stream()
+                .map(EventScheduleEventProjection::getEventId)
+                .toList();
+
+        Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent =
+                findAssignmentsByEventAssignmentType(eventIds, assignmentType);
+
+        List<EventScheduleQueryResponseDTO> content = eventPage.getContent().stream()
+                .map(event -> toEventScheduleQueryResponse(event, type, assignmentsByEvent))
+                .toList();
 
         return new PageImpl<>(content, pageable, eventPage.getTotalElements());
     }
@@ -509,6 +553,28 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                         )
                 ));
     }
+
+    private Map<Long, List<EventScheduleAssignmentResponseDTO>> findAssignmentsByEventAssignmentType(
+            List<Long> eventIds,
+            EventAssignmentType assignmentType
+    ) {
+        if (eventIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return celebrationEventRepository.findEventScheduleAssignmentsByAssignmentType(eventIds, assignmentType.name()).stream()
+                .collect(Collectors.groupingBy(
+                        EventScheduleAssignmentProjection::getEventId,
+                        Collectors.mapping(
+                                assignment -> new EventScheduleAssignmentResponseDTO(
+                                        assignment.getPersonId(),
+                                        assignment.getPersonName()
+                                ),
+                                Collectors.toList()
+                        )
+                ));
+    }
+
 
     private Map<Long, List<String>> findEucharistMinistersByEvent(List<Long> eventIds) {
         if (eventIds.isEmpty()) {

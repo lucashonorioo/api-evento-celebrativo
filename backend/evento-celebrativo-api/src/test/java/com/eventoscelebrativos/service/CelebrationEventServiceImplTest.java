@@ -9,6 +9,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
+import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -106,6 +107,8 @@ class CelebrationEventServiceImplTest {
         lenient().when(eventAssignmentReadSourceProperties.getEventScaleDetail())
                 .thenReturn(EventAssignmentReadSource.LEGACY);
         lenient().when(eventAssignmentReadSourceProperties.getEucharistScale())
+                .thenReturn(EventAssignmentReadSource.LEGACY);
+        lenient().when(eventAssignmentReadSourceProperties.getMonthlySchedule())
                 .thenReturn(EventAssignmentReadSource.LEGACY);
     }
 
@@ -839,6 +842,163 @@ class CelebrationEventServiceImplTest {
 
         assertTrue(result.isEmpty());
         verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
+    }
+
+    @Test
+    void shouldFindEventSchedulesFromParallelAssignmentsWithoutLegacyReadOrShadow() {
+        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.READER.name()),
+                eq(false)
+        )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L), scheduleEvent(2L)), PageRequest.of(1, 2), 5));
+        when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L, 2L), EventAssignmentType.READER.name()))
+                .thenReturn(List.of(
+                        scheduleAssignment(1L, 10L, "Ana"),
+                        scheduleAssignment(2L, 11L, "Pessoa de outro subtipo")
+                ));
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 1, 2, false);
+
+        assertEquals(5, result.getTotalElements());
+        assertEquals(1, result.getNumber());
+        assertEquals(EventScheduleType.READER, result.getContent().get(0).getAssignmentType());
+        assertEquals(List.of(10L), result.getContent().get(0).getAssignments().stream()
+                .map(EventScheduleAssignmentResponseDTO::getPersonId)
+                .toList());
+        assertEquals(List.of(11L), result.getContent().get(1).getAssignments().stream()
+                .map(EventScheduleAssignmentResponseDTO::getPersonId)
+                .toList());
+        verify(repository).findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.READER.name()),
+                eq(false)
+        );
+        verify(repository).findEventScheduleAssignmentsByAssignmentType(List.of(1L, 2L), EventAssignmentType.READER.name());
+        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
+        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
+        verify(eventAssignmentShadowReadExecutor, never()).comparePartialAssignmentsIfEnabled(
+                anyBoolean(),
+                eq("monthly-schedule"),
+                anyList(),
+                any(),
+                any()
+        );
+        verifyNoInteractions(eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldPassIncludeUnassignedToParallelMonthlyScheduleQuery() {
+        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.PRIEST.name()),
+                eq(true)
+        )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.PRIEST.name()))
+                .thenReturn(List.of());
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.PRIEST, 0, 10, true);
+
+        assertTrue(result.getContent().get(0).getAssignments().isEmpty());
+        verify(repository).findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.PRIEST.name()),
+                eq(true)
+        );
+    }
+
+    @Test
+    void shouldReturnEmptyEventSchedulePageFromParallelSourceWithoutAssignmentBatch() {
+        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.READER.name()),
+                eq(false)
+        )).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        Page<EventScheduleQueryResponseDTO> result =
+                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
+
+        assertTrue(result.isEmpty());
+        verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
+        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
+        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.READER.name()),
+                eq(false)
+        )).thenThrow(new IllegalStateException("controlled parallel failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false)
+        );
+
+        assertEquals("controlled parallel failure", exception.getMessage());
+        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
+        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
+        verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldPropagateParallelAssignmentBatchFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
+        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEventScheduleEventsByAssignments(
+                any(),
+                eq(EVENT_DATE),
+                eq(EVENT_DATE),
+                eq(EventAssignmentType.READER.name()),
+                eq(false)
+        )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
+        when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.READER.name()))
+                .thenThrow(new IllegalStateException("controlled batch failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false)
+        );
+
+        assertEquals("controlled batch failure", exception.getMessage());
+        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
+        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldPropagateLegacyFailureWithoutParallelFallbackWhenFindingEventSchedules() {
+        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
+                .thenThrow(new IllegalStateException("controlled legacy failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false)
+        );
+
+        assertEquals("controlled legacy failure", exception.getMessage());
+        verify(repository, never()).findEventScheduleEventsByAssignments(any(), any(), any(), anyString(), anyBoolean());
+        verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
     }
 
     @Test
