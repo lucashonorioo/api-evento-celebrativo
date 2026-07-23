@@ -98,6 +98,9 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/admin/event-assignments/consistency"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -137,6 +140,9 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/admin/event-assignments/consistency"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -175,6 +181,9 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/eventos/1/escala"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/admin/event-assignments/consistency"))
                 .andExpect(status().isOk());
     }
 
