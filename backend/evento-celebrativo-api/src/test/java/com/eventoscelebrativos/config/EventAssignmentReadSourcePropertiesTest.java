@@ -41,22 +41,39 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldDeclareBaseApplicationPropertiesWithLegacyDefaultAndEnvironmentOverride() {
+    void shouldDeclareBaseApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application.properties");
 
         assertFalse(properties.containsKey(PREFIX + "event-detail"));
         assertEquals(
-                "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:LEGACY}",
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:PARALLEL}",
                 properties.getProperty(PREFIX + "event-scale-detail")
         );
         assertEquals(
-                "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:LEGACY}",
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:PARALLEL}",
                 properties.getProperty(PREFIX + "eucharist-scale")
         );
         assertEquals(
-                "${EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE:LEGACY}",
+                "${EVENT_ASSIGNMENT_READ_SOURCE_MONTHLY_SCHEDULE:PARALLEL}",
                 properties.getProperty(PREFIX + "monthly-schedule")
         );
+    }
+
+    @Test
+    void shouldBindReadSourcesAsParallelInBaseApplicationProperties() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active="
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
+                });
     }
 
     @Test
