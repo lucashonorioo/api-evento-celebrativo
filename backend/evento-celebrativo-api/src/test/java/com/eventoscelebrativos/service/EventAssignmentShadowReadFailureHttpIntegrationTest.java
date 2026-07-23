@@ -22,6 +22,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "app.event-assignment.read-source.event-scale-detail=LEGACY",
+        "app.event-assignment.read-source.eucharist-scale=LEGACY",
+        "app.event-assignment.read-source.monthly-schedule=LEGACY",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",
