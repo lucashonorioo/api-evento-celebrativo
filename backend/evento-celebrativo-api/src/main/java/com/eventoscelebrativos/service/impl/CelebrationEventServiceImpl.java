@@ -135,27 +135,46 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             throw new BusinessException("As datas estão inválidas");
         }
 
+        return switch (eventAssignmentReadSourceProperties.getEucharistScale()) {
+            case LEGACY -> findEucharistScaleLegacy(pageable, startDate, endDate);
+            case PARALLEL -> findEucharistScaleParallel(pageable, startDate, endDate);
+        };
+    }
+
+    private Page<EucharistScaleEventResponseDTO> findEucharistScaleLegacy(
+            Pageable pageable,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
         Page<EucharistScaleEventProjection> projections =
                 celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
         runEucharistScaleShadowRead(projections.getContent());
 
-        return projections.map(projection -> {
-            EucharistScaleEventResponseDTO dto = new EucharistScaleEventResponseDTO(
-                    projection.getNameMassOrEvent(),
-                    projection.getEventDate(),
-                    projection.getEventTime(),
-                    projection.getChurchName()
-            );
+        return projections.map(this::toLegacyEucharistScaleResponse);
+    }
 
-            if (projection.getMinisterNames() != null && !projection.getMinisterNames().isBlank()) {
-                Arrays.stream(projection.getMinisterNames().split(","))
-                        .map(String::trim)
-                        .filter(name -> !name.isBlank())
-                        .forEach(dto.getNameMinisters()::add);
-            }
+    private Page<EucharistScaleEventResponseDTO> findEucharistScaleParallel(
+            Pageable pageable,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        LOGGER.debug("eucharist-scale source = {}", EventAssignmentReadSource.PARALLEL);
+        Page<EucharistScaleEventProjection> eventPage =
+                celebrationEventRepository.findEucharistScaleByAssignments(pageable, startDate, endDate);
+        List<Long> eventIds = eventPage.getContent().stream()
+                .map(EucharistScaleEventProjection::getEventId)
+                .distinct()
+                .toList();
+        Map<Long, List<String>> ministersByEvent = findEucharistMinistersByEvent(eventIds);
 
-            return dto;
-        });
+        List<EucharistScaleEventResponseDTO> content = eventPage.getContent().stream()
+                .map(event -> toEucharistScaleResponse(
+                        event,
+                        ministersByEvent.getOrDefault(event.getEventId(), List.of())
+                ))
+                .toList();
+
+        return new PageImpl<>(content, eventPage.getPageable(), eventPage.getTotalElements());
     }
 
     @Override
@@ -489,6 +508,50 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                                 Collectors.toList()
                         )
                 ));
+    }
+
+    private Map<Long, List<String>> findEucharistMinistersByEvent(List<Long> eventIds) {
+        if (eventIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return celebrationEventRepository.findEucharistScaleAssignmentsByEventIds(eventIds).stream()
+                .collect(Collectors.groupingBy(
+                        EventScheduleAssignmentProjection::getEventId,
+                        Collectors.mapping(
+                                EventScheduleAssignmentProjection::getPersonName,
+                                Collectors.toList()
+                        )
+                ));
+    }
+
+    private EucharistScaleEventResponseDTO toLegacyEucharistScaleResponse(
+            EucharistScaleEventProjection projection
+    ) {
+        EucharistScaleEventResponseDTO dto = toEucharistScaleResponse(projection, List.of());
+
+        if (projection.getMinisterNames() != null && !projection.getMinisterNames().isBlank()) {
+            Arrays.stream(projection.getMinisterNames().split(","))
+                    .map(String::trim)
+                    .filter(name -> !name.isBlank())
+                    .forEach(dto.getNameMinisters()::add);
+        }
+
+        return dto;
+    }
+
+    private EucharistScaleEventResponseDTO toEucharistScaleResponse(
+            EucharistScaleEventProjection projection,
+            List<String> ministerNames
+    ) {
+        EucharistScaleEventResponseDTO dto = new EucharistScaleEventResponseDTO(
+                projection.getNameMassOrEvent(),
+                projection.getEventDate(),
+                projection.getEventTime(),
+                projection.getChurchName()
+        );
+        dto.getNameMinisters().addAll(ministerNames);
+        return dto;
     }
 
     private void runMonthlyScheduleShadowRead(

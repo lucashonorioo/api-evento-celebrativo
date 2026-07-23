@@ -105,6 +105,8 @@ class CelebrationEventServiceImplTest {
     void configureDefaultReadSource() {
         lenient().when(eventAssignmentReadSourceProperties.getEventScaleDetail())
                 .thenReturn(EventAssignmentReadSource.LEGACY);
+        lenient().when(eventAssignmentReadSourceProperties.getEucharistScale())
+                .thenReturn(EventAssignmentReadSource.LEGACY);
     }
 
     @Test
@@ -562,6 +564,9 @@ class CelebrationEventServiceImplTest {
         assertEquals(EVENT_TIME, dto.getEventTime());
         assertEquals("Igreja Matriz", dto.getChurchName());
         assertEquals(List.of("Ana", "Bruno"), dto.getNameMinisters());
+        verify(repository).findEucharistScale(pageable, startDate, endDate);
+        verify(repository, never()).findEucharistScaleByAssignments(any(), any(), any());
+        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
     }
 
     @Test
@@ -583,6 +588,121 @@ class CelebrationEventServiceImplTest {
                 eq(com.eventoscelebrativos.model.EventAssignmentType.EUCHARISTIC_MINISTER),
                 org.mockito.ArgumentMatchers.<Supplier<List<EventAssignmentSnapshot>>>any()
         );
+    }
+
+    @Test
+    void shouldFindEucharistScaleFromParallelAssignmentsWithoutLegacyReadOrShadow() {
+        PageRequest pageable = PageRequest.of(1, 2);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        EucharistScaleEventProjection first = projection(1L, "Missa A", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
+        EucharistScaleEventProjection second = projection(2L, "Missa B", EVENT_DATE.plusDays(1), EVENT_TIME, "Capela", null);
+        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+                .thenReturn(new PageImpl<>(List.of(first, second), pageable, 5));
+        when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        scheduleAssignment(1L, 10L, "Mariana"),
+                        scheduleAssignment(1L, 11L, "Carlos"),
+                        scheduleAssignment(2L, 12L, "Pessoa de outro subtipo")
+                ));
+
+        Page<EucharistScaleEventResponseDTO> result = service.findEucharistScale(pageable, startDate, endDate);
+
+        assertEquals(5, result.getTotalElements());
+        assertEquals(1, result.getNumber());
+        assertEquals(List.of("Mariana", "Carlos"), result.getContent().get(0).getNameMinisters());
+        assertEquals(List.of("Pessoa de outro subtipo"), result.getContent().get(1).getNameMinisters());
+        verify(repository).findEucharistScaleByAssignments(pageable, startDate, endDate);
+        verify(repository).findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L));
+        verify(repository, never()).findEucharistScale(any(), any(), any());
+        verify(eventAssignmentShadowReadExecutor, never()).comparePartialAssignmentsIfEnabled(
+                anyBoolean(),
+                eq("eucharist-scale"),
+                anyList(),
+                any(),
+                any()
+        );
+        verifyNoInteractions(eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldReturnEmptyEucharistScalePageFromParallelSourceWithoutAssignmentBatch() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2030, 1, 1);
+        LocalDate endDate = LocalDate.of(2030, 1, 31);
+        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<EucharistScaleEventResponseDTO> result = service.findEucharistScale(pageable, startDate, endDate);
+
+        assertTrue(result.isEmpty());
+        assertEquals(0, result.getTotalElements());
+        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
+        verify(repository, never()).findEucharistScale(any(), any(), any());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor);
+    }
+
+    @Test
+    void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEucharistScale() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+                .thenThrow(new IllegalStateException("controlled parallel failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEucharistScale(pageable, startDate, endDate)
+        );
+
+        assertEquals("controlled parallel failure", exception.getMessage());
+        verify(repository, never()).findEucharistScale(any(), any(), any());
+        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldPropagateParallelAssignmentBatchFailureWithoutLegacyFallbackWhenFindingEucharistScale() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
+        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+                .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
+        when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L)))
+                .thenThrow(new IllegalStateException("controlled batch failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEucharistScale(pageable, startDate, endDate)
+        );
+
+        assertEquals("controlled batch failure", exception.getMessage());
+        verify(repository, never()).findEucharistScale(any(), any(), any());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+    }
+
+    @Test
+    void shouldPropagateLegacyFailureWithoutParallelFallbackWhenFindingEucharistScale() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        when(repository.findEucharistScale(pageable, startDate, endDate))
+                .thenThrow(new IllegalStateException("controlled legacy failure"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.findEucharistScale(pageable, startDate, endDate)
+        );
+
+        assertEquals("controlled legacy failure", exception.getMessage());
+        verify(repository, never()).findEucharistScaleByAssignments(any(), any(), any());
+        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
+        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
     }
 
     @Test
@@ -1127,10 +1247,21 @@ class CelebrationEventServiceImplTest {
             String churchName,
             String ministerNames
     ) {
+        return projection(1L, nameMassOrEvent, eventDate, eventTime, churchName, ministerNames);
+    }
+
+    private EucharistScaleEventProjection projection(
+            Long eventId,
+            String nameMassOrEvent,
+            LocalDate eventDate,
+            LocalTime eventTime,
+            String churchName,
+            String ministerNames
+    ) {
         return new EucharistScaleEventProjection() {
             @Override
             public Long getEventId() {
-                return 1L;
+                return eventId;
             }
 
             @Override
