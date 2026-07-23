@@ -1,0 +1,286 @@
+<section class="event-assignment-audit page-shell" aria-labelledby="audit-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Administração</p>
+      <h1 id="audit-title">Auditoria de consistência das escalas</h1>
+      <p>
+        Compara os vínculos legados dos eventos com as atribuições paralelas. Esta operação não
+        altera nem corrige dados.
+      </p>
+    </div>
+  </header>
+
+  <p class="audit__warning" role="note">
+    A auditoria é somente leitura e não corrige inconsistências automaticamente.
+  </p>
+
+  <form
+    class="audit__filters surface-card"
+    [formGroup]="filtersForm"
+    (ngSubmit)="executeAudit()"
+    novalidate
+  >
+    <div class="audit__field">
+      <label for="audit-start-date">Data inicial</label>
+      <input id="audit-start-date" type="date" formControlName="startDate" />
+    </div>
+
+    <div class="audit__field">
+      <label for="audit-end-date">Data final</label>
+      <input
+        id="audit-end-date"
+        type="date"
+        formControlName="endDate"
+        aria-describedby="audit-date-range-error"
+      />
+      @if (showDateRangeError()) {
+        <p id="audit-date-range-error" class="audit__validation">
+          A data inicial não pode ser posterior à data final.
+        </p>
+      }
+    </div>
+
+    <div class="audit__field">
+      <label for="audit-event-id">ID do evento</label>
+      <input
+        id="audit-event-id"
+        type="number"
+        min="1"
+        step="1"
+        formControlName="eventId"
+        aria-describedby="audit-event-id-error"
+      />
+      @if (showEventIdError()) {
+        <p id="audit-event-id-error" class="audit__validation">
+          Informe um ID de evento inteiro e positivo.
+        </p>
+      }
+    </div>
+
+    <div class="audit__field">
+      <label for="audit-page-size">Tamanho da página</label>
+      <input
+        id="audit-page-size"
+        type="number"
+        min="1"
+        max="100"
+        step="1"
+        formControlName="size"
+        aria-describedby="audit-page-size-error"
+      />
+      @if (showPageSizeError()) {
+        <p id="audit-page-size-error" class="audit__validation">
+          Informe um tamanho entre 1 e 100.
+        </p>
+      }
+    </div>
+
+    <label class="audit__checkbox">
+      <input type="checkbox" formControlName="includeDetails" />
+      <span>Exibir detalhes</span>
+    </label>
+
+    <div class="audit__actions">
+      <button class="audit__button" type="submit" [disabled]="isLoading()">
+        Executar auditoria
+      </button>
+      <button
+        class="audit__button audit__button--secondary"
+        type="button"
+        [disabled]="isLoading()"
+        (click)="clearFilters()"
+      >
+        Limpar filtros
+      </button>
+    </div>
+  </form>
+
+  <div class="audit__messages" aria-live="polite">
+    @if (isLoading()) {
+      <p class="audit__status" role="status">Executando auditoria...</p>
+    } @else if (errorMessage()) {
+      <div
+        class="audit__feedback audit__feedback--error"
+        role="alert"
+        tabindex="-1"
+      >
+        <p>{{ errorMessage() }}</p>
+        <button class="audit__button" type="button" (click)="retry()">
+          Tentar novamente
+        </button>
+      </div>
+    } @else if (!hasExecuted()) {
+      <p class="audit__status">
+        Informe os filtros desejados e execute a auditoria para visualizar o resumo.
+      </p>
+    }
+  </div>
+
+  @if (result(); as auditResult) {
+    <section class="audit__result" aria-live="polite">
+      <div
+        class="audit__page-state"
+        [class.audit__page-state--consistent]="isConsistentPage()"
+        [class.audit__page-state--inconsistent]="hasInconsistencies()"
+      >
+        @if (isEmptyPage()) {
+          <strong>Nenhum evento encontrado.</strong>
+          <span>Total de eventos encontrados pelos filtros: {{ auditResult.totalElements }}.</span>
+        } @else if (isConsistentPage()) {
+          <strong>Página consistente.</strong>
+          <span>Total de eventos encontrados pelos filtros: {{ auditResult.totalElements }}.</span>
+        } @else {
+          <strong>Página com inconsistências.</strong>
+          <span>Total de eventos encontrados pelos filtros: {{ auditResult.totalElements }}.</span>
+        }
+      </div>
+
+      <section class="audit__summary surface-card" aria-labelledby="audit-summary-title">
+        <div>
+          <h2 id="audit-summary-title">Resumo da página auditada</h2>
+          <p>
+            Página {{ auditResult.page + 1 }} de {{ auditResult.totalPages || 1 }} com
+            {{ auditResult.numberOfElements }} evento(s) retornado(s).
+          </p>
+        </div>
+
+        <div class="audit__metric-grid">
+          @for (metric of summaryMetrics(); track metric.label) {
+            <article class="audit__metric">
+              <span>{{ metric.label }}</span>
+              <strong>{{ metric.value }}</strong>
+            </article>
+          }
+        </div>
+
+        <div class="audit__issue-grid" aria-label="Tipos de problemas">
+          @for (metric of issueMetrics(); track metric.label) {
+            <article class="audit__issue-metric">
+              <span>{{ metric.label }}</span>
+              <strong>{{ metric.value }}</strong>
+            </article>
+          }
+        </div>
+      </section>
+
+      @if (isDetailsHidden()) {
+        <p class="audit__status">
+          Os detalhes foram ocultados para esta auditoria.
+        </p>
+      } @else if (events().length === 0) {
+        <p class="audit__status">
+          Nenhum evento inconsistente foi retornado nos detalhes desta página.
+        </p>
+      } @else {
+        <section class="audit__details surface-card" aria-labelledby="audit-details-title">
+          <h2 id="audit-details-title">Eventos inconsistentes</h2>
+
+          <div class="audit__table-wrapper">
+            <table class="audit__table">
+              <thead>
+                <tr>
+                  <th scope="col">Evento</th>
+                  <th scope="col">Participantes legados</th>
+                  <th scope="col">Assignments paralelos</th>
+                  <th scope="col">Problemas</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col">Expandir</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (event of events(); track event.eventId) {
+                  <tr>
+                    <td data-label="Evento">Evento {{ event.eventId }}</td>
+                    <td data-label="Participantes legados">
+                      {{ event.legacyParticipantCount }}
+                    </td>
+                    <td data-label="Assignments paralelos">
+                      {{ event.parallelAssignmentCount }}
+                    </td>
+                    <td data-label="Problemas">{{ event.issueCount }}</td>
+                    <td data-label="Situação">
+                      <span class="audit__badge">
+                        {{ eventStatusLabel(event) }}
+                      </span>
+                    </td>
+                    <td data-label="Expandir">
+                      <button
+                        class="audit__button audit__button--secondary"
+                        type="button"
+                        [attr.aria-expanded]="isEventExpanded(event)"
+                        [attr.aria-controls]="eventDetailsId(event)"
+                        (click)="toggleEvent(event)"
+                      >
+                        {{ isEventExpanded(event) ? 'Ocultar' : 'Ver problemas' }}
+                      </button>
+                    </td>
+                  </tr>
+
+                  @if (isEventExpanded(event)) {
+                    <tr class="audit__details-row">
+                      <td colspan="6">
+                        <section
+                          class="audit__issue-panel"
+                          [id]="eventDetailsId(event)"
+                          [attr.aria-label]="'Problemas do evento ' + event.eventId"
+                        >
+                          <ul class="audit__issue-list">
+                            @for (issue of event.issues; track issue.issueType + '-' + issue.personId + '-' + $index) {
+                              <li>
+                                <strong>{{ issueTypeLabel(issue.issueType) }}</strong>
+                                <dl>
+                                  <div>
+                                    <dt>Evento</dt>
+                                    <dd>{{ eventIdLabel(issue) }}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>ID da pessoa</dt>
+                                    <dd>{{ nullableNumberLabel(issue.personId) }}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Tipo legado</dt>
+                                    <dd>{{ assignmentTypeLabel(issue.legacyType) }}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Tipo paralelo</dt>
+                                    <dd>{{ assignmentTypeLabel(issue.parallelType) }}</dd>
+                                  </div>
+                                </dl>
+                              </li>
+                            }
+                          </ul>
+                        </section>
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      @if (auditResult.totalPages > 0) {
+        <nav class="audit__pagination" aria-label="Paginação da auditoria">
+          <button
+            class="audit__button audit__button--secondary"
+            type="button"
+            [disabled]="!canGoPrevious()"
+            (click)="previousPage()"
+          >
+            Página anterior
+          </button>
+          <span>Página {{ auditResult.page + 1 }} de {{ auditResult.totalPages }}</span>
+          <button
+            class="audit__button audit__button--secondary"
+            type="button"
+            [disabled]="!canGoNext()"
+            (click)="nextPage()"
+          >
+            Próxima página
+          </button>
+        </nav>
+      }
+    </section>
+  }
+</section>

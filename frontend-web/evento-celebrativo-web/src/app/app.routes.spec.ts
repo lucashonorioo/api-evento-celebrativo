@@ -12,6 +12,7 @@ import { CommentatorManagementComponent } from './commentators/commentator-manag
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharisticMinisterManagementComponent } from './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
+import { EventAssignmentAuditPageComponent } from './event-assignment-audit/event-assignment-audit-page/event-assignment-audit-page.component';
 import { EventScheduleCreateComponent } from './event-schedules/event-schedule-create/event-schedule-create.component';
 import { EventScheduleDetailComponent } from './event-schedules/event-schedule-detail/event-schedule-detail.component';
 import { EventScheduleEditComponent } from './event-schedules/event-schedule-edit/event-schedule-edit.component';
@@ -84,6 +85,7 @@ describe('routes', () => {
       'escalas/eventos/:id',
       'admin/escalas/eventos/:id/editar',
       'admin/escalas/novo-evento',
+      'admin/auditoria-de-escalas',
     ];
 
     for (const path of privatePaths) {
@@ -152,6 +154,14 @@ describe('routes', () => {
     expectAppRouteProtection();
     await expectLazyComponent(appScheduleCreateRoute, EventScheduleCreateComponent);
     expect(appScheduleCreateRoute?.canActivate).toEqual([adminGuard]);
+  });
+
+  it('should render event assignment audit inside the protected app route for admins only', async () => {
+    const auditRoute = findAppChildRoute('admin/auditoria-de-escalas');
+
+    expectAppRouteProtection();
+    await expectLazyComponent(auditRoute, EventAssignmentAuditPageComponent);
+    expect(auditRoute?.canActivate).toEqual([adminGuard]);
   });
 
   it('should render locations inside the protected app route', async () => {

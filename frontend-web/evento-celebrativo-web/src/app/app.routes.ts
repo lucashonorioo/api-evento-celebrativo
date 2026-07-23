@@ -105,6 +105,14 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       {
+        path: 'admin/auditoria-de-escalas',
+        loadComponent: () =>
+          import(
+            './event-assignment-audit/event-assignment-audit-page/event-assignment-audit-page.component'
+          ).then(({ EventAssignmentAuditPageComponent }) => EventAssignmentAuditPageComponent),
+        canActivate: [adminGuard],
+      },
+      {
         path: 'escala/eucaristia',
         loadComponent: () =>
           import(

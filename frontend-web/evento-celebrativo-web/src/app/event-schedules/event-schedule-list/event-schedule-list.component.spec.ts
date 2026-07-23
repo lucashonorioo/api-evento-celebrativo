@@ -101,10 +101,10 @@ describe('EventScheduleListComponent', () => {
 
     fixture.detectChanges();
 
-    const createLink = Array.from(
+    const links = Array.from(
       fixture.nativeElement.querySelectorAll('.page-action'),
     ) as HTMLAnchorElement[];
-    const createAction = createLink.find((link) =>
+    const createAction = links.find((link) =>
       link.textContent?.includes('Novo evento com escala'),
     ) as
       | HTMLAnchorElement
@@ -115,12 +115,29 @@ describe('EventScheduleListComponent', () => {
     expect(createAction?.getAttribute('href')).toContain('/app/admin/escalas/novo-evento');
   });
 
+  it('should render the event assignment audit action for administrators', async () => {
+    await setup(createPage(), {}, true);
+
+    fixture.detectChanges();
+
+    const links = Array.from(
+      fixture.nativeElement.querySelectorAll('.page-action'),
+    ) as HTMLAnchorElement[];
+    const auditAction = links.find((link) =>
+      link.textContent?.includes('Auditoria de consistência'),
+    );
+
+    expect(auditAction).toBeDefined();
+    expect(auditAction?.getAttribute('href')).toContain('/app/admin/auditoria-de-escalas');
+  });
+
   it('should not render the event with schedule creation action for operators', async () => {
     await setup(createPage(), {}, false);
 
     fixture.detectChanges();
 
     expect(textContent()).not.toContain('Novo evento com escala');
+    expect(textContent()).not.toContain('Auditoria de consistência');
   });
 
   it('should render a link to the full schedule detail without showing ids as text', async () => {
