@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 public class EventAssignmentReadSourceProperties {
 
     private EventAssignmentReadSource eventScaleDetail = EventAssignmentReadSource.LEGACY;
+    private EventAssignmentReadSource eucharistScale = EventAssignmentReadSource.LEGACY;
 
     public EventAssignmentReadSource getEventScaleDetail() {
         return eventScaleDetail;
@@ -15,5 +16,13 @@ public class EventAssignmentReadSourceProperties {
 
     public void setEventScaleDetail(EventAssignmentReadSource eventScaleDetail) {
         this.eventScaleDetail = eventScaleDetail;
+    }
+
+    public EventAssignmentReadSource getEucharistScale() {
+        return eucharistScale;
+    }
+
+    public void setEucharistScale(EventAssignmentReadSource eucharistScale) {
+        this.eucharistScale = eucharistScale;
     }
 }

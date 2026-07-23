@@ -35,6 +35,7 @@ class EventAssignmentReadSourcePropertiesTest {
                     context.getBean(EventAssignmentReadSourceProperties.class);
 
             assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+            assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
         });
     }
 
@@ -47,6 +48,10 @@ class EventAssignmentReadSourcePropertiesTest {
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:LEGACY}",
                 properties.getProperty(PREFIX + "event-scale-detail")
         );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:LEGACY}",
+                properties.getProperty(PREFIX + "eucharist-scale")
+        );
     }
 
     @Test
@@ -57,6 +62,10 @@ class EventAssignmentReadSourcePropertiesTest {
         assertEquals(
                 "${EVENT_ASSIGNMENT_READ_SOURCE_EVENT_SCALE_DETAIL:PARALLEL}",
                 properties.getProperty(PREFIX + "event-scale-detail")
+        );
+        assertEquals(
+                "${EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE:PARALLEL}",
+                properties.getProperty(PREFIX + "eucharist-scale")
         );
     }
 
@@ -69,6 +78,7 @@ class EventAssignmentReadSourcePropertiesTest {
                             context.getBean(EventAssignmentReadSourceProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                 });
     }
 
@@ -81,6 +91,7 @@ class EventAssignmentReadSourcePropertiesTest {
                             context.getBean(EventAssignmentReadSourceProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                 });
     }
 
@@ -98,6 +109,7 @@ class EventAssignmentReadSourcePropertiesTest {
                             context.getBean(EventAssignmentReadSourceProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                 });
     }
 
@@ -106,6 +118,7 @@ class EventAssignmentReadSourcePropertiesTest {
         Properties properties = loadProperties("application-test.properties");
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
+        assertFalse(properties.containsKey(PREFIX + "eucharist-scale"));
     }
 
     @Test
@@ -113,6 +126,7 @@ class EventAssignmentReadSourcePropertiesTest {
         Properties properties = loadProperties("application-mysql.properties");
 
         assertFalse(properties.containsKey(PREFIX + "event-scale-detail"));
+        assertFalse(properties.containsKey(PREFIX + "eucharist-scale"));
     }
 
     @Test
@@ -129,6 +143,29 @@ class EventAssignmentReadSourcePropertiesTest {
                             context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertTrue(shadowProperties.isEventDetailEnabled());
+                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
+                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
+                    assertTrue(shadowProperties.isEucharistScaleEnabled());
+                });
+    }
+
+    @Test
+    void shouldAllowLocalEucharistScaleRollbackWithoutChangingEventScaleDetailOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=local",
+                        "EVENT_ASSIGNMENT_READ_SOURCE_EUCHARIST_SCALE=LEGACY"
+                )
+                .run(context -> {
+                    EventAssignmentReadSourceProperties properties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    EventAssignmentShadowReadProperties shadowProperties =
+                            context.getBean(EventAssignmentShadowReadProperties.class);
+
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                     assertTrue(shadowProperties.isEventDetailEnabled());
                     assertTrue(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
@@ -150,6 +187,7 @@ class EventAssignmentReadSourcePropertiesTest {
                             context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertFalse(shadowProperties.isEventScaleDetailEnabled());
                     assertTrue(shadowProperties.isEventDetailEnabled());
                     assertTrue(shadowProperties.isMonthlyScheduleEnabled());
@@ -162,10 +200,24 @@ class EventAssignmentReadSourcePropertiesTest {
         contextRunner
                 .withPropertyValues(PREFIX + "event-scale-detail=parallel")
                 .run(context -> {
+            EventAssignmentReadSourceProperties properties =
+                    context.getBean(EventAssignmentReadSourceProperties.class);
+
+            assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+            assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
+        });
+    }
+
+    @Test
+    void shouldBindEucharistScaleReadSourceIgnoringCase() {
+        contextRunner
+                .withPropertyValues(PREFIX + "eucharist-scale=parallel")
+                .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
 
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                 });
     }
 
@@ -173,6 +225,19 @@ class EventAssignmentReadSourcePropertiesTest {
     void shouldFailContextWhenEventScaleDetailReadSourceIsInvalid() {
         contextRunner
                 .withPropertyValues(PREFIX + "event-scale-detail=invalid")
+                .run(context -> {
+                    Throwable failure = context.getStartupFailure();
+
+                    assertNotNull(failure);
+                    assertTrue(hasMessageContaining(failure, "app.event-assignment.read-source"));
+                    assertTrue(hasMessageContaining(failure, "invalid"));
+                });
+    }
+
+    @Test
+    void shouldFailContextWhenEucharistScaleReadSourceIsInvalid() {
+        contextRunner
+                .withPropertyValues(PREFIX + "eucharist-scale=invalid")
                 .run(context -> {
                     Throwable failure = context.getStartupFailure();
 

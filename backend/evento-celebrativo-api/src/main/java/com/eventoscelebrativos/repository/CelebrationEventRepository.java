@@ -66,6 +66,77 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
             value = """
                     SELECT
                         ce.id AS eventId,
+                        ce.name_mass_or_event AS nameMassOrEvent,
+                        ce.event_date AS eventDate,
+                        ce.event_time AS eventTime,
+                        l.church_name AS churchName,
+                        NULL AS ministerNames
+                    FROM tb_celebration_event ce
+                    INNER JOIN tb_event_location el ON ce.id = el.event_id
+                    INNER JOIN tb_location l ON l.id = el.location_id
+                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    AND EXISTS (
+                        SELECT 1
+                        FROM tb_event_assignment ea
+                        WHERE ea.event_id = ce.id
+                        AND ea.assignment_type = 'EUCHARISTIC_MINISTER'
+                    )
+                    GROUP BY
+                        ce.id,
+                        ce.name_mass_or_event,
+                        ce.event_date,
+                        ce.event_time,
+                        l.id,
+                        l.church_name
+                    ORDER BY ce.event_date, ce.event_time, ce.name_mass_or_event
+                    """,
+            countQuery = """
+                    SELECT COUNT(*)
+                    FROM (
+                        SELECT
+                            ce.id AS event_id,
+                            l.id AS location_id
+                        FROM tb_celebration_event ce
+                        INNER JOIN tb_event_location el ON ce.id = el.event_id
+                        INNER JOIN tb_location l ON l.id = el.location_id
+                        WHERE ce.event_date BETWEEN :startDate AND :endDate
+                        AND EXISTS (
+                            SELECT 1
+                            FROM tb_event_assignment ea
+                            WHERE ea.event_id = ce.id
+                            AND ea.assignment_type = 'EUCHARISTIC_MINISTER'
+                        )
+                        GROUP BY ce.id, l.id
+                    ) AS total
+                    """,
+            nativeQuery = true)
+    Page<EucharistScaleEventProjection> findEucharistScaleByAssignments(
+            Pageable pageable,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        ea.event_id AS eventId,
+                        p.id AS personId,
+                        p.name AS personName
+                    FROM tb_event_assignment ea
+                    INNER JOIN tb_person p ON p.id = ea.person_id
+                    WHERE ea.event_id IN (:eventIds)
+                    AND ea.assignment_type = 'EUCHARISTIC_MINISTER'
+                    ORDER BY ea.event_id, ea.id
+                    """,
+            nativeQuery = true)
+    List<EventScheduleAssignmentProjection> findEucharistScaleAssignmentsByEventIds(
+            @Param("eventIds") List<Long> eventIds
+    );
+
+    @Query(
+            value = """
+                    SELECT
+                        ce.id AS eventId,
                         ce.name_mass_or_event AS eventName,
                         ce.event_date AS eventDate,
                         ce.event_time AS eventTime,
