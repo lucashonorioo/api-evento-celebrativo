@@ -173,18 +173,33 @@ class PersonMinistryReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldNotOverrideReaderReadSourceInMysqlProfile() {
+    void shouldDeclareMysqlApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application-mysql.properties");
 
-        assertFalse(properties.containsKey(PREFIX + "reader"));
-        assertFalse(properties.containsKey(PREFIX + "commentator"));
-        assertFalse(properties.containsKey(PREFIX + "priest"));
-        assertFalse(properties.containsKey(PREFIX + "minister-of-the-word"));
-        assertFalse(properties.containsKey(PREFIX + "eucharistic-minister"));
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}",
+                properties.getProperty(PREFIX + "reader")
+        );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}",
+                properties.getProperty(PREFIX + "commentator")
+        );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_PRIEST:PARALLEL}",
+                properties.getProperty(PREFIX + "priest")
+        );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD:PARALLEL}",
+                properties.getProperty(PREFIX + "minister-of-the-word")
+        );
+        assertEquals(
+                "${PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER:PARALLEL}",
+                properties.getProperty(PREFIX + "eucharistic-minister")
+        );
     }
 
     @Test
-    void shouldBindReadSourcesAsLegacyInMysqlProfile() {
+    void shouldBindReadSourcesAsParallelInMysqlProfileWithoutChangingEventAssignmentSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -192,14 +207,22 @@ class PersonMinistryReadSourcePropertiesTest {
                         "MYSQL_DATASOURCE_USERNAME=test",
                         "MYSQL_DATASOURCE_PASSWORD=test"
                 )
-                .run(context -> assertPersonMinistryReadSources(
-                        context.getBean(PersonMinistryReadSourceProperties.class),
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY
-                ));
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+
+                    EventAssignmentReadSourceProperties eventAssignmentProperties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getMonthlySchedule());
+                });
     }
 
     @Test
@@ -416,6 +439,151 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.LEGACY
                     );
                     assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlReaderRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "PERSON_MINISTRY_READ_SOURCE_READER=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlCommentatorRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "PERSON_MINISTRY_READ_SOURCE_COMMENTATOR=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlPriestRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "PERSON_MINISTRY_READ_SOURCE_PRIEST=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlMinisterOfTheWordRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlEucharisticMinisterRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        "PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowMysqlShadowReadOverrideWithoutChangingReadSources() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=mysql",
+                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
+                        "MYSQL_DATASOURCE_USERNAME=test",
+                        "MYSQL_DATASOURCE_PASSWORD=test",
+                        SHADOW_PREFIX + "reader-enabled=true"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+
+                    PersonMinistryShadowReadProperties shadowProperties =
+                            context.getBean(PersonMinistryShadowReadProperties.class);
+                    assertTrue(shadowProperties.isReaderEnabled());
+                    assertFalse(shadowProperties.isCommentatorEnabled());
+                    assertFalse(shadowProperties.isPriestEnabled());
+                    assertFalse(shadowProperties.isMinisterOfTheWordEnabled());
+                    assertFalse(shadowProperties.isEucharisticMinisterEnabled());
                 });
     }
 
