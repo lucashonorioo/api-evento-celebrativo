@@ -16,14 +16,14 @@ O projeto nasceu de uma necessidade real de organização de escalas em contexto
 | Linguagem e framework | Java 21, Spring Boot 3.4.5 |
 | Build | Maven Wrapper |
 | API | Spring Web, Bean Validation |
-| Persistência | Spring Data JPA, H2 Database no perfil atual |
+| Persistência | Spring Data JPA, Flyway (migrations versionadas), H2 no perfil `local`/`test`, MySQL no perfil `mysql` |
 | Segurança | Spring Security, OAuth2, JWT |
 | Mapeamento | MapStruct |
 | Documentação | SpringDoc OpenAPI, Swagger UI |
 | Testes | JUnit 5, Mockito, MockMvc, `@DataJpaTest` |
 | Testes manuais | Postman, Swagger UI |
 
-> Observação: o backend possui driver MySQL no `pom.xml`, mas ainda não há profile/datasource real configurado para MySQL. No estado atual, o banco configurado é H2. Banco relacional real com migrations está listado como melhoria planejada.
+> Observação: o perfil padrão (`APP_PROFILE=local`, usado quando a variável não é definida) usa H2 com Flyway aplicando as migrations versionadas em `src/main/resources/db/migration`. O perfil `mysql` (`APP_PROFILE=mysql`) usa um datasource MySQL real, configurado por variáveis de ambiente (`MYSQL_DATASOURCE_URL`, `MYSQL_DATASOURCE_USERNAME`, `MYSQL_DATASOURCE_PASSWORD`), com o mesmo mecanismo de migrations.
 
 ---
 
@@ -50,12 +50,12 @@ O projeto nasceu de uma necessidade real de organização de escalas em contexto
 - Tratamento de erro referencial em deletes com resposta controlada.
 - Testes automatizados de service, repository e controller.
 - Documentação Swagger/OpenAPI.
+- Banco relacional real (MySQL) com migrations versionadas usando Flyway, no perfil `mysql`.
 
 ### Planejadas
 
 - Integração com frontend.
 - Perfis separados para `test`, `dev` e `prod`.
-- Banco relacional real com migrations usando Flyway ou Liquibase.
 - Remoção de secrets default antes de ambiente real.
 - Remoção de hardcoded `localhost` antes de deploy.
 - Relatórios.

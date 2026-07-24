@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -7,9 +7,9 @@ const destructiveCommandRules = [
   [/\bgit\s+clean\s+[^\r\n]*(?:--force|-[a-z]*f[a-z]*)/i, 'git clean com force pode remover arquivos não rastreados.'],
   [/\bgit\s+push\s+[^\r\n]*(?:--force(?:-with-lease)?|-f)(?:\s|$)/i, 'Force push está bloqueado pela política do projeto.'],
   [/\bgit\s+branch\s+-D\b/i, 'Exclusão forçada de branch está bloqueada.'],
-  [/\bgit\s+checkout\s+--\s+(?:\.|\*|:\/)\s*$/i, 'Esse checkout pode descartar alterações locais em massa.'],
-  [/\bgit\s+restore\s+[^\r\n]*(?:\s\.|\s\*)\s*$/i, 'Esse restore pode descartar alterações locais em massa.'],
-  [/\brm\s+-[^\r\n]*r[^\r\n]*f[^\r\n]*\s+(?:\/|~|\.|\.\/|\*)\s*$/i, 'Remoção recursiva da raiz, home ou diretório atual está bloqueada.'],
+  [/\bgit\s+checkout\s+(?:\S+\s+)?--\s+(?:\.|\*|:\/)\s*$/i, 'Esse checkout pode descartar alterações locais em massa.'],
+  [/\bgit\s+restore\s+(?:\S+\s+)*(?:\.|\*)\s*$/i, 'Esse restore pode descartar alterações locais em massa.'],
+  [/\brm\s+-[^\r\n]*r[^\r\n]*f[^\r\n]*\s+(?:\/\*?|~\/?|\.\/?|\*)\s*$/i, 'Remoção recursiva da raiz, home ou diretório atual está bloqueada.'],
   [/\bRemove-Item\b[^\r\n]*(?:-Recurse[^\r\n]*-Force|-Force[^\r\n]*-Recurse)[^\r\n]*(?:\s\.\s*$|\s\*\s*$|[A-Z]:\\\s*$)/i, 'Remoção recursiva forçada em massa está bloqueada.'],
   [/\b(?:diskpart|format\s+[A-Z]:|shutdown\b|Stop-Computer\b|Restart-Computer\b)/i, 'Comando destrutivo de sistema ou desligamento está bloqueado.'],
 ];
@@ -32,6 +32,21 @@ export function isProtectedEnvFile(normalizedPath) {
   return !/^\.env\.(?:example|sample|template)$/i.test(name);
 }
 
+export function isPathTrackedByGit(absolutePath, projectDir) {
+  try {
+    execFileSync('git', ['-C', projectDir, 'ls-files', '--error-unmatch', '--', absolutePath], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch (error) {
+    // ls-files sai com status 1 quando o caminho não está rastreado; qualquer outra
+    // falha (git ausente, diretório fora de um repositório etc.) é tratada como
+    // rastreada para falhar de forma segura e não liberar a escrita por engano.
+    if (error.status === 1) return false;
+    return true;
+  }
+}
+
 export function evaluateShellCommand(command) {
   const text = String(command ?? '');
   for (const [pattern, reason] of destructiveCommandRules) {
@@ -45,7 +60,7 @@ export function evaluateFileWrite({
   filePath,
   cwd = process.cwd(),
   projectDir = process.env.CLAUDE_PROJECT_DIR || cwd,
-  pathExists = existsSync,
+  isTracked = isPathTrackedByGit,
 }) {
   const normalized = normalizePath(filePath);
   if (!normalized) return null;
@@ -69,11 +84,8 @@ export function evaluateFileWrite({
     if (pattern.test(normalized)) return `${reason} Caminho: ${normalized}`;
   }
 
-  if (flywayMigrationPattern.test(normalized)) {
-    const overwritesExistingFile = toolName === 'Edit' || pathExists(absolutePath);
-    if (overwritesExistingFile) {
-      return `Migration Flyway versionada existente não deve ser alterada: ${normalized}. Crie uma nova migration incremental.`;
-    }
+  if (flywayMigrationPattern.test(normalized) && isTracked(absolutePath, absoluteProjectDir)) {
+    return `Migration Flyway versionada existente não deve ser alterada: ${normalized}. Crie uma nova migration incremental.`;
   }
 
   return null;
@@ -91,7 +103,7 @@ export function evaluateHookPayload(payload, options = {}) {
       filePath: payload?.tool_input?.file_path,
       cwd: payload?.cwd,
       projectDir: options.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? payload?.cwd,
-      pathExists: options.pathExists,
+      isTracked: options.isTracked,
     });
   }
 

@@ -1,5 +1,11 @@
 import { pathToFileURL } from 'node:url';
 
+// As regras abaixo (destructiveCommandRules e sensitivePathRules) devem ficar em
+// paridade de conteúdo com `.claude/hooks/pre-tool-guard.mjs`. As duas ferramentas
+// divergem intencionalmente apenas em payload (apply_patch vs. Edit/Write) e em
+// formato de saída (JSON hookSpecificOutput.permissionDecision aqui, stderr+exit 2
+// no hook do Claude Code) — ambos os formatos são válidos para suas respectivas
+// ferramentas; não copie um formato de saída para a outra ferramenta.
 const destructiveCommandRules = [
   {
     pattern: /\bgit\s+reset\s+--hard\b/i,
@@ -18,15 +24,15 @@ const destructiveCommandRules = [
     reason: 'Exclusão forçada de branch está bloqueada.',
   },
   {
-    pattern: /\bgit\s+checkout\s+--\s+(?:\.|\*|:\/)/i,
+    pattern: /\bgit\s+checkout\s+(?:\S+\s+)?--\s+(?:\.|\*|:\/)\s*$/i,
     reason: 'Esse checkout pode descartar alterações locais em massa.',
   },
   {
-    pattern: /\bgit\s+restore\s+[^\r\n]*(?:--worktree|--source)[^\r\n]*(?:\s\.|\s\*)/i,
+    pattern: /\bgit\s+restore\s+(?:\S+\s+)*(?:\.|\*)\s*$/i,
     reason: 'Esse restore pode descartar alterações locais em massa.',
   },
   {
-    pattern: /\brm\s+-[^\r\n]*r[^\r\n]*f[^\r\n]*\s+(?:\/|~|\.|\.\/|\*)\s*$/i,
+    pattern: /\brm\s+-[^\r\n]*r[^\r\n]*f[^\r\n]*\s+(?:\/\*?|~\/?|\.\/?|\*)\s*$/i,
     reason: 'Remoção recursiva de raiz, home ou diretório atual está bloqueada.',
   },
   {
@@ -41,7 +47,7 @@ const destructiveCommandRules = [
 
 const sensitivePathRules = [
   {
-    pattern: /(^|\/)\.env(?:\.(?!example$|sample$)[^/]+)?$/i,
+    pattern: /(^|\/)\.env(?:\.(?!example$|sample$|template$)[^/]+)?$/i,
     reason: 'Arquivos .env reais não devem ser alterados pelo agente.',
   },
   {
