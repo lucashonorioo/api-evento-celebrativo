@@ -43,6 +43,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "app.person-ministry.read-source.commentator=LEGACY",
+        "app.person-ministry.read-source.priest=LEGACY",
+        "app.person-ministry.read-source.minister-of-the-word=LEGACY",
+        "app.person-ministry.read-source.eucharistic-minister=LEGACY",
         "app.person-ministry.shadow-read.commentator-enabled=true",
         "app.person-ministry.shadow-read.priest-enabled=true",
         "app.person-ministry.shadow-read.minister-of-the-word-enabled=true",
