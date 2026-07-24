@@ -18,7 +18,7 @@ test('settings registra os eventos e matchers esperados', () => {
   assert.equal(settings.hooks.PostToolUse[0].matcher, 'Edit|Write');
 });
 
-test('hooks usam exec form e apontam para scripts existentes', () => {
+test('hooks usam command como string única (formato oficial) e apontam para scripts existentes', () => {
   const handlers = [
     ...settings.hooks.PreToolUse.flatMap((entry) => entry.hooks),
     ...settings.hooks.PostToolUse.flatMap((entry) => entry.hooks),
@@ -26,11 +26,14 @@ test('hooks usam exec form e apontam para scripts existentes', () => {
 
   for (const handler of handlers) {
     assert.equal(handler.type, 'command');
-    assert.equal(handler.command, 'node');
-    assert.ok(Array.isArray(handler.args));
-    assert.equal(handler.args.length, 1);
+    assert.equal(typeof handler.command, 'string');
+    assert.equal(handler.args, undefined, 'handler não deve usar "args" separado do "command" (fora do schema oficial de hooks)');
+    assert.match(handler.command, /^node "\$\{CLAUDE_PROJECT_DIR\}\/\.claude\/hooks\/[\w-]+\.mjs"$/);
 
-    const relative = handler.args[0].replace('${CLAUDE_PROJECT_DIR}/.claude/', '');
+    const relative = handler.command
+      .replace(/^node "/, '')
+      .replace(/"$/, '')
+      .replace('${CLAUDE_PROJECT_DIR}/.claude/', '');
     assert.doesNotThrow(() => readFileSync(path.resolve(projectClaudeDir, relative), 'utf8'));
   }
 });
