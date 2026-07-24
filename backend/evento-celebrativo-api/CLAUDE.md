@@ -85,6 +85,13 @@ Não crie novas camadas, interfaces ou pacotes nem mova código em massa sem ben
 - Considere compatibilidade, backfill, valores nulos, índices e rollback operacional em mudanças de dados.
 - Não inclua credenciais ou segredos em `application*.properties`.
 
+## Migração de domínio Person/PersonMinistry
+
+- O domínio de pessoas está em transição do modelo legado (entidades por tipo de ministério, ex. `Reader`) para o modelo unificado `Person` + `PersonMinistry`.
+- A fonte de leitura de cada ministério é controlada por `app.person-ministry.read-source.*` (`LEGACY` ou `PARALLEL`, propriedade lida em `PersonMinistryReadSourceProperties`); `app.event-assignment.read-source.*` controla o mesmo padrão para escala/atribuição de evento, via `EventAssignmentReadSourceProperties`. Ambas têm `LEGACY` como padrão quando a variável de ambiente correspondente não é definida.
+- Com `shadow-read` habilitado (`app.person-ministry.shadow-read.*-enabled` / `app.event-assignment.shadow-read.*-enabled`, padrão `false`), o service continua respondendo pela fonte configurada em `read-source`, mas também consulta a outra fonte e compara o resultado sem alterar a resposta (ver `ReaderServiceImpl.findAllReaders()`), servindo para validar a migração sem risco ao contrato.
+- Ao alterar um fluxo de leitura de ministério ou de escala, mantenha os dois caminhos (`LEGACY` e `PARALLEL`) funcionando e consistentes até a migração ser concluída; não assuma que apenas uma das fontes está em uso em produção.
+
 ## DTOs, MapStruct e validação
 
 - Use Bean Validation para regras estruturais de entrada.
