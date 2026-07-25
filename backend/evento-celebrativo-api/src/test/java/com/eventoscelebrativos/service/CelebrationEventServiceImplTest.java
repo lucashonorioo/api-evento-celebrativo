@@ -25,6 +25,7 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
@@ -33,7 +34,6 @@ import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
-import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.CelebrationEventServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +42,7 @@ import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -70,7 +71,10 @@ class CelebrationEventServiceImplTest {
     private LocationRepository locationRepository;
 
     @Mock
-    private PersonRepository personRepository;
+    private PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
+
+    @Spy
+    private ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator = new ScaleLegacyCompatibilityValidator();
 
     @Mock
     private CelebrationEventMapper mapper;
@@ -1081,11 +1085,13 @@ class CelebrationEventServiceImplTest {
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
-        when(personRepository.findById(2L)).thenReturn(Optional.of(reader));
-        when(personRepository.findById(4L)).thenReturn(Optional.of(commentator));
-        when(personRepository.findById(5L)).thenReturn(Optional.of(ministerOfTheWord));
-        when(personRepository.findById(6L)).thenReturn(Optional.of(eucharisticMinister));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
+                eligible(priest, MinistryType.PRIEST),
+                eligible(reader, MinistryType.READER),
+                eligible(commentator, MinistryType.COMMENTATOR),
+                eligible(ministerOfTheWord, MinistryType.MINISTER_OF_THE_WORD),
+                eligible(eucharisticMinister, MinistryType.EUCHARISTIC_MINISTER)
+        ));
         when(repository.save(event)).thenReturn(event);
         when(eventAssignmentTargetResolver.resolve(event.getPeople())).thenReturn(targets);
         when(scaleMapper.toDto(event)).thenReturn(response);
@@ -1104,7 +1110,7 @@ class CelebrationEventServiceImplTest {
         List<EventAssignmentTarget> targets = List.of(new EventAssignmentTarget(priest, com.eventoscelebrativos.model.EventAssignmentType.PRIEST));
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         when(repository.save(any(CelebrationEvent.class))).thenAnswer(invocation -> {
             CelebrationEvent event = invocation.getArgument(0);
             event.setId(1L);
@@ -1135,6 +1141,7 @@ class CelebrationEventServiceImplTest {
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of());
         when(repository.save(event)).thenReturn(event);
         when(eventAssignmentTargetResolver.resolve(event.getPeople())).thenReturn(List.of());
         when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
@@ -1165,18 +1172,37 @@ class CelebrationEventServiceImplTest {
     void shouldThrowResourceNotFoundWhenScalePersonDoesNotExist() {
         when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        when(personRepository.findById(8L)).thenReturn(Optional.empty());
+        when(personMinistryEligibilityResolver.resolve(any()))
+                .thenReturn(List.of(personNotFound(8L, MinistryType.PRIEST)));
 
         assertThrows(ResourceNotFoundException.class, () -> service.updateEventScale(1L, scaleRequest()));
     }
 
     @Test
-    void shouldThrowBusinessExceptionWhenScalePersonHasWrongType() {
+    void shouldThrowBusinessExceptionWhenScalePersonHasActiveMinistryButIncompatibleLegacyType() {
         when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        when(personRepository.findById(8L)).thenReturn(Optional.of(person(new Reader(), 8L, "Leitor")));
+        Reader personWithPriestMinistry = person(new Reader(), 8L, "Leitor");
+        when(personMinistryEligibilityResolver.resolve(any()))
+                .thenReturn(List.of(eligible(personWithPriestMinistry, MinistryType.PRIEST)));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateEventScale(1L, scaleRequest())
+        );
+        assertTrue(exception.getMessage().contains("compatível"));
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenScalePersonHasCompatibleLegacyTypeButNoActiveMinistry() {
+        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
+        Priest priestWithoutActiveMinistry = person(new Priest(), 8L, "Padre");
+        when(personMinistryEligibilityResolver.resolve(any()))
+                .thenReturn(List.of(ministryNotAssigned(priestWithoutActiveMinistry, MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.updateEventScale(1L, scaleRequest()));
+        verify(scaleLegacyCompatibilityValidator, never()).validate(any(), any(), any());
     }
 
     @Test
@@ -1200,6 +1226,7 @@ class CelebrationEventServiceImplTest {
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of());
         when(repository.save(event)).thenReturn(event);
         when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
 
@@ -1218,6 +1245,7 @@ class CelebrationEventServiceImplTest {
                 new CelebrationEventScaleRequestDTO(1L, null, List.of(2L, 2L), null, null, null);
 
         assertThrows(BusinessException.class, () -> service.updateEventScale(1L, request));
+        verifyNoInteractions(personMinistryEligibilityResolver);
     }
 
     @Test
@@ -1230,7 +1258,7 @@ class CelebrationEventServiceImplTest {
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personRepository.findById(8L)).thenReturn(Optional.of(priest));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         when(repository.save(event)).thenReturn(event);
         when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
 
@@ -1243,7 +1271,8 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldNotCreateEventWithScaleWhenScaleIsInvalid() {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        when(personRepository.findById(8L)).thenReturn(Optional.of(person(new Reader(), 8L, "Leitor")));
+        when(personMinistryEligibilityResolver.resolve(any()))
+                .thenReturn(List.of(eligible(person(new Reader(), 8L, "Leitor"), MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
@@ -1322,6 +1351,18 @@ class CelebrationEventServiceImplTest {
         person.setName(name);
         person.setPhoneNumber("34" + id);
         return person;
+    }
+
+    private ScaleParticipantEligibility eligible(Person person, MinistryType ministryType) {
+        return new ScaleParticipantEligibility(person.getId(), ministryType, true, true, person);
+    }
+
+    private ScaleParticipantEligibility personNotFound(Long personId, MinistryType ministryType) {
+        return new ScaleParticipantEligibility(personId, ministryType, false, false, null);
+    }
+
+    private ScaleParticipantEligibility ministryNotAssigned(Person person, MinistryType ministryType) {
+        return new ScaleParticipantEligibility(person.getId(), ministryType, true, false, person);
     }
 
     private EventAssignmentSnapshot snapshot(

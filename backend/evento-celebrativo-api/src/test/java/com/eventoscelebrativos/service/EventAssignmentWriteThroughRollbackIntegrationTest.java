@@ -4,10 +4,13 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Location;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
+import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,9 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
 
     @Autowired
     private PersonRepository personRepository;
+
+    @Autowired
+    private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -164,13 +170,17 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
     private Priest savePriest(String name) {
         Priest priest = new Priest();
         populatePerson(priest, name);
-        return (Priest) personRepository.saveAndFlush(priest);
+        priest = (Priest) personRepository.saveAndFlush(priest);
+        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+        return priest;
     }
 
     private Reader saveReader(String name) {
         Reader reader = new Reader();
         populatePerson(reader, name);
-        return (Reader) personRepository.saveAndFlush(reader);
+        reader = (Reader) personRepository.saveAndFlush(reader);
+        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
+        return reader;
     }
 
     private void populatePerson(Person person, String name) {
