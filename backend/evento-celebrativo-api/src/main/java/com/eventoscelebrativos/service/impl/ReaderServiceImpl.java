@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -16,8 +15,6 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -44,9 +41,7 @@ public class ReaderServiceImpl implements ReaderService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
     private final PersonMinistryReadSourceProperties readSourceProperties;
-    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public ReaderServiceImpl(
             ReaderRepository readerRepository,
@@ -56,9 +51,7 @@ public class ReaderServiceImpl implements ReaderService {
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
             PersonMinistryReadService personMinistryReadService,
-            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
-            PersonMinistryReadSourceProperties readSourceProperties,
-            PersonMinistryShadowReadProperties shadowReadProperties
+            PersonMinistryReadSourceProperties readSourceProperties
     ) {
         this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
@@ -67,9 +60,7 @@ public class ReaderServiceImpl implements ReaderService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
         this.readSourceProperties = readSourceProperties;
-        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -100,17 +91,10 @@ public class ReaderServiceImpl implements ReaderService {
         }
 
         LOGGER.debug(
-                "Reader listing official read source selected: source={}, shadowReadEnabled={}",
-                PersonMinistryReadSource.LEGACY,
-                shadowReadProperties.isReaderEnabled()
+                "Reader listing official read source selected: source={}",
+                PersonMinistryReadSource.LEGACY
         );
         List<Reader> reader = readerRepository.findAll();
-        personMinistryShadowReadExecutor.execute(
-                shadowReadProperties.isReaderEnabled(),
-                MinistryType.READER,
-                reader,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
         return readerMapper.toDtoList(reader);
     }
 

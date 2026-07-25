@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -61,13 +60,7 @@ class ReaderServiceImplTest {
     private PersonMinistryReadService personMinistryReadService;
 
     @Mock
-    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
-
-    @Mock
     private PersonMinistryReadSourceProperties readSourceProperties;
-
-    @Mock
-    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private ReaderServiceImpl service;
@@ -141,7 +134,7 @@ class ReaderServiceImplTest {
     }
 
     @Test
-    void shouldListReadersWithShadowReadDisabled() {
+    void shouldListReadersFromLegacyRepositoryWhenReadSourceIsLegacy() {
         List<Reader> readers = List.of(reader(1L, "encoded-password"));
         List<ReaderResponseDTO> responses = List.of(response(1L));
 
@@ -149,43 +142,17 @@ class ReaderServiceImplTest {
         when(readerMapper.toDtoList(readers)).thenReturn(responses);
 
         assertSame(responses, service.findAllReaders());
-        verify(personMinistryShadowReadExecutor).execute(
-                false,
-                MinistryType.READER,
-                readers,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
         verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
-    void shouldRunReaderShadowReadWhenEnabledAndKeepLegacyResponse() {
-        List<Reader> readers = List.of(reader(1L, "encoded-password"));
-        List<ReaderResponseDTO> responses = List.of(response(1L));
-
-        when(shadowReadProperties.isReaderEnabled()).thenReturn(true);
-        when(readerRepository.findAll()).thenReturn(readers);
-        when(readerMapper.toDtoList(readers)).thenReturn(responses);
-
-        assertSame(responses, service.findAllReaders());
-        verify(personMinistryShadowReadExecutor).execute(
-                true,
-                MinistryType.READER,
-                readers,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
-        verifyNoInteractions(personMinistryReadService);
-    }
-
-    @Test
-    void shouldNotReorderLegacyReaderListWhenShadowReadIsEnabled() {
+    void shouldNotReorderLegacyReaderList() {
         List<Reader> readers = List.of(
                 reader(2L, "encoded-password"),
                 reader(1L, "encoded-password")
         );
         List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
 
-        when(shadowReadProperties.isReaderEnabled()).thenReturn(true);
         when(readerRepository.findAll()).thenReturn(readers);
         when(readerMapper.toDtoList(readers)).thenReturn(responses);
 
@@ -210,7 +177,7 @@ class ReaderServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.READER);
         verify(readerMapper).toDtoPersonList(people);
-        verifyNoInteractions(readerRepository, personMinistryShadowReadExecutor);
+        verifyNoInteractions(readerRepository);
     }
 
     @Test
@@ -238,17 +205,17 @@ class ReaderServiceImplTest {
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenThrow(parallelFailure);
 
         assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
-        verifyNoInteractions(readerRepository, personMinistryShadowReadExecutor, readerMapper);
+        verifyNoInteractions(readerRepository, readerMapper);
     }
 
     @Test
-    void shouldPropagateLegacyFailureWithoutUsingShadowReadAsFallback() {
+    void shouldPropagateLegacyFailureWithoutMappingResponse() {
         RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
 
         when(readerRepository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
-        verifyNoInteractions(personMinistryShadowReadExecutor, readerMapper);
+        verifyNoInteractions(readerMapper);
     }
 
     @Test

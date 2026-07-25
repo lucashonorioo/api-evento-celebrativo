@@ -13,14 +13,12 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PersonMinistryReadSourcePropertiesTest {
 
     private static final String PREFIX = "app.person-ministry.read-source.";
-    private static final String SHADOW_PREFIX = "app.person-ministry.shadow-read.";
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(Config.class);
@@ -93,7 +91,7 @@ class PersonMinistryReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldAllowBaseReaderRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+    void shouldAllowBaseReaderRollbackWithoutChangingOtherBaseSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
@@ -109,12 +107,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowBaseCommentatorRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+    void shouldAllowBaseCommentatorRollbackWithoutChangingOtherBaseSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
@@ -130,12 +127,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowBasePriestRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+    void shouldAllowBasePriestRollbackWithoutChangingOtherBaseSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
@@ -151,12 +147,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowBaseMinisterOfTheWordRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+    void shouldAllowBaseMinisterOfTheWordRollbackWithoutChangingOtherBaseSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
@@ -172,12 +167,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.LEGACY,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowBaseEucharisticMinisterRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+    void shouldAllowBaseEucharisticMinisterRollbackWithoutChangingOtherBaseSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
@@ -193,35 +187,6 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.LEGACY
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
-                });
-    }
-
-    @Test
-    void shouldAllowBaseShadowReadOverrideWithoutChangingReadSources() {
-        applicationPropertiesContextRunner
-                .withPropertyValues(
-                        "spring.config.location=file:src/main/resources/application.properties",
-                        "spring.profiles.active=",
-                        SHADOW_PREFIX + "reader-enabled=true"
-                )
-                .run(context -> {
-                    assertPersonMinistryReadSources(
-                            context.getBean(PersonMinistryReadSourceProperties.class),
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL
-                    );
-
-                    PersonMinistryShadowReadProperties shadowProperties =
-                            context.getBean(PersonMinistryShadowReadProperties.class);
-                    assertTrue(shadowProperties.isReaderEnabled());
-                    assertFalse(shadowProperties.isCommentatorEnabled());
-                    assertFalse(shadowProperties.isPriestEnabled());
-                    assertFalse(shadowProperties.isMinisterOfTheWordEnabled());
-                    assertFalse(shadowProperties.isEucharisticMinisterEnabled());
                 });
     }
 
@@ -484,7 +449,7 @@ class PersonMinistryReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldAllowTestReaderRollbackWithoutChangingOtherTestSourcesOrShadowReadFlags() {
+    void shouldAllowTestReaderRollbackWithoutChangingOtherTestSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -499,12 +464,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowTestCommentatorRollbackWithoutChangingOtherTestSourcesOrShadowReadFlags() {
+    void shouldAllowTestCommentatorRollbackWithoutChangingOtherTestSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -519,12 +483,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowTestPriestRollbackWithoutChangingOtherTestSourcesOrShadowReadFlags() {
+    void shouldAllowTestPriestRollbackWithoutChangingOtherTestSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -539,12 +502,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowTestMinisterOfTheWordRollbackWithoutChangingOtherTestSourcesOrShadowReadFlags() {
+    void shouldAllowTestMinisterOfTheWordRollbackWithoutChangingOtherTestSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -559,12 +521,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.LEGACY,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowTestEucharisticMinisterRollbackWithoutChangingOtherTestSourcesOrShadowReadFlags() {
+    void shouldAllowTestEucharisticMinisterRollbackWithoutChangingOtherTestSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -579,12 +540,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.LEGACY
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowMysqlReaderRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlReaderRollbackWithoutChangingOtherMysqlSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -602,12 +562,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowMysqlCommentatorRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlCommentatorRollbackWithoutChangingOtherMysqlSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -625,12 +584,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowMysqlPriestRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlPriestRollbackWithoutChangingOtherMysqlSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -648,12 +606,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowMysqlMinisterOfTheWordRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlMinisterOfTheWordRollbackWithoutChangingOtherMysqlSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -671,12 +628,11 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.LEGACY,
                             PersonMinistryReadSource.PARALLEL
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
     }
 
     @Test
-    void shouldAllowMysqlEucharisticMinisterRollbackWithoutChangingOtherMysqlSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlEucharisticMinisterRollbackWithoutChangingOtherMysqlSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -694,79 +650,7 @@ class PersonMinistryReadSourcePropertiesTest {
                             PersonMinistryReadSource.PARALLEL,
                             PersonMinistryReadSource.LEGACY
                     );
-                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
                 });
-    }
-
-    @Test
-    void shouldAllowMysqlShadowReadOverrideWithoutChangingReadSources() {
-        applicationPropertiesContextRunner
-                .withPropertyValues(
-                        "spring.profiles.active=mysql",
-                        "MYSQL_DATASOURCE_URL=jdbc:mysql://localhost:3307/evento_celeb_test",
-                        "MYSQL_DATASOURCE_USERNAME=test",
-                        "MYSQL_DATASOURCE_PASSWORD=test",
-                        SHADOW_PREFIX + "reader-enabled=true"
-                )
-                .run(context -> {
-                    assertPersonMinistryReadSources(
-                            context.getBean(PersonMinistryReadSourceProperties.class),
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL
-                    );
-
-                    PersonMinistryShadowReadProperties shadowProperties =
-                            context.getBean(PersonMinistryShadowReadProperties.class);
-                    assertTrue(shadowProperties.isReaderEnabled());
-                    assertFalse(shadowProperties.isCommentatorEnabled());
-                    assertFalse(shadowProperties.isPriestEnabled());
-                    assertFalse(shadowProperties.isMinisterOfTheWordEnabled());
-                    assertFalse(shadowProperties.isEucharisticMinisterEnabled());
-                });
-    }
-
-    @Test
-    void shouldAllowTestShadowReadOverrideWithoutChangingReadSources() {
-        applicationPropertiesContextRunner
-                .withPropertyValues(
-                        "spring.profiles.active=test",
-                        SHADOW_PREFIX + "reader-enabled=true"
-                )
-                .run(context -> {
-                    assertPersonMinistryReadSources(
-                            context.getBean(PersonMinistryReadSourceProperties.class),
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL,
-                            PersonMinistryReadSource.PARALLEL
-                    );
-
-                    PersonMinistryShadowReadProperties shadowProperties =
-                            context.getBean(PersonMinistryShadowReadProperties.class);
-                    assertTrue(shadowProperties.isReaderEnabled());
-                    assertFalse(shadowProperties.isCommentatorEnabled());
-                    assertFalse(shadowProperties.isPriestEnabled());
-                    assertFalse(shadowProperties.isMinisterOfTheWordEnabled());
-                    assertFalse(shadowProperties.isEucharisticMinisterEnabled());
-                });
-    }
-
-    @Test
-    void shouldKeepShadowPropertiesDeclaredUnderTheirOwnPrefix() {
-        Properties properties = loadProperties("application.properties");
-
-        assertEquals(
-                "${PERSON_MINISTRY_SHADOW_READ_READER_ENABLED:false}",
-                properties.getProperty(SHADOW_PREFIX + "reader-enabled")
-        );
-        assertEquals(
-                "${PERSON_MINISTRY_SHADOW_READ_EUCHARISTIC_MINISTER_ENABLED:false}",
-                properties.getProperty(SHADOW_PREFIX + "eucharistic-minister-enabled")
-        );
     }
 
     @Test
@@ -860,14 +744,6 @@ class PersonMinistryReadSourcePropertiesTest {
         assertEquals(eucharisticMinister, properties.getEucharisticMinister());
     }
 
-    private void assertAllPersonMinistryShadowReadFlagsDisabled(PersonMinistryShadowReadProperties properties) {
-        assertFalse(properties.isReaderEnabled());
-        assertFalse(properties.isCommentatorEnabled());
-        assertFalse(properties.isPriestEnabled());
-        assertFalse(properties.isMinisterOfTheWordEnabled());
-        assertFalse(properties.isEucharisticMinisterEnabled());
-    }
-
     private Properties loadProperties(String resourceName) {
         Properties properties = new Properties();
         Path resourcePath = Path.of("src", "main", "resources", resourceName);
@@ -882,7 +758,6 @@ class PersonMinistryReadSourcePropertiesTest {
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({
             PersonMinistryReadSourceProperties.class,
-            PersonMinistryShadowReadProperties.class,
             EventAssignmentReadSourceProperties.class
     })
     static class Config {

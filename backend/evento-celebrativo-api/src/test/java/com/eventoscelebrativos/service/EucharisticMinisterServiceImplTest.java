@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -63,13 +62,7 @@ class EucharisticMinisterServiceImplTest {
     private PersonMinistryReadService personMinistryReadService;
 
     @Mock
-    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
-
-    @Mock
     private PersonMinistryReadSourceProperties readSourceProperties;
-
-    @Mock
-    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private EucharisticMinisterServiceImpl service;
@@ -138,7 +131,7 @@ class EucharisticMinisterServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllEucharisticMinisters());
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
+        verifyNoInteractions(personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -154,45 +147,6 @@ class EucharisticMinisterServiceImplTest {
         var inOrder = inOrder(personMinistryCompatibilityService, repository);
         inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
         inOrder.verify(repository).deleteById(1L);
-    }
-
-    @Test
-    void shouldRunEucharisticMinisterShadowReadWhenEnabledAndKeepLegacyResponse() {
-        EucharisticMinister entity = minister(1L, "encoded-password");
-        EucharisticMinisterResponseDTO response = response(1L);
-        List<EucharisticMinister> entities = List.of(entity);
-        List<EucharisticMinisterResponseDTO> responses = List.of(response);
-
-        when(shadowReadProperties.isEucharisticMinisterEnabled()).thenReturn(true);
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-
-        assertSame(responses, service.findAllEucharisticMinisters());
-        verify(personMinistryShadowReadExecutor).execute(
-                true,
-                MinistryType.EUCHARISTIC_MINISTER,
-                entities,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
-        verifyNoInteractions(personMinistryReadService);
-    }
-
-    @Test
-    void shouldListEucharisticMinistersWithShadowReadDisabledUsingLegacyRepository() {
-        EucharisticMinister entity = minister(1L, "encoded-password");
-        EucharisticMinisterResponseDTO response = response(1L);
-        List<EucharisticMinister> entities = List.of(entity);
-        List<EucharisticMinisterResponseDTO> responses = List.of(response);
-
-        when(readSourceProperties.getEucharisticMinister()).thenReturn(PersonMinistryReadSource.LEGACY);
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-
-        assertSame(responses, service.findAllEucharisticMinisters());
-
-        verify(repository).findAll();
-        verify(mapper).toDtoList(entities);
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
     }
 
     @Test
@@ -216,7 +170,7 @@ class EucharisticMinisterServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER);
         verify(mapper).toDtoPersonList(people);
-        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -233,7 +187,7 @@ class EucharisticMinisterServiceImplTest {
 
         assertSame(responses, service.findAllEucharisticMinisters());
 
-        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -245,17 +199,17 @@ class EucharisticMinisterServiceImplTest {
                 .thenThrow(parallelFailure);
 
         assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
-        verifyNoInteractions(repository, mapper, personMinistryShadowReadExecutor);
+        verifyNoInteractions(repository, mapper);
     }
 
     @Test
-    void shouldPropagateLegacyEucharisticMinisterListFailureWithoutUsingShadowReadAsFallback() {
+    void shouldPropagateLegacyEucharisticMinisterListFailureWithoutMappingResponse() {
         RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
 
         when(repository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(personMinistryReadService, mapper);
     }
 
     @Test
