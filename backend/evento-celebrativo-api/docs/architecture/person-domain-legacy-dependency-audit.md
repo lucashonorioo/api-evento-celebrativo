@@ -16,8 +16,9 @@ O backend ja possui as estruturas paralelas principais:
 - write-through entre modelo legado e paralelo;
 - shadow read;
 - cutovers configuraveis;
-- auditoria operacional administrativa de `EventAssignment`;
-- frontend administrativo para auditoria de assignments.
+- frontend administrativo para auditoria de assignments (sem endpoint correspondente desde a remocao da auditoria operacional em `refactor/retire-event-assignment-operational-audit`).
+
+Atualizacao posterior a esta auditoria: a auditoria operacional administrativa de `EventAssignment` (`GET /admin/event-assignments/consistency`) foi removida nesta branch. Os detalhes dessa remocao estao documentados no roadmap, secao "Remocao da auditoria operacional temporaria de EventAssignment".
 
 Apesar disso, o modelo legado ainda e uma dependencia ativa. A remocao imediata de `tb_event_person`, `person_type` ou subclasses de `Person` nao e segura.
 
@@ -55,7 +56,7 @@ Conclusao operacional:
 | `PersonMinistry` | entidade, `PersonMinistryRepository`, `PersonMinistryReadService` | Leitura paralela das cinco listagens ministeriais e write-through dos CRUDs legados. |
 | `EventAssignment` | entidade, `EventAssignmentRepository`, `EventAssignmentReadService` | Fonte oficial padrao para os tres endpoints de escala ja cortados para `PARALLEL`. |
 | Compatibilidade de escrita | `PersonMinistryCompatibilityService`, `EventAssignmentCompatibilityService` | Sincroniza modelo paralelo depois da escrita legada. |
-| Auditorias | `PersonMinistryConsistencyService`, `EventAssignmentConsistencyService`, `EventAssignmentOperationalAuditService` | Detectam divergencias sem alterar dados. |
+| Auditorias | `PersonMinistryConsistencyService`, `EventAssignmentConsistencyService` (`EventAssignmentOperationalAuditService` removido) | Detectam divergencias sem alterar dados; `EventAssignmentConsistencyService` continua em uso interno pelos testes de escrita oficial e de leitura paralela em banco migrado, sem endpoint HTTP proprio. |
 
 ### Configuracao observada
 
@@ -82,13 +83,13 @@ Observacao: a frase operacional "todos os profiles usando `PARALLEL`" e verdadei
 | `CelebrationEventRepository.findEucharistScale` | native query com `tb_event_person` + `person_type` | `GET /eventos/escala/eucaristia` em `LEGACY` | leitura | Nao no default | Sim | Nao | Remover rollback da eucaristia. |
 | `CelebrationEventRepository.findEventScheduleEvents` | `EXISTS` em `tb_event_person` | `GET /eventos/escalas` em `LEGACY` | leitura | Nao no default | Sim | Nao | Remover rollback mensal. |
 | `CelebrationEventRepository.findEventScheduleAssignments` | busca participantes por `tb_event_person` | `GET /eventos/escalas` legacy e shadow parcial | leitura | Sim quando shadow read legado esta habilitado; rollback | Parcial | Nao | Remover shadow/rollback mensal. |
-| `CelebrationEventRepository.findLegacyEventAssignmentsForAudit` | leitura em lote de `tb_event_person` + `person_type` | `GET /admin/event-assignments/consistency` | leitura | Sim, endpoint administrativo | Nao | Nao | Definir fim da auditoria comparativa ou trocar por auditoria historica arquivada. |
+| `CelebrationEventRepository.findLegacyEventAssignmentsForAudit` (removido) | leitura em lote de `tb_event_person` + `person_type` | `GET /admin/event-assignments/consistency` (removido) | leitura | Nao, endpoint removido em `refactor/retire-event-assignment-operational-audit` | Nao | Ja removido | Concluido: auditoria comparativa administrativa encerrada; `EventAssignmentConsistencyService` permanece para uso interno de testes. |
 | `V5__backfill_event_assignments.java` | load/validate `tb_event_person` | Flyway V5 | leitura migratoria | Sim em bancos que ainda aplicarao V5 | Migration only | Nao editar migration aplicada | Nova migration futura, nunca editar V5. |
 | `V1__create_current_schema.sql` | cria `tb_event_person` | banco novo | DDL | Sim em banco novo | Compatibilidade | Nao editar V1 | Migration destrutiva futura. |
 | `R__load_local_demo_data.sql` | insere `tb_event_person` e depois assignments derivados | seed local | escrita de fixture | Sim em local | Test/demo | Nao nesta tarefa | Atualizar seeds quando legacy for removido. |
 | `R__load_test_fixtures.sql` | insere `tb_event_person` e assignments derivados | fixtures de teste | escrita de fixture | Sim em testes | Test/demo | Nao nesta tarefa | Atualizar fixtures quando legacy for removido. |
 | Testes de migrations | `EventAssignmentBackfillMigrationIntegrationTest`, `LocalFlywayMigrationIntegrationTest`, `TestProfileFlywayIntegrationTest`, `FlywayMigrationIntegrationTest` | regressao de schema/backfill | leitura/escrita de teste | Sim na suite | Migration regression | Nao | Manter ate remocao final ou congelar como regressao historica. |
-| Testes repository/audit | `CelebrationEventRepositoryTest`, `EventAssignmentOperationalAuditRepositoryTest` | queries legacy e auditoria | leitura/escrita de teste | Sim na suite | Parcial | Nao | Remover com queries legadas/auditoria comparativa. |
+| Testes repository/audit | `CelebrationEventRepositoryTest` (`EventAssignmentOperationalAuditRepositoryTest` removido) | queries legacy | leitura/escrita de teste | Sim na suite | Parcial | Nao | Remover com as demais queries legadas restantes. |
 | Testes de cutover/rollback | `*ReadCutoverLegacyIntegrationTest`, `EventAssignmentParallelCutoverConsistencyIntegrationTest`, `EventAssignmentShadowRead*`, `EventAssignmentLegacyCompatibilityIntegrationTest` | rollback/shadow/equivalencia | leitura/escrita de teste | Sim na suite | Sim/parcial | Nao | Remover apos encerrar rollback/shadow. |
 | Documentacao | ADR e roadmap | historico de decisao | n/a | Sim como doc | n/a | Nao | Atualizar por etapa. |
 
@@ -111,7 +112,7 @@ Classificacao usada:
 | `EventScheduleType.getPersonType()` | `EventScheduleType`, `CelebrationEventServiceImpl.findEventSchedulesLegacy` | `ROLLBACK_REQUIRED` | Usado no modo mensal `LEGACY` e shadow parcial. |
 | Query eucaristica legacy | `CelebrationEventRepository.findEucharistScale` | `ROLLBACK_REQUIRED` | Seleciona ministros por `p.person_type = 'eucharistic_minister'`. |
 | Query mensal legacy | `findEventScheduleEvents`, `findEventScheduleAssignments` | `ROLLBACK_REQUIRED` | Seleciona eventos e participantes por subtipo legado. |
-| Auditoria operacional de assignments | `findLegacyEventAssignmentsForAudit`, `EventAssignmentOperationalAuditServiceImpl.toAssignmentType` | `LEGACY_COMPATIBILITY` | Compara `person_type` legado contra `assignment_type`. |
+| Auditoria operacional de assignments (removida) | `findLegacyEventAssignmentsForAudit`, `EventAssignmentOperationalAuditServiceImpl.toAssignmentType` | `LEGACY_COMPATIBILITY` (componentes removidos em `refactor/retire-event-assignment-operational-audit`) | Comparava `person_type` legado contra `assignment_type`; a comparacao equivalente continua disponivel internamente via `EventAssignmentConsistencyService`, sem endpoint HTTP. |
 | Auditoria interna de ministries | `PersonMinistryConsistencyServiceImpl`, `MinistryTypeResolver` | `LEGACY_COMPATIBILITY` | Verifica se o subtipo possui ministerio esperado; nao e endpoint HTTP. |
 | Backfill de ministries | `V4__backfill_person_ministries` | `MIGRATION_ONLY` | Deriva `tb_person_ministry` de `person_type`. |
 | Backfill de assignments | `V5__backfill_event_assignments` | `MIGRATION_ONLY` | Deriva `tb_event_assignment` de `tb_event_person` + `person_type`. |
@@ -161,7 +162,7 @@ Demais herdeiros: nao foram encontradas outras subclasses concretas de `Person` 
 
 Auditorias:
 
-- `EventAssignmentOperationalAuditServiceImpl` sempre usa a leitura legada em lote para comparar `tb_event_person`/`person_type` contra `tb_event_assignment`.
+- `EventAssignmentOperationalAuditServiceImpl` foi removido junto do endpoint `GET /admin/event-assignments/consistency`; a comparacao entre `tb_event_person`/`person_type` e `tb_event_assignment` continua disponivel internamente via `EventAssignmentConsistencyService`, sem endpoint HTTP e usada apenas por testes de escrita oficial e de leitura paralela em banco migrado.
 - `PersonMinistryConsistencyServiceImpl` nao tem endpoint HTTP administrativo, mas e usado em testes e validacoes internas.
 
 ## 7. Escritas e write-through
@@ -199,7 +200,7 @@ Responsavel principal atual pela validacao:
 | `GET /eventos/escala/eucaristia` | `EucharistScheduleService` | pagina com nomes de ministros | `EventAssignment` no default | Nao | Nao bloqueado. |
 | `/leitores`, `/comentaristas`, `/padres`, `/ministrosDaPalavra`, `/ministrosDeEucaristia` | services especificos de pessoas | `id`, `name`, `phoneNumber`, `birthdayDate`; requests com senha | subtipo legado em escrita; listagem configuravel | Nao se backend mantiver rotas/DTOs; sim se trocar por API unica sem compat | Nao bloqueado para telas atuais. |
 | `GET /pessoas`, `GET /pessoas/{id}`, `PUT /pessoas/{id}/roles` | `AdminUserService` | `personType`, roles, phone | `Person.personType` + roles | Sim se remover `personType` sem substituto | Mudanca de contrato necessaria para remover `person_type`. |
-| `GET /admin/event-assignments/consistency` | `EventAssignmentAuditService` | resumo/issues sem dados pessoais | compara legado vs paralelo | Sim se remover legado/auditoria comparativa | Frontend de auditoria fica bloqueado por remocao do legado sem novo contrato. |
+| `GET /admin/event-assignments/consistency` (removido) | `EventAssignmentAuditService` | endpoint removido em `refactor/retire-event-assignment-operational-audit` | n/a | Sim, endpoint deixou de existir | Frontend de auditoria ja esta bloqueado agora: a tela fica sem endpoint correspondente e deve ser removida ou substituida quando o desenvolvimento frontend for retomado. |
 | `POST /public/login` | `AuthService` | token OAuth/JWT | `Person` como `UserDetails` + roles | Potencialmente sim quando separar `UserAccount` | Requer branch propria de auth. |
 
 Classificacao:
@@ -268,7 +269,7 @@ Nao criar nem editar migrations nesta branch.
 | Cutover de escala parallel | `*ReadCutoverParallelIntegrationTest`, `EventAssignmentParallelCutoverConsistencyIntegrationTest` | prova ausencia de `tb_event_person` no paralelo e dados divergentes | `CONVERT_TO_PARALLEL`/manter como regressao |
 | Shadow read | `EventAssignmentShadowRead*`, `ReaderShadowReadIntegrationTest`, `PersonMinistryShadowReadExpansionIntegrationTest` | legado + paralelo simultaneamente | `REMOVE_WITH_LEGACY` |
 | Repositories legacy | `CelebrationEventRepositoryTest` | queries nativas com `tb_event_person`/`person_type` | `REMOVE_WITH_LEGACY` |
-| Auditoria operacional | `EventAssignmentOperationalAudit*` | compara legado vs paralelo | `KEEP_UNTIL_AUDIT_REPLACED` |
+| Auditoria operacional (removida) | `EventAssignmentOperationalAudit*` | comparava legado vs paralelo | `REMOVED` em `refactor/retire-event-assignment-operational-audit` |
 | Testes unitarios de services legados | `ReaderServiceImplTest`, `PriestServiceImplTest`, etc. | repositories de subtipo e mappers | `CONVERT_TO_PARALLEL` ou `REMOVE_WITH_LEGACY` conforme contrato escolhido |
 
 ## 12. Codigo potencialmente obsoleto
@@ -295,7 +296,7 @@ Nao foi identificada peca claramente removivel agora sem quebrar rollback, teste
 | Manter `APP_PROFILE:local` em producao por erro | Risco de subir H2 local sem datasource real | Hardening de profile em branch separada. |
 | Listagens ministeriais ainda default `LEGACY` fora local | O modelo novo de multiplas funcoes nao e exercitado por default em test/mysql/producao | Branch separada para ativar `PersonMinistry` globalmente, se aprovado. |
 | Escrever escala por subtipo, ler por assignment | Pessoa com assignment divergente aparece em leitura, mas nao pode ser gravada pelo fluxo atual | Migrar validacao para `PersonMinistry` e decidir regra de multipla funcao por evento. |
-| Auditoria de EventAssignment depende do legado | Perde utilidade quando legado for removido | Encerrar ou substituir por auditoria de invariantes do novo modelo. |
+| Auditoria administrativa de EventAssignment dependia do legado | Perdeu utilidade quando o legado fosse removido | Resolvido: endpoint administrativo encerrado em `refactor/retire-event-assignment-operational-audit`; `EventAssignmentConsistencyService` permanece apenas para uso interno de testes. |
 
 ## 14. Sequencia recomendada de branches
 
@@ -362,7 +363,7 @@ Antes de remover `person_type` e subclasses:
 Respostas objetivas:
 
 - O frontend esta tecnicamente desbloqueado agora? Sim, para funcionalidades que preservem contratos atuais.
-- O que pode continuar sem aguardar backend? Telas de eventos, escalas, auditoria de assignments, usuarios/roles, listagens e CRUDs ministeriais existentes.
+- O que pode continuar sem aguardar backend? Telas de eventos, escalas, usuarios/roles, listagens e CRUDs ministeriais existentes. A tela de auditoria de assignments deixou de ter endpoint correspondente e precisa ser removida ou substituida quando o desenvolvimento frontend for retomado.
 - O que depende de novos contratos? Gestao de multiplas funcoes ministeriais por pessoa, API unificada de pessoa, eventual remocao de `personType` da administracao de usuarios e novo modelo de autenticacao/conta.
 - Alguma alteracao futura obrigara retrabalho? Sim, se a equipe decidir substituir os cinco endpoints ministeriais e o contrato de admin usuarios por uma API unificada sem adaptadores.
 - E seguro pausar a refatoracao depois desta auditoria? Sim. O estado atual preserva rollback e contratos; o risco principal e operacional, nao de bloqueio imediato do frontend.
