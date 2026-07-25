@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -11,7 +9,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -39,7 +36,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.eucharist-scale=PARALLEL",
         "spring.jpa.show-sql=false",
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "logging.level.org.springframework=WARN",
@@ -60,9 +56,6 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -71,25 +64,15 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
-    @AfterEach
-    void resetReadSources() {
-        eventAssignmentReadSourceProperties.setEucharistScale(EventAssignmentReadSource.PARALLEL);
-    }
-
     @Test
     void shouldUseBackfilledAssignmentsAsOfficialSourceWithoutChangingContractPaginationOrData() throws Exception {
-        eventAssignmentReadSourceProperties.setEucharistScale(EventAssignmentReadSource.LEGACY);
-        String legacyJson = getPublicJson(FIXTURE_URL);
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
         long eventPeopleBefore = count("tb_event_person");
-
-        eventAssignmentReadSourceProperties.setEucharistScale(EventAssignmentReadSource.PARALLEL);
         Statistics statistics = statistics();
         statistics.clear();
 
         String parallelJson = getPublicJson(FIXTURE_URL);
 
-        assertEquals(legacyJson, parallelJson);
         assertEquals(3L, statistics.getPrepareStatementCount());
         assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(assignmentsBefore, assignmentRows());

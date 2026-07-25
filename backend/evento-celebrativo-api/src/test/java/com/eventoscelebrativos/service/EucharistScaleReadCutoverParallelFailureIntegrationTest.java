@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.eucharist-scale=PARALLEL",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",
@@ -55,7 +54,6 @@ class EucharistScaleReadCutoverParallelFailureIntegrationTest {
         assertThrows(Exception.class, () -> mockMvc.perform(get(URL)).andReturn());
 
         verify(celebrationEventRepository).findEucharistScaleByAssignments(any(Pageable.class), any(), any());
-        verify(celebrationEventRepository, never()).findEucharistScale(any(), any(), any());
         verify(celebrationEventRepository, never()).findEucharistScaleAssignmentsByEventIds(any());
         assertEquals(assignmentsBefore, countAssignments());
     }
@@ -72,7 +70,6 @@ class EucharistScaleReadCutoverParallelFailureIntegrationTest {
 
         verify(celebrationEventRepository).findEucharistScaleByAssignments(any(Pageable.class), any(), any());
         verify(celebrationEventRepository).findEucharistScaleAssignmentsByEventIds(List.of(1L));
-        verify(celebrationEventRepository, never()).findEucharistScale(any(), any(), any());
         assertEquals(assignmentsBefore, countAssignments());
     }
 
