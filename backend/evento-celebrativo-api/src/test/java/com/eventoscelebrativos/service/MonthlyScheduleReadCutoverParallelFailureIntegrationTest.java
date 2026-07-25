@@ -29,7 +29,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 @SpringBootTest(properties = {
         "app.event-assignment.read-source.monthly-schedule=PARALLEL",
-        "app.event-assignment.shadow-read.monthly-schedule-enabled=false",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",

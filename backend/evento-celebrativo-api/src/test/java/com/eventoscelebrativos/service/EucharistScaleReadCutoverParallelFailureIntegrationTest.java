@@ -26,7 +26,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 @SpringBootTest(properties = {
         "app.event-assignment.read-source.eucharist-scale=PARALLEL",
-        "app.event-assignment.shadow-read.eucharist-scale-enabled=false",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",

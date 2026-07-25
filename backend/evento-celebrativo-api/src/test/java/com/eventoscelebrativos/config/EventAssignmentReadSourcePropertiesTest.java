@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EventAssignmentReadSourcePropertiesTest {
 
     private static final String PREFIX = "app.event-assignment.read-source.";
-    private static final String SHADOW_PREFIX = "app.event-assignment.shadow-read.";
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(Config.class);
@@ -179,7 +178,7 @@ class EventAssignmentReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldAllowLocalEventScaleDetailRollbackWithoutChangingShadowReadFlags() {
+    void shouldAllowLocalEventScaleDetailRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=local",
@@ -188,21 +187,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertTrue(shadowProperties.isEventDetailEnabled());
-                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
-                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
-                    assertTrue(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowLocalEucharistScaleRollbackWithoutChangingEventScaleDetailOrShadowReadFlags() {
+    void shouldAllowLocalEucharistScaleRollbackWithoutChangingEventScaleDetail() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=local",
@@ -211,21 +204,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertTrue(shadowProperties.isEventDetailEnabled());
-                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
-                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
-                    assertTrue(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowLocalMonthlyScheduleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowLocalMonthlyScheduleRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=local",
@@ -234,21 +221,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
-                    assertTrue(shadowProperties.isEventDetailEnabled());
-                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
-                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
-                    assertTrue(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowMysqlEventScaleDetailRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlEventScaleDetailRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -260,21 +241,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowTestEventScaleDetailRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowTestEventScaleDetailRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -283,21 +258,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowTestEucharistScaleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowTestEucharistScaleRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -306,21 +275,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowTestMonthlyScheduleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowTestMonthlyScheduleRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=test",
@@ -329,21 +292,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowMysqlEucharistScaleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlEucharistScaleRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -355,21 +312,15 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
     @Test
-    void shouldAllowMysqlMonthlyScheduleRollbackWithoutChangingOtherReadSourcesOrShadowReadFlags() {
+    void shouldAllowMysqlMonthlyScheduleRollbackWithoutChangingOtherReadSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.profiles.active=mysql",
@@ -381,62 +332,10 @@ class EventAssignmentReadSourcePropertiesTest {
                 .run(context -> {
                     EventAssignmentReadSourceProperties properties =
                             context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
 
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
                     assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
                     assertEquals(EventAssignmentReadSource.LEGACY, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
-                });
-    }
-
-    @Test
-    void shouldAllowShadowReadRollbackWithoutChangingLocalReadSource() {
-        applicationPropertiesContextRunner
-                .withPropertyValues(
-                        "spring.profiles.active=local",
-                        "EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED=false"
-                )
-                .run(context -> {
-                    EventAssignmentReadSourceProperties properties =
-                            context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
-
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertFalse(shadowProperties.isEventScaleDetailEnabled());
-                    assertTrue(shadowProperties.isEventDetailEnabled());
-                    assertTrue(shadowProperties.isMonthlyScheduleEnabled());
-                    assertTrue(shadowProperties.isEucharistScaleEnabled());
-                });
-    }
-
-    @Test
-    void shouldAllowTestShadowReadOverrideWithoutChangingReadSources() {
-        applicationPropertiesContextRunner
-                .withPropertyValues(
-                        "spring.profiles.active=test",
-                        SHADOW_PREFIX + "event-scale-detail-enabled=true"
-                )
-                .run(context -> {
-                    EventAssignmentReadSourceProperties properties =
-                            context.getBean(EventAssignmentReadSourceProperties.class);
-                    EventAssignmentShadowReadProperties shadowProperties =
-                            context.getBean(EventAssignmentShadowReadProperties.class);
-
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEventScaleDetail());
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getEucharistScale());
-                    assertEquals(EventAssignmentReadSource.PARALLEL, properties.getMonthlySchedule());
-                    assertTrue(shadowProperties.isEventScaleDetailEnabled());
-                    assertFalse(shadowProperties.isEventDetailEnabled());
-                    assertFalse(shadowProperties.isMonthlyScheduleEnabled());
-                    assertFalse(shadowProperties.isEucharistScaleEnabled());
                 });
     }
 
@@ -521,20 +420,6 @@ class EventAssignmentReadSourcePropertiesTest {
                 });
     }
 
-    @Test
-    void shouldKeepShadowPropertiesDeclaredUnderTheirOwnPrefix() {
-        Properties properties = loadProperties("application.properties");
-
-        assertEquals(
-                "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_DETAIL_ENABLED:false}",
-                properties.getProperty(SHADOW_PREFIX + "event-detail-enabled")
-        );
-        assertEquals(
-                "${EVENT_ASSIGNMENT_SHADOW_READ_EVENT_SCALE_DETAIL_ENABLED:false}",
-                properties.getProperty(SHADOW_PREFIX + "event-scale-detail-enabled")
-        );
-    }
-
     private boolean hasMessageContaining(Throwable throwable, String text) {
         Throwable current = throwable;
         while (current != null) {
@@ -559,8 +444,7 @@ class EventAssignmentReadSourcePropertiesTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({
-            EventAssignmentReadSourceProperties.class,
-            EventAssignmentShadowReadProperties.class
+            EventAssignmentReadSourceProperties.class
     })
     static class Config {
     }

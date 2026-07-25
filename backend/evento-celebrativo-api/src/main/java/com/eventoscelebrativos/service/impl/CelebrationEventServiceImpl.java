@@ -11,7 +11,6 @@ import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.config.EventAssignmentReadSource;
 import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
-import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
@@ -38,8 +37,6 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
 import com.eventoscelebrativos.service.EventAssignmentGroup;
 import com.eventoscelebrativos.service.EventAssignmentReadService;
-import com.eventoscelebrativos.service.EventAssignmentShadowReadExecutor;
-import com.eventoscelebrativos.service.EventAssignmentSnapshot;
 import com.eventoscelebrativos.service.EventScaleAssignmentPlan;
 import com.eventoscelebrativos.service.LegacyScaleMirrorService;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
@@ -83,8 +80,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
     private final EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
     private final EventAssignmentReadService eventAssignmentReadService;
-    private final EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
-    private final EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator;
     private final LegacyScaleMirrorService legacyScaleMirrorService;
@@ -98,8 +93,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventAssignmentCompatibilityService eventAssignmentCompatibilityService,
             EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties,
             EventAssignmentReadService eventAssignmentReadService,
-            EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties,
-            EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
             ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator,
             LegacyScaleMirrorService legacyScaleMirrorService
@@ -112,8 +105,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
         this.eventAssignmentReadSourceProperties = eventAssignmentReadSourceProperties;
         this.eventAssignmentReadService = eventAssignmentReadService;
-        this.eventAssignmentShadowReadProperties = eventAssignmentShadowReadProperties;
-        this.eventAssignmentShadowReadExecutor = eventAssignmentShadowReadExecutor;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.scaleLegacyCompatibilityValidator = scaleLegacyCompatibilityValidator;
         this.legacyScaleMirrorService = legacyScaleMirrorService;
@@ -155,7 +146,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     ) {
         Page<EucharistScaleEventProjection> projections =
                 celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
-        runEucharistScaleShadowRead(projections.getContent());
 
         return projections.map(this::toLegacyEucharistScaleResponse);
     }
@@ -230,7 +220,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         List<EventScheduleQueryResponseDTO> content = eventPage.getContent().stream()
                 .map(event -> toEventScheduleQueryResponse(event, type, assignmentsByEvent))
                 .toList();
-        runMonthlyScheduleShadowRead(eventIds, type, assignmentsByEvent);
 
         return new PageImpl<>(content, pageable, eventPage.getTotalElements());
     }
@@ -274,13 +263,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
         CelebrationEvent celebrationEvent = celebrationEventRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
-        CelebrationEventResponseDTO response = celebrationEventMapper.toDto(celebrationEvent);
-        eventAssignmentShadowReadExecutor.compareEventIfEnabled(
-                eventAssignmentShadowReadProperties.isEventDetailEnabled(),
-                "event-detail",
-                () -> celebrationEventRepository.findByIdWithPeople(id)
-        );
-        return response;
+        return celebrationEventMapper.toDto(celebrationEvent);
     }
 
     @Override
@@ -304,12 +287,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if (priests.size() > 1) {
             throw new BusinessException("Evento possui mais de um padre vinculado à escala");
         }
-
-        eventAssignmentShadowReadExecutor.compareEventIfEnabled(
-                eventAssignmentShadowReadProperties.isEventScaleDetailEnabled(),
-                "event-scale-detail",
-                celebrationEvent
-        );
 
         return celebrationEventScaleDetailMapper.toDto(
                 celebrationEvent,
@@ -668,85 +645,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         );
         dto.getNameMinisters().addAll(ministerNames);
         return dto;
-    }
-
-    private void runMonthlyScheduleShadowRead(
-            List<Long> eventIds,
-            EventScheduleType type,
-            Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent
-    ) {
-        eventAssignmentShadowReadExecutor.comparePartialAssignmentsIfEnabled(
-                eventAssignmentShadowReadProperties.isMonthlyScheduleEnabled(),
-                "monthly-schedule",
-                eventIds,
-                toAssignmentType(type),
-                () -> toPartialSnapshots(eventIds, type, assignmentsByEvent)
-        );
-    }
-
-    private void runEucharistScaleShadowRead(List<EucharistScaleEventProjection> projections) {
-        List<Long> eventIds = projections.stream()
-                .map(EucharistScaleEventProjection::getEventId)
-                .toList();
-        eventAssignmentShadowReadExecutor.comparePartialAssignmentsIfEnabled(
-                eventAssignmentShadowReadProperties.isEucharistScaleEnabled(),
-                "eucharist-scale",
-                eventIds,
-                EventAssignmentType.EUCHARISTIC_MINISTER,
-                () -> findScheduleAssignmentSnapshots(eventIds, EventScheduleType.EUCHARISTIC_MINISTER)
-        );
-    }
-
-    private List<EventAssignmentSnapshot> findScheduleAssignmentSnapshots(
-            List<Long> eventIds,
-            EventScheduleType type
-    ) {
-        if (eventIds.isEmpty()) {
-            return List.of();
-        }
-        return celebrationEventRepository.findEventScheduleAssignments(eventIds, type.getPersonType()).stream()
-                .map(assignment -> toPartialSnapshot(assignment, type))
-                .toList();
-    }
-
-    private List<EventAssignmentSnapshot> toPartialSnapshots(
-            List<Long> eventIds,
-            EventScheduleType type,
-            Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent
-    ) {
-        return eventIds.stream()
-                .flatMap(eventId -> assignmentsByEvent.getOrDefault(eventId, List.of()).stream()
-                        .map(assignment -> toPartialSnapshot(eventId, assignment, type)))
-                .toList();
-    }
-
-    private EventAssignmentSnapshot toPartialSnapshot(
-            EventScheduleAssignmentProjection assignment,
-            EventScheduleType type
-    ) {
-        return new EventAssignmentSnapshot(
-                null,
-                assignment.getEventId(),
-                assignment.getPersonId(),
-                toAssignmentType(type),
-                assignment.getPersonName(),
-                type.getPersonType()
-        );
-    }
-
-    private EventAssignmentSnapshot toPartialSnapshot(
-            Long eventId,
-            EventScheduleAssignmentResponseDTO assignment,
-            EventScheduleType type
-    ) {
-        return new EventAssignmentSnapshot(
-                null,
-                eventId,
-                assignment.getPersonId(),
-                toAssignmentType(type),
-                assignment.getPersonName(),
-                type.getPersonType()
-        );
     }
 
     private EventAssignmentType toAssignmentType(EventScheduleType type) {

@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.EventAssignmentReadSource;
 import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
-import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -51,9 +50,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.event-assignment.read-source.event-scale-detail=PARALLEL",
         "app.event-assignment.read-source.eucharist-scale=PARALLEL",
         "app.event-assignment.read-source.monthly-schedule=PARALLEL",
-        "app.event-assignment.shadow-read.event-scale-detail-enabled=false",
-        "app.event-assignment.shadow-read.eucharist-scale-enabled=false",
-        "app.event-assignment.shadow-read.monthly-schedule-enabled=false",
         "spring.jpa.show-sql=false",
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "logging.level.org.springframework=WARN",
@@ -76,9 +72,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
 
     @Autowired
     private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Autowired
-    private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -272,10 +265,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
 
     @Test
     void shouldKeepReadSourceRollbacksIndependentAcrossTheThreeCutovers() throws Exception {
-        assertFalse(eventAssignmentShadowReadProperties.isEventScaleDetailEnabled());
-        assertFalse(eventAssignmentShadowReadProperties.isEucharistScaleEnabled());
-        assertFalse(eventAssignmentShadowReadProperties.isMonthlyScheduleEnabled());
-
         assertRollbackScenario(
                 EventAssignmentReadSource.LEGACY,
                 EventAssignmentReadSource.PARALLEL,

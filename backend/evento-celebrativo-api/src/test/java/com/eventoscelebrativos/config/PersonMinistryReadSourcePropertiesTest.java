@@ -883,8 +883,7 @@ class PersonMinistryReadSourcePropertiesTest {
     @EnableConfigurationProperties({
             PersonMinistryReadSourceProperties.class,
             PersonMinistryShadowReadProperties.class,
-            EventAssignmentReadSourceProperties.class,
-            EventAssignmentShadowReadProperties.class
+            EventAssignmentReadSourceProperties.class
     })
     static class Config {
     }
