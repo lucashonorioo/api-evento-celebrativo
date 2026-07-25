@@ -42,50 +42,191 @@ class PersonMinistryReadSourcePropertiesTest {
     }
 
     @Test
-    void shouldKeepBaseApplicationReaderReadSourceAsLegacy() {
+    void shouldDeclareBaseApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application.properties");
 
         assertEquals(
-                "${PERSON_MINISTRY_READ_SOURCE_READER:LEGACY}",
+                "${PERSON_MINISTRY_READ_SOURCE_READER:PARALLEL}",
                 properties.getProperty(PREFIX + "reader")
         );
         assertEquals(
-                "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:LEGACY}",
+                "${PERSON_MINISTRY_READ_SOURCE_COMMENTATOR:PARALLEL}",
                 properties.getProperty(PREFIX + "commentator")
         );
         assertEquals(
-                "${PERSON_MINISTRY_READ_SOURCE_PRIEST:LEGACY}",
+                "${PERSON_MINISTRY_READ_SOURCE_PRIEST:PARALLEL}",
                 properties.getProperty(PREFIX + "priest")
         );
         assertEquals(
-                "${PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD:LEGACY}",
+                "${PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD:PARALLEL}",
                 properties.getProperty(PREFIX + "minister-of-the-word")
         );
         assertEquals(
-                "${PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER:LEGACY}",
+                "${PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER:PARALLEL}",
                 properties.getProperty(PREFIX + "eucharistic-minister")
         );
     }
 
     @Test
-    void shouldBindReadSourcesAsLegacyInBaseApplicationProperties() {
+    void shouldBindReadSourcesAsParallelInBaseApplicationPropertiesWithoutChangingEventAssignmentSources() {
         applicationPropertiesContextRunner
                 .withPropertyValues(
                         "spring.config.location=file:src/main/resources/application.properties",
                         "spring.profiles.active="
                 )
-                .run(context -> assertPersonMinistryReadSources(
-                        context.getBean(PersonMinistryReadSourceProperties.class),
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY,
-                        PersonMinistryReadSource.LEGACY
-                ));
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+
+                    EventAssignmentReadSourceProperties eventAssignmentProperties =
+                            context.getBean(EventAssignmentReadSourceProperties.class);
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getEventScaleDetail());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getEucharistScale());
+                    assertEquals(EventAssignmentReadSource.PARALLEL, eventAssignmentProperties.getMonthlySchedule());
+                });
     }
 
     @Test
-    void shouldEnableParallelReaderReadSourceOnlyInLocalProfileWithEnvironmentOverride() {
+    void shouldAllowBaseReaderRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        "PERSON_MINISTRY_READ_SOURCE_READER=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowBaseCommentatorRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        "PERSON_MINISTRY_READ_SOURCE_COMMENTATOR=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowBasePriestRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        "PERSON_MINISTRY_READ_SOURCE_PRIEST=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowBaseMinisterOfTheWordRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        "PERSON_MINISTRY_READ_SOURCE_MINISTER_OF_THE_WORD=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowBaseEucharisticMinisterRollbackWithoutChangingOtherBaseSourcesOrShadowReadFlags() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        "PERSON_MINISTRY_READ_SOURCE_EUCHARISTIC_MINISTER=LEGACY"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.LEGACY
+                    );
+                    assertAllPersonMinistryShadowReadFlagsDisabled(context.getBean(PersonMinistryShadowReadProperties.class));
+                });
+    }
+
+    @Test
+    void shouldAllowBaseShadowReadOverrideWithoutChangingReadSources() {
+        applicationPropertiesContextRunner
+                .withPropertyValues(
+                        "spring.config.location=file:src/main/resources/application.properties",
+                        "spring.profiles.active=",
+                        SHADOW_PREFIX + "reader-enabled=true"
+                )
+                .run(context -> {
+                    assertPersonMinistryReadSources(
+                            context.getBean(PersonMinistryReadSourceProperties.class),
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL,
+                            PersonMinistryReadSource.PARALLEL
+                    );
+
+                    PersonMinistryShadowReadProperties shadowProperties =
+                            context.getBean(PersonMinistryShadowReadProperties.class);
+                    assertTrue(shadowProperties.isReaderEnabled());
+                    assertFalse(shadowProperties.isCommentatorEnabled());
+                    assertFalse(shadowProperties.isPriestEnabled());
+                    assertFalse(shadowProperties.isMinisterOfTheWordEnabled());
+                    assertFalse(shadowProperties.isEucharisticMinisterEnabled());
+                });
+    }
+
+    @Test
+    void shouldDeclareLocalApplicationPropertiesWithParallelDefaultAndEnvironmentOverride() {
         Properties properties = loadProperties("application-local.properties");
 
         assertEquals(
