@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.EventAssignmentReadSource;
 import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
-import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "app.event-assignment.read-source.event-scale-detail=LEGACY",
-        "app.event-assignment.shadow-read.event-scale-detail-enabled=false",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",
@@ -41,15 +39,11 @@ class EventScaleDetailReadCutoverLegacyIntegrationTest {
     private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
 
     @Autowired
-    private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @AfterEach
     void resetProperties() {
         eventAssignmentReadSourceProperties.setEventScaleDetail(EventAssignmentReadSource.LEGACY);
-        eventAssignmentShadowReadProperties.setEventScaleDetailEnabled(false);
     }
 
     @Test
@@ -68,19 +62,6 @@ class EventScaleDetailReadCutoverLegacyIntegrationTest {
 
         assertEquals(expected, actual);
         assertEquals(EventAssignmentType.EUCHARISTIC_MINISTER.name(), assignmentType(1L, readerId));
-        assertEquals(assignmentsBefore, assignmentRows());
-    }
-
-    @Test
-    void shouldKeepLegacyScaleDetailResponseWhenShadowReadIsEnabled() throws Exception {
-        eventAssignmentShadowReadProperties.setEventScaleDetailEnabled(false);
-        String disabled = getAuthorizedJson(1L);
-        List<Map<String, Object>> assignmentsBefore = assignmentRows();
-
-        eventAssignmentShadowReadProperties.setEventScaleDetailEnabled(true);
-        String enabled = getAuthorizedJson(1L);
-
-        assertEquals(disabled, enabled);
         assertEquals(assignmentsBefore, assignmentRows());
     }
 

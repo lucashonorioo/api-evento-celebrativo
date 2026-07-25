@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.EventAssignmentReadSource;
 import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
-import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "app.event-assignment.read-source.monthly-schedule=LEGACY",
-        "app.event-assignment.shadow-read.monthly-schedule-enabled=false",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",
@@ -43,15 +41,11 @@ class MonthlyScheduleReadCutoverLegacyIntegrationTest {
     private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
 
     @Autowired
-    private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @AfterEach
     void resetProperties() {
         eventAssignmentReadSourceProperties.setMonthlySchedule(EventAssignmentReadSource.LEGACY);
-        eventAssignmentShadowReadProperties.setMonthlyScheduleEnabled(false);
     }
 
     @Test
@@ -70,19 +64,6 @@ class MonthlyScheduleReadCutoverLegacyIntegrationTest {
 
         assertEquals(expected, actual);
         assertEquals(EventAssignmentType.READER.name(), assignmentType(1L, eucharisticMinisterId));
-        assertEquals(assignmentsBefore, assignmentRows());
-    }
-
-    @Test
-    void shouldKeepLegacyMonthlyScheduleResponseWhenShadowReadIsEnabled() throws Exception {
-        eventAssignmentShadowReadProperties.setMonthlyScheduleEnabled(false);
-        String disabled = getJson(URL);
-        List<Map<String, Object>> assignmentsBefore = assignmentRows();
-
-        eventAssignmentShadowReadProperties.setMonthlyScheduleEnabled(true);
-        String enabled = getJson(URL);
-
-        assertEquals(disabled, enabled);
         assertEquals(assignmentsBefore, assignmentRows());
     }
 

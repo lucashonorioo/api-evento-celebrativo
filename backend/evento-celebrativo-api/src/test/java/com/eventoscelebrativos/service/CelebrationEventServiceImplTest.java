@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.EventAssignmentShadowReadProperties;
 import com.eventoscelebrativos.config.EventAssignmentReadSource;
 import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
@@ -54,7 +53,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -98,12 +96,6 @@ class CelebrationEventServiceImplTest {
     @Mock
     private EventAssignmentReadService eventAssignmentReadService;
 
-    @Mock
-    private EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
-
-    @Mock
-    private EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
-
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -143,23 +135,6 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldInvokeEventDetailShadowReadAfterMappingWhenEnabled() {
-        CelebrationEvent entity = event(1L);
-        CelebrationEventResponseDTO response = response(1L);
-        when(eventAssignmentShadowReadProperties.isEventDetailEnabled()).thenReturn(true);
-        when(repository.findById(1L)).thenReturn(Optional.of(entity));
-        when(mapper.toDto(entity)).thenReturn(response);
-
-        assertSame(response, service.findEventById(1L));
-
-        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
-                eq(true),
-                eq("event-detail"),
-                org.mockito.ArgumentMatchers.<Supplier<Optional<CelebrationEvent>>>any()
-        );
-    }
-
-    @Test
     void shouldFindEventByIdWithoutMandatoryAssignmentRead() {
         CelebrationEvent entity = event(1L);
         CelebrationEventResponseDTO response = response(1L);
@@ -170,11 +145,6 @@ class CelebrationEventServiceImplTest {
 
         verify(repository).findById(1L);
         verify(mapper).toDto(entity);
-        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
-                eq(false),
-                eq("event-detail"),
-                org.mockito.ArgumentMatchers.<Supplier<Optional<CelebrationEvent>>>any()
-        );
         verifyNoInteractions(eventAssignmentReadService);
         verify(repository, never()).findByIdWithLocations(anyLong());
     }
@@ -187,7 +157,7 @@ class CelebrationEventServiceImplTest {
                 assertThrows(IllegalStateException.class, () -> service.findEventById(1L));
 
         assertEquals("controlled legacy failure", exception.getMessage());
-        verifyNoInteractions(eventAssignmentReadService, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(eventAssignmentReadService);
         verify(repository, never()).findByIdWithLocations(anyLong());
     }
 
@@ -205,7 +175,6 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findEventById(99L));
-        verifyNoInteractions(eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -225,32 +194,6 @@ class CelebrationEventServiceImplTest {
         )).thenReturn(response);
 
         assertSame(response, service.findScaleByEventId(1L));
-    }
-
-    @Test
-    void shouldInvokeEventScaleDetailShadowReadAfterLegacyScaleIsLoadedWhenEnabled() {
-        CelebrationEvent event = eventWithCompleteScale();
-        CelebrationEventScaleDetailResponseDTO response = detailResponse();
-        when(eventAssignmentShadowReadProperties.isEventScaleDetailEnabled()).thenReturn(true);
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(
-                eq(event),
-                any(Location.class),
-                any(Priest.class),
-                anyList(),
-                anyList(),
-                anyList(),
-                anyList()
-        )).thenReturn(response);
-
-        assertSame(response, service.findScaleByEventId(1L));
-
-        verify(eventAssignmentShadowReadExecutor).compareEventIfEnabled(
-                true,
-                "event-scale-detail",
-                event
-        );
     }
 
     @Test
@@ -404,7 +347,7 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldFindEventScaleFromParallelAssignmentsWithoutUsingLegacyPeopleOrShadow() {
+    void shouldFindEventScaleFromParallelAssignmentsWithoutUsingLegacyPeople() {
         CelebrationEvent event = event(1L);
         event.getLocations().add(location(1L));
         event.getPeople().add(person(new Reader(), 99L, "Legacy Reader Not Used"));
@@ -435,7 +378,6 @@ class CelebrationEventServiceImplTest {
         assertEquals(List.of(11L, 10L), group.eucharisticMinisters().stream().map(EventAssignmentSnapshot::personId).toList());
         verify(repository, never()).findByIdWithPeople(anyLong());
         verify(eventAssignmentReadService).findAllByEventId(1L);
-        verifyNoInteractions(eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -473,7 +415,7 @@ class CelebrationEventServiceImplTest {
 
         assertEquals("controlled parallel failure", exception.getMessage());
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -483,7 +425,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(eventAssignmentReadService, scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(eventAssignmentReadService, scaleDetailMapper);
     }
 
     @Test
@@ -498,7 +440,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -513,7 +455,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -527,7 +469,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -541,7 +483,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verify(repository, never()).findByIdWithPeople(anyLong());
-        verifyNoInteractions(scaleDetailMapper, eventAssignmentShadowReadExecutor);
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -578,28 +520,7 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldInvokeEucharistScalePartialShadowReadWhenEnabled() {
-        PageRequest pageable = PageRequest.of(0, 10);
-        LocalDate startDate = LocalDate.of(2026, 8, 1);
-        LocalDate endDate = LocalDate.of(2026, 8, 31);
-        EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", "Ana");
-        when(eventAssignmentShadowReadProperties.isEucharistScaleEnabled()).thenReturn(true);
-        when(repository.findEucharistScale(pageable, startDate, endDate))
-                .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
-
-        service.findEucharistScale(pageable, startDate, endDate);
-
-        verify(eventAssignmentShadowReadExecutor).comparePartialAssignmentsIfEnabled(
-                eq(true),
-                eq("eucharist-scale"),
-                eq(List.of(1L)),
-                eq(com.eventoscelebrativos.model.EventAssignmentType.EUCHARISTIC_MINISTER),
-                org.mockito.ArgumentMatchers.<Supplier<List<EventAssignmentSnapshot>>>any()
-        );
-    }
-
-    @Test
-    void shouldFindEucharistScaleFromParallelAssignmentsWithoutLegacyReadOrShadow() {
+    void shouldFindEucharistScaleFromParallelAssignmentsWithoutLegacyRead() {
         PageRequest pageable = PageRequest.of(1, 2);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -624,13 +545,6 @@ class CelebrationEventServiceImplTest {
         verify(repository).findEucharistScaleByAssignments(pageable, startDate, endDate);
         verify(repository).findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L));
         verify(repository, never()).findEucharistScale(any(), any(), any());
-        verify(eventAssignmentShadowReadExecutor, never()).comparePartialAssignmentsIfEnabled(
-                anyBoolean(),
-                eq("eucharist-scale"),
-                anyList(),
-                any(),
-                any()
-        );
         verifyNoInteractions(eventAssignmentReadService);
     }
 
@@ -649,7 +563,6 @@ class CelebrationEventServiceImplTest {
         assertEquals(0, result.getTotalElements());
         verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
         verify(repository, never()).findEucharistScale(any(), any(), any());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -669,7 +582,7 @@ class CelebrationEventServiceImplTest {
         assertEquals("controlled parallel failure", exception.getMessage());
         verify(repository, never()).findEucharistScale(any(), any(), any());
         verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
@@ -691,7 +604,7 @@ class CelebrationEventServiceImplTest {
 
         assertEquals("controlled batch failure", exception.getMessage());
         verify(repository, never()).findEucharistScale(any(), any(), any());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
@@ -710,7 +623,7 @@ class CelebrationEventServiceImplTest {
         assertEquals("controlled legacy failure", exception.getMessage());
         verify(repository, never()).findEucharistScaleByAssignments(any(), any(), any());
         verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
@@ -790,25 +703,6 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldInvokeMonthlySchedulePartialShadowReadWhenEnabled() {
-        when(eventAssignmentShadowReadProperties.isMonthlyScheduleEnabled()).thenReturn(true);
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
-                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
-        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.READER.getPersonType()))
-                .thenReturn(List.of(scheduleAssignment(1L, 10L, "Maria")));
-
-        service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
-
-        verify(eventAssignmentShadowReadExecutor).comparePartialAssignmentsIfEnabled(
-                eq(true),
-                eq("monthly-schedule"),
-                eq(List.of(1L)),
-                eq(com.eventoscelebrativos.model.EventAssignmentType.READER),
-                org.mockito.ArgumentMatchers.<Supplier<List<EventAssignmentSnapshot>>>any()
-        );
-    }
-
-    @Test
     void shouldMapEventScheduleWithSeveralAssignments() {
         when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
@@ -850,7 +744,7 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldFindEventSchedulesFromParallelAssignmentsWithoutLegacyReadOrShadow() {
+    void shouldFindEventSchedulesFromParallelAssignmentsWithoutLegacyRead() {
         when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
@@ -887,13 +781,6 @@ class CelebrationEventServiceImplTest {
         verify(repository).findEventScheduleAssignmentsByAssignmentType(List.of(1L, 2L), EventAssignmentType.READER.name());
         verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
         verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
-        verify(eventAssignmentShadowReadExecutor, never()).comparePartialAssignmentsIfEnabled(
-                anyBoolean(),
-                eq("monthly-schedule"),
-                anyList(),
-                any(),
-                any()
-        );
         verifyNoInteractions(eventAssignmentReadService);
     }
 
@@ -940,7 +827,6 @@ class CelebrationEventServiceImplTest {
         assertTrue(result.isEmpty());
         verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
         verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor);
     }
 
     @Test
@@ -963,7 +849,7 @@ class CelebrationEventServiceImplTest {
         verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
         verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
         verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
@@ -987,7 +873,7 @@ class CelebrationEventServiceImplTest {
         assertEquals("controlled batch failure", exception.getMessage());
         verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
         verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
@@ -1003,7 +889,7 @@ class CelebrationEventServiceImplTest {
         assertEquals("controlled legacy failure", exception.getMessage());
         verify(repository, never()).findEventScheduleEventsByAssignments(any(), any(), any(), anyString(), anyBoolean());
         verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
-        verifyNoInteractions(eventAssignmentShadowReadExecutor, eventAssignmentReadService);
+        verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
