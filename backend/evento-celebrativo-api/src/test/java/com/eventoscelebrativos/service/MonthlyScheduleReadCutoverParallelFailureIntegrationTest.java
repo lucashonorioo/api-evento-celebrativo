@@ -28,7 +28,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.monthly-schedule=PARALLEL",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",
@@ -70,9 +69,7 @@ class MonthlyScheduleReadCutoverParallelFailureIntegrationTest {
                 anyString(),
                 anyBoolean()
         );
-        verify(celebrationEventRepository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
         verify(celebrationEventRepository, never()).findEventScheduleAssignmentsByAssignmentType(any(), anyString());
-        verify(celebrationEventRepository, never()).findEventScheduleAssignments(any(), anyString());
         assertEquals(assignmentsBefore, countAssignments());
     }
 
@@ -100,8 +97,6 @@ class MonthlyScheduleReadCutoverParallelFailureIntegrationTest {
                 anyBoolean()
         );
         verify(celebrationEventRepository).findEventScheduleAssignmentsByAssignmentType(List.of(1L), "READER");
-        verify(celebrationEventRepository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
-        verify(celebrationEventRepository, never()).findEventScheduleAssignments(any(), anyString());
         assertEquals(assignmentsBefore, countAssignments());
     }
 

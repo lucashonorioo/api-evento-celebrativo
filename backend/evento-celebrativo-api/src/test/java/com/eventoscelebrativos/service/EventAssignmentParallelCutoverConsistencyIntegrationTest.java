@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -47,9 +45,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.event-scale-detail=PARALLEL",
-        "app.event-assignment.read-source.eucharist-scale=PARALLEL",
-        "app.event-assignment.read-source.monthly-schedule=PARALLEL",
         "spring.jpa.show-sql=false",
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "logging.level.org.springframework=WARN",
@@ -71,9 +66,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -83,52 +75,25 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     private EntityManagerFactory entityManagerFactory;
 
     @AfterEach
-    void resetReadSources() {
-        setReadSources(
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL
-        );
+    void resetSqlCapture() {
         SqlCapture.clear();
     }
 
     @Test
-    void shouldKeepBackfilledFixturesEquivalentAndReadOnlyAcrossAllParallelCutovers() throws Exception {
+    void shouldKeepBackfilledFixturesReadOnlyAcrossAllEndpoints() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
         long eventPeopleBefore = count("tb_event_person");
 
-        setReadSources(
-                EventAssignmentReadSource.LEGACY,
-                EventAssignmentReadSource.LEGACY,
-                EventAssignmentReadSource.LEGACY
-        );
-        JsonNode legacyScaleDetail = getEventScaleJson(EVENT_SCALE_URL);
-        JsonNode legacyEucharistScale = getPublicJson(EUCHARIST_SCALE_URL);
-        List<JsonNode> legacyMonthlySchedules = new ArrayList<>();
-        for (EventScheduleType type : EventScheduleType.values()) {
-            legacyMonthlySchedules.add(getMonthlyScheduleJson(fixtureMonthlyUrl(type, 0, 1, false)));
-        }
-
-        setReadSources(
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL
-        );
-
         JsonNode parallelScaleDetail = getParallelEventScaleJson(EVENT_SCALE_URL, 2);
-        assertEquals(legacyScaleDetail, parallelScaleDetail);
         assertScaleDetailContract(parallelScaleDetail);
 
         JsonNode parallelEucharistScale = getParallelPublicJson(EUCHARIST_SCALE_URL, 3);
-        assertEquals(legacyEucharistScale, parallelEucharistScale);
         assertEquals(3, parallelEucharistScale.path("totalElements").asInt());
         assertEquals(3, parallelEucharistScale.path("totalPages").asInt());
 
-        for (int index = 0; index < EventScheduleType.values().length; index++) {
-            EventScheduleType type = EventScheduleType.values()[index];
+        for (EventScheduleType type : EventScheduleType.values()) {
             JsonNode parallelMonthly = getParallelMonthlyScheduleJson(fixtureMonthlyUrl(type, 0, 1, false), 3);
 
-            assertEquals(legacyMonthlySchedules.get(index), parallelMonthly);
             assertEquals(type.name(), parallelMonthly.path("content").get(0).path("assignmentType").asText());
         }
 
@@ -261,61 +226,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
                 2
         ).path("content").toString().contains(personName(personId)));
         assertEquals(eventPeopleBefore, count("tb_event_person"));
-    }
-
-    @Test
-    void shouldKeepReadSourceRollbacksIndependentAcrossTheThreeCutovers() throws Exception {
-        assertRollbackScenario(
-                EventAssignmentReadSource.LEGACY,
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL,
-                true,
-                false,
-                false
-        );
-        assertRollbackScenario(
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.LEGACY,
-                EventAssignmentReadSource.PARALLEL,
-                false,
-                true,
-                false
-        );
-        assertRollbackScenario(
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.PARALLEL,
-                EventAssignmentReadSource.LEGACY,
-                false,
-                false,
-                true
-        );
-    }
-
-    private void assertRollbackScenario(
-            EventAssignmentReadSource scaleDetail,
-            EventAssignmentReadSource eucharistScale,
-            EventAssignmentReadSource monthlySchedule,
-            boolean scaleUsesLegacy,
-            boolean eucharistUsesLegacy,
-            boolean monthlyUsesLegacy
-    ) throws Exception {
-        setReadSources(scaleDetail, eucharistScale, monthlySchedule);
-
-        assertEndpointUsesLegacyTable(() -> getEventScaleJson(EVENT_SCALE_URL), scaleUsesLegacy);
-        assertEndpointUsesLegacyTable(() -> getPublicJson(EUCHARIST_SCALE_URL), eucharistUsesLegacy);
-        assertEndpointUsesLegacyTable(
-                () -> getMonthlyScheduleJson(fixtureMonthlyUrl(EventScheduleType.READER, 0, 1, false)),
-                monthlyUsesLegacy
-        );
-    }
-
-    private void assertEndpointUsesLegacyTable(SqlCheckedRequest request, boolean expectedLegacyTable) throws Exception {
-        SqlCapture.clear();
-        statistics().clear();
-
-        request.execute();
-
-        assertEquals(expectedLegacyTable, sqlContains("tb_event_person"), String.join("\n", SqlCapture.statements()));
     }
 
     private JsonNode getParallelEventScaleJson(String url, long expectedQueries) throws Exception {
@@ -464,16 +374,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         for (JsonNode person : people) {
             assertFalse(person.path("id").asLong() == personId, "Unexpected person id " + personId + " in " + people);
         }
-    }
-
-    private void setReadSources(
-            EventAssignmentReadSource scaleDetail,
-            EventAssignmentReadSource eucharistScale,
-            EventAssignmentReadSource monthlySchedule
-    ) {
-        eventAssignmentReadSourceProperties.setEventScaleDetail(scaleDetail);
-        eventAssignmentReadSourceProperties.setEucharistScale(eucharistScale);
-        eventAssignmentReadSourceProperties.setMonthlySchedule(monthlySchedule);
     }
 
     private String fixtureMonthlyUrl(EventScheduleType type, int page, int size, boolean includeUnassigned) {

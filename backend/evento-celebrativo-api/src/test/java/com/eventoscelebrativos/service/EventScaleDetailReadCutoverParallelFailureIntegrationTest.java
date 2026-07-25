@@ -16,7 +16,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.event-scale-detail=PARALLEL",
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
         "logging.level.org.hibernate=WARN",

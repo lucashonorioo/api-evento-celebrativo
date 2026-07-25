@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
@@ -35,7 +33,6 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.service.impl.CelebrationEventServiceImpl;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,23 +88,10 @@ class CelebrationEventServiceImplTest {
     private LegacyScaleMirrorService legacyScaleMirrorService;
 
     @Mock
-    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Mock
     private EventAssignmentReadService eventAssignmentReadService;
 
     @InjectMocks
     private CelebrationEventServiceImpl service;
-
-    @BeforeEach
-    void configureDefaultReadSource() {
-        lenient().when(eventAssignmentReadSourceProperties.getEventScaleDetail())
-                .thenReturn(EventAssignmentReadSource.LEGACY);
-        lenient().when(eventAssignmentReadSourceProperties.getEucharistScale())
-                .thenReturn(EventAssignmentReadSource.LEGACY);
-        lenient().when(eventAssignmentReadSourceProperties.getMonthlySchedule())
-                .thenReturn(EventAssignmentReadSource.LEGACY);
-    }
 
     @Test
     void shouldCreateEvent() {
@@ -178,115 +162,6 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldFindCompleteEventScale() {
-        CelebrationEvent event = eventWithCompleteScale();
-        CelebrationEventScaleDetailResponseDTO response = detailResponse();
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(
-                eq(event),
-                any(Location.class),
-                any(Priest.class),
-                anyList(),
-                anyList(),
-                anyList(),
-                anyList()
-        )).thenReturn(response);
-
-        assertSame(response, service.findScaleByEventId(1L));
-    }
-
-    @Test
-    void shouldFindEventScaleWithoutPriest() {
-        CelebrationEvent event = event(1L);
-        event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Reader(), 4L, "Alice"));
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), any(Location.class), isNull(), anyList(), anyList(), anyList(), anyList()))
-                .thenReturn(detailResponse());
-
-        service.findScaleByEventId(1L);
-
-        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), isNull(), anyList(), anyList(), anyList(), anyList());
-    }
-
-    @Test
-    void shouldFindEventScaleWithEmptyRoleLists() {
-        CelebrationEvent event = event(1L);
-        event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Priest(), 13L, "Padre"));
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(Priest.class), eq(List.of()), eq(List.of()), eq(List.of()), eq(List.of())))
-                .thenReturn(detailResponse());
-
-        service.findScaleByEventId(1L);
-
-        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), any(Priest.class), eq(List.of()), eq(List.of()), eq(List.of()), eq(List.of()));
-    }
-
-    @Test
-    void shouldFindEventScaleWithoutLocation() {
-        CelebrationEvent event = event(1L);
-        event.getPeople().add(person(new Priest(), 13L, "Padre"));
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), isNull(), any(Priest.class), anyList(), anyList(), anyList(), anyList()))
-                .thenReturn(detailResponse());
-
-        service.findScaleByEventId(1L);
-
-        verify(scaleDetailMapper).toDto(eq(event), isNull(), any(Priest.class), anyList(), anyList(), anyList(), anyList());
-    }
-
-    @Test
-    void shouldSeparateAllPersonSubtypesWhenFindingEventScale() {
-        CelebrationEvent event = eventWithCompleteScale();
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), any(), any(), anyList(), anyList(), anyList(), anyList()))
-                .thenReturn(detailResponse());
-
-        service.findScaleByEventId(1L);
-
-        verify(scaleDetailMapper).toDto(
-                eq(event),
-                any(Location.class),
-                any(Priest.class),
-                argThat(list -> list.size() == 2 && list.stream().allMatch(Reader.class::isInstance)),
-                argThat(list -> list.size() == 1 && list.stream().allMatch(Commentator.class::isInstance)),
-                argThat(list -> list.size() == 1 && list.stream().allMatch(MinisterOfTheWord.class::isInstance)),
-                argThat(list -> list.size() == 2 && list.stream().allMatch(EucharisticMinister.class::isInstance))
-        );
-    }
-
-    @Test
-    void shouldSortPeopleDeterministicallyWhenFindingEventScale() {
-        CelebrationEvent event = event(1L);
-        event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Reader(), 5L, "Bruno"));
-        event.getPeople().add(person(new Reader(), 4L, "Ana"));
-        event.getPeople().add(person(new Reader(), 3L, "Ana"));
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), any(), isNull(), anyList(), anyList(), anyList(), anyList()))
-                .thenReturn(detailResponse());
-
-        service.findScaleByEventId(1L);
-
-        verify(scaleDetailMapper).toDto(
-                eq(event),
-                any(Location.class),
-                isNull(),
-                argThat(list -> List.of(3L, 4L, 5L).equals(list.stream().map(Person::getId).toList())),
-                anyList(),
-                anyList(),
-                anyList()
-        );
-    }
-
-    @Test
     void shouldNotExposePersonalDataInEventScaleDetailResponse() {
         assertAll(
                 () -> assertThrows(NoSuchMethodException.class,
@@ -301,13 +176,6 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldThrowResourceNotFoundWhenFindingScaleForMissingEvent() {
-        when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
-    }
-
-    @Test
     void shouldThrowBusinessExceptionWhenFindingScaleWithInvalidId() {
         assertAll(
                 () -> assertThrows(BusinessException.class, () -> service.findScaleByEventId(null)),
@@ -318,32 +186,18 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldNotModifyEventWhenFindingScale() {
-        CelebrationEvent event = eventWithCompleteScale();
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
         int locationCount = event.getLocations().size();
-        int peopleCount = event.getPeople().size();
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-        when(scaleDetailMapper.toDto(eq(event), any(), any(), anyList(), anyList(), anyList(), anyList()))
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of());
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
                 .thenReturn(detailResponse());
 
         service.findScaleByEventId(1L);
 
         assertEquals(locationCount, event.getLocations().size());
-        assertEquals(peopleCount, event.getPeople().size());
         verify(repository, never()).save(any());
-    }
-
-    @Test
-    void shouldThrowBusinessExceptionWhenEventScaleHasMoreThanOnePriest() {
-        CelebrationEvent event = event(1L);
-        event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Priest(), 13L, "Padre A"));
-        event.getPeople().add(person(new Priest(), 14L, "Padre B"));
-        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
-        when(repository.findByIdWithPeople(1L)).thenReturn(Optional.of(event));
-
-        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
-        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -352,7 +206,6 @@ class CelebrationEventServiceImplTest {
         event.getLocations().add(location(1L));
         event.getPeople().add(person(new Reader(), 99L, "Legacy Reader Not Used"));
         CelebrationEventScaleDetailResponseDTO response = detailResponse();
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 13L, EventAssignmentType.PRIEST, "Padre", "priest"),
@@ -384,7 +237,6 @@ class CelebrationEventServiceImplTest {
     void shouldGroupParallelEventScaleByAssignmentTypeInsteadOfPersonType() {
         CelebrationEvent event = event(1L);
         event.getLocations().add(location(1L));
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 20L, EventAssignmentType.EUCHARISTIC_MINISTER, "Reader Serving Eucharist", "reader")
@@ -405,7 +257,6 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEventScale() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L))
                 .thenThrow(new IllegalStateException("controlled parallel failure"));
@@ -420,7 +271,6 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldPreserveNotFoundBehaviorWhenParallelEventScaleEventDoesNotExist() {
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
@@ -431,7 +281,6 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldRejectParallelEventScaleWithDuplicatedPersonAssignment() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader"),
@@ -446,7 +295,6 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldRejectParallelEventScaleWithMoreThanOnePriest() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 10L, EventAssignmentType.PRIEST, "Padre A", "priest"),
@@ -461,7 +309,6 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldRejectParallelEventScaleWithMissingAssignmentType() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 10L, null, "Pessoa", "reader")
@@ -475,7 +322,6 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldRejectParallelEventScaleWithAssignmentFromAnotherEvent() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentReadSourceProperties.getEventScaleDetail()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 2L, 10L, EventAssignmentType.READER, "Pessoa", "reader")
@@ -497,36 +343,12 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldMapEucharistScaleProjectionToResponse() {
-        PageRequest pageable = PageRequest.of(0, 10);
-        LocalDate startDate = LocalDate.of(2026, 8, 1);
-        LocalDate endDate = LocalDate.of(2026, 8, 31);
-        EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", "Ana, Bruno");
-        when(repository.findEucharistScale(pageable, startDate, endDate))
-                .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
-
-        Page<EucharistScaleEventResponseDTO> result = service.findEucharistScale(pageable, startDate, endDate);
-
-        assertEquals(1, result.getTotalElements());
-        EucharistScaleEventResponseDTO dto = result.getContent().get(0);
-        assertEquals("Missa", dto.getNameMassOrEvent());
-        assertEquals(EVENT_DATE, dto.getEventDate());
-        assertEquals(EVENT_TIME, dto.getEventTime());
-        assertEquals("Igreja Matriz", dto.getChurchName());
-        assertEquals(List.of("Ana", "Bruno"), dto.getNameMinisters());
-        verify(repository).findEucharistScale(pageable, startDate, endDate);
-        verify(repository, never()).findEucharistScaleByAssignments(any(), any(), any());
-        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
-    }
-
-    @Test
     void shouldFindEucharistScaleFromParallelAssignmentsWithoutLegacyRead() {
         PageRequest pageable = PageRequest.of(1, 2);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         EucharistScaleEventProjection first = projection(1L, "Missa A", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
         EucharistScaleEventProjection second = projection(2L, "Missa B", EVENT_DATE.plusDays(1), EVENT_TIME, "Capela", null);
-        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
                 .thenReturn(new PageImpl<>(List.of(first, second), pageable, 5));
         when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L)))
@@ -544,7 +366,6 @@ class CelebrationEventServiceImplTest {
         assertEquals(List.of("Pessoa de outro subtipo"), result.getContent().get(1).getNameMinisters());
         verify(repository).findEucharistScaleByAssignments(pageable, startDate, endDate);
         verify(repository).findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L));
-        verify(repository, never()).findEucharistScale(any(), any(), any());
         verifyNoInteractions(eventAssignmentReadService);
     }
 
@@ -553,7 +374,6 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2030, 1, 1);
         LocalDate endDate = LocalDate.of(2030, 1, 31);
-        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
@@ -562,7 +382,6 @@ class CelebrationEventServiceImplTest {
         assertTrue(result.isEmpty());
         assertEquals(0, result.getTotalElements());
         verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
-        verify(repository, never()).findEucharistScale(any(), any(), any());
     }
 
     @Test
@@ -570,7 +389,6 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
-        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
                 .thenThrow(new IllegalStateException("controlled parallel failure"));
 
@@ -580,7 +398,6 @@ class CelebrationEventServiceImplTest {
         );
 
         assertEquals("controlled parallel failure", exception.getMessage());
-        verify(repository, never()).findEucharistScale(any(), any(), any());
         verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
         verifyNoInteractions(eventAssignmentReadService);
     }
@@ -591,7 +408,6 @@ class CelebrationEventServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
-        when(eventAssignmentReadSourceProperties.getEucharistScale()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
                 .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
         when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L)))
@@ -603,26 +419,6 @@ class CelebrationEventServiceImplTest {
         );
 
         assertEquals("controlled batch failure", exception.getMessage());
-        verify(repository, never()).findEucharistScale(any(), any(), any());
-        verifyNoInteractions(eventAssignmentReadService);
-    }
-
-    @Test
-    void shouldPropagateLegacyFailureWithoutParallelFallbackWhenFindingEucharistScale() {
-        PageRequest pageable = PageRequest.of(0, 10);
-        LocalDate startDate = LocalDate.of(2026, 8, 1);
-        LocalDate endDate = LocalDate.of(2026, 8, 31);
-        when(repository.findEucharistScale(pageable, startDate, endDate))
-                .thenThrow(new IllegalStateException("controlled legacy failure"));
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> service.findEucharistScale(pageable, startDate, endDate)
-        );
-
-        assertEquals("controlled legacy failure", exception.getMessage());
-        verify(repository, never()).findEucharistScaleByAssignments(any(), any(), any());
-        verify(repository, never()).findEucharistScaleAssignmentsByEventIds(anyList());
         verifyNoInteractions(eventAssignmentReadService);
     }
 
@@ -638,22 +434,6 @@ class CelebrationEventServiceImplTest {
                 () -> assertThrows(BusinessException.class,
                         () -> service.findEucharistScale(pageable, EVENT_DATE.plusDays(1), EVENT_DATE))
         );
-    }
-
-    @Test
-    void shouldFindEventSchedulesForEachType() {
-        for (EventScheduleType type : EventScheduleType.values()) {
-            when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(type.getPersonType()), eq(false)))
-                    .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
-            when(repository.findEventScheduleAssignments(List.of(1L), type.getPersonType()))
-                    .thenReturn(List.of(scheduleAssignment(1L, 10L, "Pessoa")));
-
-            Page<EventScheduleQueryResponseDTO> result = service.findEventSchedules(EVENT_DATE, EVENT_DATE, type, 0, 10, false);
-
-            assertEquals(1, result.getTotalElements());
-            assertEquals(type, result.getContent().get(0).getAssignmentType());
-            assertEquals(1, result.getContent().get(0).getAssignments().size());
-        }
     }
 
     @Test
@@ -682,9 +462,9 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldMapEventScheduleToResponse() {
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
+        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventAssignmentType.READER.name()), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
-        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.READER.getPersonType()))
+        when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.READER.name()))
                 .thenReturn(List.of(scheduleAssignment(1L, 10L, "Maria")));
 
         Page<EventScheduleQueryResponseDTO> result =
@@ -704,9 +484,9 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldMapEventScheduleWithSeveralAssignments() {
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()), eq(false)))
+        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventAssignmentType.EUCHARISTIC_MINISTER.name()), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
-        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.EUCHARISTIC_MINISTER.getPersonType()))
+        when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.EUCHARISTIC_MINISTER.name()))
                 .thenReturn(List.of(
                         scheduleAssignment(1L, 10L, "Ana"),
                         scheduleAssignment(1L, 11L, "Bruno")
@@ -719,33 +499,7 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldReturnEmptyAssignmentsWhenIncludeUnassignedIsTrueAndEventHasNoPerson() {
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.PRIEST.getPersonType()), eq(true)))
-                .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
-        when(repository.findEventScheduleAssignments(List.of(1L), EventScheduleType.PRIEST.getPersonType()))
-                .thenReturn(List.of());
-
-        Page<EventScheduleQueryResponseDTO> result =
-                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.PRIEST, 0, 10, true);
-
-        assertTrue(result.getContent().get(0).getAssignments().isEmpty());
-    }
-
-    @Test
-    void shouldReturnEmptyEventSchedulePage() {
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
-
-        Page<EventScheduleQueryResponseDTO> result =
-                service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false);
-
-        assertTrue(result.isEmpty());
-        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
-    }
-
-    @Test
     void shouldFindEventSchedulesFromParallelAssignmentsWithoutLegacyRead() {
-        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
                 eq(EVENT_DATE),
@@ -779,14 +533,11 @@ class CelebrationEventServiceImplTest {
                 eq(false)
         );
         verify(repository).findEventScheduleAssignmentsByAssignmentType(List.of(1L, 2L), EventAssignmentType.READER.name());
-        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
-        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
         verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
     void shouldPassIncludeUnassignedToParallelMonthlyScheduleQuery() {
-        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
                 eq(EVENT_DATE),
@@ -812,7 +563,6 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldReturnEmptyEventSchedulePageFromParallelSourceWithoutAssignmentBatch() {
-        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
                 eq(EVENT_DATE),
@@ -826,12 +576,10 @@ class CelebrationEventServiceImplTest {
 
         assertTrue(result.isEmpty());
         verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
-        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
     }
 
     @Test
     void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
-        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
                 eq(EVENT_DATE),
@@ -846,15 +594,12 @@ class CelebrationEventServiceImplTest {
         );
 
         assertEquals("controlled parallel failure", exception.getMessage());
-        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
-        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
         verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
         verifyNoInteractions(eventAssignmentReadService);
     }
 
     @Test
     void shouldPropagateParallelAssignmentBatchFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
-        when(eventAssignmentReadSourceProperties.getMonthlySchedule()).thenReturn(EventAssignmentReadSource.PARALLEL);
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
                 eq(EVENT_DATE),
@@ -871,24 +616,6 @@ class CelebrationEventServiceImplTest {
         );
 
         assertEquals("controlled batch failure", exception.getMessage());
-        verify(repository, never()).findEventScheduleEvents(any(), any(), any(), anyString(), anyBoolean());
-        verify(repository, never()).findEventScheduleAssignments(anyList(), anyString());
-        verifyNoInteractions(eventAssignmentReadService);
-    }
-
-    @Test
-    void shouldPropagateLegacyFailureWithoutParallelFallbackWhenFindingEventSchedules() {
-        when(repository.findEventScheduleEvents(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventScheduleType.READER.getPersonType()), eq(false)))
-                .thenThrow(new IllegalStateException("controlled legacy failure"));
-
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> service.findEventSchedules(EVENT_DATE, EVENT_DATE, EventScheduleType.READER, 0, 10, false)
-        );
-
-        assertEquals("controlled legacy failure", exception.getMessage());
-        verify(repository, never()).findEventScheduleEventsByAssignments(any(), any(), any(), anyString(), anyBoolean());
-        verify(repository, never()).findEventScheduleAssignmentsByAssignmentType(anyList(), anyString());
         verifyNoInteractions(eventAssignmentReadService);
     }
 
@@ -1267,19 +994,6 @@ class CelebrationEventServiceImplTest {
         response.setEventTime(EVENT_TIME);
         response.setMassOrCelebration(true);
         return response;
-    }
-
-    private CelebrationEvent eventWithCompleteScale() {
-        CelebrationEvent event = event(1L);
-        event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Priest(), 13L, "Padre"));
-        event.getPeople().add(person(new Reader(), 5L, "Bruno"));
-        event.getPeople().add(person(new Reader(), 4L, "Ana"));
-        event.getPeople().add(person(new Commentator(), 1L, "Luana"));
-        event.getPeople().add(person(new MinisterOfTheWord(), 7L, "Davi"));
-        event.getPeople().add(person(new EucharisticMinister(), 11L, "Carlos"));
-        event.getPeople().add(person(new EucharisticMinister(), 10L, "Mariana"));
-        return event;
     }
 
     private Location location(Long id) {

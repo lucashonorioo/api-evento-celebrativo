@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -12,7 +10,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -39,7 +36,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "app.event-assignment.read-source.monthly-schedule=PARALLEL",
         "spring.jpa.show-sql=false",
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "logging.level.org.springframework=WARN",
@@ -57,9 +53,6 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -68,11 +61,6 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
-    @AfterEach
-    void resetReadSources() {
-        eventAssignmentReadSourceProperties.setMonthlySchedule(EventAssignmentReadSource.PARALLEL);
-    }
-
     @Test
     void shouldUseBackfilledAssignmentsAsOfficialSourceForAllTypesWithoutChangingContractOrData() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
@@ -80,15 +68,10 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
 
         for (EventScheduleType type : EventScheduleType.values()) {
             String url = fixtureUrl(type, 0, 1, false);
-            eventAssignmentReadSourceProperties.setMonthlySchedule(EventAssignmentReadSource.LEGACY);
-            String legacyJson = getJson(url);
-
-            eventAssignmentReadSourceProperties.setMonthlySchedule(EventAssignmentReadSource.PARALLEL);
             Statistics statistics = statistics();
             statistics.clear();
             String parallelJson = getJson(url);
 
-            assertEquals(legacyJson, parallelJson);
             assertEquals(3L, statistics.getPrepareStatementCount());
             JsonNode root = objectMapper.readTree(parallelJson);
             assertEquals(type.name(), root.path("content").get(0).path("assignmentType").asText());

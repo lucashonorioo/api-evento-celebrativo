@@ -9,8 +9,6 @@ import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
@@ -48,13 +46,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -69,7 +64,6 @@ import java.util.stream.Collectors;
 @Service
 public class CelebrationEventServiceImpl implements CelebrationEventService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CelebrationEventServiceImpl.class);
     private static final int MAX_PAGE_SIZE = 100;
 
     private final CelebrationEventRepository celebrationEventRepository;
@@ -78,7 +72,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
     private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
-    private final EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
     private final EventAssignmentReadService eventAssignmentReadService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator;
@@ -91,7 +84,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventScaleMapper celebrationEventScaleMapper,
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
             EventAssignmentCompatibilityService eventAssignmentCompatibilityService,
-            EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties,
             EventAssignmentReadService eventAssignmentReadService,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
             ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator,
@@ -103,7 +95,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
         this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
-        this.eventAssignmentReadSourceProperties = eventAssignmentReadSourceProperties;
         this.eventAssignmentReadService = eventAssignmentReadService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.scaleLegacyCompatibilityValidator = scaleLegacyCompatibilityValidator;
@@ -133,29 +124,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             throw new BusinessException("As datas estão inválidas");
         }
 
-        return switch (eventAssignmentReadSourceProperties.getEucharistScale()) {
-            case LEGACY -> findEucharistScaleLegacy(pageable, startDate, endDate);
-            case PARALLEL -> findEucharistScaleParallel(pageable, startDate, endDate);
-        };
-    }
-
-    private Page<EucharistScaleEventResponseDTO> findEucharistScaleLegacy(
-            Pageable pageable,
-            LocalDate startDate,
-            LocalDate endDate
-    ) {
-        Page<EucharistScaleEventProjection> projections =
-                celebrationEventRepository.findEucharistScale(pageable, startDate, endDate);
-
-        return projections.map(this::toLegacyEucharistScaleResponse);
-    }
-
-    private Page<EucharistScaleEventResponseDTO> findEucharistScaleParallel(
-            Pageable pageable,
-            LocalDate startDate,
-            LocalDate endDate
-    ) {
-        LOGGER.debug("eucharist-scale source = {}", EventAssignmentReadSource.PARALLEL);
         Page<EucharistScaleEventProjection> eventPage =
                 celebrationEventRepository.findEucharistScaleByAssignments(pageable, startDate, endDate);
         List<Long> eventIds = eventPage.getContent().stream()
@@ -187,51 +155,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         validateEventScheduleQuery(startDate, endDate, type, page, size);
 
         PageRequest pageable = PageRequest.of(page, size);
-        return switch (eventAssignmentReadSourceProperties.getMonthlySchedule()) {
-            case LEGACY -> findEventSchedulesLegacy(startDate, endDate, type, includeUnassigned, pageable);
-            case PARALLEL -> findEventSchedulesParallel(startDate, endDate, type, includeUnassigned, pageable);
-        };
-    }
-
-    private Page<EventScheduleQueryResponseDTO> findEventSchedulesLegacy(
-            LocalDate startDate,
-            LocalDate endDate,
-            EventScheduleType type,
-            boolean includeUnassigned,
-            PageRequest pageable
-    ) {
-        Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEvents(
-                pageable,
-                startDate,
-                endDate,
-                type.getPersonType(),
-                includeUnassigned
-        );
-
-        List<Long> eventIds = eventPage.getContent().stream()
-                .map(EventScheduleEventProjection::getEventId)
-                .toList();
-
-        Map<Long, List<EventScheduleAssignmentResponseDTO>> assignmentsByEvent = findAssignmentsByEvent(
-                eventIds,
-                type
-        );
-
-        List<EventScheduleQueryResponseDTO> content = eventPage.getContent().stream()
-                .map(event -> toEventScheduleQueryResponse(event, type, assignmentsByEvent))
-                .toList();
-
-        return new PageImpl<>(content, pageable, eventPage.getTotalElements());
-    }
-
-    private Page<EventScheduleQueryResponseDTO> findEventSchedulesParallel(
-            LocalDate startDate,
-            LocalDate endDate,
-            EventScheduleType type,
-            boolean includeUnassigned,
-            PageRequest pageable
-    ) {
-        LOGGER.debug("monthly-schedule source = {}", EventAssignmentReadSource.PARALLEL);
         EventAssignmentType assignmentType = toAssignmentType(type);
         Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEventsByAssignments(
                 pageable,
@@ -270,37 +193,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     @Transactional(readOnly = true)
     public CelebrationEventScaleDetailResponseDTO findScaleByEventId(Long id) {
         validateId(id);
-        return switch (eventAssignmentReadSourceProperties.getEventScaleDetail()) {
-            case LEGACY -> findScaleByEventIdLegacy(id);
-            case PARALLEL -> findScaleByEventIdParallel(id);
-        };
-    }
-
-    private CelebrationEventScaleDetailResponseDTO findScaleByEventIdLegacy(Long id) {
-        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
-        celebrationEventRepository.findByIdWithPeople(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
-
-        Location location = firstLocation(celebrationEvent);
-        List<Priest> priests = peopleByType(celebrationEvent, Priest.class);
-        if (priests.size() > 1) {
-            throw new BusinessException("Evento possui mais de um padre vinculado à escala");
-        }
-
-        return celebrationEventScaleDetailMapper.toDto(
-                celebrationEvent,
-                location,
-                priests.isEmpty() ? null : priests.get(0),
-                peopleByType(celebrationEvent, Reader.class),
-                peopleByType(celebrationEvent, Commentator.class),
-                peopleByType(celebrationEvent, MinisterOfTheWord.class),
-                peopleByType(celebrationEvent, EucharisticMinister.class)
-        );
-    }
-
-    private CelebrationEventScaleDetailResponseDTO findScaleByEventIdParallel(Long id) {
-        LOGGER.debug("event-scale-detail source = {}", EventAssignmentReadSource.PARALLEL);
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
@@ -529,16 +421,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 .orElse(null);
     }
 
-    private <T extends Person> List<T> peopleByType(CelebrationEvent celebrationEvent, Class<T> type) {
-        return celebrationEvent.getPeople().stream()
-                .filter(type::isInstance)
-                .map(type::cast)
-                .sorted(Comparator
-                        .comparing(Person::getName, Comparator.nullsLast(String::compareToIgnoreCase))
-                        .thenComparing(Person::getId, Comparator.nullsLast(Long::compareTo)))
-                .toList();
-    }
-
     private void validateEventScheduleQuery(
             LocalDate startDate,
             LocalDate endDate,
@@ -558,27 +440,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if (size <= 0 || size > MAX_PAGE_SIZE) {
             throw new BusinessException("O tamanho da página deve ser maior que zero e menor ou igual a 100");
         }
-    }
-
-    private Map<Long, List<EventScheduleAssignmentResponseDTO>> findAssignmentsByEvent(
-            List<Long> eventIds,
-            EventScheduleType type
-    ) {
-        if (eventIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        return celebrationEventRepository.findEventScheduleAssignments(eventIds, type.getPersonType()).stream()
-                .collect(Collectors.groupingBy(
-                        EventScheduleAssignmentProjection::getEventId,
-                        Collectors.mapping(
-                                assignment -> new EventScheduleAssignmentResponseDTO(
-                                        assignment.getPersonId(),
-                                        assignment.getPersonName()
-                                ),
-                                Collectors.toList()
-                        )
-                ));
     }
 
     private Map<Long, List<EventScheduleAssignmentResponseDTO>> findAssignmentsByEventAssignmentType(
@@ -616,21 +477,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                                 Collectors.toList()
                         )
                 ));
-    }
-
-    private EucharistScaleEventResponseDTO toLegacyEucharistScaleResponse(
-            EucharistScaleEventProjection projection
-    ) {
-        EucharistScaleEventResponseDTO dto = toEucharistScaleResponse(projection, List.of());
-
-        if (projection.getMinisterNames() != null && !projection.getMinisterNames().isBlank()) {
-            Arrays.stream(projection.getMinisterNames().split(","))
-                    .map(String::trim)
-                    .filter(name -> !name.isBlank())
-                    .forEach(dto.getNameMinisters()::add);
-        }
-
-        return dto;
     }
 
     private EucharistScaleEventResponseDTO toEucharistScaleResponse(

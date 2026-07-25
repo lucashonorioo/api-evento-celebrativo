@@ -1,8 +1,6 @@
 package com.eventoscelebrativos.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.eventoscelebrativos.config.EventAssignmentReadSource;
-import com.eventoscelebrativos.config.EventAssignmentReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.Commentator;
@@ -18,7 +16,6 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -86,9 +83,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
     private EventAssignmentConsistencyService eventAssignmentConsistencyService;
 
     @Autowired
-    private EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
-
-    @Autowired
     private PersonRepository personRepository;
 
     @Autowired
@@ -99,11 +93,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @AfterEach
-    void resetReadSource() {
-        eventAssignmentReadSourceProperties.setEventScaleDetail(EventAssignmentReadSource.PARALLEL);
-    }
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -188,48 +177,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
                     before.stream().map(EventAssignmentSnapshot::assignmentId).sorted().toList(),
                     after.stream().map(EventAssignmentSnapshot::assignmentId).sorted().toList()
             );
-        } finally {
-            cleanupEvent(eventId);
-            personIds.forEach(this::cleanupPerson);
-            cleanupLocation(locationId);
-        }
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void shouldKeepLegacyOverrideReadSemanticallyConsistentAfterOfficialWrite() throws Exception {
-        Long eventId = null;
-        Long locationId = null;
-        List<Long> personIds = List.of();
-        try {
-            Priest priest = savePriest("Legacy Override Priest");
-            Priest newPriest = savePriest("Legacy Override New Priest");
-            personIds = List.of(priest.getId(), newPriest.getId());
-            Location location = locationRepository.saveAndFlush(location("Legacy Override Church"));
-            locationId = location.getId();
-
-            MvcResult result = mockMvc.perform(post("/eventos/com-escala")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(eventRequest(
-                                    "Legacy Override Mass", locationId, priest.getId(), null, null, null, null
-                            ))))
-                    .andExpect(status().isCreated())
-                    .andReturn();
-            eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
-
-            Long finalEventId = eventId;
-            mockMvc.perform(put("/eventos/{id}/escala", finalEventId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(scaleRequest(
-                                    locationId, newPriest.getId(), null, null, null, null
-                            ))))
-                    .andExpect(status().isOk());
-
-            eventAssignmentReadSourceProperties.setEventScaleDetail(EventAssignmentReadSource.LEGACY);
-
-            mockMvc.perform(get("/eventos/{id}/escala", finalEventId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.priest.id").value(newPriest.getId()));
         } finally {
             cleanupEvent(eventId);
             personIds.forEach(this::cleanupPerson);
