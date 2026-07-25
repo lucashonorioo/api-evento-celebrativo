@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -62,9 +60,6 @@ class CommentatorServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
-    @Mock
-    private PersonMinistryReadSourceProperties readSourceProperties;
-
     @InjectMocks
     private CommentatorServiceImpl service;
 
@@ -123,16 +118,9 @@ class CommentatorServiceImplTest {
     }
 
     @Test
-    void shouldListUpdateAndDeleteCommentator() {
+    void shouldUpdateAndDeleteCommentator() {
         Commentator entity = commentator(1L, "old-password");
         CommentatorResponseDTO response = response(1L);
-        List<Commentator> entities = List.of(entity);
-        List<CommentatorResponseDTO> responses = List.of(response);
-
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-        assertSame(responses, service.findAllCommentators());
-        verifyNoInteractions(personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -151,13 +139,12 @@ class CommentatorServiceImplTest {
     }
 
     @Test
-    void shouldUseParallelCommentatorReadSourceWithoutCallingLegacyRepository() {
+    void shouldListCommentatorsUsingPersonMinistryWithoutCallingLegacyRepository() {
         Commentator commentator = commentator(1L, "encoded-password");
         Reader readerWithCommentatorMinistry = reader(2L, "encoded-password");
         List<Person> people = List.of(commentator, readerWithCommentatorMinistry);
         List<CommentatorResponseDTO> responses = List.of(response(1L), response(2L));
 
-        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR)).thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
 
@@ -169,13 +156,12 @@ class CommentatorServiceImplTest {
     }
 
     @Test
-    void shouldPreserveParallelCommentatorOrderReturnedByPersonMinistryReadService() {
+    void shouldPreserveCommentatorOrderReturnedByPersonMinistryReadService() {
         Reader readerWithCommentatorMinistry = reader(2L, "encoded-password");
         Commentator commentator = commentator(1L, "encoded-password");
         List<Person> people = List.of(readerWithCommentatorMinistry, commentator);
         List<CommentatorResponseDTO> responses = List.of(response(2L), response(1L));
 
-        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR)).thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
 
@@ -186,25 +172,14 @@ class CommentatorServiceImplTest {
     }
 
     @Test
-    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
-        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+    void shouldPropagateOfficialReadFailureWithoutFallback() {
+        RuntimeException officialFailure = new IllegalStateException("official read failed");
 
-        when(readSourceProperties.getCommentator()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR))
-                .thenThrow(parallelFailure);
+                .thenThrow(officialFailure);
 
-        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
+        assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
         verifyNoInteractions(repository, mapper);
-    }
-
-    @Test
-    void shouldPropagateLegacyCommentatorListFailureWithoutMappingResponse() {
-        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
-
-        when(repository.findAll()).thenThrow(legacyFailure);
-
-        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
-        verifyNoInteractions(personMinistryReadService, mapper);
     }
 
     @Test

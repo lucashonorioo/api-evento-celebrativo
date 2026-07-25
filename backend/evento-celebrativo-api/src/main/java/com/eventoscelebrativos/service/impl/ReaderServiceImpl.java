@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service.impl;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -20,8 +18,6 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +27,6 @@ import java.util.List;
 @Service
 public class ReaderServiceImpl implements ReaderService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ReaderServiceImpl.class);
-
     private final ReaderRepository readerRepository;
     private final ReaderMapper readerMapper;
 
@@ -41,7 +35,6 @@ public class ReaderServiceImpl implements ReaderService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryReadSourceProperties readSourceProperties;
 
     public ReaderServiceImpl(
             ReaderRepository readerRepository,
@@ -50,8 +43,7 @@ public class ReaderServiceImpl implements ReaderService {
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
-            PersonMinistryReadService personMinistryReadService,
-            PersonMinistryReadSourceProperties readSourceProperties
+            PersonMinistryReadService personMinistryReadService
     ) {
         this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
@@ -60,7 +52,6 @@ public class ReaderServiceImpl implements ReaderService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.readSourceProperties = readSourceProperties;
     }
 
 
@@ -84,18 +75,8 @@ public class ReaderServiceImpl implements ReaderService {
     @Override
     @Transactional(readOnly = true)
     public List<ReaderResponseDTO> findAllReaders() {
-        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getReader())) {
-            LOGGER.debug("Reader listing official read source selected: source={}", PersonMinistryReadSource.PARALLEL);
-            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER);
-            return readerMapper.toDtoPersonList(people);
-        }
-
-        LOGGER.debug(
-                "Reader listing official read source selected: source={}",
-                PersonMinistryReadSource.LEGACY
-        );
-        List<Reader> reader = readerRepository.findAll();
-        return readerMapper.toDtoList(reader);
+        List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER);
+        return readerMapper.toDtoPersonList(people);
     }
 
     @Override

@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service.impl;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -20,8 +18,6 @@ import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +27,6 @@ import java.util.List;
 @Service
 public class CommentatorServiceImpl implements CommentatorService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CommentatorServiceImpl.class);
-
     private final CommentatorRepository commentatorRepository;
     private final CommentatorMapper commentatorMapper;
 
@@ -41,7 +35,6 @@ public class CommentatorServiceImpl implements CommentatorService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryReadSourceProperties readSourceProperties;
 
     public CommentatorServiceImpl(
             CommentatorRepository commentatorRepository,
@@ -50,8 +43,7 @@ public class CommentatorServiceImpl implements CommentatorService {
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
-            PersonMinistryReadService personMinistryReadService,
-            PersonMinistryReadSourceProperties readSourceProperties
+            PersonMinistryReadService personMinistryReadService
     ) {
         this.commentatorRepository = commentatorRepository;
         this.commentatorMapper = commentatorMapper;
@@ -60,7 +52,6 @@ public class CommentatorServiceImpl implements CommentatorService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.readSourceProperties = readSourceProperties;
     }
 
     @Override
@@ -83,15 +74,8 @@ public class CommentatorServiceImpl implements CommentatorService {
     @Override
     @Transactional(readOnly = true)
     public List<CommentatorResponseDTO> findAllCommentators() {
-        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getCommentator())) {
-            LOGGER.debug("commentator read source={}", PersonMinistryReadSource.PARALLEL);
-            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR);
-            return commentatorMapper.toDtoPersonList(people);
-        }
-
-        LOGGER.debug("commentator read source={}", PersonMinistryReadSource.LEGACY);
-        List<Commentator> commentators = commentatorRepository.findAll();
-        return commentatorMapper.toDtoList(commentators);
+        List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.COMMENTATOR);
+        return commentatorMapper.toDtoPersonList(people);
     }
 
     @Override

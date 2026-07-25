@@ -18,8 +18,6 @@ public interface PriestMapper {
 
     PriestResponseDTO toDto(Priest priest);
 
-    List<PriestResponseDTO> toDtoList(List<Priest> priests);
-
     default PriestResponseDTO toDtoFromPerson(Person person) {
         return new PriestResponseDTO(
                 person.getId(),

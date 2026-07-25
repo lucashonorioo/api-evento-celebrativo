@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -61,9 +59,6 @@ class EucharisticMinisterServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
-    @Mock
-    private PersonMinistryReadSourceProperties readSourceProperties;
-
     @InjectMocks
     private EucharisticMinisterServiceImpl service;
 
@@ -122,16 +117,9 @@ class EucharisticMinisterServiceImplTest {
     }
 
     @Test
-    void shouldListUpdateAndDeleteEucharisticMinister() {
+    void shouldUpdateAndDeleteEucharisticMinister() {
         EucharisticMinister entity = minister(1L, "old-password");
         EucharisticMinisterResponseDTO response = response(1L);
-        List<EucharisticMinister> entities = List.of(entity);
-        List<EucharisticMinisterResponseDTO> responses = List.of(response);
-
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-        assertSame(responses, service.findAllEucharisticMinisters());
-        verifyNoInteractions(personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -150,7 +138,7 @@ class EucharisticMinisterServiceImplTest {
     }
 
     @Test
-    void shouldUseParallelEucharisticMinisterReadSourceWithoutCallingLegacyRepository() {
+    void shouldListEucharisticMinistersUsingPersonMinistryWithoutCallingLegacyRepository() {
         Reader readerWithEucharisticMinisterMinistry = reader(2L, "encoded-password");
         EucharisticMinisterResponseDTO response = new EucharisticMinisterResponseDTO(
                 2L,
@@ -161,7 +149,6 @@ class EucharisticMinisterServiceImplTest {
         List<Person> people = List.of(readerWithEucharisticMinisterMinistry);
         List<EucharisticMinisterResponseDTO> responses = List.of(response);
 
-        when(readSourceProperties.getEucharisticMinister()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER))
                 .thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
@@ -174,13 +161,12 @@ class EucharisticMinisterServiceImplTest {
     }
 
     @Test
-    void shouldPreserveParallelEucharisticMinisterOrderReturnedByPersonMinistryReadService() {
+    void shouldPreserveEucharisticMinisterOrderReturnedByPersonMinistryReadService() {
         EucharisticMinister first = minister(1L, "encoded-password");
         Reader second = reader(2L, "encoded-password");
         List<Person> people = List.of(first, second);
         List<EucharisticMinisterResponseDTO> responses = List.of(response(1L), response(2L));
 
-        when(readSourceProperties.getEucharisticMinister()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER))
                 .thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
@@ -191,25 +177,14 @@ class EucharisticMinisterServiceImplTest {
     }
 
     @Test
-    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
-        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+    void shouldPropagateOfficialReadFailureWithoutFallback() {
+        RuntimeException officialFailure = new IllegalStateException("official read failed");
 
-        when(readSourceProperties.getEucharisticMinister()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER))
-                .thenThrow(parallelFailure);
+                .thenThrow(officialFailure);
 
-        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
+        assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
         verifyNoInteractions(repository, mapper);
-    }
-
-    @Test
-    void shouldPropagateLegacyEucharisticMinisterListFailureWithoutMappingResponse() {
-        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
-
-        when(repository.findAll()).thenThrow(legacyFailure);
-
-        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
-        verifyNoInteractions(personMinistryReadService, mapper);
     }
 
     @Test
