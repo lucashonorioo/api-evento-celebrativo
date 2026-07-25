@@ -18,8 +18,6 @@ public interface ReaderMapper {
 
     ReaderResponseDTO toDto(Reader reader);
 
-    List<ReaderResponseDTO> toDtoList(List<Reader> readers);
-
     default ReaderResponseDTO toDtoFromPerson(Person person) {
         return new ReaderResponseDTO(
                 person.getId(),

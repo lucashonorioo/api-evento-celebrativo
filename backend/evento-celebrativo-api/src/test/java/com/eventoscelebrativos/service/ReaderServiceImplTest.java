@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -58,9 +56,6 @@ class ReaderServiceImplTest {
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
-
-    @Mock
-    private PersonMinistryReadSourceProperties readSourceProperties;
 
     @InjectMocks
     private ReaderServiceImpl service;
@@ -134,42 +129,12 @@ class ReaderServiceImplTest {
     }
 
     @Test
-    void shouldListReadersFromLegacyRepositoryWhenReadSourceIsLegacy() {
-        List<Reader> readers = List.of(reader(1L, "encoded-password"));
-        List<ReaderResponseDTO> responses = List.of(response(1L));
-
-        when(readerRepository.findAll()).thenReturn(readers);
-        when(readerMapper.toDtoList(readers)).thenReturn(responses);
-
-        assertSame(responses, service.findAllReaders());
-        verifyNoInteractions(personMinistryReadService);
-    }
-
-    @Test
-    void shouldNotReorderLegacyReaderList() {
-        List<Reader> readers = List.of(
-                reader(2L, "encoded-password"),
-                reader(1L, "encoded-password")
-        );
-        List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
-
-        when(readerRepository.findAll()).thenReturn(readers);
-        when(readerMapper.toDtoList(readers)).thenReturn(responses);
-
-        assertSame(responses, service.findAllReaders());
-
-        verify(readerMapper).toDtoList(readers);
-        assertEquals(List.of(2L, 1L), readers.stream().map(Reader::getId).toList());
-    }
-
-    @Test
-    void shouldUseParallelReaderReadSourceWithoutCallingLegacyRepository() {
+    void shouldListReadersUsingPersonMinistryWithoutCallingLegacyRepository() {
         Reader reader = reader(1L, "encoded-password");
         Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
         List<Person> people = List.of(reader, commentatorWithReaderMinistry);
         List<ReaderResponseDTO> responses = List.of(response(1L), response(2L));
 
-        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenReturn(people);
         when(readerMapper.toDtoPersonList(people)).thenReturn(responses);
 
@@ -181,13 +146,12 @@ class ReaderServiceImplTest {
     }
 
     @Test
-    void shouldPreserveParallelReadOrderReturnedByPersonMinistryReadService() {
+    void shouldPreserveReadOrderReturnedByPersonMinistryReadService() {
         Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
         Reader reader = reader(1L, "encoded-password");
         List<Person> people = List.of(commentatorWithReaderMinistry, reader);
         List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
 
-        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenReturn(people);
         when(readerMapper.toDtoPersonList(people)).thenReturn(responses);
 
@@ -198,24 +162,13 @@ class ReaderServiceImplTest {
     }
 
     @Test
-    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
-        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+    void shouldPropagateOfficialReadFailureWithoutFallback() {
+        RuntimeException officialFailure = new IllegalStateException("official read failed");
 
-        when(readSourceProperties.getReader()).thenReturn(PersonMinistryReadSource.PARALLEL);
-        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenThrow(parallelFailure);
+        when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenThrow(officialFailure);
 
-        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
+        assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
         verifyNoInteractions(readerRepository, readerMapper);
-    }
-
-    @Test
-    void shouldPropagateLegacyFailureWithoutMappingResponse() {
-        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
-
-        when(readerRepository.findAll()).thenThrow(legacyFailure);
-
-        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
-        verifyNoInteractions(readerMapper);
     }
 
     @Test

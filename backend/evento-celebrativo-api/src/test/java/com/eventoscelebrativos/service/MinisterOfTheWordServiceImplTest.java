@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -61,9 +59,6 @@ class MinisterOfTheWordServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
-    @Mock
-    private PersonMinistryReadSourceProperties readSourceProperties;
-
     @InjectMocks
     private MinisterOfTheWordServiceImpl service;
 
@@ -122,16 +117,9 @@ class MinisterOfTheWordServiceImplTest {
     }
 
     @Test
-    void shouldListUpdateAndDeleteMinisterOfTheWord() {
+    void shouldUpdateAndDeleteMinisterOfTheWord() {
         MinisterOfTheWord entity = minister(1L, "old-password");
         MinisterOfTheWordResponseDTO response = response(1L);
-        List<MinisterOfTheWord> entities = List.of(entity);
-        List<MinisterOfTheWordResponseDTO> responses = List.of(response);
-
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-        assertSame(responses, service.findAllMinistersOfTheWord());
-        verifyNoInteractions(personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         doAnswer(invocation -> {
@@ -155,7 +143,7 @@ class MinisterOfTheWordServiceImplTest {
     }
 
     @Test
-    void shouldUseParallelMinisterOfTheWordReadSourceWithoutCallingLegacyRepository() {
+    void shouldListMinistersOfTheWordUsingPersonMinistryWithoutCallingLegacyRepository() {
         Reader readerWithMinisterOfTheWordMinistry = reader(2L, "encoded-password");
         MinisterOfTheWordResponseDTO response = new MinisterOfTheWordResponseDTO(
                 2L,
@@ -166,7 +154,6 @@ class MinisterOfTheWordServiceImplTest {
         List<Person> people = List.of(readerWithMinisterOfTheWordMinistry);
         List<MinisterOfTheWordResponseDTO> responses = List.of(response);
 
-        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
                 .thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
@@ -179,13 +166,12 @@ class MinisterOfTheWordServiceImplTest {
     }
 
     @Test
-    void shouldPreserveParallelMinisterOfTheWordOrderReturnedByPersonMinistryReadService() {
+    void shouldPreserveMinisterOfTheWordOrderReturnedByPersonMinistryReadService() {
         MinisterOfTheWord first = minister(1L, "encoded-password");
         Reader second = reader(2L, "encoded-password");
         List<Person> people = List.of(first, second);
         List<MinisterOfTheWordResponseDTO> responses = List.of(response(1L), response(2L));
 
-        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
                 .thenReturn(people);
         when(mapper.toDtoPersonList(people)).thenReturn(responses);
@@ -196,25 +182,14 @@ class MinisterOfTheWordServiceImplTest {
     }
 
     @Test
-    void shouldPropagateOfficialParallelFailureWithoutUsingLegacyFallback() {
-        RuntimeException parallelFailure = new IllegalStateException("parallel read failed");
+    void shouldPropagateOfficialReadFailureWithoutFallback() {
+        RuntimeException officialFailure = new IllegalStateException("official read failed");
 
-        when(readSourceProperties.getMinisterOfTheWord()).thenReturn(PersonMinistryReadSource.PARALLEL);
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD))
-                .thenThrow(parallelFailure);
+                .thenThrow(officialFailure);
 
-        assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
+        assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
         verifyNoInteractions(repository, mapper);
-    }
-
-    @Test
-    void shouldPropagateLegacyMinisterOfTheWordListFailureWithoutMappingResponse() {
-        RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
-
-        when(repository.findAll()).thenThrow(legacyFailure);
-
-        assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
-        verifyNoInteractions(personMinistryReadService, mapper);
     }
 
     @Test

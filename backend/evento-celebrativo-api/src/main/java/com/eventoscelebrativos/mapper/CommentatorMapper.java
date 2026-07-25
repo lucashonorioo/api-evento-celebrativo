@@ -18,8 +18,6 @@ public interface CommentatorMapper {
 
     CommentatorResponseDTO toDto(Commentator commentator);
 
-    List<CommentatorResponseDTO> toDtoList(List<Commentator> commentators);
-
     default CommentatorResponseDTO toDtoFromPerson(Person person) {
         return new CommentatorResponseDTO(
                 person.getId(),

@@ -3,8 +3,6 @@ package com.eventoscelebrativos.service.impl;
 
 
 
-import com.eventoscelebrativos.config.PersonMinistryReadSource;
-import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -23,8 +21,6 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +30,6 @@ import java.util.List;
 @Service
 public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MinisterOfTheWordServiceImpl.class);
-
     private final MinisterOfTheWordRepository ministerOfTheWordRepository;
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
     private final RoleRepository roleRepository;
@@ -43,7 +37,6 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryReadSourceProperties readSourceProperties;
 
     public MinisterOfTheWordServiceImpl(
             MinisterOfTheWordRepository ministerOfTheWordRepository,
@@ -52,8 +45,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
             PasswordEncoder passwordEncoder,
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
-            PersonMinistryReadService personMinistryReadService,
-            PersonMinistryReadSourceProperties readSourceProperties
+            PersonMinistryReadService personMinistryReadService
     ) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
@@ -62,7 +54,6 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.readSourceProperties = readSourceProperties;
     }
 
 
@@ -87,15 +78,8 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Override
     @Transactional(readOnly = true)
     public List<MinisterOfTheWordResponseDTO> findAllMinistersOfTheWord() {
-        if (PersonMinistryReadSource.PARALLEL.equals(readSourceProperties.getMinisterOfTheWord())) {
-            LOGGER.debug("minister-of-the-word read source={}", PersonMinistryReadSource.PARALLEL);
-            List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD);
-            return ministerOfTheWordMapper.toDtoPersonList(people);
-        }
-
-        LOGGER.debug("minister-of-the-word read source={}", PersonMinistryReadSource.LEGACY);
-        List<MinisterOfTheWord> ministrosDaPalavra = ministerOfTheWordRepository.findAll();
-        return ministerOfTheWordMapper.toDtoList(ministrosDaPalavra);
+        List<Person> people = personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD);
+        return ministerOfTheWordMapper.toDtoPersonList(people);
     }
 
     @Override

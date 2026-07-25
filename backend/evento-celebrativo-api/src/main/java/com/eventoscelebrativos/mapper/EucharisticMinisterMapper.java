@@ -18,8 +18,6 @@ public interface EucharisticMinisterMapper {
 
     EucharisticMinisterResponseDTO toDto(EucharisticMinister eucharisticMinister);
 
-    List<EucharisticMinisterResponseDTO> toDtoList(List<EucharisticMinister> eucharisticMinisters);
-
     default EucharisticMinisterResponseDTO toDtoFromPerson(Person person) {
         return new EucharisticMinisterResponseDTO(
                 person.getId(),

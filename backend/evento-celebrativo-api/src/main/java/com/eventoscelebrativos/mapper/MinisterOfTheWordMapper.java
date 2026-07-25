@@ -18,8 +18,6 @@ public interface MinisterOfTheWordMapper {
 
     MinisterOfTheWordResponseDTO toDto(MinisterOfTheWord ministerOfTheWord);
 
-    List<MinisterOfTheWordResponseDTO> toDtoList(List<MinisterOfTheWord> ministerOfTheWord);
-
     default MinisterOfTheWordResponseDTO toDtoFromPerson(Person person) {
         return new MinisterOfTheWordResponseDTO(
                 person.getId(),
