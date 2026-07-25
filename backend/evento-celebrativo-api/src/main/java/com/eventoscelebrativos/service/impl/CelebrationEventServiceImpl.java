@@ -23,6 +23,7 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
@@ -31,7 +32,6 @@ import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
-import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -42,6 +42,9 @@ import com.eventoscelebrativos.service.EventAssignmentShadowReadExecutor;
 import com.eventoscelebrativos.service.EventAssignmentSnapshot;
 import com.eventoscelebrativos.service.EventAssignmentTarget;
 import com.eventoscelebrativos.service.EventAssignmentTargetResolver;
+import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
+import com.eventoscelebrativos.service.ScaleLegacyCompatibilityValidator;
+import com.eventoscelebrativos.service.ScaleParticipantEligibility;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -58,10 +61,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -73,7 +78,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
     private final CelebrationEventRepository celebrationEventRepository;
     private final LocationRepository locationRepository;
-    private final PersonRepository personRepository;
     private final CelebrationEventMapper celebrationEventMapper;
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
@@ -83,11 +87,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventAssignmentReadService eventAssignmentReadService;
     private final EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties;
     private final EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
+    private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
+    private final ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
             LocationRepository locationRepository,
-            PersonRepository personRepository,
             CelebrationEventMapper celebrationEventMapper,
             CelebrationEventScaleMapper celebrationEventScaleMapper,
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
@@ -96,11 +101,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties,
             EventAssignmentReadService eventAssignmentReadService,
             EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties,
-            EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor
+            EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor,
+            PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
+            ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
-        this.personRepository = personRepository;
         this.celebrationEventMapper = celebrationEventMapper;
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
@@ -110,6 +116,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventAssignmentReadService = eventAssignmentReadService;
         this.eventAssignmentShadowReadProperties = eventAssignmentShadowReadProperties;
         this.eventAssignmentShadowReadExecutor = eventAssignmentShadowReadExecutor;
+        this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
+        this.scaleLegacyCompatibilityValidator = scaleLegacyCompatibilityValidator;
     }
 
     @Override
@@ -411,19 +419,62 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         Location location = locationRepository.findById(dto.getLocationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Local", dto.getLocationId()));
 
+        List<Long> readerIds = safeList(dto.getReaderIds());
+        List<Long> commentatorIds = safeList(dto.getCommentatorIds());
+        List<Long> ministerOfTheWordIds = safeList(dto.getMinisterOfTheWordIds());
+        List<Long> eucharisticMinisterIds = safeList(dto.getEucharisticMinisterIds());
+
+        validateNoDuplicatedIds(readerIds, "leitor");
+        validateNoDuplicatedIds(commentatorIds, "comentarista");
+        validateNoDuplicatedIds(ministerOfTheWordIds, "ministro da Palavra");
+        validateNoDuplicatedIds(eucharisticMinisterIds, "ministro da Eucaristia");
+
+        Map<MinistryType, List<Long>> idsByMinistry = new EnumMap<>(MinistryType.class);
+        idsByMinistry.put(MinistryType.PRIEST, optionalId(dto.getPriestId()));
+        idsByMinistry.put(MinistryType.READER, readerIds);
+        idsByMinistry.put(MinistryType.COMMENTATOR, commentatorIds);
+        idsByMinistry.put(MinistryType.MINISTER_OF_THE_WORD, ministerOfTheWordIds);
+        idsByMinistry.put(MinistryType.EUCHARISTIC_MINISTER, eucharisticMinisterIds);
+
+        Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry =
+                groupEligibilityByMinistry(personMinistryEligibilityResolver.resolve(idsByMinistry));
+
         List<Person> people = new ArrayList<>();
         Set<Long> usedPersonIds = new HashSet<>();
 
-        addOptionalPerson(people, usedPersonIds, dto.getPriestId(), Priest.class, "padre");
-        addPeople(people, usedPersonIds, safeList(dto.getReaderIds()), Reader.class, "leitor");
-        addPeople(people, usedPersonIds, safeList(dto.getCommentatorIds()), Commentator.class, "comentarista");
-        addPeople(people, usedPersonIds, safeList(dto.getMinisterOfTheWordIds()), MinisterOfTheWord.class, "ministro da Palavra");
-        addPeople(people, usedPersonIds, safeList(dto.getEucharisticMinisterIds()), EucharisticMinister.class, "ministro da Eucaristia");
+        addOptionalPerson(people, usedPersonIds, dto.getPriestId(), MinistryType.PRIEST, Priest.class, "padre", eligibilityByMinistry);
+        addPeople(people, usedPersonIds, readerIds, MinistryType.READER, Reader.class, "leitor", eligibilityByMinistry);
+        addPeople(people, usedPersonIds, commentatorIds, MinistryType.COMMENTATOR, Commentator.class, "comentarista", eligibilityByMinistry);
+        addPeople(people, usedPersonIds, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, MinisterOfTheWord.class, "ministro da Palavra", eligibilityByMinistry);
+        addPeople(people, usedPersonIds, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, EucharisticMinister.class, "ministro da Eucaristia", eligibilityByMinistry);
 
         celebrationEvent.getLocations().clear();
         celebrationEvent.getLocations().add(location);
         celebrationEvent.getPeople().clear();
         celebrationEvent.getPeople().addAll(people);
+    }
+
+    private List<Long> optionalId(Long id) {
+        return id == null ? List.of() : List.of(id);
+    }
+
+    private void validateNoDuplicatedIds(List<Long> ids, String roleName) {
+        Set<Long> seen = new HashSet<>();
+        for (Long id : ids) {
+            if (!seen.add(id)) {
+                throw new BusinessException("Não é permitido informar IDs duplicados para " + roleName);
+            }
+        }
+    }
+
+    private Map<MinistryType, Map<Long, ScaleParticipantEligibility>> groupEligibilityByMinistry(
+            List<ScaleParticipantEligibility> eligibilities
+    ) {
+        return eligibilities.stream()
+                .collect(Collectors.groupingBy(
+                        ScaleParticipantEligibility::ministryType,
+                        Collectors.toMap(ScaleParticipantEligibility::personId, Function.identity())
+                ));
     }
 
     private CelebrationEventScaleRequestDTO toScaleRequest(CelebrationEventWithScaleRequestDTO dto) {
@@ -441,17 +492,13 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             List<Person> people,
             Set<Long> usedPersonIds,
             List<Long> ids,
-            Class<? extends Person> expectedType,
-            String roleName
+            MinistryType ministryType,
+            Class<? extends Person> expectedLegacyType,
+            String roleName,
+            Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry
     ) {
-        Set<Long> idsInSameRole = new HashSet<>();
         for (Long id : ids) {
-            if (!idsInSameRole.add(id)) {
-                throw new BusinessException("Não é permitido informar IDs duplicados para " + roleName);
-            }
-        }
-        for (Long id : ids) {
-            addOptionalPerson(people, usedPersonIds, id, expectedType, roleName);
+            addOptionalPerson(people, usedPersonIds, id, ministryType, expectedLegacyType, roleName, eligibilityByMinistry);
         }
     }
 
@@ -459,8 +506,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             List<Person> people,
             Set<Long> usedPersonIds,
             Long id,
-            Class<? extends Person> expectedType,
-            String roleName
+            MinistryType ministryType,
+            Class<? extends Person> expectedLegacyType,
+            String roleName,
+            Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry
     ) {
         if (id == null) {
             return;
@@ -470,12 +519,21 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             throw new BusinessException("A mesma pessoa não pode ocupar mais de uma função na mesma escala");
         }
 
-        Person person = personRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
+        ScaleParticipantEligibility eligibility = eligibilityByMinistry
+                .getOrDefault(ministryType, Map.of())
+                .get(id);
 
-        if (!expectedType.isInstance(person)) {
-            throw new BusinessException("A pessoa informada para " + roleName + " não possui o tipo correto");
+        if (eligibility == null || !eligibility.personFound()) {
+            throw new ResourceNotFoundException("Pessoa", id);
         }
+        if (!eligibility.ministryAssigned()) {
+            throw new BusinessException(
+                    "A pessoa informada para " + roleName + " não possui a função ministerial ativa correspondente"
+            );
+        }
+
+        Person person = eligibility.person();
+        scaleLegacyCompatibilityValidator.validate(person, expectedLegacyType, roleName);
 
         people.add(person);
     }
