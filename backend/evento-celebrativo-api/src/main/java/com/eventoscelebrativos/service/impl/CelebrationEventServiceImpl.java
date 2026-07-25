@@ -40,8 +40,8 @@ import com.eventoscelebrativos.service.EventAssignmentGroup;
 import com.eventoscelebrativos.service.EventAssignmentReadService;
 import com.eventoscelebrativos.service.EventAssignmentShadowReadExecutor;
 import com.eventoscelebrativos.service.EventAssignmentSnapshot;
-import com.eventoscelebrativos.service.EventAssignmentTarget;
-import com.eventoscelebrativos.service.EventAssignmentTargetResolver;
+import com.eventoscelebrativos.service.EventScaleAssignmentPlan;
+import com.eventoscelebrativos.service.LegacyScaleMirrorService;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
 import com.eventoscelebrativos.service.ScaleLegacyCompatibilityValidator;
 import com.eventoscelebrativos.service.ScaleParticipantEligibility;
@@ -57,7 +57,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -81,7 +80,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventMapper celebrationEventMapper;
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
-    private final EventAssignmentTargetResolver eventAssignmentTargetResolver;
     private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
     private final EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties;
     private final EventAssignmentReadService eventAssignmentReadService;
@@ -89,6 +87,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator;
+    private final LegacyScaleMirrorService legacyScaleMirrorService;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -96,21 +95,20 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventMapper celebrationEventMapper,
             CelebrationEventScaleMapper celebrationEventScaleMapper,
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
-            EventAssignmentTargetResolver eventAssignmentTargetResolver,
             EventAssignmentCompatibilityService eventAssignmentCompatibilityService,
             EventAssignmentReadSourceProperties eventAssignmentReadSourceProperties,
             EventAssignmentReadService eventAssignmentReadService,
             EventAssignmentShadowReadProperties eventAssignmentShadowReadProperties,
             EventAssignmentShadowReadExecutor eventAssignmentShadowReadExecutor,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
-            ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator
+            ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator,
+            LegacyScaleMirrorService legacyScaleMirrorService
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
         this.celebrationEventMapper = celebrationEventMapper;
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
-        this.eventAssignmentTargetResolver = eventAssignmentTargetResolver;
         this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
         this.eventAssignmentReadSourceProperties = eventAssignmentReadSourceProperties;
         this.eventAssignmentReadService = eventAssignmentReadService;
@@ -118,6 +116,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventAssignmentShadowReadExecutor = eventAssignmentShadowReadExecutor;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.scaleLegacyCompatibilityValidator = scaleLegacyCompatibilityValidator;
+        this.legacyScaleMirrorService = legacyScaleMirrorService;
     }
 
     @Override
@@ -366,11 +365,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         CelebrationEvent celebrationEvent = celebrationEventRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        applyScaleToEvent(celebrationEvent, celebrationEventScaleRequestDTO);
-        CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
-        synchronizeAssignments(savedEvent);
+        EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, celebrationEventScaleRequestDTO);
 
-        return celebrationEventScaleMapper.toDto(savedEvent);
+        eventAssignmentCompatibilityService.synchronizeAssignments(celebrationEvent, plan.toTargets());
+        legacyScaleMirrorService.synchronizeMirror(celebrationEvent, plan.people());
+
+        return celebrationEventScaleMapper.toDto(celebrationEvent);
     }
 
     @Override
@@ -382,9 +382,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         celebrationEvent.setEventTime(celebrationEventWithScaleRequestDTO.getEventTime());
         celebrationEvent.setMassOrCelebration(celebrationEventWithScaleRequestDTO.getMassOrCelebration());
 
-        applyScaleToEvent(celebrationEvent, toScaleRequest(celebrationEventWithScaleRequestDTO));
+        EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, toScaleRequest(celebrationEventWithScaleRequestDTO));
+
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
-        synchronizeAssignments(savedEvent);
+
+        eventAssignmentCompatibilityService.synchronizeAssignments(savedEvent, plan.toTargets());
+        legacyScaleMirrorService.synchronizeMirror(savedEvent, plan.people());
 
         return celebrationEventScaleMapper.toDto(savedEvent);
     }
@@ -408,12 +411,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
     }
 
-    private void synchronizeAssignments(CelebrationEvent event) {
-        List<EventAssignmentTarget> targets = eventAssignmentTargetResolver.resolve(event.getPeople());
-        eventAssignmentCompatibilityService.synchronizeAssignments(event, targets);
-    }
-
-    private void applyScaleToEvent(CelebrationEvent celebrationEvent, CelebrationEventScaleRequestDTO dto) {
+    private EventScaleAssignmentPlan buildScalePlan(CelebrationEvent celebrationEvent, CelebrationEventScaleRequestDTO dto) {
         validateId(dto.getLocationId());
 
         Location location = locationRepository.findById(dto.getLocationId())
@@ -439,19 +437,18 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry =
                 groupEligibilityByMinistry(personMinistryEligibilityResolver.resolve(idsByMinistry));
 
-        List<Person> people = new ArrayList<>();
-        Set<Long> usedPersonIds = new HashSet<>();
+        EventScaleAssignmentPlan.Builder planBuilder = EventScaleAssignmentPlan.builder();
 
-        addOptionalPerson(people, usedPersonIds, dto.getPriestId(), MinistryType.PRIEST, Priest.class, "padre", eligibilityByMinistry);
-        addPeople(people, usedPersonIds, readerIds, MinistryType.READER, Reader.class, "leitor", eligibilityByMinistry);
-        addPeople(people, usedPersonIds, commentatorIds, MinistryType.COMMENTATOR, Commentator.class, "comentarista", eligibilityByMinistry);
-        addPeople(people, usedPersonIds, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, MinisterOfTheWord.class, "ministro da Palavra", eligibilityByMinistry);
-        addPeople(people, usedPersonIds, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, EucharisticMinister.class, "ministro da Eucaristia", eligibilityByMinistry);
+        addOptionalPerson(planBuilder, dto.getPriestId(), MinistryType.PRIEST, Priest.class, "padre", eligibilityByMinistry);
+        addPeople(planBuilder, readerIds, MinistryType.READER, Reader.class, "leitor", eligibilityByMinistry);
+        addPeople(planBuilder, commentatorIds, MinistryType.COMMENTATOR, Commentator.class, "comentarista", eligibilityByMinistry);
+        addPeople(planBuilder, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, MinisterOfTheWord.class, "ministro da Palavra", eligibilityByMinistry);
+        addPeople(planBuilder, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, EucharisticMinister.class, "ministro da Eucaristia", eligibilityByMinistry);
 
         celebrationEvent.getLocations().clear();
         celebrationEvent.getLocations().add(location);
-        celebrationEvent.getPeople().clear();
-        celebrationEvent.getPeople().addAll(people);
+
+        return planBuilder.build();
     }
 
     private List<Long> optionalId(Long id) {
@@ -489,8 +486,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     }
 
     private void addPeople(
-            List<Person> people,
-            Set<Long> usedPersonIds,
+            EventScaleAssignmentPlan.Builder planBuilder,
             List<Long> ids,
             MinistryType ministryType,
             Class<? extends Person> expectedLegacyType,
@@ -498,13 +494,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry
     ) {
         for (Long id : ids) {
-            addOptionalPerson(people, usedPersonIds, id, ministryType, expectedLegacyType, roleName, eligibilityByMinistry);
+            addOptionalPerson(planBuilder, id, ministryType, expectedLegacyType, roleName, eligibilityByMinistry);
         }
     }
 
     private void addOptionalPerson(
-            List<Person> people,
-            Set<Long> usedPersonIds,
+            EventScaleAssignmentPlan.Builder planBuilder,
             Long id,
             MinistryType ministryType,
             Class<? extends Person> expectedLegacyType,
@@ -515,9 +510,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             return;
         }
         validateId(id);
-        if (!usedPersonIds.add(id)) {
-            throw new BusinessException("A mesma pessoa não pode ocupar mais de uma função na mesma escala");
-        }
 
         ScaleParticipantEligibility eligibility = eligibilityByMinistry
                 .getOrDefault(ministryType, Map.of())
@@ -535,7 +527,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         Person person = eligibility.person();
         scaleLegacyCompatibilityValidator.validate(person, expectedLegacyType, roleName);
 
-        people.add(person);
+        planBuilder.add(person, toAssignmentType(ministryType));
     }
 
     private List<Long> safeList(List<Long> ids) {
@@ -759,6 +751,16 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
     private EventAssignmentType toAssignmentType(EventScheduleType type) {
         return switch (type) {
+            case PRIEST -> EventAssignmentType.PRIEST;
+            case READER -> EventAssignmentType.READER;
+            case COMMENTATOR -> EventAssignmentType.COMMENTATOR;
+            case MINISTER_OF_THE_WORD -> EventAssignmentType.MINISTER_OF_THE_WORD;
+            case EUCHARISTIC_MINISTER -> EventAssignmentType.EUCHARISTIC_MINISTER;
+        };
+    }
+
+    private EventAssignmentType toAssignmentType(MinistryType ministryType) {
+        return switch (ministryType) {
             case PRIEST -> EventAssignmentType.PRIEST;
             case READER -> EventAssignmentType.READER;
             case COMMENTATOR -> EventAssignmentType.COMMENTATOR;
