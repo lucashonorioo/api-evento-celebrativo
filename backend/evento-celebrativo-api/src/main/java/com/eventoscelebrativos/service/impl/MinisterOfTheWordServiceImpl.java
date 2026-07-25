@@ -5,7 +5,6 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -19,8 +18,6 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -46,9 +43,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
     private final PersonMinistryReadSourceProperties readSourceProperties;
-    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public MinisterOfTheWordServiceImpl(
             MinisterOfTheWordRepository ministerOfTheWordRepository,
@@ -58,9 +53,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
             PersonMinistryReadService personMinistryReadService,
-            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
-            PersonMinistryReadSourceProperties readSourceProperties,
-            PersonMinistryShadowReadProperties shadowReadProperties
+            PersonMinistryReadSourceProperties readSourceProperties
     ) {
         this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
@@ -69,9 +62,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
         this.readSourceProperties = readSourceProperties;
-        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -104,14 +95,6 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
         LOGGER.debug("minister-of-the-word read source={}", PersonMinistryReadSource.LEGACY);
         List<MinisterOfTheWord> ministrosDaPalavra = ministerOfTheWordRepository.findAll();
-        if (shadowReadProperties.isMinisterOfTheWordEnabled()) {
-            personMinistryShadowReadExecutor.execute(
-                    true,
-                    MinistryType.MINISTER_OF_THE_WORD,
-                    ministrosDaPalavra,
-                    PersonMinistryShadowReadComparisonOptions.unorderedList()
-            );
-        }
         return ministerOfTheWordMapper.toDtoList(ministrosDaPalavra);
     }
 

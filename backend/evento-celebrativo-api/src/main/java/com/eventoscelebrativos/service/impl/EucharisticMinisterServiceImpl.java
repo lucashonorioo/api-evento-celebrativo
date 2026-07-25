@@ -5,7 +5,6 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -20,8 +19,6 @@ import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
@@ -46,9 +43,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
     private final PersonMinistryReadSourceProperties readSourceProperties;
-    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public EucharisticMinisterServiceImpl(
             EucharisticMinisterRepository eucharisticMinisterRepository,
@@ -58,9 +53,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
             PersonMinistryReadService personMinistryReadService,
-            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
-            PersonMinistryReadSourceProperties readSourceProperties,
-            PersonMinistryShadowReadProperties shadowReadProperties
+            PersonMinistryReadSourceProperties readSourceProperties
     ) {
         this.eucharisticMinisterRepository = eucharisticMinisterRepository;
         this.eucharisticMinisterMapper = eucharisticMinisterMapper;
@@ -69,9 +62,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
         this.readSourceProperties = readSourceProperties;
-        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -103,14 +94,6 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
 
         LOGGER.debug("eucharistic-minister read source={}", PersonMinistryReadSource.LEGACY);
         List<EucharisticMinister> ministrosDeEucaristia = eucharisticMinisterRepository.findAll();
-        if (shadowReadProperties.isEucharisticMinisterEnabled()) {
-            personMinistryShadowReadExecutor.execute(
-                    true,
-                    MinistryType.EUCHARISTIC_MINISTER,
-                    ministrosDeEucaristia,
-                    PersonMinistryShadowReadComparisonOptions.unorderedList()
-            );
-        }
         return eucharisticMinisterMapper.toDtoList(ministrosDeEucaristia);
     }
 

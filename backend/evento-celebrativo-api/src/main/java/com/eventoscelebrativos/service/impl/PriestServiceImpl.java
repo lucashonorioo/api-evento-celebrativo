@@ -6,7 +6,6 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -20,8 +19,6 @@ import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.MinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadComparisonOptions;
-import com.eventoscelebrativos.service.PersonMinistryShadowReadExecutor;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -47,9 +44,7 @@ public class PriestServiceImpl implements PriestService {
     private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
     private final MinistryTypeResolver ministryTypeResolver;
     private final PersonMinistryReadService personMinistryReadService;
-    private final PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
     private final PersonMinistryReadSourceProperties readSourceProperties;
-    private final PersonMinistryShadowReadProperties shadowReadProperties;
 
     public PriestServiceImpl(
             PriestRepository priestRepository,
@@ -59,9 +54,7 @@ public class PriestServiceImpl implements PriestService {
             PersonMinistryCompatibilityService personMinistryCompatibilityService,
             MinistryTypeResolver ministryTypeResolver,
             PersonMinistryReadService personMinistryReadService,
-            PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor,
-            PersonMinistryReadSourceProperties readSourceProperties,
-            PersonMinistryShadowReadProperties shadowReadProperties
+            PersonMinistryReadSourceProperties readSourceProperties
     ) {
         this.priestRepository = priestRepository;
         this.priestMapper = priestMapper;
@@ -70,9 +63,7 @@ public class PriestServiceImpl implements PriestService {
         this.personMinistryCompatibilityService = personMinistryCompatibilityService;
         this.ministryTypeResolver = ministryTypeResolver;
         this.personMinistryReadService = personMinistryReadService;
-        this.personMinistryShadowReadExecutor = personMinistryShadowReadExecutor;
         this.readSourceProperties = readSourceProperties;
-        this.shadowReadProperties = shadowReadProperties;
     }
 
 
@@ -104,14 +95,6 @@ public class PriestServiceImpl implements PriestService {
 
         LOGGER.debug("priest read source={}", PersonMinistryReadSource.LEGACY);
         List<Priest> priests = priestRepository.findAll();
-        if (shadowReadProperties.isPriestEnabled()) {
-            personMinistryShadowReadExecutor.execute(
-                    true,
-                    MinistryType.PRIEST,
-                    priests,
-                    PersonMinistryShadowReadComparisonOptions.unorderedList()
-            );
-        }
         return priestMapper.toDtoList(priests);
     }
 

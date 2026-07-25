@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -63,13 +62,9 @@ class MinisterOfTheWordLegacyCutoverConsistencyIntegrationTest {
     @Autowired
     private PersonMinistryReadSourceProperties readSourceProperties;
 
-    @Autowired
-    private PersonMinistryShadowReadProperties shadowReadProperties;
-
     @Test
     void shouldKeepLegacySourceAndContractsForMinisterOfTheWordLifecycle() throws Exception {
         assertEquals(PersonMinistryReadSource.LEGACY, readSourceProperties.getMinisterOfTheWord());
-        assertFalse(shadowReadProperties.isMinisterOfTheWordEnabled());
 
         Reader readerWithMinisterMinistry = new Reader();
         readerWithMinisterMinistry.setName("Legacy Additional Word Minister Ministry");

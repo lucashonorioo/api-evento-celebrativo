@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.config.PersonMinistryReadSource;
 import com.eventoscelebrativos.config.PersonMinistryReadSourceProperties;
-import com.eventoscelebrativos.config.PersonMinistryShadowReadProperties;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -63,13 +62,7 @@ class PriestServiceImplTest {
     private PersonMinistryReadService personMinistryReadService;
 
     @Mock
-    private PersonMinistryShadowReadExecutor personMinistryShadowReadExecutor;
-
-    @Mock
     private PersonMinistryReadSourceProperties readSourceProperties;
-
-    @Mock
-    private PersonMinistryShadowReadProperties shadowReadProperties;
 
     @InjectMocks
     private PriestServiceImpl service;
@@ -138,7 +131,7 @@ class PriestServiceImplTest {
         when(repository.findAll()).thenReturn(entities);
         when(mapper.toDtoList(entities)).thenReturn(responses);
         assertSame(responses, service.findAllPriests());
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
+        verifyNoInteractions(personMinistryReadService);
 
         when(repository.getReferenceById(1L)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -157,44 +150,6 @@ class PriestServiceImplTest {
     }
 
     @Test
-    void shouldListPriestsWithShadowReadDisabledUsingLegacyRepository() {
-        Priest entity = priest(1L, "encoded-password");
-        PriestResponseDTO response = response(1L);
-        List<Priest> entities = List.of(entity);
-        List<PriestResponseDTO> responses = List.of(response);
-
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-
-        assertSame(responses, service.findAllPriests());
-
-        verify(repository).findAll();
-        verify(mapper).toDtoList(entities);
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor);
-    }
-
-    @Test
-    void shouldRunPriestShadowReadWhenEnabledAndKeepLegacyResponse() {
-        Priest entity = priest(1L, "encoded-password");
-        PriestResponseDTO response = response(1L);
-        List<Priest> entities = List.of(entity);
-        List<PriestResponseDTO> responses = List.of(response);
-
-        when(shadowReadProperties.isPriestEnabled()).thenReturn(true);
-        when(repository.findAll()).thenReturn(entities);
-        when(mapper.toDtoList(entities)).thenReturn(responses);
-
-        assertSame(responses, service.findAllPriests());
-        verify(personMinistryShadowReadExecutor).execute(
-                true,
-                MinistryType.PRIEST,
-                entities,
-                PersonMinistryShadowReadComparisonOptions.unorderedList()
-        );
-        verifyNoInteractions(personMinistryReadService);
-    }
-
-    @Test
     void shouldUseParallelPriestReadSourceWithoutCallingLegacyRepository() {
         Priest priest = priest(1L, "encoded-password");
         Reader readerWithPriestMinistry = reader(2L, "encoded-password");
@@ -209,7 +164,7 @@ class PriestServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.PRIEST);
         verify(mapper).toDtoPersonList(people);
-        verifyNoInteractions(repository, personMinistryShadowReadExecutor);
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -238,17 +193,17 @@ class PriestServiceImplTest {
                 .thenThrow(parallelFailure);
 
         assertSame(parallelFailure, assertThrows(RuntimeException.class, () -> service.findAllPriests()));
-        verifyNoInteractions(repository, personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(repository, mapper);
     }
 
     @Test
-    void shouldPropagateLegacyPriestListFailureWithoutUsingShadowReadAsFallback() {
+    void shouldPropagateLegacyPriestListFailureWithoutMappingResponse() {
         RuntimeException legacyFailure = new IllegalStateException("legacy read failed");
 
         when(repository.findAll()).thenThrow(legacyFailure);
 
         assertSame(legacyFailure, assertThrows(RuntimeException.class, () -> service.findAllPriests()));
-        verifyNoInteractions(personMinistryReadService, personMinistryShadowReadExecutor, mapper);
+        verifyNoInteractions(personMinistryReadService, mapper);
     }
 
     @Test
