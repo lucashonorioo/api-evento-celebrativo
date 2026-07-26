@@ -1,7 +1,6 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.model.MinistryType;
-import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,9 +56,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private MinisterOfTheWordRepository ministerOfTheWordRepository;
 
     @Autowired
     private PersonRepository personRepository;
@@ -174,7 +170,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // MINISTER_OF_THE_WORD association, never the shared Person row.
             assertTrue(personRepository.existsById(ministerId));
-            assertTrue(ministerOfTheWordRepository.existsById(ministerId));
+            assertEquals("minister_of_the_word", personType(ministerId));
             assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, false);
             assertEquals(1, countMinistries(ministerId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(ministerId));
@@ -357,9 +353,11 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
     }
 
     private Set<Long> legacyMinisterIds() {
-        return new LinkedHashSet<>(ministerOfTheWordRepository.findAll().stream()
-                .map(minister -> minister.getId())
-                .toList());
+        return new LinkedHashSet<>(jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                "minister_of_the_word"
+        ));
     }
 
     private Set<Long> activeMinisterIds() {

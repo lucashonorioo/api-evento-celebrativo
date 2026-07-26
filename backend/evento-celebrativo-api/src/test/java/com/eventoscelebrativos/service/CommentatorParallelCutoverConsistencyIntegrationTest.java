@@ -1,7 +1,6 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.model.MinistryType;
-import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,9 +56,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private CommentatorRepository commentatorRepository;
 
     @Autowired
     private PersonRepository personRepository;
@@ -182,7 +178,7 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // COMMENTATOR association, never the shared Person row.
             assertTrue(personRepository.existsById(commentatorId));
-            assertTrue(commentatorRepository.existsById(commentatorId));
+            assertEquals("commentator", personType(commentatorId));
             assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, false);
             assertEquals(1, countMinistries(commentatorId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(commentatorId));
@@ -369,9 +365,11 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
     }
 
     private Set<Long> legacyCommentatorIds() {
-        return new LinkedHashSet<>(commentatorRepository.findAll().stream()
-                .map(commentator -> commentator.getId())
-                .toList());
+        return new LinkedHashSet<>(jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                "commentator"
+        ));
     }
 
     private Set<Long> activeCommentatorIds() {

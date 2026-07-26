@@ -3,7 +3,6 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.PriestRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -57,9 +56,6 @@ class PriestParallelCutoverConsistencyIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private PriestRepository priestRepository;
 
     @Autowired
     private PersonRepository personRepository;
@@ -174,7 +170,7 @@ class PriestParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // PRIEST association, never the shared Person row.
             assertTrue(personRepository.existsById(priestId));
-            assertTrue(priestRepository.existsById(priestId));
+            assertEquals("priest", personType(priestId));
             assertSingleMinistry(priestId, MinistryType.PRIEST, false);
             assertEquals(1, countMinistries(priestId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(priestId));
@@ -357,9 +353,11 @@ class PriestParallelCutoverConsistencyIntegrationTest {
     }
 
     private Set<Long> legacyPriestIds() {
-        return new LinkedHashSet<>(priestRepository.findAll().stream()
-                .map(priest -> priest.getId())
-                .toList());
+        return new LinkedHashSet<>(jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                "priest"
+        ));
     }
 
     private Set<Long> activePriestIds() {

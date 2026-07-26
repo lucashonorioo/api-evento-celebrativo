@@ -9,13 +9,8 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
-import com.eventoscelebrativos.repository.CommentatorRepository;
-import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
-import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.PriestRepository;
-import com.eventoscelebrativos.repository.ReaderRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -62,21 +57,6 @@ class PersonMinistryParallelReadIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
-
-    @Autowired
-    private ReaderRepository readerRepository;
-
-    @Autowired
-    private CommentatorRepository commentatorRepository;
-
-    @Autowired
-    private PriestRepository priestRepository;
-
-    @Autowired
-    private MinisterOfTheWordRepository ministerOfTheWordRepository;
-
-    @Autowired
-    private EucharisticMinisterRepository eucharisticMinisterRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -191,7 +171,7 @@ class PersonMinistryParallelReadIntegrationTest {
 
         assertContainsPerson(readService.findActivePeopleByMinistry(MinistryType.READER, PageRequest.of(0, 20)), reader);
         assertContainsPerson(readService.findActivePeopleByMinistry(MinistryType.COMMENTATOR, PageRequest.of(0, 20)), reader);
-        assertFalse(commentatorRepository.findAll().stream().map(Person::getId).toList().contains(reader.getId()));
+        assertFalse(legacyPeople(MinistryType.COMMENTATOR).stream().map(Person::getId).toList().contains(reader.getId()));
 
         PersonMinistryConsistencyReport report = consistencyService.audit(5);
         PersonMinistryConsistencyEntry detail = findDetail(report, reader.getId());
@@ -211,7 +191,7 @@ class PersonMinistryParallelReadIntegrationTest {
         personMinistryRepository.deleteAllByPersonId(reader.getId());
         personMinistryRepository.flush();
 
-        assertTrue(readerRepository.findAll().stream().map(Person::getId).toList().contains(reader.getId()));
+        assertTrue(legacyPeople(MinistryType.READER).stream().map(Person::getId).toList().contains(reader.getId()));
         assertDoesNotContainPerson(readService.findActivePeopleByMinistry(MinistryType.READER, PageRequest.of(0, 20)), reader);
 
         PersonMinistryConsistencyReport report = consistencyService.audit(5);
@@ -264,12 +244,21 @@ class PersonMinistryParallelReadIntegrationTest {
     }
 
     private List<Person> legacyPeople(MinistryType ministryType) {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                legacyPersonType(ministryType)
+        );
+        return personRepository.findAllByIdIn(ids);
+    }
+
+    private String legacyPersonType(MinistryType ministryType) {
         return switch (ministryType) {
-            case READER -> List.copyOf(readerRepository.findAll());
-            case COMMENTATOR -> List.copyOf(commentatorRepository.findAll());
-            case PRIEST -> List.copyOf(priestRepository.findAll());
-            case MINISTER_OF_THE_WORD -> List.copyOf(ministerOfTheWordRepository.findAll());
-            case EUCHARISTIC_MINISTER -> List.copyOf(eucharisticMinisterRepository.findAll());
+            case READER -> "reader";
+            case COMMENTATOR -> "commentator";
+            case PRIEST -> "priest";
+            case MINISTER_OF_THE_WORD -> "minister_of_the_word";
+            case EUCHARISTIC_MINISTER -> "eucharistic_minister";
         };
     }
 

@@ -5,7 +5,6 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Reader;
-import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,9 +52,6 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private MinisterOfTheWordRepository ministerOfTheWordRepository;
-
-    @Autowired
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
@@ -98,7 +94,7 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
         assertTrue(responseIds.contains(savedMultiMinistryMinister.getId()));
         assertFalse(responseIds.contains(savedInactiveMinister.getId()));
         assertEquals(1, responseIds.stream().filter(savedMultiMinistryMinister.getId()::equals).count());
-        assertFalse(ministerOfTheWordRepository.findAll().stream().map(Person::getId).toList().contains(savedReader.getId()));
+        assertFalse(legacyMinisterIds().contains(savedReader.getId()));
         assertEquals("reader", personType(savedReader.getId()));
         assertEquals(ministryRowsBefore, countPersonMinistryRows());
 
@@ -156,6 +152,14 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
     private int countPersonMinistryRows() {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_person_ministry", Integer.class);
         return count == null ? 0 : count;
+    }
+
+    private List<Long> legacyMinisterIds() {
+        return jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                "minister_of_the_word"
+        );
     }
 
     private String personType(Long personId) {
