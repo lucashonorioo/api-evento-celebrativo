@@ -28,14 +28,6 @@ public class CelebrationEvent implements Serializable {
 
     @ManyToMany
     @JoinTable(
-            name = "tb_event_person",
-            joinColumns = @JoinColumn(name = "event_id", referencedColumnName = "id"),
-            inverseJoinColumns = @JoinColumn(name = "person_id", referencedColumnName = "id")
-    )
-    List<Person> people = new ArrayList<>();
-
-    @ManyToMany
-    @JoinTable(
             name = "tb_event_location",
             joinColumns = @JoinColumn(name = "event_id", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "location_id", referencedColumnName = "id")
@@ -105,11 +97,6 @@ public class CelebrationEvent implements Serializable {
     public void setMassOrCelebration(Boolean massOrCelebration) {
         this.massOrCelebration = massOrCelebration;
     }
-
-    public List<Person> getPeople() {
-        return people;
-    }
-
 
     public List<Location> getLocations() {
         return locations;

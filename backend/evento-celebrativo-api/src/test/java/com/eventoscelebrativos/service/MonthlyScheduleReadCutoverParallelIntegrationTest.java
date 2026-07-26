@@ -64,7 +64,6 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
     @Test
     void shouldUseBackfilledAssignmentsAsOfficialSourceForAllTypesWithoutChangingContractOrData() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
-        long eventPeopleBefore = count("tb_event_person");
 
         for (EventScheduleType type : EventScheduleType.values()) {
             String url = fixtureUrl(type, 0, 1, false);
@@ -78,7 +77,6 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
             assertTrue(root.path("content").get(0).path("assignments").isArray());
         }
 
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(assignmentsBefore, assignmentRows());
     }
 
@@ -167,13 +165,11 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
                 personId,
                 EventAssignmentType.COMMENTATOR.name()
         );
-        long eventPeopleBefore = count("tb_event_person");
         String personName = personName(personId);
 
         String json = getJson(urlForDate(LocalDate.now().plusDays(96), EventScheduleType.COMMENTATOR));
 
         assertTrue(objectMapper.readTree(json).path("content").toString().contains(personName));
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(1, countAssignment(eventId, personId));
     }
 
@@ -304,11 +300,6 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
                 eventId,
                 personId
         );
-        return count == null ? 0 : count;
-    }
-
-    private long count(String table) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
         return count == null ? 0 : count;
     }
 

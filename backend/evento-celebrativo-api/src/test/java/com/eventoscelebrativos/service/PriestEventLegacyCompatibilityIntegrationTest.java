@@ -142,7 +142,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
             assertTrue(personRepository.existsById(priestId));
             assertEquals(ministriesBeforeDelete, countMinistries(priestId));
             assertEquals(1, countMinistries(priestId, MinistryType.PRIEST));
-            assertEquals(0, countEventPeople(eventId, priestId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(priestId);
@@ -225,21 +224,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private int countEventPeople(Long eventId, Long personId) {
-        Integer count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM tb_event_person
-                WHERE event_id = ?
-                  AND person_id = ?
-                """,
-                Integer.class,
-                eventId,
-                personId
-        );
-        return count == null ? 0 : count;
-    }
-
     private void cleanupEventsByName(String eventName) {
         jdbcTemplate.queryForList(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
@@ -254,7 +238,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_event_location WHERE event_id = ?", eventId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_celebration_event WHERE id = ?", eventId);
     }
 
@@ -263,7 +246,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);

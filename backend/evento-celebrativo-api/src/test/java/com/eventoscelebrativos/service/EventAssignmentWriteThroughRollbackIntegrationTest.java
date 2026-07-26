@@ -81,7 +81,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
 
             assertSame(failure, result);
             assertEquals(0, countEventsByName(eventName));
-            assertEquals(0, countRows("tb_event_person", "person_id", priestId));
             assertEquals(0, countRows("tb_event_assignment", "person_id", priestId));
         } finally {
             cleanupEventsByName(eventName);
@@ -123,7 +122,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
                     ));
 
             assertSame(failure, result);
-            assertTrue(eventPersonIds(eventId).isEmpty());
             assertEquals(Set.of(oldReaderId), Set.copyOf(eventAssignmentPersonIds(eventId)));
             assertEquals(1, countRows("tb_event_assignment", "person_id", oldReaderId));
             assertEquals(0, countRows("tb_event_assignment", "person_id", newReaderId));
@@ -159,7 +157,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
 
             assertSame(failure, result);
             assertEquals(1, countRows("tb_celebration_event", "id", eventId));
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
@@ -223,14 +220,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         );
     }
 
-    private List<Long> eventPersonIds(Long eventId) {
-        return jdbcTemplate.queryForList(
-                "SELECT person_id FROM tb_event_person WHERE event_id = ? ORDER BY person_id",
-                Long.class,
-                eventId
-        );
-    }
-
     private List<Long> eventAssignmentPersonIds(Long eventId) {
         return jdbcTemplate.queryForList(
                 "SELECT person_id FROM tb_event_assignment WHERE event_id = ? ORDER BY person_id",
@@ -271,7 +260,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_event_location WHERE event_id = ?", eventId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_celebration_event WHERE id = ?", eventId);
     }
 
@@ -280,7 +268,6 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);

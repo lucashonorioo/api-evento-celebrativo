@@ -224,7 +224,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, celebrationEventScaleRequestDTO);
 
         eventAssignmentCompatibilityService.synchronizeAssignments(celebrationEvent, plan.toTargets());
-        celebrationEvent.getPeople().clear();
 
         return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
     }

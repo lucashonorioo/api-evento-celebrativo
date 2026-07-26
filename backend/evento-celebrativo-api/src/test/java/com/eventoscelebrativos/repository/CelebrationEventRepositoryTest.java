@@ -134,24 +134,6 @@ class CelebrationEventRepositoryTest {
     }
 
     @Test
-    void shouldNotUseLegacyEventPersonToSelectParallelEucharistScaleEvents() {
-        Long personId = insertPerson("eucharistic_minister", "Legacy Only Minister");
-        Long eventId = insertEvent("Legacy Only Eucharist", LocalDate.of(2026, 3, 9));
-        Long locationId = firstLocationId();
-        jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
-        jdbcTemplate.update("INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)", eventId, personId);
-
-        Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
-                PageRequest.of(0, 10),
-                LocalDate.of(2026, 3, 9),
-                LocalDate.of(2026, 3, 9)
-        );
-
-        Assertions.assertTrue(result.isEmpty());
-        Assertions.assertTrue(eventRepository.findEucharistScaleAssignmentsByEventIds(List.of(eventId)).isEmpty());
-    }
-
-    @Test
     void shouldFindParallelScheduleEventsForEachAssignmentType() {
         for (EventScheduleType type : EventScheduleType.values()) {
             Page<EventScheduleEventProjection> result = findParallelSchedule(type, false);
@@ -248,29 +230,6 @@ class CelebrationEventRepositoryTest {
     }
 
     @Test
-    void shouldNotUseLegacyEventPersonToSelectParallelMonthlyScheduleEvents() {
-        Long personId = insertPerson("reader", "Legacy Only Reader");
-        Long eventId = insertEvent("Legacy Only Monthly", LocalDate.of(2026, 3, 11));
-        Long locationId = firstLocationId();
-        jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
-        jdbcTemplate.update("INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)", eventId, personId);
-
-        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
-                PageRequest.of(0, 10),
-                LocalDate.of(2026, 3, 11),
-                LocalDate.of(2026, 3, 11),
-                EventAssignmentType.READER.name(),
-                false
-        );
-
-        Assertions.assertTrue(result.isEmpty());
-        Assertions.assertTrue(eventRepository.findEventScheduleAssignmentsByAssignmentType(
-                List.of(eventId),
-                EventAssignmentType.READER.name()
-        ).isEmpty());
-    }
-
-    @Test
     void shouldCountParallelScheduleTotalElementsByEventsAndNotAssignments() {
         Page<EventScheduleEventProjection> result = findParallelSchedule(EventScheduleType.EUCHARISTIC_MINISTER, false);
         List<EventScheduleAssignmentProjection> assignments =
@@ -292,14 +251,6 @@ class CelebrationEventRepositoryTest {
     }
 
     @Test
-    void shouldFindEventWithPeopleWithoutDuplicatingEvent() {
-        CelebrationEvent event = eventRepository.findByIdWithPeople(1L).orElseThrow();
-
-        Assertions.assertEquals(1L, event.getId());
-        Assertions.assertEquals(7, event.getPeople().size());
-    }
-
-    @Test
     void shouldFindEventWithoutLocation() {
         CelebrationEvent event = new CelebrationEvent(null, "Evento sem local", LocalDate.of(2026, 2, 1), LocalTime.of(9, 0), true);
         entityManager.persist(event);
@@ -309,18 +260,6 @@ class CelebrationEventRepositoryTest {
         CelebrationEvent result = eventRepository.findByIdWithLocations(event.getId()).orElseThrow();
 
         Assertions.assertTrue(result.getLocations().isEmpty());
-    }
-
-    @Test
-    void shouldFindEventWithoutPeople() {
-        CelebrationEvent event = new CelebrationEvent(null, "Evento sem pessoas", LocalDate.of(2026, 2, 2), LocalTime.of(9, 0), true);
-        entityManager.persist(event);
-        entityManager.flush();
-        entityManager.clear();
-
-        CelebrationEvent result = eventRepository.findByIdWithPeople(event.getId()).orElseThrow();
-
-        Assertions.assertTrue(result.getPeople().isEmpty());
     }
 
     private Page<EventScheduleEventProjection> findParallelSchedule(EventScheduleType type, boolean includeUnassigned) {

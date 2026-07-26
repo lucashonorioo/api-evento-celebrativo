@@ -169,12 +169,4 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
             """)
     Optional<CelebrationEvent> findByIdWithLocations(@Param("id") Long id);
 
-    @Query("""
-            SELECT DISTINCT ce
-            FROM CelebrationEvent ce
-            LEFT JOIN FETCH ce.people
-            WHERE ce.id = :id
-            """)
-    Optional<CelebrationEvent> findByIdWithPeople(@Param("id") Long id);
-
 }

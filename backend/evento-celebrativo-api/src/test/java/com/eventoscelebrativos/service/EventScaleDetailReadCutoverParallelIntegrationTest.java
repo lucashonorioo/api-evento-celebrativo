@@ -62,14 +62,12 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
     @Test
     void shouldUseBackfilledAssignmentsAsOfficialSourceWithoutChangingContractOrData() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
-        long eventPeopleBefore = count("tb_event_person");
         Statistics statistics = statistics();
         statistics.clear();
 
         String parallelJson = getAuthorizedJson(1L);
 
         assertEquals(2L, statistics.getPrepareStatementCount());
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(assignmentsBefore, assignmentRows());
 
         JsonNode root = objectMapper.readTree(parallelJson);
@@ -114,7 +112,6 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         Long eventId = objectMapper.readTree(createdJson).path("eventId").asLong();
         entityManager.flush();
 
-        assertEquals(0, countRows("tb_event_person", "event_id", eventId));
         assertEquals(5, countRows("tb_event_assignment", "event_id", eventId));
         assertAssignmentType(eventId, priestId, EventAssignmentType.PRIEST);
         assertAssignmentType(eventId, readerId, EventAssignmentType.READER);
@@ -140,7 +137,6 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         Long eventId = insertEvent("Parallel Different Subtype Mass");
         Long locationId = firstLocationId();
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
-        jdbcTemplate.update("INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)", eventId, personId);
         jdbcTemplate.update(
                 """
                 INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
@@ -266,11 +262,6 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
                 Integer.class,
                 id
         );
-        return count == null ? 0 : count;
-    }
-
-    private long count(String table) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
         return count == null ? 0 : count;
     }
 

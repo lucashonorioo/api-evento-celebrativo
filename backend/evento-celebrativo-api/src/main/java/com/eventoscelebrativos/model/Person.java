@@ -30,9 +30,6 @@ public abstract class Person implements Serializable, UserDetails {
     @Column(name = "person_type", insertable = false, updatable = false)
     private String personType;
 
-    @ManyToMany(mappedBy = "people")
-    private List<CelebrationEvent> celebrationEvent = new ArrayList<>();
-
     @ManyToMany
     @JoinTable(
             name = "tb_person_role",
@@ -109,10 +106,6 @@ public abstract class Person implements Serializable, UserDetails {
     }
 
     public void setPassword(String password) { this.password = password;
-    }
-
-    public List<CelebrationEvent> getCelebrationEvent() {
-        return celebrationEvent;
     }
 
     public Set<Role> getRoles() {

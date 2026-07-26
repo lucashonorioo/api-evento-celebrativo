@@ -198,7 +198,6 @@ class CelebrationEventServiceImplTest {
     void shouldFindEventScaleFromParallelAssignmentsWithoutUsingLegacyPeople() {
         CelebrationEvent event = event(1L);
         event.getLocations().add(location(1L));
-        event.getPeople().add(person(new Reader(), 99L, "Legacy Reader Not Used"));
         CelebrationEventScaleDetailResponseDTO response = detailResponse();
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
@@ -223,7 +222,6 @@ class CelebrationEventServiceImplTest {
         assertEquals(List.of(1L), group.commentators().stream().map(EventAssignmentSnapshot::personId).toList());
         assertEquals(List.of(7L), group.ministersOfTheWord().stream().map(EventAssignmentSnapshot::personId).toList());
         assertEquals(List.of(11L, 10L), group.eucharisticMinisters().stream().map(EventAssignmentSnapshot::personId).toList());
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verify(eventAssignmentReadService).findAllByEventId(1L);
     }
 
@@ -245,7 +243,6 @@ class CelebrationEventServiceImplTest {
         EventAssignmentGroup group = groupCaptor.getValue();
         assertTrue(group.readers().isEmpty());
         assertEquals(List.of(20L), group.eucharisticMinisters().stream().map(EventAssignmentSnapshot::personId).toList());
-        verify(repository, never()).findByIdWithPeople(anyLong());
     }
 
     @Test
@@ -259,7 +256,6 @@ class CelebrationEventServiceImplTest {
                 assertThrows(IllegalStateException.class, () -> service.findScaleByEventId(1L));
 
         assertEquals("controlled parallel failure", exception.getMessage());
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(scaleDetailMapper);
     }
 
@@ -268,7 +264,6 @@ class CelebrationEventServiceImplTest {
         when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findScaleByEventId(99L));
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(eventAssignmentReadService, scaleDetailMapper);
     }
 
@@ -303,7 +298,6 @@ class CelebrationEventServiceImplTest {
         ));
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(scaleDetailMapper);
     }
 
@@ -317,7 +311,6 @@ class CelebrationEventServiceImplTest {
         ));
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(scaleDetailMapper);
     }
 
@@ -330,7 +323,6 @@ class CelebrationEventServiceImplTest {
         ));
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(scaleDetailMapper);
     }
 
@@ -343,7 +335,6 @@ class CelebrationEventServiceImplTest {
         ));
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
-        verify(repository, never()).findByIdWithPeople(anyLong());
         verifyNoInteractions(scaleDetailMapper);
     }
 
@@ -733,7 +724,6 @@ class CelebrationEventServiceImplTest {
                 new EventAssignmentTarget(eucharisticMinister, EventAssignmentType.EUCHARISTIC_MINISTER)
         );
         verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
-        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test
@@ -771,9 +761,7 @@ class CelebrationEventServiceImplTest {
     void shouldReplacePreviousScaleWhenUpdatingEventScale() {
         CelebrationEvent event = event(1L);
         Location oldLocation = location(9L);
-        Reader oldReader = person(new Reader(), 9L, "Leitor antigo");
         event.getLocations().add(oldLocation);
-        event.getPeople().add(oldReader);
         Location newLocation = location(1L);
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
@@ -785,11 +773,10 @@ class CelebrationEventServiceImplTest {
 
         assertEquals(List.of(newLocation), event.getLocations());
         verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, List.of());
-        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test
-    void shouldNotClearLegacyMirrorWhenOfficialAssignmentWriteFailsOnUpdate() {
+    void shouldPropagateOfficialAssignmentWriteFailureOnUpdateWithoutPartialWrite() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
         Priest priest = person(new Priest(), 8L, "Padre");
@@ -804,7 +791,6 @@ class CelebrationEventServiceImplTest {
                 service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
 
         assertSame(failure, result);
-        assertEquals(List.of(), event.getPeople());
     }
 
     @Test
@@ -909,7 +895,6 @@ class CelebrationEventServiceImplTest {
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(location), event.getLocations());
-        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test

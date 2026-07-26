@@ -32,7 +32,10 @@ class TestProfileFlywayIntegrationTest {
         assertSuccessfulVersionedMigration("3");
         assertSuccessfulVersionedMigration("4");
         assertSuccessfulVersionedMigration("5");
+        assertSuccessfulVersionedMigration("6");
+        assertSuccessfulVersionedMigration("7");
         assertSuccessfulScript("R__load_test_fixtures.sql");
+        assertTableDoesNotExist("tb_event_person");
 
         assertEquals(2, countRows("tb_role"));
         assertEquals(1, countRows("tb_role", "id", 1L, "authority", "ROLE_OPERATOR"));
@@ -51,7 +54,6 @@ class TestProfileFlywayIntegrationTest {
         assertEquals("Missa de Ação de Graças", queryString("SELECT name_mass_or_event FROM tb_celebration_event WHERE id = 3"));
 
         assertEquals(20, countRows("tb_person_role"));
-        assertEquals(21, countRows("tb_event_person"));
         assertEquals(3, countRows("tb_event_location"));
         assertEquals(15, countPeopleWithFilledParallelColumns());
         assertPersonMinistryFixtures();
@@ -66,7 +68,6 @@ class TestProfileFlywayIntegrationTest {
         int locationsBefore = countRows("tb_location");
         int eventsBefore = countRows("tb_celebration_event");
         int personRolesBefore = countRows("tb_person_role");
-        int eventPeopleBefore = countRows("tb_event_person");
         int eventLocationsBefore = countRows("tb_event_location");
         int personMinistriesBefore = countRows("tb_person_ministry");
         int userAccountsBefore = countRows("tb_user_account");
@@ -81,7 +82,6 @@ class TestProfileFlywayIntegrationTest {
         assertEquals(locationsBefore, countRows("tb_location"));
         assertEquals(eventsBefore, countRows("tb_celebration_event"));
         assertEquals(personRolesBefore, countRows("tb_person_role"));
-        assertEquals(eventPeopleBefore, countRows("tb_event_person"));
         assertEquals(eventLocationsBefore, countRows("tb_event_location"));
         assertEquals(personMinistriesBefore, countRows("tb_person_ministry"));
         assertEquals(userAccountsBefore, countRows("tb_user_account"));
@@ -133,9 +133,7 @@ class TestProfileFlywayIntegrationTest {
     }
 
     private void assertEventAssignmentFixtures() {
-        assertEquals(countRows("tb_event_person"), countRows("tb_event_assignment"));
-        assertEquals(0, countEventPeopleWithoutAssignment());
-        assertEquals(0, countAssignmentsWithoutLegacyEventPerson());
+        assertEquals(21, countRows("tb_event_assignment"));
         assertEquals(0, countDuplicatedEventAssignments());
         assertEquals(0, countAssignmentsWithUnexpectedType());
     }
@@ -143,6 +141,15 @@ class TestProfileFlywayIntegrationTest {
     private void assertFutureUserTablesAreEmpty() {
         assertEquals(0, countRows("tb_user_account"));
         assertEquals(0, countRows("tb_user_account_role"));
+    }
+
+    private void assertTableDoesNotExist(String tableName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name) = LOWER(?)",
+                Integer.class,
+                tableName
+        );
+        assertEquals(0, count == null ? 0 : count);
     }
 
     private int countActivePersonMinistries() {
@@ -185,40 +192,6 @@ class TestProfileFlywayIntegrationTest {
                           WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
                           WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
                       END
-                )
-                """,
-                Integer.class
-        );
-        return count == null ? 0 : count;
-    }
-
-    private int countEventPeopleWithoutAssignment() {
-        Integer count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM tb_event_person ep
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM tb_event_assignment ea
-                    WHERE ea.event_id = ep.event_id
-                      AND ea.person_id = ep.person_id
-                )
-                """,
-                Integer.class
-        );
-        return count == null ? 0 : count;
-    }
-
-    private int countAssignmentsWithoutLegacyEventPerson() {
-        Integer count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM tb_event_assignment ea
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM tb_event_person ep
-                    WHERE ep.event_id = ea.event_id
-                      AND ep.person_id = ea.person_id
                 )
                 """,
                 Integer.class

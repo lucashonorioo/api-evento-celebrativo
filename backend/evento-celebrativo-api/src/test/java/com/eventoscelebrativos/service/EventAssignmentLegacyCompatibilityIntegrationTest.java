@@ -121,7 +121,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
 
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
 
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertAssignmentType(eventId, priest.getId(), EventAssignmentType.PRIEST);
             assertAssignmentType(eventId, reader.getId(), EventAssignmentType.READER);
             assertAssignmentType(eventId, commentator.getId(), EventAssignmentType.COMMENTATOR);
@@ -209,7 +208,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                     newEucharisticMinister.getId()
             );
             assertEquals(expectedPeople, Set.copyOf(eventAssignmentPersonIds(eventId)));
-            assertTrue(eventPersonIds(eventId).isEmpty());
 
             AssignmentSnapshot keptReaderAfter = assignmentSnapshot(eventId, keptReader.getId());
             assertEquals(keptReaderBefore.id(), keptReaderAfter.id());
@@ -254,11 +252,8 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
             personIds = List.of(priest.getId(), keptReader.getId(), removedReader.getId(), addedCommentator.getId());
             Location location = locationRepository.saveAndFlush(location("Assignment Backfill Update Church"));
             locationId = location.getId();
-            eventId = insertLegacyEvent("Assignment Backfill Update Mass");
-            insertLegacyEventLocation(eventId, locationId);
-            insertLegacyEventPerson(eventId, priest.getId());
-            insertLegacyEventPerson(eventId, keptReader.getId());
-            insertLegacyEventPerson(eventId, removedReader.getId());
+            eventId = insertEvent("Assignment Backfill Update Mass");
+            insertEventLocation(eventId, locationId);
             insertBackfilledAssignment(eventId, priest.getId(), EventAssignmentType.PRIEST);
             insertBackfilledAssignment(eventId, keptReader.getId(), EventAssignmentType.READER);
             insertBackfilledAssignment(eventId, removedReader.getId(), EventAssignmentType.READER);
@@ -277,7 +272,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                     )
             );
 
-            assertTrue(eventPersonIds(eventId).isEmpty());
             AssignmentSnapshot keptReaderAfter = assignmentSnapshot(eventId, keptReader.getId());
             assertEquals(keptReaderBefore.id(), keptReaderAfter.id());
             assertEquals(keptReaderBefore.createdAt(), keptReaderAfter.createdAt());
@@ -309,7 +303,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                     .andExpect(status().isNoContent());
 
             assertEquals(0, countRows("tb_celebration_event", "id", eventId));
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(0, countEventAssignments(eventId));
         } finally {
             cleanupEvent(eventId);
@@ -330,14 +323,12 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
             locationId = location.getId();
             eventId = createEventWithPriest("Assignment Delete Rollback Mass", locationId, priestId);
             int assignmentsBefore = countEventAssignments(eventId);
-            int eventPeopleBefore = countRows("tb_event_person", "event_id", eventId);
             createEventDeleteBlocker(eventId);
 
             Long savedEventId = eventId;
             assertThrows(DatabaseException.class, () -> celebrationEventService.deleteEventById(savedEventId));
 
             assertEquals(1, countRows("tb_celebration_event", "id", eventId));
-            assertEquals(eventPeopleBefore, countRows("tb_event_person", "event_id", eventId));
             assertEquals(assignmentsBefore, countEventAssignments(eventId));
         } finally {
             dropEventDeleteBlocker();
@@ -360,7 +351,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
             eventId = createEventWithPriest("Assignment Linked Person Mass", locationId, priestId);
             int ministriesBefore = countRows("tb_person_ministry", "person_id", priestId);
             int assignmentsBefore = countRows("tb_event_assignment", "person_id", priestId);
-            int eventPeopleBefore = countRows("tb_event_person", "person_id", priestId);
 
             Long savedPriestId = priestId;
             assertThrows(DatabaseException.class, () -> priestService.deletePriestById(savedPriestId));
@@ -368,7 +358,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
             assertTrue(personRepository.existsById(priestId));
             assertEquals(ministriesBefore, countRows("tb_person_ministry", "person_id", priestId));
             assertEquals(assignmentsBefore, countRows("tb_event_assignment", "person_id", priestId));
-            assertEquals(eventPeopleBefore, countRows("tb_event_person", "person_id", priestId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(priestId);
@@ -474,15 +463,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         );
     }
 
-    private List<Long> eventPersonIds(Long eventId) {
-        return jdbcTemplate.queryForList(
-                "SELECT person_id FROM tb_event_person WHERE event_id = ? ORDER BY person_id",
-                Long.class,
-                eventId
-        );
-    }
-
-    private Long insertLegacyEvent(String name) {
+    private Long insertEvent(String name) {
         String eventName = name + " " + UUID.randomUUID();
         jdbcTemplate.update(
                 """
@@ -500,19 +481,11 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         );
     }
 
-    private void insertLegacyEventLocation(Long eventId, Long locationId) {
+    private void insertEventLocation(Long eventId, Long locationId) {
         jdbcTemplate.update(
                 "INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)",
                 eventId,
                 locationId
-        );
-    }
-
-    private void insertLegacyEventPerson(Long eventId, Long personId) {
-        jdbcTemplate.update(
-                "INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)",
-                eventId,
-                personId
         );
     }
 
@@ -645,7 +618,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_event_location WHERE event_id = ?", eventId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_celebration_event WHERE id = ?", eventId);
     }
 
@@ -654,7 +626,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);

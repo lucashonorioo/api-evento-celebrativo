@@ -117,9 +117,11 @@ class PersonMinistryBackfillMigrationIntegrationTest {
     }
 
     private MigrateResult migrateAll(DataSource dataSource) {
+        // Historical regression: stops at V6 so migrationsExecuted stays scoped to this backfill.
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
+                .target("6")
                 .load()
                 .migrate();
     }
