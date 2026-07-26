@@ -70,7 +70,7 @@ public class EventAssignmentReadServiceImpl implements EventAssignmentReadServic
                 person.getId(),
                 assignment.getAssignmentType(),
                 person.getName(),
-                person.getPersonType()
+                assignment.getAssignmentType().name().toLowerCase()
         );
     }
 

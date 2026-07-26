@@ -5,8 +5,6 @@ import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.service.impl.EventAssignmentCompatibilityServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -54,8 +52,8 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldCreateAssignmentsForAllTypes() {
         CelebrationEvent event = event(1L);
-        Priest priest = person(new Priest(), 10L);
-        Reader reader = person(new Reader(), 11L);
+        Person priest = person(new Person(), 10L);
+        Person reader = person(new Person(), 11L);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
 
         service.synchronizeAssignments(event, List.of(
@@ -73,7 +71,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldBeIdempotentAndPreserveExistingAssignment() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
@@ -90,9 +88,9 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldAddAndRemoveOnlyChangedAssignments() {
         CelebrationEvent event = event(1L);
-        Reader kept = person(new Reader(), 11L);
-        Reader removed = person(new Reader(), 12L);
-        Reader added = person(new Reader(), 13L);
+        Person kept = person(new Person(), 11L);
+        Person removed = person(new Person(), 12L);
+        Person added = person(new Person(), 13L);
         EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
         EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(keptAssignment, removedAssignment));
@@ -114,8 +112,8 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldReplacePriestByRemovingOldAndCreatingNew() {
         CelebrationEvent event = event(1L);
-        Priest oldPriest = person(new Priest(), 10L);
-        Priest newPriest = person(new Priest(), 20L);
+        Person oldPriest = person(new Person(), 10L);
+        Person newPriest = person(new Person(), 20L);
         EventAssignment oldAssignment = assignment(100L, event, oldPriest, EventAssignmentType.PRIEST);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(oldAssignment));
 
@@ -132,7 +130,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldRemoveOldPairAndCreateNewPairWhenSamePersonChangesFunction() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
@@ -152,7 +150,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldAddSecondFunctionForSamePersonWithoutRemovingTheFirst() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         EventAssignment existingReaderAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(existingReaderAssignment));
 
@@ -172,7 +170,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldRemoveOnlyOneFunctionAndPreserveTheOtherWhenPersonHasTwoFunctions() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         EventAssignment readerAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
         EventAssignment commentatorAssignment = assignment(101L, event, reader, EventAssignmentType.COMMENTATOR);
         when(eventAssignmentRepository.findAllByEventId(1L))
@@ -192,7 +190,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldRemoveAllAssignmentsWhenTargetsAreEmpty() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(assignment));
 
@@ -207,7 +205,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldAllowSamePersonInTwoDifferentFunctionsInTheSameTarget() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
 
         service.synchronizeAssignments(event, List.of(
@@ -224,7 +222,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldRejectRepeatedPersonAndTypePairBeforeSaving() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
 
         assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event, List.of(
                 new EventAssignmentTarget(reader, EventAssignmentType.READER),
@@ -236,7 +234,7 @@ class EventAssignmentCompatibilityServiceImplTest {
 
     @Test
     void shouldRejectInvalidEventOrTarget() {
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
 
         assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(null), List.of()));
         assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(1L), List.of(
@@ -261,7 +259,7 @@ class EventAssignmentCompatibilityServiceImplTest {
     @Test
     void shouldNotUseIndividualPersonAssignmentQueries() {
         CelebrationEvent event = event(1L);
-        Reader reader = person(new Reader(), 11L);
+        Person reader = person(new Person(), 11L);
         when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
 
         service.synchronizeAssignments(event, List.of(new EventAssignmentTarget(reader, EventAssignmentType.READER)));

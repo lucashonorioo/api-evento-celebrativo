@@ -73,7 +73,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             String updatePhoneNumber = uniquePhoneNumber();
 
             assertFalse(initialMinisters.stream().anyMatch(minister -> minister.phoneNumber().equals(createPhoneNumber)));
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             MvcResult createResult = postMinisterOfTheWord("Word Minister Cutover Alpha", createPhoneNumber)
                     .andExpect(status().isCreated())
@@ -89,7 +88,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             assertEquals(BIRTHDAY.toString(), createdMinister.birthdayDate());
             assertJsonContract(createResult);
 
-            assertPersonRow(ministerId, "Word Minister Cutover Alpha", createPhoneNumber, "minister_of_the_word");
+            assertPersonRow(ministerId, "Word Minister Cutover Alpha", createPhoneNumber);
             MinistrySnapshot createdMinistry = assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, true);
             assertNotNull(createdMinistry.createdAt());
             assertNotNull(createdMinistry.updatedAt());
@@ -100,7 +99,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             assertEquals(ministryRowsBeforeRead, countAllMinistries());
             assertContainsOnce(ministersAfterCreate, ministerId);
             assertEquals(idsOrderedByActiveMinisterMinistry(), ministersAfterCreate.stream().map(PersonPayload::id).toList());
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             MvcResult updateResult = putMinisterOfTheWord(ministerId, "Word Minister Cutover Beta", updatePhoneNumber)
                     .andExpect(status().isOk())
@@ -112,7 +110,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             assertEquals(updatePhoneNumber, updatedMinister.phoneNumber());
             assertJsonContract(updateResult);
 
-            assertPersonRow(ministerId, "Word Minister Cutover Beta", updatePhoneNumber, "minister_of_the_word");
+            assertPersonRow(ministerId, "Word Minister Cutover Beta", updatePhoneNumber);
             MinistrySnapshot updatedMinistry = assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, true);
             assertEquals(createdMinistry.id(), updatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), updatedMinistry.createdAt());
@@ -126,11 +124,10 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                             && minister.phoneNumber().equals(updatePhoneNumber)));
             assertFalse(ministersAfterUpdate.stream().anyMatch(minister -> minister.phoneNumber().equals(createPhoneNumber)));
             assertEquals(idsOrderedByActiveMinisterMinistry(), ministersAfterUpdate.stream().map(PersonPayload::id).toList());
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             deactivateMinisterMinistry(ministerId);
             MinistrySnapshot inactiveMinistry = assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, false);
-            assertTrue(legacyMinisterIds().contains(ministerId));
+            assertTrue(personRepository.existsById(ministerId));
             assertFalse(activeMinisterIds().contains(ministerId));
             assertFalse(getMinistersOfTheWord().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
 
@@ -147,7 +144,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getMinistersOfTheWord(), ministerId);
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             putMinisterOfTheWord(ministerId, "Word Minister Cutover Gamma", updatePhoneNumber)
                     .andExpect(status().isOk());
@@ -162,7 +158,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             );
             assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, true);
             assertContainsOnce(getMinistersOfTheWord(), ministerId);
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             deleteMinisterOfTheWord(ministerId)
                     .andExpect(status().isNoContent());
@@ -170,7 +165,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // MINISTER_OF_THE_WORD association, never the shared Person row.
             assertTrue(personRepository.existsById(ministerId));
-            assertEquals("minister_of_the_word", personType(ministerId));
             assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, false);
             assertEquals(1, countMinistries(ministerId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(ministerId));
@@ -267,7 +261,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
         assertEquals(1, ministers.stream().filter(minister -> minister.id().equals(ministerId)).count());
     }
 
-    private void assertPersonRow(Long ministerId, String expectedName, String expectedPhoneNumber, String expectedPersonType) {
+    private void assertPersonRow(Long ministerId, String expectedName, String expectedPhoneNumber) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -275,16 +269,13 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                 WHERE id = ?
                   AND name = ?
                   AND phone_number = ?
-                  AND person_type = ?
                 """,
                 Integer.class,
                 ministerId,
                 expectedName,
-                expectedPhoneNumber,
-                expectedPersonType
+                expectedPhoneNumber
         );
         assertEquals(1, count);
-        assertEquals(expectedPersonType, personType(ministerId));
     }
 
     private MinistrySnapshot assertSingleMinistry(Long personId, MinistryType ministryType, boolean active) {
@@ -352,14 +343,6 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
         ));
     }
 
-    private Set<Long> legacyMinisterIds() {
-        return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "minister_of_the_word"
-        ));
-    }
-
     private Set<Long> activeMinisterIds() {
         return new LinkedHashSet<>(idsOrderedByActiveMinisterMinistry());
     }
@@ -379,20 +362,8 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
         );
     }
 
-    private void assertEquivalentLegacyAndParallelMinisterSources() {
-        assertEquals(legacyMinisterIds(), activeMinisterIds());
-    }
-
     private Set<Long> idsFrom(List<PersonPayload> ministers) {
         return new LinkedHashSet<>(ministers.stream().map(PersonPayload::id).toList());
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private List<MinistryType> ministryTypes(Long personId) {

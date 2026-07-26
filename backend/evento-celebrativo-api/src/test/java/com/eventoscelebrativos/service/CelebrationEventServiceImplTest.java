@@ -16,16 +16,11 @@ import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
-import com.eventoscelebrativos.model.Commentator;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
@@ -231,7 +226,7 @@ class CelebrationEventServiceImplTest {
         event.getLocations().add(location(1L));
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
-                snapshot(100L, 1L, 20L, EventAssignmentType.EUCHARISTIC_MINISTER, "Reader Serving Eucharist", "reader")
+                snapshot(100L, 1L, 20L, EventAssignmentType.EUCHARISTIC_MINISTER, "Person Serving Eucharist", "reader")
         ));
         when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
                 .thenReturn(detailResponse());
@@ -694,11 +689,11 @@ class CelebrationEventServiceImplTest {
     void shouldUpdateEventScaleWhenEventExists() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Priest priest = person(new Priest(), 8L, "Padre");
-        Reader reader = person(new Reader(), 2L, "Leitor");
-        Commentator commentator = person(new Commentator(), 4L, "Comentarista");
-        MinisterOfTheWord ministerOfTheWord = person(new MinisterOfTheWord(), 5L, "Ministro da Palavra");
-        EucharisticMinister eucharisticMinister = person(new EucharisticMinister(), 6L, "Ministro da Eucaristia");
+        Person priest = person(new Person(), 8L, "Padre");
+        Person reader = person(new Person(), 2L, "Leitor");
+        Person commentator = person(new Person(), 4L, "Comentarista");
+        Person ministerOfTheWord = person(new Person(), 5L, "Ministro da Palavra");
+        Person eucharisticMinister = person(new Person(), 6L, "Ministro da Eucaristia");
         CelebrationEventScaleRequestDTO request = scaleRequest();
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
@@ -729,7 +724,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldCreateEventWithScale() {
         Location location = location(1L);
-        Priest priest = person(new Priest(), 8L, "Padre");
+        Person priest = person(new Person(), 8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -779,7 +774,7 @@ class CelebrationEventServiceImplTest {
     void shouldPropagateOfficialAssignmentWriteFailureOnUpdateWithoutPartialWrite() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Priest priest = person(new Priest(), 8L, "Padre");
+        Person priest = person(new Person(), 8L, "Padre");
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -796,7 +791,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldNotSaveEventWithScaleWhenOfficialAssignmentWriteFailsOnCreate() {
         Location location = location(1L);
-        Priest priest = person(new Priest(), 8L, "Padre");
+        Person priest = person(new Person(), 8L, "Padre");
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
@@ -844,7 +839,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent event = event(1L);
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        Reader personWithPriestMinistry = person(new Reader(), 8L, "Leitor");
+        Person personWithPriestMinistry = person(new Person(), 8L, "Leitor");
         when(personMinistryEligibilityResolver.resolve(any()))
                 .thenReturn(List.of(eligible(personWithPriestMinistry, MinistryType.PRIEST)));
         when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
@@ -861,7 +856,7 @@ class CelebrationEventServiceImplTest {
     void shouldThrowBusinessExceptionWhenScalePersonHasCompatibleLegacyTypeButNoActiveMinistry() {
         when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        Priest priestWithoutActiveMinistry = person(new Priest(), 8L, "Padre");
+        Person priestWithoutActiveMinistry = person(new Person(), 8L, "Padre");
         when(personMinistryEligibilityResolver.resolve(any()))
                 .thenReturn(List.of(ministryNotAssigned(priestWithoutActiveMinistry, MinistryType.PRIEST)));
 
@@ -913,7 +908,7 @@ class CelebrationEventServiceImplTest {
     void shouldNotChangePersonPasswordRolesOrRegistrationDataWhenUpdatingScale() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Priest priest = person(new Priest(), 8L, "Padre");
+        Person priest = person(new Person(), 8L, "Padre");
         priest.setPassword("encoded");
         priest.setPhoneNumber("34999999999");
 
@@ -932,7 +927,7 @@ class CelebrationEventServiceImplTest {
     void shouldNotCreateEventWithScaleWhenScaleIsInvalid() {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
         when(personMinistryEligibilityResolver.resolve(any()))
-                .thenReturn(List.of(ministryNotAssigned(person(new Reader(), 8L, "Leitor"), MinistryType.PRIEST)));
+                .thenReturn(List.of(ministryNotAssigned(person(new Person(), 8L, "Leitor"), MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
@@ -943,7 +938,7 @@ class CelebrationEventServiceImplTest {
     void shouldAllowSamePersonInMultipleAssignmentTypesWhenEligibleForBoth() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Priest priestAndReader = person(new Priest(), 8L, "Padre Leitor");
+        Person priestAndReader = person(new Person(), 8L, "Padre Leitor");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(repository.findById(1L)).thenReturn(Optional.of(event));

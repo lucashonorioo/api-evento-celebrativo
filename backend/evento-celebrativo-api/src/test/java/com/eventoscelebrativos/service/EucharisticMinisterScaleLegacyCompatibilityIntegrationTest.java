@@ -9,13 +9,11 @@ import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -156,7 +154,6 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
             assertEquals(List.of(savedReaderId), createdEvent.getEucharisticMinisters().stream()
                     .map(person -> person.getId())
                     .toList());
-            assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.EUCHARISTIC_MINISTER));
         } finally {
             cleanupEvent(eventId);
@@ -196,14 +193,14 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
         }
     }
 
-    private EucharisticMinister eucharisticMinister(String name) {
-        EucharisticMinister minister = new EucharisticMinister();
+    private Person eucharisticMinister(String name) {
+        Person minister = new Person();
         populatePerson(minister, name);
         return minister;
     }
 
-    private Reader reader(String name) {
-        Reader reader = new Reader();
+    private Person reader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
         return reader;
     }
@@ -273,14 +270,6 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
                 eventName
         );
         return count == null ? 0 : count;
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private int countMinistries(Long personId) {

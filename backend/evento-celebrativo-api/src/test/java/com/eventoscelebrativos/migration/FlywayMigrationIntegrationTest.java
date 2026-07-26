@@ -52,8 +52,10 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("5");
         assertSuccessfulMigration("6");
         assertSuccessfulMigration("7");
+        assertSuccessfulMigration("8");
         assertTableExists("flyway_schema_history");
         assertTableDoesNotExist("tb_event_person");
+        assertColumnDoesNotExist("tb_person", "person_type");
 
         for (String table : CURRENT_TABLES) {
             assertTableExists(table);
@@ -91,10 +93,10 @@ class FlywayMigrationIntegrationTest {
         assertEquals(0, countRows("tb_celebration_event"));
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4', '5', '6', '7') AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4', '5', '6', '7', '8') AND success = TRUE",
                 Integer.class
         );
-        assertEquals(7, successfulVersions);
+        assertEquals(8, successfulVersions);
     }
 
     @Test
@@ -112,7 +114,9 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("5");
         assertSuccessfulMigration("6");
         assertSuccessfulMigration("7");
+        assertSuccessfulMigration("8");
         assertTableDoesNotExist("tb_event_person");
+        assertColumnDoesNotExist("tb_person", "person_type");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         for (String table : PARALLEL_DOMAIN_TABLES) {
@@ -146,6 +150,16 @@ class FlywayMigrationIntegrationTest {
                 columnName
         );
         assertEquals(1, count);
+    }
+
+    private void assertColumnDoesNotExist(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
+                Integer.class,
+                tableName,
+                columnName
+        );
+        assertEquals(0, count == null ? 0 : count);
     }
 
     private void assertMainConstraintExists(String tableName, String constraintName) {

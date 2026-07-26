@@ -55,7 +55,6 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
         try {
             readerId = createPerson("/leitores", "Isolated Reader", uniquePhoneNumber());
 
-            assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.READER));
             assertTrue(isMinistryActive(readerId, MinistryType.READER));
             assertContainsOnce(getReaders(), readerId);
@@ -85,7 +84,6 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
             commentatorId = createPerson("/comentaristas", "Isolated Commentator Reader", uniquePhoneNumber());
             addMinistry(commentatorId, MinistryType.READER);
 
-            assertEquals("commentator", personType(commentatorId));
             assertContainsOnce(getReaders(), commentatorId);
             assertEquals(1, countMinistries(commentatorId, MinistryType.COMMENTATOR));
             assertEquals(1, countMinistries(commentatorId, MinistryType.READER));
@@ -151,14 +149,6 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
 
     private boolean containsReader(List<Long> readerIds, Long readerId) {
         return readerIds.stream().anyMatch(readerId::equals);
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private boolean isMinistryActive(Long personId, MinistryType ministryType) {

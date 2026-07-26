@@ -6,11 +6,9 @@ import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.model.Location;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -115,7 +113,6 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
             assertEquals(List.of(savedReaderId), createdEvent.getMinistersOfTheWord().stream()
                     .map(person -> person.getId())
                     .toList());
-            assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.MINISTER_OF_THE_WORD));
         } finally {
             cleanupEvent(eventId);
@@ -155,14 +152,14 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
         }
     }
 
-    private MinisterOfTheWord ministerOfTheWord(String name) {
-        MinisterOfTheWord minister = new MinisterOfTheWord();
+    private Person ministerOfTheWord(String name) {
+        Person minister = new Person();
         populatePerson(minister, name);
         return minister;
     }
 
-    private Reader reader(String name) {
-        Reader reader = new Reader();
+    private Person reader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
         return reader;
     }
@@ -200,14 +197,6 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
                 eventName
         );
         return count == null ? 0 : count;
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private int countMinistries(Long personId) {

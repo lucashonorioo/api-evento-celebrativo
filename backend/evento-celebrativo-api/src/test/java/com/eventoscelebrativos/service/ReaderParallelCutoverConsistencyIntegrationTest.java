@@ -73,7 +73,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         String updatePhoneNumber = uniquePhoneNumber();
 
         assertFalse(initialReaders.stream().anyMatch(reader -> reader.phoneNumber().equals(createPhoneNumber)));
-        assertEquivalentLegacyAndParallelReaderSources();
 
         MvcResult createResult = postReader("Reader Cutover Alpha", createPhoneNumber)
                 .andExpect(status().isCreated())
@@ -89,7 +88,7 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertEquals(BIRTHDAY.toString(), createdReader.birthdayDate());
         assertJsonContract(createResult);
 
-        assertPersonRow(readerId, "Reader Cutover Alpha", createPhoneNumber, "reader");
+        assertPersonRow(readerId, "Reader Cutover Alpha", createPhoneNumber);
         MinistrySnapshot createdMinistry = assertSingleMinistry(readerId, MinistryType.READER, true);
         assertNotNull(createdMinistry.createdAt());
         assertNotNull(createdMinistry.updatedAt());
@@ -100,7 +99,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertEquals(ministryRowsBeforeRead, countAllMinistries());
         assertContainsOnce(readersAfterCreate, readerId);
         assertEquals(idsOrderedByActiveReaderMinistry(), readersAfterCreate.stream().map(PersonPayload::id).toList());
-        assertEquivalentLegacyAndParallelReaderSources();
 
         MvcResult updateResult = putReader(readerId, "Reader Cutover Beta", updatePhoneNumber)
                 .andExpect(status().isOk())
@@ -112,7 +110,7 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertEquals(updatePhoneNumber, updatedReader.phoneNumber());
         assertJsonContract(updateResult);
 
-        assertPersonRow(readerId, "Reader Cutover Beta", updatePhoneNumber, "reader");
+        assertPersonRow(readerId, "Reader Cutover Beta", updatePhoneNumber);
         MinistrySnapshot updatedMinistry = assertSingleMinistry(readerId, MinistryType.READER, true);
         assertEquals(createdMinistry.id(), updatedMinistry.id());
         assertEquals(createdMinistry.createdAt(), updatedMinistry.createdAt());
@@ -126,11 +124,10 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
                         && reader.phoneNumber().equals(updatePhoneNumber)));
         assertFalse(readersAfterUpdate.stream().anyMatch(reader -> reader.phoneNumber().equals(createPhoneNumber)));
         assertEquals(idsOrderedByActiveReaderMinistry(), readersAfterUpdate.stream().map(PersonPayload::id).toList());
-        assertEquivalentLegacyAndParallelReaderSources();
 
         deactivateReaderMinistry(readerId);
         MinistrySnapshot inactiveMinistry = assertSingleMinistry(readerId, MinistryType.READER, false);
-        assertTrue(legacyReaderIds().contains(readerId));
+        assertTrue(personRepository.existsById(readerId));
         assertFalse(activeReaderIds().contains(readerId));
         assertFalse(getReaders().stream().anyMatch(reader -> reader.id().equals(createdReaderId)));
 
@@ -147,7 +144,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
         assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
         assertContainsOnce(getReaders(), readerId);
-        assertEquivalentLegacyAndParallelReaderSources();
 
         putReader(readerId, "Reader Cutover Gamma", updatePhoneNumber)
                 .andExpect(status().isOk());
@@ -162,7 +158,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         );
         assertSingleMinistry(readerId, MinistryType.READER, true);
         assertContainsOnce(getReaders(), readerId);
-        assertEquivalentLegacyAndParallelReaderSources();
 
         deleteReader(readerId)
                 .andExpect(status().isNoContent());
@@ -170,7 +165,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         // Person and the other ministry (COMMENTATOR) survive: the delete only removes the
         // READER association, never the shared Person row.
         assertTrue(personRepository.existsById(readerId));
-        assertEquals("reader", personType(readerId));
         assertSingleMinistry(readerId, MinistryType.READER, false);
         assertEquals(1, countMinistries(readerId, MinistryType.COMMENTATOR));
         assertEquals(0, countOrphanMinistries(readerId));
@@ -267,7 +261,7 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertEquals(1, readers.stream().filter(reader -> reader.id().equals(readerId)).count());
     }
 
-    private void assertPersonRow(Long readerId, String expectedName, String expectedPhoneNumber, String expectedPersonType) {
+    private void assertPersonRow(Long readerId, String expectedName, String expectedPhoneNumber) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -275,16 +269,13 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
                 WHERE id = ?
                   AND name = ?
                   AND phone_number = ?
-                  AND person_type = ?
                 """,
                 Integer.class,
                 readerId,
                 expectedName,
-                expectedPhoneNumber,
-                expectedPersonType
+                expectedPhoneNumber
         );
         assertEquals(1, count);
-        assertEquals(expectedPersonType, personType(readerId));
     }
 
     private MinistrySnapshot assertSingleMinistry(Long personId, MinistryType ministryType, boolean active) {
@@ -352,14 +343,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         ));
     }
 
-    private Set<Long> legacyReaderIds() {
-        return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "reader"
-        ));
-    }
-
     private Set<Long> activeReaderIds() {
         return new LinkedHashSet<>(idsOrderedByActiveReaderMinistry());
     }
@@ -379,20 +362,8 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         );
     }
 
-    private void assertEquivalentLegacyAndParallelReaderSources() {
-        assertEquals(legacyReaderIds(), activeReaderIds());
-    }
-
     private Set<Long> idsFrom(List<PersonPayload> readers) {
         return new LinkedHashSet<>(readers.stream().map(PersonPayload::id).toList());
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private List<MinistryType> ministryTypes(Long personId) {

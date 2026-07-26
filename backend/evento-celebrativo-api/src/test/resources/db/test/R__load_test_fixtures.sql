@@ -1,49 +1,38 @@
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'commentator');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Luana Odinson', '34989374748', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Miguel Souza', '34962165544', '1995-02-18', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Helena Oliveira', '34991564562', '1999-09-06', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Alice Lima', '34983246978', '1989-08-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'reader');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Alice Lima', '34983246978', '1989-08-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Arthur Costa', '34978956324', '2005-03-24', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Laura Alves', '34998563215', '2006-07-11', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'minister_of_the_word');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Davi Gomes', '34963284523', '2003-06-02', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Laura Alves', '34998563215', '2006-07-11', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Mariana Ferraz', '34989374749', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'eucharistic_minister');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Mariana Ferraz', '34989374749', '1988-05-21', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Carlos Silva', '34991234567', '1975-11-10', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Fernanda Souza', '34987654321', '1992-03-25', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
 
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
-INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', 'priest');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Padre Miguel', '34988776655', '1968-07-14', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Padre Paulo', '34999887766', '1980-01-08', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
+INSERT INTO tb_person(name, phone_number, birthday_date, password) VALUES ('Padre Roberto', '34981112233', '1972-09-03', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW');
 
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at)
-SELECT id,
-       CASE person_type
-           WHEN 'reader' THEN 'READER'
-           WHEN 'commentator' THEN 'COMMENTATOR'
-           WHEN 'priest' THEN 'PRIEST'
-           WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
-           WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
-       END,
-       TRUE,
-       CURRENT_TIMESTAMP(6),
-       CURRENT_TIMESTAMP(6)
-FROM tb_person
-WHERE person_type IN ('reader', 'commentator', 'priest', 'minister_of_the_word', 'eucharistic_minister')
-  AND NOT EXISTS (
-      SELECT 1
-      FROM tb_person_ministry pm
-      WHERE pm.person_id = tb_person.id
-        AND pm.ministry_type = CASE tb_person.person_type
-            WHEN 'reader' THEN 'READER'
-            WHEN 'commentator' THEN 'COMMENTATOR'
-            WHEN 'priest' THEN 'PRIEST'
-            WHEN 'minister_of_the_word' THEN 'MINISTER_OF_THE_WORD'
-            WHEN 'eucharistic_minister' THEN 'EUCHARISTIC_MINISTER'
-        END
-  );
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (1, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (2, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (3, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (4, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (5, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (6, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (7, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (8, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (9, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (10, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (11, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (12, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (13, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (14, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (15, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
 
 INSERT INTO tb_person_role (person_id, role_id) VALUES (1, 1);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (1, 2);

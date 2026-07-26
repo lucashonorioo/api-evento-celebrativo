@@ -8,8 +8,6 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.PriestServiceImpl;
@@ -55,9 +53,9 @@ class PriestServiceImplTest {
     @Test
     void shouldCreatePriestWithEncryptedPasswordAndOperatorRole() {
         PriestRequestDTO request = request();
-        Priest entity = priest(null, "raw-password");
+        Person entity = priest(null, "raw-password");
         Role operatorRole = new Role(1L, "ROLE_OPERATOR");
-        Priest saved = priest(1L, "encoded-password");
+        Person saved = priest(1L, "encoded-password");
         PriestResponseDTO response = response(1L);
 
         when(mapper.toEntity(request)).thenReturn(entity);
@@ -88,7 +86,7 @@ class PriestServiceImplTest {
 
     @Test
     void shouldFindPriestByIdWhenExists() {
-        Priest entity = priest(1L, "encoded-password");
+        Person entity = priest(1L, "encoded-password");
         PriestResponseDTO response = response(1L);
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -107,7 +105,7 @@ class PriestServiceImplTest {
 
     @Test
     void shouldUpdateAndDeletePriest() {
-        Priest entity = priest(1L, "old-password");
+        Person entity = priest(1L, "old-password");
         PriestResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
@@ -123,8 +121,8 @@ class PriestServiceImplTest {
 
     @Test
     void shouldListPriestsUsingPersonMinistryWithoutCallingLegacyRepository() {
-        Priest priest = priest(1L, "encoded-password");
-        Reader readerWithPriestMinistry = reader(2L, "encoded-password");
+        Person priest = priest(1L, "encoded-password");
+        Person readerWithPriestMinistry = reader(2L, "encoded-password");
         List<Person> people = List.of(priest, readerWithPriestMinistry);
         List<PriestResponseDTO> responses = List.of(response(1L), response(2L));
 
@@ -140,8 +138,8 @@ class PriestServiceImplTest {
 
     @Test
     void shouldPreservePriestOrderReturnedByPersonMinistryReadService() {
-        Reader readerWithPriestMinistry = reader(2L, "encoded-password");
-        Priest priest = priest(1L, "encoded-password");
+        Person readerWithPriestMinistry = reader(2L, "encoded-password");
+        Person priest = priest(1L, "encoded-password");
         List<Person> people = List.of(readerWithPriestMinistry, priest);
         List<PriestResponseDTO> responses = List.of(response(2L), response(1L));
 
@@ -188,8 +186,8 @@ class PriestServiceImplTest {
         return new PriestRequestDTO("Priest", "34999999995", BIRTHDAY, "raw-password");
     }
 
-    private Priest priest(Long id, String password) {
-        Priest priest = new Priest();
+    private Person priest(Long id, String password) {
+        Person priest = new Person();
         priest.setId(id);
         priest.setName("Priest");
         priest.setPhoneNumber("34999999995");
@@ -202,8 +200,8 @@ class PriestServiceImplTest {
         return new PriestResponseDTO(id, "Priest", "34999999995", BIRTHDAY);
     }
 
-    private Reader reader(Long id, String password) {
-        Reader reader = new Reader();
+    private Person reader(Long id, String password) {
+        Person reader = new Person();
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");

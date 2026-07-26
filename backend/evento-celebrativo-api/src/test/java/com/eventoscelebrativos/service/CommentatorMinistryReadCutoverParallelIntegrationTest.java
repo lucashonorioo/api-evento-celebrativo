@@ -1,10 +1,8 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -59,23 +57,23 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldUseActiveCommentatorMinistryAsOfficialSourceWithoutChangingData() throws Exception {
-        Commentator activeCommentator = new Commentator();
+        Person activeCommentator = new Person();
         populatePerson(activeCommentator, "000 Cutover Active Commentator");
         Person savedActiveCommentator = personRepository.saveAndFlush(activeCommentator);
         saveMinistry(savedActiveCommentator, MinistryType.COMMENTATOR, true);
 
-        Reader readerWithCommentatorMinistry = new Reader();
+        Person readerWithCommentatorMinistry = new Person();
         populatePerson(readerWithCommentatorMinistry, "000 Cutover Reader Commentator");
         Person savedReader = personRepository.saveAndFlush(readerWithCommentatorMinistry);
         saveMinistry(savedReader, MinistryType.READER, true);
         saveMinistry(savedReader, MinistryType.COMMENTATOR, true);
 
-        Commentator inactiveCommentator = new Commentator();
+        Person inactiveCommentator = new Person();
         populatePerson(inactiveCommentator, "000 Cutover Inactive Commentator");
         Person savedInactiveCommentator = personRepository.saveAndFlush(inactiveCommentator);
         saveMinistry(savedInactiveCommentator, MinistryType.COMMENTATOR, false);
 
-        Commentator multiMinistryCommentator = new Commentator();
+        Person multiMinistryCommentator = new Person();
         populatePerson(multiMinistryCommentator, "000 Cutover Multi Commentator");
         Person savedMultiMinistryCommentator = personRepository.saveAndFlush(multiMinistryCommentator);
         saveMinistry(savedMultiMinistryCommentator, MinistryType.COMMENTATOR, true);
@@ -94,8 +92,6 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
         assertTrue(responseIds.contains(savedMultiMinistryCommentator.getId()));
         assertFalse(responseIds.contains(savedInactiveCommentator.getId()));
         assertEquals(1, responseIds.stream().filter(savedMultiMinistryCommentator.getId()::equals).count());
-        assertFalse(legacyCommentatorIds().contains(savedReader.getId()));
-        assertEquals("reader", personType(savedReader.getId()));
         assertEquals(ministryRowsBefore, countPersonMinistryRows());
 
         PersonPayload readerPayload = payload.stream()
@@ -150,22 +146,6 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
     private int countPersonMinistryRows() {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_person_ministry", Integer.class);
         return count == null ? 0 : count;
-    }
-
-    private List<Long> legacyCommentatorIds() {
-        return jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "commentator"
-        );
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private String uniquePhoneNumber() {

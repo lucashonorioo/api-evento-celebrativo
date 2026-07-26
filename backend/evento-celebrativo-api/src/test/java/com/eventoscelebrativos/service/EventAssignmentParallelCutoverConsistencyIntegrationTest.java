@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
+import com.eventoscelebrativos.model.MinistryType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -102,11 +103,11 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     @Test
     void shouldUseWriteThroughCreatedAndUpdatedEventsInTheThreeParallelCutovers() throws Exception {
         Long locationId = firstLocationId();
-        List<Long> priests = personIdsByType("priest", 2);
-        List<Long> readers = personIdsByType("reader", 3);
-        List<Long> commentators = personIdsByType("commentator", 2);
-        List<Long> ministersOfTheWord = personIdsByType("minister_of_the_word", 1);
-        List<Long> eucharisticMinisters = personIdsByType("eucharistic_minister", 2);
+        List<Long> priests = personIdsByMinistry(MinistryType.PRIEST, 2);
+        List<Long> readers = personIdsByMinistry(MinistryType.READER, 3);
+        List<Long> commentators = personIdsByMinistry(MinistryType.COMMENTATOR, 2);
+        List<Long> ministersOfTheWord = personIdsByMinistry(MinistryType.MINISTER_OF_THE_WORD, 1);
+        List<Long> eucharisticMinisters = personIdsByMinistry(MinistryType.EUCHARISTIC_MINISTER, 2);
         LocalDate eventDate = LocalDate.now().plusDays(45);
 
         Long eventId = createEventWithScale(eventRequest(
@@ -197,7 +198,7 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         assertPage(fixtureMonthlyUrl(EventScheduleType.EUCHARISTIC_MINISTER, 9, 2, false), 3, 0, 2);
         assertPage("/eventos/escalas?startDate=2030-01-01&endDate=2030-01-31&type=READER&page=0&size=10", 0, 0, 1);
 
-        Long personId = insertPerson("reader", "Reader Assigned As Eucharistic Minister");
+        Long personId = insertPerson("Reader Assigned As Eucharistic Minister");
         LocalDate eventDate = LocalDate.now().plusDays(61);
         Long eventId = insertEvent("Parallel Divergent Assignment", eventDate);
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, firstLocationId());
@@ -390,25 +391,32 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_location ORDER BY id LIMIT 1", Long.class);
     }
 
-    private List<Long> personIdsByType(String personType, int limit) {
+    private List<Long> personIdsByMinistry(MinistryType ministryType, int limit) {
         return jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ? ORDER BY id LIMIT ?",
+                """
+                SELECT p.id
+                FROM tb_person_ministry pm
+                INNER JOIN tb_person p ON p.id = pm.person_id
+                WHERE pm.ministry_type = ?
+                  AND pm.active = TRUE
+                ORDER BY p.id
+                LIMIT ?
+                """,
                 Long.class,
-                personType,
+                ministryType.name(),
                 limit
         );
     }
 
-    private Long insertPerson(String personType, String name) {
+    private Long insertPerson(String name) {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type)
-                VALUES (?, ?, '1990-01-10', 'encoded-password', ?)
+                INSERT INTO tb_person(name, phone_number, birthday_date, password)
+                VALUES (?, ?, '1990-01-10', 'encoded-password')
                 """,
                 name + " " + UUID.randomUUID(),
-                phoneNumber,
-                personType
+                phoneNumber
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_person WHERE phone_number = ?",

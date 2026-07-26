@@ -9,8 +9,6 @@ import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -109,7 +107,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
 
             assertEquals(1, countEventsByName(eventName));
             assertEquals(savedReaderId, createdEvent.getPriest().getId());
-            assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.PRIEST));
         } finally {
             cleanupEvent(eventId);
@@ -149,14 +146,14 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         }
     }
 
-    private Priest priest(String name) {
-        Priest priest = new Priest();
+    private Person priest(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
         return priest;
     }
 
-    private Reader reader(String name) {
-        Reader reader = new Reader();
+    private Person reader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
         return reader;
     }
@@ -190,14 +187,6 @@ class PriestEventLegacyCompatibilityIntegrationTest {
                 eventName
         );
         return count == null ? 0 : count;
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private int countMinistries(Long personId) {

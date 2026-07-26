@@ -1,14 +1,9 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.CelebrationEvent;
-import com.eventoscelebrativos.model.Commentator;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -50,7 +45,7 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldPersistEventAssignmentWithEnumAsStringAndTimestamps() {
         CelebrationEvent event = saveEvent("Assignment Persistence Event");
-        Reader reader = saveReader("Assignment Reader", "34973000001");
+        Person reader = savePerson("Assignment Reader", "34973000001");
 
         EventAssignment assignment = eventAssignmentRepository.saveAndFlush(
                 new EventAssignment(event, reader, EventAssignmentType.READER)
@@ -71,7 +66,7 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldFindAssignmentsByEventAndPerson() {
         CelebrationEvent event = saveEvent("Assignment Lookup Event");
-        Reader reader = saveReader("Assignment Lookup Reader", "34973000002");
+        Person reader = savePerson("Assignment Lookup Reader", "34973000002");
         EventAssignment assignment = eventAssignmentRepository.saveAndFlush(
                 new EventAssignment(event, reader, EventAssignmentType.READER)
         );
@@ -91,7 +86,7 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldAllowSamePersonInDifferentAssignmentTypesForSameEvent() {
         CelebrationEvent event = saveEvent("Assignment Multi Function Event");
-        Reader reader = saveReader("Assignment Multi Function Reader", "34973000003");
+        Person reader = savePerson("Assignment Multi Function Reader", "34973000003");
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
 
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.COMMENTATOR));
@@ -102,7 +97,7 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldEnforceUniqueEventPersonAndAssignmentType() {
         CelebrationEvent event = saveEvent("Assignment Unique Event");
-        Reader reader = saveReader("Assignment Unique Reader", "34973000103");
+        Person reader = savePerson("Assignment Unique Reader", "34973000103");
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
 
         assertThrows(DataIntegrityViolationException.class, () ->
@@ -115,7 +110,7 @@ class EventAssignmentRepositoryTest {
     void shouldAllowSamePersonInDifferentEvents() {
         CelebrationEvent firstEvent = saveEvent("Assignment First Event");
         CelebrationEvent secondEvent = saveEvent("Assignment Second Event");
-        Reader reader = saveReader("Assignment Multi Event Reader", "34973000004");
+        Person reader = savePerson("Assignment Multi Event Reader", "34973000004");
 
         eventAssignmentRepository.save(new EventAssignment(firstEvent, reader, EventAssignmentType.READER));
         eventAssignmentRepository.save(new EventAssignment(secondEvent, reader, EventAssignmentType.READER));
@@ -128,8 +123,8 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldAllowSeveralPeopleInSameEvent() {
         CelebrationEvent event = saveEvent("Assignment Several People Event");
-        Reader reader = saveReader("Assignment Several Reader", "34973000005");
-        Priest priest = savePriest("Assignment Several Priest", "34973000006");
+        Person reader = savePerson("Assignment Several Reader", "34973000005");
+        Person priest = savePerson("Assignment Several Priest", "34973000006");
 
         eventAssignmentRepository.save(new EventAssignment(event, reader, EventAssignmentType.READER));
         eventAssignmentRepository.save(new EventAssignment(event, priest, EventAssignmentType.PRIEST));
@@ -148,8 +143,8 @@ class EventAssignmentRepositoryTest {
     void shouldDeleteAllAssignmentsByEventWithoutDeletingEventOrPeople() {
         CelebrationEvent event = saveEvent("Assignment Delete Event");
         CelebrationEvent otherEvent = saveEvent("Assignment Delete Other Event");
-        Reader reader = saveReader("Assignment Delete Reader", "34973000007");
-        Priest priest = savePriest("Assignment Delete Priest", "34973000008");
+        Person reader = savePerson("Assignment Delete Reader", "34973000007");
+        Person priest = savePerson("Assignment Delete Priest", "34973000008");
         eventAssignmentRepository.save(new EventAssignment(event, reader, EventAssignmentType.READER));
         eventAssignmentRepository.save(new EventAssignment(event, priest, EventAssignmentType.PRIEST));
         eventAssignmentRepository.save(new EventAssignment(otherEvent, reader, EventAssignmentType.READER));
@@ -162,14 +157,14 @@ class EventAssignmentRepositoryTest {
         assertTrue(eventAssignmentRepository.findAllByEventId(event.getId()).isEmpty());
         assertEquals(1, eventAssignmentRepository.findAllByEventId(otherEvent.getId()).size());
         assertNotNull(entityManager.find(CelebrationEvent.class, event.getId()));
-        assertNotNull(entityManager.find(Reader.class, reader.getId()));
-        assertNotNull(entityManager.find(Priest.class, priest.getId()));
+        assertNotNull(entityManager.find(Person.class, reader.getId()));
+        assertNotNull(entityManager.find(Person.class, priest.getId()));
     }
 
     @Test
     void shouldNotCascadeDeleteEventOrPersonWhenDeletingAssignment() {
         CelebrationEvent event = saveEvent("Assignment Cascade Event");
-        Reader reader = saveReader("Assignment Cascade Reader", "34973000009");
+        Person reader = savePerson("Assignment Cascade Reader", "34973000009");
         EventAssignment assignment = eventAssignmentRepository.saveAndFlush(
                 new EventAssignment(event, reader, EventAssignmentType.READER)
         );
@@ -179,17 +174,17 @@ class EventAssignmentRepositoryTest {
         entityManager.clear();
 
         assertNotNull(entityManager.find(CelebrationEvent.class, event.getId()));
-        assertNotNull(entityManager.find(Reader.class, reader.getId()));
+        assertNotNull(entityManager.find(Person.class, reader.getId()));
     }
 
     @Test
     void shouldFindEventAssignmentsWithPeopleForEventOrderedDeterministically() {
         CelebrationEvent event = saveEvent("Assignment Read Event");
-        saveAssignment(event, saveEucharisticMinister("Zelia Minister", "34973000010"), EventAssignmentType.EUCHARISTIC_MINISTER);
-        saveAssignment(event, saveReader("Bruno Reader", "34973000011"), EventAssignmentType.READER);
-        saveAssignment(event, savePriest("Carlos Priest", "34973000012"), EventAssignmentType.PRIEST);
-        saveAssignment(event, saveCommentator("Ana Commentator", "34973000013"), EventAssignmentType.COMMENTATOR);
-        saveAssignment(event, saveMinisterOfTheWord("Dora Word", "34973000014"), EventAssignmentType.MINISTER_OF_THE_WORD);
+        saveAssignment(event, savePerson("Zelia Minister", "34973000010"), EventAssignmentType.EUCHARISTIC_MINISTER);
+        saveAssignment(event, savePerson("Bruno Reader", "34973000011"), EventAssignmentType.READER);
+        saveAssignment(event, savePerson("Carlos Priest", "34973000012"), EventAssignmentType.PRIEST);
+        saveAssignment(event, savePerson("Ana Commentator", "34973000013"), EventAssignmentType.COMMENTATOR);
+        saveAssignment(event, savePerson("Dora Word", "34973000014"), EventAssignmentType.MINISTER_OF_THE_WORD);
         entityManager.flush();
         entityManager.clear();
 
@@ -216,8 +211,8 @@ class EventAssignmentRepositoryTest {
     void shouldFindAssignmentsForSeveralEventsInSingleBatchQueryWithoutPersonNPlusOne() {
         CelebrationEvent firstEvent = saveEvent("Assignment Batch First Event");
         CelebrationEvent secondEvent = saveEvent("Assignment Batch Second Event");
-        Reader sharedReader = saveReader("Assignment Shared Reader", "34973000015");
-        Reader otherReader = saveReader("Assignment Other Reader", "34973000016");
+        Person sharedReader = savePerson("Assignment Shared Reader", "34973000015");
+        Person otherReader = savePerson("Assignment Other Reader", "34973000016");
         saveAssignment(firstEvent, sharedReader, EventAssignmentType.READER);
         saveAssignment(secondEvent, sharedReader, EventAssignmentType.READER);
         saveAssignment(secondEvent, otherReader, EventAssignmentType.READER);
@@ -241,8 +236,8 @@ class EventAssignmentRepositoryTest {
     @Test
     void shouldNotDuplicateAssignmentsWhenReadingInBatch() {
         CelebrationEvent event = saveEvent("Assignment Batch Duplicate Event");
-        Reader reader = saveReader("Assignment Batch Duplicate Reader", "34973000017");
-        Priest priest = savePriest("Assignment Batch Duplicate Priest", "34973000018");
+        Person reader = savePerson("Assignment Batch Duplicate Reader", "34973000017");
+        Person priest = savePerson("Assignment Batch Duplicate Priest", "34973000018");
         saveAssignment(event, reader, EventAssignmentType.READER);
         saveAssignment(event, priest, EventAssignmentType.PRIEST);
         entityManager.flush();
@@ -268,44 +263,12 @@ class EventAssignmentRepositoryTest {
         return event;
     }
 
-    private Reader saveReader(String name, String phoneNumber) {
-        Reader reader = new Reader();
-        populatePerson(reader, name, phoneNumber);
-        entityManager.persist(reader);
+    private Person savePerson(String name, String phoneNumber) {
+        Person person = new Person();
+        populatePerson(person, name, phoneNumber);
+        entityManager.persist(person);
         entityManager.flush();
-        return reader;
-    }
-
-    private Priest savePriest(String name, String phoneNumber) {
-        Priest priest = new Priest();
-        populatePerson(priest, name, phoneNumber);
-        entityManager.persist(priest);
-        entityManager.flush();
-        return priest;
-    }
-
-    private Commentator saveCommentator(String name, String phoneNumber) {
-        Commentator commentator = new Commentator();
-        populatePerson(commentator, name, phoneNumber);
-        entityManager.persist(commentator);
-        entityManager.flush();
-        return commentator;
-    }
-
-    private MinisterOfTheWord saveMinisterOfTheWord(String name, String phoneNumber) {
-        MinisterOfTheWord ministerOfTheWord = new MinisterOfTheWord();
-        populatePerson(ministerOfTheWord, name, phoneNumber);
-        entityManager.persist(ministerOfTheWord);
-        entityManager.flush();
-        return ministerOfTheWord;
-    }
-
-    private EucharisticMinister saveEucharisticMinister(String name, String phoneNumber) {
-        EucharisticMinister eucharisticMinister = new EucharisticMinister();
-        populatePerson(eucharisticMinister, name, phoneNumber);
-        entityManager.persist(eucharisticMinister);
-        entityManager.flush();
-        return eucharisticMinister;
+        return person;
     }
 
     private EventAssignment saveAssignment(CelebrationEvent event, Person person, EventAssignmentType assignmentType) {

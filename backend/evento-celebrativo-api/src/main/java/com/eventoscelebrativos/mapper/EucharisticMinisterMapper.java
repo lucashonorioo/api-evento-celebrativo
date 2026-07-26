@@ -2,7 +2,6 @@ package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -14,9 +13,7 @@ import java.util.List;
 public interface EucharisticMinisterMapper {
 
     @Mapping(target = "id", ignore = true)
-    EucharisticMinister toEntity(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO);
-
-    EucharisticMinisterResponseDTO toDto(EucharisticMinister eucharisticMinister);
+    Person toEntity(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO);
 
     default EucharisticMinisterResponseDTO toDtoFromPerson(Person person) {
         return new EucharisticMinisterResponseDTO(

@@ -1,8 +1,8 @@
 package com.eventoscelebrativos.repository;
 
-import com.eventoscelebrativos.model.Commentator;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
+import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +30,8 @@ class PersonRepositoryTest {
 
     @Test
     void shouldPagePeopleOrderedByNameAndId() {
-        Reader first = saveReader("AAA User Same", "34970000001", operatorRole());
-        Reader second = saveReader("AAA User Same", "34970000002", operatorRole());
+        Person first = savePerson("AAA User Same", "34970000001", operatorRole());
+        Person second = savePerson("AAA User Same", "34970000002", operatorRole());
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "AAA User Same",
@@ -47,8 +47,8 @@ class PersonRepositoryTest {
 
     @Test
     void shouldFilterPeopleByPartialNameCaseInsensitive() {
-        Reader reader = saveReader("Repository Alice", "34970000003", operatorRole());
-        saveReader("Repository Bob", "34970000004", operatorRole());
+        Person person = savePerson("Repository Alice", "34970000003", operatorRole());
+        savePerson("Repository Bob", "34970000004", operatorRole());
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "repoSITORY ali",
@@ -59,12 +59,12 @@ class PersonRepositoryTest {
         );
 
         assertEquals(1, result.getTotalElements());
-        assertEquals(reader.getId(), result.getContent().get(0));
+        assertEquals(person.getId(), result.getContent().get(0));
     }
 
     @Test
     void shouldFilterPeopleByPartialPhoneNumber() {
-        Reader reader = saveReader("Phone Filter", "34970000005", operatorRole());
+        Person person = savePerson("Phone Filter", "34970000005", operatorRole());
 
         Page<Long> result = personRepository.findAdminPageIds(
                 null,
@@ -74,18 +74,20 @@ class PersonRepositoryTest {
                 PageRequest.of(0, 10)
         );
 
-        assertTrue(result.getContent().contains(reader.getId()));
+        assertTrue(result.getContent().contains(person.getId()));
     }
 
     @Test
-    void shouldFilterPeopleByPersonType() {
-        Reader reader = saveReader("Type Reader", "34970000006", operatorRole());
-        Commentator commentator = saveCommentator("Type Commentator", "34970000007", operatorRole());
+    void shouldFilterPeopleByActiveMinistryType() {
+        Person reader = savePerson("Type Reader", "34970000006", operatorRole());
+        saveMinistry(reader, MinistryType.READER);
+        Person commentator = savePerson("Type Commentator", "34970000007", operatorRole());
+        saveMinistry(commentator, MinistryType.COMMENTATOR);
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "Type",
                 null,
-                "reader",
+                MinistryType.READER,
                 null,
                 PageRequest.of(0, 10)
         );
@@ -96,8 +98,8 @@ class PersonRepositoryTest {
 
     @Test
     void shouldFilterPeopleByRole() {
-        Reader admin = saveReader("Role Admin", "34970000008", adminRole());
-        Reader operator = saveReader("Role Operator", "34970000009", operatorRole());
+        Person admin = savePerson("Role Admin", "34970000008", adminRole());
+        Person operator = savePerson("Role Operator", "34970000009", operatorRole());
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "Role",
@@ -113,14 +115,17 @@ class PersonRepositoryTest {
 
     @Test
     void shouldCombineFilters() {
-        Reader match = saveReader("Combined Alice", "34970000010", adminRole());
-        saveReader("Combined Alice", "34970000011", operatorRole());
-        saveCommentator("Combined Alice", "34970000016", adminRole());
+        Person match = savePerson("Combined Alice", "34970000010", adminRole());
+        saveMinistry(match, MinistryType.READER);
+        Person otherRole = savePerson("Combined Alice", "34970000011", operatorRole());
+        saveMinistry(otherRole, MinistryType.READER);
+        Person otherMinistry = savePerson("Combined Alice", "34970000016", adminRole());
+        saveMinistry(otherMinistry, MinistryType.COMMENTATOR);
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "Combined",
                 "00010",
-                "reader",
+                MinistryType.READER,
                 "ROLE_ADMIN",
                 PageRequest.of(0, 10)
         );
@@ -131,7 +136,7 @@ class PersonRepositoryTest {
 
     @Test
     void shouldNotDuplicatePersonWithMultipleRolesOrCountRolesAsPeople() {
-        Reader person = saveReader("Multiple Roles", "34970000012", operatorRole(), adminRole());
+        Person person = savePerson("Multiple Roles", "34970000012", operatorRole(), adminRole());
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "Multiple Roles",
@@ -147,7 +152,7 @@ class PersonRepositoryTest {
 
     @Test
     void shouldLoadRolesInBatchForPageIds() {
-        Reader person = saveReader("Batch Roles", "34970000013", operatorRole(), adminRole());
+        Person person = savePerson("Batch Roles", "34970000013", operatorRole(), adminRole());
 
         List<Person> people = personRepository.findAllByIdInWithRoles(List.of(person.getId()));
 
@@ -157,7 +162,7 @@ class PersonRepositoryTest {
 
     @Test
     void shouldFindPersonWithoutRolesWhenNoRoleFilterIsApplied() {
-        Reader person = saveReader("No Roles", "34970000014");
+        Person person = savePerson("No Roles", "34970000014");
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "No Roles",
@@ -173,7 +178,7 @@ class PersonRepositoryTest {
 
     @Test
     void shouldReturnDistinctAdministratorsForUpdateLockQuery() {
-        Reader admin = saveReader("Locked Admin", "34970000015", adminRole(), operatorRole());
+        Person admin = savePerson("Locked Admin", "34970000015", adminRole(), operatorRole());
 
         List<Person> administrators = personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN");
 
@@ -184,22 +189,19 @@ class PersonRepositoryTest {
         );
     }
 
-    private Reader saveReader(String name, String phoneNumber, Role... roles) {
-        Reader reader = new Reader();
-        fillPerson(reader, name, phoneNumber, roles);
-        entityManager.persist(reader);
+    private Person savePerson(String name, String phoneNumber, Role... roles) {
+        Person person = new Person();
+        fillPerson(person, name, phoneNumber, roles);
+        entityManager.persist(person);
         entityManager.flush();
         entityManager.clear();
-        return reader;
+        return person;
     }
 
-    private Commentator saveCommentator(String name, String phoneNumber, Role... roles) {
-        Commentator commentator = new Commentator();
-        fillPerson(commentator, name, phoneNumber, roles);
-        entityManager.persist(commentator);
+    private void saveMinistry(Person person, MinistryType ministryType) {
+        entityManager.persist(new PersonMinistry(person, ministryType));
         entityManager.flush();
         entityManager.clear();
-        return commentator;
     }
 
     private void fillPerson(Person person, String name, String phoneNumber, Role... roles) {

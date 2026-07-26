@@ -3,7 +3,6 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
@@ -46,7 +45,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Override
     @Transactional
     public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
-        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
+        Person ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
 
         ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
 

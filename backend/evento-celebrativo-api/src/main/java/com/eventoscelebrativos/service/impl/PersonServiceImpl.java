@@ -9,10 +9,12 @@ import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,17 +51,20 @@ public class PersonServiceImpl implements PersonService {
     private final RoleRepository roleRepository;
     private final PersonAdminMapper personAdminMapper;
     private final PersonRoleUpdateMapper personRoleUpdateMapper;
+    private final PersonMinistryReadService personMinistryReadService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
             RoleRepository roleRepository,
             PersonAdminMapper personAdminMapper,
-            PersonRoleUpdateMapper personRoleUpdateMapper
+            PersonRoleUpdateMapper personRoleUpdateMapper,
+            PersonMinistryReadService personMinistryReadService
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
         this.personAdminMapper = personAdminMapper;
         this.personRoleUpdateMapper = personRoleUpdateMapper;
+        this.personMinistryReadService = personMinistryReadService;
     }
 
     @Override
@@ -73,7 +79,7 @@ public class PersonServiceImpl implements PersonService {
     ) {
         String normalizedName = normalizeOptionalFilter(name);
         String normalizedPhoneNumber = normalizeOptionalFilter(phoneNumber);
-        String normalizedPersonType = normalizePersonTypeFilter(personType);
+        MinistryType ministryType = normalizePersonTypeFilter(personType);
         String normalizedRole = normalizeRoleFilter(role);
         validatePage(page, size);
 
@@ -81,7 +87,7 @@ public class PersonServiceImpl implements PersonService {
         Page<Long> idPage = personRepository.findAdminPageIds(
                 normalizedName,
                 normalizedPhoneNumber,
-                normalizedPersonType,
+                ministryType,
                 normalizedRole,
                 pageable
         );
@@ -93,10 +99,15 @@ public class PersonServiceImpl implements PersonService {
         List<Long> ids = idPage.getContent();
         Map<Long, Person> peopleById = personRepository.findAllByIdInWithRoles(ids).stream()
                 .collect(Collectors.toMap(Person::getId, Function.identity()));
+        Map<Long, Set<MinistryType>> activeMinistriesById = personMinistryReadService.findActiveMinistriesByPersonIds(ids);
 
         List<PersonAdminResponseDTO> content = ids.stream()
                 .map(peopleById::get)
-                .map(personAdminMapper::toDto)
+                .map(person -> {
+                    PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
+                    dto.setPersonType(legacyPersonType(activeMinistriesById.get(person.getId())));
+                    return dto;
+                })
                 .toList();
 
         return new PageImpl<>(content, pageable, idPage.getTotalElements());
@@ -108,7 +119,9 @@ public class PersonServiceImpl implements PersonService {
         validateId(id);
         Person person = personRepository.findByIdWithRoles(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
-        return personAdminMapper.toDto(person);
+        PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
+        dto.setPersonType(legacyPersonTypeForOne(id));
+        return dto;
     }
 
     @Override
@@ -132,7 +145,31 @@ public class PersonServiceImpl implements PersonService {
         person.addRole(role);
 
         Person savedPerson = personRepository.save(person);
-        return personRoleUpdateMapper.toDto(savedPerson);
+        PersonRoleUpdateResponseDTO dto = personRoleUpdateMapper.toDto(savedPerson);
+        return new PersonRoleUpdateResponseDTO(
+                dto.getId(),
+                dto.getName(),
+                dto.getPhoneNumber(),
+                legacyPersonTypeForOne(savedPerson.getId()),
+                dto.getRoles()
+        );
+    }
+
+    private String legacyPersonTypeForOne(Long personId) {
+        Set<MinistryType> activeMinistries = personMinistryReadService
+                .findActiveMinistriesByPersonIds(List.of(personId))
+                .getOrDefault(personId, Set.of());
+        return legacyPersonType(activeMinistries);
+    }
+
+    private String legacyPersonType(Set<MinistryType> activeMinistries) {
+        if (activeMinistries == null || activeMinistries.isEmpty()) {
+            return null;
+        }
+        return activeMinistries.stream()
+                .min(Comparator.naturalOrder())
+                .map(ministryType -> ministryType.name().toLowerCase())
+                .orElse(null);
     }
 
     private void validateId(Long id) {
@@ -157,12 +194,15 @@ public class PersonServiceImpl implements PersonService {
         return value.trim();
     }
 
-    private String normalizePersonTypeFilter(String personType) {
+    private MinistryType normalizePersonTypeFilter(String personType) {
         String normalized = normalizeOptionalFilter(personType);
-        if (normalized != null && !ALLOWED_PERSON_TYPES.contains(normalized)) {
+        if (normalized == null) {
+            return null;
+        }
+        if (!ALLOWED_PERSON_TYPES.contains(normalized)) {
             throw new BadRequestException("Tipo de pessoa invalido");
         }
-        return normalized;
+        return MinistryType.valueOf(normalized.toUpperCase());
     }
 
     private String normalizeRoleFilter(String role) {

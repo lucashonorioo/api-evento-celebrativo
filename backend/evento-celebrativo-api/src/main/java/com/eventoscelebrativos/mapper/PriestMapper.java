@@ -3,7 +3,6 @@ package com.eventoscelebrativos.mapper;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -14,9 +13,7 @@ import java.util.List;
 public interface PriestMapper {
 
     @Mapping(target = "id", ignore = true)
-    Priest toEntity(PriestRequestDTO priestRequestDTO);
-
-    PriestResponseDTO toDto(Priest priest);
+    Person toEntity(PriestRequestDTO priestRequestDTO);
 
     default PriestResponseDTO toDtoFromPerson(Person person) {
         return new PriestResponseDTO(

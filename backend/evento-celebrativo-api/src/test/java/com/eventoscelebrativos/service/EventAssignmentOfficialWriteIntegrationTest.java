@@ -7,8 +7,6 @@ import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -86,8 +84,8 @@ class EventAssignmentOfficialWriteIntegrationTest {
         Long locationId = null;
         List<Long> personIds = List.of();
         try {
-            Priest priest = savePriest("NoOp Priest");
-            Reader reader = saveReader("NoOp Reader");
+            Person priest = savePriest("NoOp Person");
+            Person reader = saveReader("NoOp Person");
             personIds = List.of(priest.getId(), reader.getId());
             Location location = locationRepository.saveAndFlush(location("NoOp Church"));
             locationId = location.getId();
@@ -129,7 +127,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
         Long priestId = null;
         Long locationId = null;
         try {
-            Priest priest = savePriest("Official Write Failure Create Priest");
+            Person priest = savePriest("Official Write Failure Create Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Official Write Failure Create Church"));
             locationId = location.getId();
@@ -160,7 +158,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
         Long locationId = null;
         Long readerId = null;
         try {
-            Reader reader = saveReader("Official Write Failure Update Reader");
+            Person reader = saveReader("Official Write Failure Update Person");
             readerId = reader.getId();
             Location location = locationRepository.saveAndFlush(location("Official Write Failure Update Church"));
             locationId = location.getId();
@@ -228,18 +226,18 @@ class EventAssignmentOfficialWriteIntegrationTest {
         return eventId;
     }
 
-    private Priest savePriest(String name) {
-        Priest priest = new Priest();
+    private Person savePriest(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
-        priest = (Priest) personRepository.saveAndFlush(priest);
+        priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
-    private Reader saveReader(String name) {
-        Reader reader = new Reader();
+    private Person saveReader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
-        reader = (Reader) personRepository.saveAndFlush(reader);
+        reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         return reader;
     }

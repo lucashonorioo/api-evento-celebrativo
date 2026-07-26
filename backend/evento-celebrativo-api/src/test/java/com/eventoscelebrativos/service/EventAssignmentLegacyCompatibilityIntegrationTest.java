@@ -4,16 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
-import com.eventoscelebrativos.model.Commentator;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Location;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -89,11 +84,11 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         List<Long> personIds = List.of();
         try {
-            Priest priest = savePriest("Assignment Create Priest");
-            Reader reader = saveReader("Assignment Create Reader");
-            Commentator commentator = saveCommentator("Assignment Create Commentator");
-            MinisterOfTheWord ministerOfTheWord = saveMinisterOfTheWord("Assignment Create Word Minister");
-            EucharisticMinister eucharisticMinister = saveEucharisticMinister("Assignment Create Eucharistic Minister");
+            Person priest = savePriest("Assignment Create Person");
+            Person reader = saveReader("Assignment Create Person");
+            Person commentator = saveCommentator("Assignment Create Person");
+            Person ministerOfTheWord = saveMinisterOfTheWord("Assignment Create Word Minister");
+            Person eucharisticMinister = saveEucharisticMinister("Assignment Create Eucharistic Minister");
             personIds = List.of(priest.getId(), reader.getId(), commentator.getId(), ministerOfTheWord.getId(), eucharisticMinister.getId());
             Location location = locationRepository.saveAndFlush(location("Assignment Create Church"));
             locationId = location.getId();
@@ -142,15 +137,15 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         List<Long> personIds = List.of();
         try {
-            Priest oldPriest = savePriest("Assignment Update Old Priest");
-            Priest newPriest = savePriest("Assignment Update New Priest");
-            Reader keptReader = saveReader("Assignment Update Kept Reader");
-            Reader removedReader = saveReader("Assignment Update Removed Reader");
-            Commentator addedCommentator = saveCommentator("Assignment Update Added Commentator");
-            MinisterOfTheWord oldWordMinister = saveMinisterOfTheWord("Assignment Update Old Word Minister");
-            MinisterOfTheWord newWordMinister = saveMinisterOfTheWord("Assignment Update New Word Minister");
-            EucharisticMinister oldEucharisticMinister = saveEucharisticMinister("Assignment Update Old Eucharistic Minister");
-            EucharisticMinister newEucharisticMinister = saveEucharisticMinister("Assignment Update New Eucharistic Minister");
+            Person oldPriest = savePriest("Assignment Update Old Person");
+            Person newPriest = savePriest("Assignment Update New Person");
+            Person keptReader = saveReader("Assignment Update Kept Person");
+            Person removedReader = saveReader("Assignment Update Removed Person");
+            Person addedCommentator = saveCommentator("Assignment Update Added Person");
+            Person oldWordMinister = saveMinisterOfTheWord("Assignment Update Old Word Minister");
+            Person newWordMinister = saveMinisterOfTheWord("Assignment Update New Word Minister");
+            Person oldEucharisticMinister = saveEucharisticMinister("Assignment Update Old Eucharistic Minister");
+            Person newEucharisticMinister = saveEucharisticMinister("Assignment Update New Eucharistic Minister");
             personIds = List.of(
                     oldPriest.getId(),
                     newPriest.getId(),
@@ -245,10 +240,10 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         List<Long> personIds = List.of();
         try {
-            Priest priest = savePriest("Assignment Backfill Update Priest");
-            Reader keptReader = saveReader("Assignment Backfill Update Kept Reader");
-            Reader removedReader = saveReader("Assignment Backfill Update Removed Reader");
-            Commentator addedCommentator = saveCommentator("Assignment Backfill Update Added Commentator");
+            Person priest = savePriest("Assignment Backfill Update Person");
+            Person keptReader = saveReader("Assignment Backfill Update Kept Person");
+            Person removedReader = saveReader("Assignment Backfill Update Removed Person");
+            Person addedCommentator = saveCommentator("Assignment Backfill Update Added Person");
             personIds = List.of(priest.getId(), keptReader.getId(), removedReader.getId(), addedCommentator.getId());
             Location location = locationRepository.saveAndFlush(location("Assignment Backfill Update Church"));
             locationId = location.getId();
@@ -293,7 +288,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priest = savePriest("Assignment Delete Event Priest");
+            Person priest = savePriest("Assignment Delete Event Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Delete Event Church"));
             locationId = location.getId();
@@ -317,7 +312,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priest = savePriest("Assignment Delete Rollback Priest");
+            Person priest = savePriest("Assignment Delete Rollback Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Delete Rollback Church"));
             locationId = location.getId();
@@ -344,7 +339,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priest = savePriest("Assignment Linked Person Priest");
+            Person priest = savePriest("Assignment Linked Person Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Linked Person Church"));
             locationId = location.getId();
@@ -371,42 +366,42 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
         ).getEventId();
     }
 
-    private Priest savePriest(String name) {
-        Priest priest = new Priest();
+    private Person savePriest(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
-        priest = (Priest) personRepository.saveAndFlush(priest);
+        priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
-    private Reader saveReader(String name) {
-        Reader reader = new Reader();
+    private Person saveReader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
-        reader = (Reader) personRepository.saveAndFlush(reader);
+        reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         return reader;
     }
 
-    private Commentator saveCommentator(String name) {
-        Commentator commentator = new Commentator();
+    private Person saveCommentator(String name) {
+        Person commentator = new Person();
         populatePerson(commentator, name);
-        commentator = (Commentator) personRepository.saveAndFlush(commentator);
+        commentator = personRepository.saveAndFlush(commentator);
         personMinistryRepository.saveAndFlush(new PersonMinistry(commentator, MinistryType.COMMENTATOR));
         return commentator;
     }
 
-    private MinisterOfTheWord saveMinisterOfTheWord(String name) {
-        MinisterOfTheWord minister = new MinisterOfTheWord();
+    private Person saveMinisterOfTheWord(String name) {
+        Person minister = new Person();
         populatePerson(minister, name);
-        minister = (MinisterOfTheWord) personRepository.saveAndFlush(minister);
+        minister = personRepository.saveAndFlush(minister);
         personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.MINISTER_OF_THE_WORD));
         return minister;
     }
 
-    private EucharisticMinister saveEucharisticMinister(String name) {
-        EucharisticMinister minister = new EucharisticMinister();
+    private Person saveEucharisticMinister(String name) {
+        Person minister = new Person();
         populatePerson(minister, name);
-        minister = (EucharisticMinister) personRepository.saveAndFlush(minister);
+        minister = personRepository.saveAndFlush(minister);
         personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.EUCHARISTIC_MINISTER));
         return minister;
     }

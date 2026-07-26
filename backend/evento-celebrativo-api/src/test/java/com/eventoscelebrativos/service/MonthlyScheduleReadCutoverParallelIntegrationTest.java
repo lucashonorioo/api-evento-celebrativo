@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
+import com.eventoscelebrativos.model.MinistryType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -105,8 +106,9 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldReadEventCreatedAndUpdatedByWriteThroughFromParallelSource() throws Exception {
-        Long firstReaderId = personIdsByType("reader").get(0);
-        Long secondReaderId = personIdsByType("reader").get(1);
+        List<Long> readerIds = personIdsByMinistry(MinistryType.READER);
+        Long firstReaderId = readerIds.get(0);
+        Long secondReaderId = readerIds.get(1);
         Long locationId = firstLocationId();
         LocalDate eventDate = LocalDate.now().plusDays(95);
 
@@ -152,7 +154,7 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldGroupPersonByAssignmentTypeWhenLegacySubtypeIsDifferent() throws Exception {
-        Long personId = insertPerson("reader", "Reader Serving As Commentator");
+        Long personId = insertPerson("Reader Serving As Commentator");
         Long eventId = insertEvent("Parallel Monthly Different Subtype", LocalDate.now().plusDays(96));
         Long locationId = firstLocationId();
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
@@ -222,11 +224,19 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
         return request;
     }
 
-    private List<Long> personIdsByType(String personType) {
+    private List<Long> personIdsByMinistry(MinistryType ministryType) {
         return jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ? ORDER BY id LIMIT 2",
+                """
+                SELECT p.id
+                FROM tb_person_ministry pm
+                INNER JOIN tb_person p ON p.id = pm.person_id
+                WHERE pm.ministry_type = ?
+                  AND pm.active = TRUE
+                ORDER BY p.id
+                LIMIT 2
+                """,
                 Long.class,
-                personType
+                ministryType.name()
         );
     }
 
@@ -234,16 +244,15 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_location ORDER BY id LIMIT 1", Long.class);
     }
 
-    private Long insertPerson(String personType, String name) {
+    private Long insertPerson(String name) {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type)
-                VALUES (?, ?, '1990-01-10', 'encoded-password', ?)
+                INSERT INTO tb_person(name, phone_number, birthday_date, password)
+                VALUES (?, ?, '1990-01-10', 'encoded-password')
                 """,
                 name + " " + UUID.randomUUID(),
-                phoneNumber,
-                personType
+                phoneNumber
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_person WHERE phone_number = ?",

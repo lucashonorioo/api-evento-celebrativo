@@ -3,7 +3,6 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -123,7 +122,7 @@ class EventScaleAssignmentPlanTest {
 
     @Test
     void shouldNotDependOnPersonTypeOrLegacySubtypeToBuildTargets() {
-        Person genericPerson = new Reader();
+        Person genericPerson = new Person();
         genericPerson.setId(1L);
         genericPerson.setName("Generic");
 
@@ -146,9 +145,9 @@ class EventScaleAssignmentPlanTest {
     }
 
     private Person person(Long id) {
-        Reader reader = new Reader();
-        reader.setId(id);
-        reader.setName("Person " + id);
-        return reader;
+        Person person = new Person();
+        person.setId(id);
+        person.setName("Person " + id);
+        return person;
     }
 }

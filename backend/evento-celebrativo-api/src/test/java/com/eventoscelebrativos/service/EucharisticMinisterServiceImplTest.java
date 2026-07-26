@@ -6,10 +6,8 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.EucharisticMinisterServiceImpl;
@@ -56,9 +54,9 @@ class EucharisticMinisterServiceImplTest {
     @Test
     void shouldCreateEucharisticMinisterWithEncryptedPasswordAndOperatorRole() {
         EucharisticMinisterRequestDTO request = request();
-        EucharisticMinister entity = minister(null, "raw-password");
+        Person entity = minister(null, "raw-password");
         Role operatorRole = new Role(1L, "ROLE_OPERATOR");
-        EucharisticMinister saved = minister(1L, "encoded-password");
+        Person saved = minister(1L, "encoded-password");
         EucharisticMinisterResponseDTO response = response(1L);
 
         when(mapper.toEntity(request)).thenReturn(entity);
@@ -89,7 +87,7 @@ class EucharisticMinisterServiceImplTest {
 
     @Test
     void shouldFindEucharisticMinisterByIdWhenExists() {
-        EucharisticMinister entity = minister(1L, "encoded-password");
+        Person entity = minister(1L, "encoded-password");
         EucharisticMinisterResponseDTO response = response(1L);
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.EUCHARISTIC_MINISTER, FIND_ENTITY_LABEL)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -108,7 +106,7 @@ class EucharisticMinisterServiceImplTest {
 
     @Test
     void shouldUpdateAndDeleteEucharisticMinister() {
-        EucharisticMinister entity = minister(1L, "old-password");
+        Person entity = minister(1L, "old-password");
         EucharisticMinisterResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
@@ -124,7 +122,7 @@ class EucharisticMinisterServiceImplTest {
 
     @Test
     void shouldListEucharisticMinistersUsingPersonMinistryWithoutCallingLegacyRepository() {
-        Reader readerWithEucharisticMinisterMinistry = reader(2L, "encoded-password");
+        Person readerWithEucharisticMinisterMinistry = reader(2L, "encoded-password");
         EucharisticMinisterResponseDTO response = new EucharisticMinisterResponseDTO(
                 2L,
                 "Minister",
@@ -147,8 +145,8 @@ class EucharisticMinisterServiceImplTest {
 
     @Test
     void shouldPreserveEucharisticMinisterOrderReturnedByPersonMinistryReadService() {
-        EucharisticMinister first = minister(1L, "encoded-password");
-        Reader second = reader(2L, "encoded-password");
+        Person first = minister(1L, "encoded-password");
+        Person second = reader(2L, "encoded-password");
         List<Person> people = List.of(first, second);
         List<EucharisticMinisterResponseDTO> responses = List.of(response(1L), response(2L));
 
@@ -195,8 +193,8 @@ class EucharisticMinisterServiceImplTest {
         return new EucharisticMinisterRequestDTO("Minister", "34999999993", BIRTHDAY, "raw-password");
     }
 
-    private EucharisticMinister minister(Long id, String password) {
-        EucharisticMinister minister = new EucharisticMinister();
+    private Person minister(Long id, String password) {
+        Person minister = new Person();
         minister.setId(id);
         minister.setName("Minister");
         minister.setPhoneNumber("34999999993");
@@ -205,8 +203,8 @@ class EucharisticMinisterServiceImplTest {
         return minister;
     }
 
-    private Reader reader(Long id, String password) {
-        Reader reader = new Reader();
+    private Person reader(Long id, String password) {
+        Person reader = new Person();
         reader.setId(id);
         reader.setName("Minister");
         reader.setPhoneNumber("34999999993");
