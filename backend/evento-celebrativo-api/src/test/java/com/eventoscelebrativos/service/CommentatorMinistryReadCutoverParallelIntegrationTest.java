@@ -5,7 +5,6 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Reader;
-import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -53,9 +52,6 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private CommentatorRepository commentatorRepository;
-
-    @Autowired
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
@@ -98,7 +94,7 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
         assertTrue(responseIds.contains(savedMultiMinistryCommentator.getId()));
         assertFalse(responseIds.contains(savedInactiveCommentator.getId()));
         assertEquals(1, responseIds.stream().filter(savedMultiMinistryCommentator.getId()::equals).count());
-        assertFalse(commentatorRepository.findAll().stream().map(Person::getId).toList().contains(savedReader.getId()));
+        assertFalse(legacyCommentatorIds().contains(savedReader.getId()));
         assertEquals("reader", personType(savedReader.getId()));
         assertEquals(ministryRowsBefore, countPersonMinistryRows());
 
@@ -154,6 +150,14 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
     private int countPersonMinistryRows() {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_person_ministry", Integer.class);
         return count == null ? 0 : count;
+    }
+
+    private List<Long> legacyCommentatorIds() {
+        return jdbcTemplate.queryForList(
+                "SELECT id FROM tb_person WHERE person_type = ?",
+                Long.class,
+                "commentator"
+        );
     }
 
     private String personType(Long personId) {
