@@ -71,6 +71,10 @@ public class PersonMinistry {
         this.active = true;
     }
 
+    public void deactivate() {
+        this.active = false;
+    }
+
     public Long getId() {
         return id;
     }

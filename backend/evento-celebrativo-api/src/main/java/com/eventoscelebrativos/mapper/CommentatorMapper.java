@@ -34,5 +34,5 @@ public interface CommentatorMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    void updateCommentatorFromDto(CommentatorRequestDTO commentatorRequestDTO, @MappingTarget Commentator commentator);
+    void updateCommentatorFromDto(CommentatorRequestDTO commentatorRequestDTO, @MappingTarget Person person);
 }

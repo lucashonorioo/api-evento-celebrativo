@@ -2,22 +2,17 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
-import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.ReaderRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,30 +22,25 @@ import java.util.List;
 @Service
 public class ReaderServiceImpl implements ReaderService {
 
-    private final ReaderRepository readerRepository;
-    private final ReaderMapper readerMapper;
+    private static final String ENTITY_LABEL = "Leitor";
 
+    private final ReaderMapper readerMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
-    private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public ReaderServiceImpl(
-            ReaderRepository readerRepository,
             ReaderMapper readerMapper,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            PersonMinistryCompatibilityService personMinistryCompatibilityService,
-            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
-        this.readerRepository = readerRepository;
         this.readerMapper = readerMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
-        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
-        this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
 
@@ -67,9 +57,8 @@ public class ReaderServiceImpl implements ReaderService {
 
         reader.addRole(operatorRole);
 
-        reader = readerRepository.save(reader);
-        ensureLegacyMinistry(reader);
-        return readerMapper.toDto(reader);
+        Person saved = personMinistryCommandService.create(reader, MinistryType.READER);
+        return readerMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -85,8 +74,8 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positvio e não nulo");
         }
-        Reader reader = readerRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Leitor", id));
-        return readerMapper.toDto(reader);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.READER, ENTITY_LABEL);
+        return readerMapper.toDtoFromPerson(person);
     }
 
     @Override
@@ -95,19 +84,12 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try {
-            Reader reader = readerRepository.getReferenceById(id);
-            readerMapper.updateReaderFromDto(readerRequestDTO, reader);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.READER, ENTITY_LABEL);
+        readerMapper.updateReaderFromDto(readerRequestDTO, person);
+        person.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
 
-            reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
-
-            Reader readerSalvo = readerRepository.save(reader);
-            ensureLegacyMinistry(readerSalvo);
-
-            return readerMapper.toDto(readerSalvo);
-        }catch (EntityNotFoundException e){
-            throw new ResourceNotFoundException("Leitor", id);
-        }
+        Person saved = personMinistryCommandService.save(person);
+        return readerMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -116,22 +98,6 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(!readerRepository.existsById(id)){
-            throw new ResourceNotFoundException("Leitor", id);
-        }
-        try {
-            personMinistryCompatibilityService.deleteAllForPerson(id);
-            readerRepository.deleteById(id);
-            readerRepository.flush();
-        }
-        catch (DataIntegrityViolationException e){
-            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
-        }
-
-    }
-
-    private void ensureLegacyMinistry(Reader reader) {
-        MinistryType ministryType = ministryTypeResolver.resolve(reader);
-        personMinistryCompatibilityService.ensureMinistry(reader, ministryType);
+        personMinistryCommandService.removeMinistry(id, MinistryType.READER, ENTITY_LABEL);
     }
 }

@@ -11,20 +11,14 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
-import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.impl.CommentatorServiceImpl;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -38,9 +32,7 @@ import static org.mockito.Mockito.*;
 class CommentatorServiceImplTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1991, 2, 11);
-
-    @Mock
-    private CommentatorRepository repository;
+    private static final String ENTITY_LABEL = "Comentarista";
 
     @Mock
     private CommentatorMapper mapper;
@@ -52,10 +44,7 @@ class CommentatorServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
-
-    @Mock
-    private MinistryTypeResolver ministryTypeResolver;
+    private PersonMinistryCommandService personMinistryCommandService;
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
@@ -74,18 +63,16 @@ class CommentatorServiceImplTest {
         when(mapper.toEntity(request)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(repository.save(any(Commentator.class))).thenReturn(saved);
-        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.COMMENTATOR);
-        when(mapper.toDto(saved)).thenReturn(response);
+        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.COMMENTATOR))).thenReturn(saved);
+        when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.createCommentator(request));
 
-        ArgumentCaptor<Commentator> captor = ArgumentCaptor.forClass(Commentator.class);
-        verify(repository).save(captor.capture());
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
+        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.COMMENTATOR));
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
-        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.COMMENTATOR);
     }
 
     @Test
@@ -96,15 +83,15 @@ class CommentatorServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.createCommentator(request));
-        verify(repository, never()).save(any());
+        verify(personMinistryCommandService, never()).create(any(), any());
     }
 
     @Test
     void shouldFindCommentatorByIdWhenExists() {
         Commentator entity = commentator(1L, "encoded-password");
         CommentatorResponseDTO response = response(1L);
-        when(repository.findById(1L)).thenReturn(Optional.of(entity));
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
 
         assertSame(response, service.findCommentatorById(1L));
     }
@@ -113,7 +100,8 @@ class CommentatorServiceImplTest {
     void shouldThrowWhenCommentatorIdIsInvalidOrMissing() {
         assertThrows(BusinessException.class, () -> service.findCommentatorById(null));
         assertThrows(BusinessException.class, () -> service.findCommentatorById(0L));
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.COMMENTATOR, ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.findCommentatorById(99L));
     }
 
@@ -122,20 +110,15 @@ class CommentatorServiceImplTest {
         Commentator entity = commentator(1L, "old-password");
         CommentatorResponseDTO response = response(1L);
 
-        when(repository.getReferenceById(1L)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(repository.save(entity)).thenReturn(entity);
-        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.COMMENTATOR);
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateCommentator(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
-        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.COMMENTATOR);
 
-        when(repository.existsById(1L)).thenReturn(true);
         service.deleteCommentatorById(1L);
-        var inOrder = inOrder(personMinistryCompatibilityService, repository);
-        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
-        inOrder.verify(repository).deleteById(1L);
+        verify(personMinistryCommandService).removeMinistry(1L, MinistryType.COMMENTATOR, ENTITY_LABEL);
     }
 
     @Test
@@ -152,7 +135,7 @@ class CommentatorServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.COMMENTATOR);
         verify(mapper).toDtoPersonList(people);
-        verifyNoInteractions(repository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -179,22 +162,24 @@ class CommentatorServiceImplTest {
                 .thenThrow(officialFailure);
 
         assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllCommentators()));
-        verifyNoInteractions(repository, mapper);
+        verifyNoInteractions(personMinistryCommandService, mapper);
     }
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingCommentator() {
-        when(repository.getReferenceById(99L)).thenThrow(new EntityNotFoundException());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.COMMENTATOR, ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateCommentator(99L, request()));
 
-        when(repository.existsById(99L)).thenReturn(false);
+        doThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L))
+                .when(personMinistryCommandService).removeMinistry(99L, MinistryType.COMMENTATOR, ENTITY_LABEL);
         assertThrows(ResourceNotFoundException.class, () -> service.deleteCommentatorById(99L));
     }
 
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedCommentator() {
-        when(repository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(personMinistryCommandService).removeMinistry(1L, MinistryType.COMMENTATOR, ENTITY_LABEL);
 
         assertThrows(DatabaseException.class, () -> service.deleteCommentatorById(1L));
     }

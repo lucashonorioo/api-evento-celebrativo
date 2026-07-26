@@ -144,15 +144,22 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             assertFalse(getEucharisticMinisters().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
 
             Thread.sleep(25);
+            // Update no longer reactivates an inactive ministry implicitly (official write authority
+            // treats an inactive PersonMinistry the same as absent for find/update purposes).
             putEucharisticMinister(ministerId, "Eucharistic Minister Cutover Gamma", updatePhoneNumber)
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNotFound());
+            assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, false);
 
+            reactivateEucharisticMinisterMinistry(ministerId);
             MinistrySnapshot reactivatedMinistry = assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, true);
             assertEquals(createdMinistry.id(), reactivatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getEucharisticMinisters(), ministerId);
             assertEquivalentLegacyAndParallelMinisterSources();
+
+            putEucharisticMinister(ministerId, "Eucharistic Minister Cutover Gamma", updatePhoneNumber)
+                    .andExpect(status().isOk());
 
             addMinistry(ministerId, MinistryType.READER);
             putEucharisticMinister(ministerId, "Eucharistic Minister Cutover Delta", updatePhoneNumber)
@@ -169,13 +176,15 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             deleteEucharisticMinister(ministerId)
                     .andExpect(status().isNoContent());
 
-            assertFalse(personRepository.existsById(ministerId));
-            assertFalse(eucharisticMinisterRepository.existsById(ministerId));
-            assertEquals(0, countMinistries(ministerId));
+            // Person and the other ministry (READER) survive: the delete only removes the
+            // EUCHARISTIC_MINISTER association, never the shared Person row.
+            assertTrue(personRepository.existsById(ministerId));
+            assertTrue(eucharisticMinisterRepository.existsById(ministerId));
+            assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, false);
+            assertEquals(1, countMinistries(ministerId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(ministerId));
             assertFalse(getEucharisticMinisters().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
-            assertEquals(initialMinisterIds, legacyMinisterIds());
-            assertEquivalentLegacyAndParallelMinisterSources();
+            assertFalse(activeMinisterIds().contains(ministerId));
         } finally {
             cleanupMinister(ministerId);
         }
@@ -318,6 +327,20 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                MinistryType.EUCHARISTIC_MINISTER.name()
+        ));
+    }
+
+    private void reactivateEucharisticMinisterMinistry(Long personId) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?

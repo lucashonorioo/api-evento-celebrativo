@@ -11,17 +11,14 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.ReaderRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.ReaderServiceImpl;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -35,9 +32,7 @@ import static org.mockito.Mockito.*;
 class ReaderServiceImplTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1990, 1, 10);
-
-    @Mock
-    private ReaderRepository readerRepository;
+    private static final String ENTITY_LABEL = "Leitor";
 
     @Mock
     private ReaderMapper readerMapper;
@@ -49,10 +44,7 @@ class ReaderServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
-
-    @Mock
-    private MinistryTypeResolver ministryTypeResolver;
+    private PersonMinistryCommandService personMinistryCommandService;
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
@@ -72,20 +64,18 @@ class ReaderServiceImplTest {
         when(readerMapper.toEntity(request)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(readerRepository.save(any(Reader.class))).thenReturn(saved);
-        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.READER);
-        when(readerMapper.toDto(saved)).thenReturn(response);
+        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.READER))).thenReturn(saved);
+        when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         ReaderResponseDTO result = service.createReader(request);
 
         assertSame(response, result);
-        ArgumentCaptor<Reader> captor = ArgumentCaptor.forClass(Reader.class);
-        verify(readerRepository).save(captor.capture());
-        Reader readerToSave = captor.getValue();
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
+        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.READER));
+        Person readerToSave = captor.getValue();
         assertEquals("encoded-password", readerToSave.getPassword());
         assertNotEquals("raw-password", readerToSave.getPassword());
         assertTrue(readerToSave.hasRole("ROLE_OPERATOR"));
-        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.READER);
     }
 
     @Test
@@ -98,7 +88,7 @@ class ReaderServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.createReader(request));
-        verify(readerRepository, never()).save(any());
+        verify(personMinistryCommandService, never()).create(any(), any());
     }
 
     @Test
@@ -106,15 +96,16 @@ class ReaderServiceImplTest {
         Reader reader = reader(1L, "encoded-password");
         ReaderResponseDTO response = response(1L);
 
-        when(readerRepository.findById(1L)).thenReturn(Optional.of(reader));
-        when(readerMapper.toDto(reader)).thenReturn(response);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(reader);
+        when(readerMapper.toDtoFromPerson(reader)).thenReturn(response);
 
         assertSame(response, service.findReaderById(1L));
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenReaderIdDoesNotExist() {
-        when(readerRepository.findById(99L)).thenReturn(Optional.empty());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.READER, ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
 
         assertThrows(ResourceNotFoundException.class, () -> service.findReaderById(99L));
     }
@@ -142,7 +133,7 @@ class ReaderServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.READER);
         verify(readerMapper).toDtoPersonList(people);
-        verifyNoInteractions(readerRepository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -168,7 +159,7 @@ class ReaderServiceImplTest {
         when(personMinistryReadService.findAllActivePeopleByMinistry(MinistryType.READER)).thenThrow(officialFailure);
 
         assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllReaders()));
-        verifyNoInteractions(readerRepository, readerMapper);
+        verifyNoInteractions(personMinistryCommandService, readerMapper);
     }
 
     @Test
@@ -178,49 +169,44 @@ class ReaderServiceImplTest {
         Reader saved = reader(1L, "encoded-password");
         ReaderResponseDTO response = response(1L);
 
-        when(readerRepository.getReferenceById(1L)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(readerRepository.save(entity)).thenReturn(saved);
-        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.READER);
-        when(readerMapper.toDto(saved)).thenReturn(response);
+        when(personMinistryCommandService.save(entity)).thenReturn(saved);
+        when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));
         verify(readerMapper).updateReaderFromDto(request, entity);
         assertEquals("encoded-password", entity.getPassword());
-        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.READER);
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenUpdatingMissingReader() {
         ReaderRequestDTO request = request();
-        when(readerRepository.getReferenceById(99L)).thenThrow(new EntityNotFoundException());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.READER, ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
 
         assertThrows(ResourceNotFoundException.class, () -> service.updateReader(99L, request));
     }
 
     @Test
     void shouldDeleteReaderWhenExists() {
-        when(readerRepository.existsById(1L)).thenReturn(true);
-
         service.deleteReaderById(1L);
 
-        var inOrder = inOrder(personMinistryCompatibilityService, readerRepository);
-        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
-        inOrder.verify(readerRepository).deleteById(1L);
+        verify(personMinistryCommandService).removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenDeletingMissingReader() {
-        when(readerRepository.existsById(99L)).thenReturn(false);
+        doThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L))
+                .when(personMinistryCommandService).removeMinistry(99L, MinistryType.READER, ENTITY_LABEL);
 
         assertThrows(ResourceNotFoundException.class, () -> service.deleteReaderById(99L));
-        verify(readerRepository, never()).deleteById(anyLong());
     }
 
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedReader() {
-        when(readerRepository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(readerRepository).flush();
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(personMinistryCommandService).removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
 
         assertThrows(DatabaseException.class, () -> service.deleteReaderById(1L));
     }

@@ -147,15 +147,22 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             assertFalse(getCommentators().stream().anyMatch(commentator -> commentator.id().equals(createdCommentatorId)));
 
             Thread.sleep(25);
+            // Update no longer reactivates an inactive ministry implicitly (official write authority
+            // treats an inactive PersonMinistry the same as absent for find/update purposes).
             putCommentator(commentatorId, "Commentator Cutover Gamma", updatePhoneNumber)
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNotFound());
+            assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, false);
 
+            reactivateCommentatorMinistry(commentatorId);
             MinistrySnapshot reactivatedMinistry = assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, true);
             assertEquals(createdMinistry.id(), reactivatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getCommentators(), commentatorId);
             assertEquivalentLegacyAndParallelCommentatorSources();
+
+            putCommentator(commentatorId, "Commentator Cutover Gamma", updatePhoneNumber)
+                    .andExpect(status().isOk());
 
             addMinistry(commentatorId, MinistryType.READER);
             putCommentator(commentatorId, "Commentator Cutover Delta", updatePhoneNumber)
@@ -172,13 +179,15 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             deleteCommentator(commentatorId)
                     .andExpect(status().isNoContent());
 
-            assertFalse(personRepository.existsById(commentatorId));
-            assertFalse(commentatorRepository.existsById(commentatorId));
-            assertEquals(0, countMinistries(commentatorId));
+            // Person and the other ministry (READER) survive: the delete only removes the
+            // COMMENTATOR association, never the shared Person row.
+            assertTrue(personRepository.existsById(commentatorId));
+            assertTrue(commentatorRepository.existsById(commentatorId));
+            assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, false);
+            assertEquals(1, countMinistries(commentatorId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(commentatorId));
             assertFalse(getCommentators().stream().anyMatch(commentator -> commentator.id().equals(createdCommentatorId)));
-            assertEquals(initialCommentatorIds, legacyCommentatorIds());
-            assertEquivalentLegacyAndParallelCommentatorSources();
+            assertFalse(activeCommentatorIds().contains(commentatorId));
         } finally {
             cleanupCommentator(commentatorId);
         }
@@ -325,6 +334,20 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                MinistryType.COMMENTATOR.name()
+        ));
+    }
+
+    private void reactivateCommentatorMinistry(Long personId) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?

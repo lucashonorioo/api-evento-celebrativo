@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.EventAssignment;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -37,6 +38,8 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
     Optional<EventAssignment> findByEventIdAndPersonId(Long eventId, Long personId);
 
     boolean existsByEventIdAndPersonId(Long eventId, Long personId);
+
+    boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
 
     @Modifying
     @Query("DELETE FROM EventAssignment assignment WHERE assignment.event.id = :eventId")

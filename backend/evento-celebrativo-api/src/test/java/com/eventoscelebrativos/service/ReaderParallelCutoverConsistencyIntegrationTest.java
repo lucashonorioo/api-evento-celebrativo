@@ -139,15 +139,22 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         assertFalse(getReaders().stream().anyMatch(reader -> reader.id().equals(createdReaderId)));
 
         Thread.sleep(25);
+        // Update no longer reactivates an inactive ministry implicitly (official write authority
+        // treats an inactive PersonMinistry the same as absent for find/update purposes).
         putReader(readerId, "Reader Cutover Gamma", updatePhoneNumber)
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
+        assertSingleMinistry(readerId, MinistryType.READER, false);
 
+        reactivateReaderMinistry(readerId);
         MinistrySnapshot reactivatedMinistry = assertSingleMinistry(readerId, MinistryType.READER, true);
         assertEquals(createdMinistry.id(), reactivatedMinistry.id());
         assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
         assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
         assertContainsOnce(getReaders(), readerId);
         assertEquivalentLegacyAndParallelReaderSources();
+
+        putReader(readerId, "Reader Cutover Gamma", updatePhoneNumber)
+                .andExpect(status().isOk());
 
         addMinistry(readerId, MinistryType.COMMENTATOR);
         putReader(readerId, "Reader Cutover Delta", updatePhoneNumber)
@@ -164,13 +171,15 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         deleteReader(readerId)
                 .andExpect(status().isNoContent());
 
-        assertFalse(personRepository.existsById(readerId));
-        assertFalse(readerRepository.existsById(readerId));
-        assertEquals(0, countMinistries(readerId));
+        // Person and the other ministry (COMMENTATOR) survive: the delete only removes the
+        // READER association, never the shared Person row.
+        assertTrue(personRepository.existsById(readerId));
+        assertTrue(readerRepository.existsById(readerId));
+        assertSingleMinistry(readerId, MinistryType.READER, false);
+        assertEquals(1, countMinistries(readerId, MinistryType.COMMENTATOR));
         assertEquals(0, countOrphanMinistries(readerId));
         assertFalse(getReaders().stream().anyMatch(reader -> reader.id().equals(createdReaderId)));
-        assertEquals(initialReaderIds, legacyReaderIds());
-        assertEquivalentLegacyAndParallelReaderSources();
+        assertFalse(activeReaderIds().contains(readerId));
         } finally {
             cleanupReader(readerId);
         }
@@ -313,6 +322,20 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                MinistryType.READER.name()
+        ));
+    }
+
+    private void reactivateReaderMinistry(Long personId) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?

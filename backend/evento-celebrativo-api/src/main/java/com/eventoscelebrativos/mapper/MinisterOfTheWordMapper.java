@@ -34,5 +34,5 @@ public interface MinisterOfTheWordMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    void updateMinisterOfTheWordFromDto(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO, @MappingTarget MinisterOfTheWord ministerOfTheWord);
+    void updateMinisterOfTheWordFromDto(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO, @MappingTarget Person person);
 }

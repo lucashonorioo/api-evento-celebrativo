@@ -139,15 +139,22 @@ class PriestParallelCutoverConsistencyIntegrationTest {
             assertFalse(getPriests().stream().anyMatch(priest -> priest.id().equals(createdPriestId)));
 
             Thread.sleep(25);
+            // Update no longer reactivates an inactive ministry implicitly (official write authority
+            // treats an inactive PersonMinistry the same as absent for find/update purposes).
             putPriest(priestId, "Priest Cutover Gamma", updatePhoneNumber)
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNotFound());
+            assertSingleMinistry(priestId, MinistryType.PRIEST, false);
 
+            reactivatePriestMinistry(priestId);
             MinistrySnapshot reactivatedMinistry = assertSingleMinistry(priestId, MinistryType.PRIEST, true);
             assertEquals(createdMinistry.id(), reactivatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getPriests(), priestId);
             assertEquivalentLegacyAndParallelPriestSources();
+
+            putPriest(priestId, "Priest Cutover Gamma", updatePhoneNumber)
+                    .andExpect(status().isOk());
 
             addMinistry(priestId, MinistryType.READER);
             putPriest(priestId, "Priest Cutover Delta", updatePhoneNumber)
@@ -164,13 +171,15 @@ class PriestParallelCutoverConsistencyIntegrationTest {
             deletePriest(priestId)
                     .andExpect(status().isNoContent());
 
-            assertFalse(personRepository.existsById(priestId));
-            assertFalse(priestRepository.existsById(priestId));
-            assertEquals(0, countMinistries(priestId));
+            // Person and the other ministry (READER) survive: the delete only removes the
+            // PRIEST association, never the shared Person row.
+            assertTrue(personRepository.existsById(priestId));
+            assertTrue(priestRepository.existsById(priestId));
+            assertSingleMinistry(priestId, MinistryType.PRIEST, false);
+            assertEquals(1, countMinistries(priestId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(priestId));
             assertFalse(getPriests().stream().anyMatch(priest -> priest.id().equals(createdPriestId)));
-            assertEquals(initialPriestIds, legacyPriestIds());
-            assertEquivalentLegacyAndParallelPriestSources();
+            assertFalse(activePriestIds().contains(priestId));
         } finally {
             cleanupPriest(priestId);
         }
@@ -313,6 +322,20 @@ class PriestParallelCutoverConsistencyIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                MinistryType.PRIEST.name()
+        ));
+    }
+
+    private void reactivatePriestMinistry(Long personId) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?
