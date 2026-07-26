@@ -3,21 +3,16 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.CommentatorRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,30 +22,25 @@ import java.util.List;
 @Service
 public class CommentatorServiceImpl implements CommentatorService {
 
-    private final CommentatorRepository commentatorRepository;
-    private final CommentatorMapper commentatorMapper;
+    private static final String ENTITY_LABEL = "Comentarista";
 
+    private final CommentatorMapper commentatorMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
-    private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public CommentatorServiceImpl(
-            CommentatorRepository commentatorRepository,
             CommentatorMapper commentatorMapper,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            PersonMinistryCompatibilityService personMinistryCompatibilityService,
-            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
-        this.commentatorRepository = commentatorRepository;
         this.commentatorMapper = commentatorMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
-        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
-        this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
 
@@ -66,9 +56,8 @@ public class CommentatorServiceImpl implements CommentatorService {
 
         commentator.addRole(operatorRole);
 
-        commentator = commentatorRepository.save(commentator);
-        ensureLegacyMinistry(commentator);
-        return commentatorMapper.toDto(commentator);
+        Person saved = personMinistryCommandService.create(commentator, MinistryType.COMMENTATOR);
+        return commentatorMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -84,8 +73,8 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Commentator commentator = commentatorRepository.findById(id).orElseThrow( () -> new ResourceNotFoundException("Comentarista", id));
-        return commentatorMapper.toDto(commentator);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
+        return commentatorMapper.toDtoFromPerson(person);
     }
 
     @Override
@@ -94,18 +83,12 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        try {
-            Commentator commentator = commentatorRepository.getReferenceById(id);
-            commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, commentator);
-            commentator.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
+        commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, person);
+        person.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
 
-            Commentator commentatorSalvo = commentatorRepository.save(commentator);
-            ensureLegacyMinistry(commentatorSalvo);
-
-            return commentatorMapper.toDto(commentatorSalvo);
-        }catch (EntityNotFoundException e){
-            throw new ResourceNotFoundException("Comentarista", id);
-        }
+        Person saved = personMinistryCommandService.save(person);
+        return commentatorMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -114,21 +97,6 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        if(!commentatorRepository.existsById(id)){
-            throw new ResourceNotFoundException("Comentarista", id);
-        }
-        try {
-            personMinistryCompatibilityService.deleteAllForPerson(id);
-            commentatorRepository.deleteById(id);
-            commentatorRepository.flush();
-        }
-        catch (DataIntegrityViolationException e){
-            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
-        }
-    }
-
-    private void ensureLegacyMinistry(Commentator commentator) {
-        MinistryType ministryType = ministryTypeResolver.resolve(commentator);
-        personMinistryCompatibilityService.ensureMinistry(commentator, ministryType);
+        personMinistryCommandService.removeMinistry(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
     }
 }

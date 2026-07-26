@@ -34,5 +34,5 @@ public interface EucharisticMinisterMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    void updateEucharisticMinisterFromDto(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO, @MappingTarget EucharisticMinister eucharisticMinister);
+    void updateEucharisticMinisterFromDto(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO, @MappingTarget Person person);
 }

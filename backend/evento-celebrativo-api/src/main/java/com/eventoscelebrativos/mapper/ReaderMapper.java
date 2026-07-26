@@ -34,5 +34,5 @@ public interface ReaderMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    void updateReaderFromDto(ReaderRequestDTO readerRequestDTO, @MappingTarget Reader reader);
+    void updateReaderFromDto(ReaderRequestDTO readerRequestDTO, @MappingTarget Person person);
 }

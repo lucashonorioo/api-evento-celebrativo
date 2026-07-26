@@ -1,8 +1,8 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
-import com.eventoscelebrativos.model.MinistryType;
-import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.PersonMinistry;
+import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "spring.jpa.show-sql=false",
@@ -34,14 +33,12 @@ class MinisterOfTheWordWriteThroughRollbackIntegrationTest {
     private PersonRepository personRepository;
 
     @MockitoBean
-    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
+    private PersonMinistryRepository personMinistryRepository;
 
     @Test
-    void shouldRollbackMinisterOfTheWordCreationWhenMinistryWriteThroughFails() {
-        RuntimeException writeThroughFailure = new IllegalStateException("write-through failed");
-        doThrow(writeThroughFailure)
-                .when(personMinistryCompatibilityService)
-                .ensureMinistry(any(Person.class), eq(MinistryType.MINISTER_OF_THE_WORD));
+    void shouldRollbackMinisterOfTheWordCreationWhenMinistryPersistenceFails() {
+        RuntimeException ministryPersistenceFailure = new IllegalStateException("ministry persistence failed");
+        when(personMinistryRepository.save(any(PersonMinistry.class))).thenThrow(ministryPersistenceFailure);
 
         String phoneNumber = uniquePhoneNumber();
         MinisterOfTheWordRequestDTO request = new MinisterOfTheWordRequestDTO(
@@ -54,7 +51,7 @@ class MinisterOfTheWordWriteThroughRollbackIntegrationTest {
         RuntimeException result = assertThrows(RuntimeException.class, () ->
                 ministerOfTheWordService.createMinisterOfTheWord(request));
 
-        assertSame(writeThroughFailure, result);
+        assertSame(ministryPersistenceFailure, result);
         assertFalse(personRepository.findByPhoneNumber(phoneNumber).isPresent());
     }
 

@@ -1,26 +1,18 @@
 package com.eventoscelebrativos.service.impl;
 
-
-
-
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
-import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
+import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,29 +22,23 @@ import java.util.List;
 @Service
 public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
-    private final MinisterOfTheWordRepository ministerOfTheWordRepository;
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final PersonMinistryCompatibilityService personMinistryCompatibilityService;
-    private final MinistryTypeResolver ministryTypeResolver;
+    private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public MinisterOfTheWordServiceImpl(
-            MinisterOfTheWordRepository ministerOfTheWordRepository,
             MinisterOfTheWordMapper ministerOfTheWordMapper,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            PersonMinistryCompatibilityService personMinistryCompatibilityService,
-            MinistryTypeResolver ministryTypeResolver,
+            PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
-        this.ministerOfTheWordRepository = ministerOfTheWordRepository;
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
-        this.personMinistryCompatibilityService = personMinistryCompatibilityService;
-        this.ministryTypeResolver = ministryTypeResolver;
+        this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
 
@@ -62,17 +48,15 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         MinisterOfTheWord ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
 
-        ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWord.getPassword()));
+        ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
 
         Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
                 .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
 
         ministerOfTheWord.addRole(operatorRole);
 
-        ministerOfTheWord = ministerOfTheWordRepository.save(ministerOfTheWord);
-        ensureLegacyMinistry(ministerOfTheWord);
-
-        return ministerOfTheWordMapper.toDto(ministerOfTheWord);
+        Person saved = personMinistryCommandService.create(ministerOfTheWord, MinistryType.MINISTER_OF_THE_WORD);
+        return ministerOfTheWordMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -88,8 +72,8 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Ministro Da Palavra", id));
-        return ministerOfTheWordMapper.toDto(ministerOfTheWord);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro Da Palavra");
+        return ministerOfTheWordMapper.toDtoFromPerson(person);
     }
 
     @Override
@@ -98,18 +82,12 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try {
-            MinisterOfTheWord ministerOfTheWord = ministerOfTheWordRepository.getReferenceById(id);
-            ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, ministerOfTheWord);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
+        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, person);
+        person.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
 
-            ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWord.getPassword()));
-
-            MinisterOfTheWord ministerOfTheWordSalvo = ministerOfTheWordRepository.save(ministerOfTheWord);
-            ensureLegacyMinistry(ministerOfTheWordSalvo);
-            return ministerOfTheWordMapper.toDto(ministerOfTheWordSalvo);
-        }catch (EntityNotFoundException e){
-            throw new ResourceNotFoundException("Ministro da Palavra", id);
-        }
+        Person saved = personMinistryCommandService.save(person);
+        return ministerOfTheWordMapper.toDtoFromPerson(saved);
     }
 
     @Override
@@ -118,21 +96,6 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(!ministerOfTheWordRepository.existsById(id)){
-            throw new ResourceNotFoundException("Ministro da Palavra", id);
-        }
-        try {
-            personMinistryCompatibilityService.deleteAllForPerson(id);
-            ministerOfTheWordRepository.deleteById(id);
-            ministerOfTheWordRepository.flush();
-        }
-        catch (DataIntegrityViolationException e){
-            throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
-        }
-    }
-
-    private void ensureLegacyMinistry(MinisterOfTheWord ministerOfTheWord) {
-        MinistryType ministryType = ministryTypeResolver.resolve(ministerOfTheWord);
-        personMinistryCompatibilityService.ensureMinistry(ministerOfTheWord, ministryType);
+        personMinistryCommandService.removeMinistry(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
     }
 }

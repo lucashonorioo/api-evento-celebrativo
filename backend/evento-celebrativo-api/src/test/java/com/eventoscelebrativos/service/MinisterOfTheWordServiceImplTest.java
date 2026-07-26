@@ -11,19 +11,14 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.MinisterOfTheWordRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.MinisterOfTheWordServiceImpl;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -37,9 +32,8 @@ import static org.mockito.Mockito.*;
 class MinisterOfTheWordServiceImplTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1993, 4, 13);
-
-    @Mock
-    private MinisterOfTheWordRepository repository;
+    private static final String FIND_ENTITY_LABEL = "Ministro Da Palavra";
+    private static final String MUTATION_ENTITY_LABEL = "Ministro da Palavra";
 
     @Mock
     private MinisterOfTheWordMapper mapper;
@@ -51,10 +45,7 @@ class MinisterOfTheWordServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
-
-    @Mock
-    private MinistryTypeResolver ministryTypeResolver;
+    private PersonMinistryCommandService personMinistryCommandService;
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
@@ -73,18 +64,16 @@ class MinisterOfTheWordServiceImplTest {
         when(mapper.toEntity(request)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(repository.save(any(MinisterOfTheWord.class))).thenReturn(saved);
-        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.MINISTER_OF_THE_WORD);
-        when(mapper.toDto(saved)).thenReturn(response);
+        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.MINISTER_OF_THE_WORD))).thenReturn(saved);
+        when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.createMinisterOfTheWord(request));
 
-        ArgumentCaptor<MinisterOfTheWord> captor = ArgumentCaptor.forClass(MinisterOfTheWord.class);
-        verify(repository).save(captor.capture());
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
+        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.MINISTER_OF_THE_WORD));
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
-        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.MINISTER_OF_THE_WORD);
     }
 
     @Test
@@ -95,15 +84,15 @@ class MinisterOfTheWordServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.createMinisterOfTheWord(request));
-        verify(repository, never()).save(any());
+        verify(personMinistryCommandService, never()).create(any(), any());
     }
 
     @Test
     void shouldFindMinisterOfTheWordByIdWhenExists() {
         MinisterOfTheWord entity = minister(1L, "encoded-password");
         MinisterOfTheWordResponseDTO response = response(1L);
-        when(repository.findById(1L)).thenReturn(Optional.of(entity));
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.MINISTER_OF_THE_WORD, FIND_ENTITY_LABEL)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
 
         assertSame(response, service.findMinisterOfTheWordById(1L));
     }
@@ -112,7 +101,8 @@ class MinisterOfTheWordServiceImplTest {
     void shouldThrowWhenMinisterOfTheWordIdIsInvalidOrMissing() {
         assertThrows(BusinessException.class, () -> service.findMinisterOfTheWordById(null));
         assertThrows(BusinessException.class, () -> service.findMinisterOfTheWordById(0L));
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.MINISTER_OF_THE_WORD, FIND_ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(FIND_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.findMinisterOfTheWordById(99L));
     }
 
@@ -121,25 +111,15 @@ class MinisterOfTheWordServiceImplTest {
         MinisterOfTheWord entity = minister(1L, "old-password");
         MinisterOfTheWordResponseDTO response = response(1L);
 
-        when(repository.getReferenceById(1L)).thenReturn(entity);
-        doAnswer(invocation -> {
-            MinisterOfTheWord target = invocation.getArgument(1);
-            target.setPassword("raw-password");
-            return null;
-        }).when(mapper).updateMinisterOfTheWordFromDto(any(), eq(entity));
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(repository.save(entity)).thenReturn(entity);
-        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.MINISTER_OF_THE_WORD);
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateMinisterOfTheWord(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
-        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.MINISTER_OF_THE_WORD);
 
-        when(repository.existsById(1L)).thenReturn(true);
         service.deleteMinisterOfTheWord(1L);
-        var inOrder = inOrder(personMinistryCompatibilityService, repository);
-        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
-        inOrder.verify(repository).deleteById(1L);
+        verify(personMinistryCommandService).removeMinistry(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL);
     }
 
     @Test
@@ -162,7 +142,7 @@ class MinisterOfTheWordServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.MINISTER_OF_THE_WORD);
         verify(mapper).toDtoPersonList(people);
-        verifyNoInteractions(repository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -178,7 +158,7 @@ class MinisterOfTheWordServiceImplTest {
 
         assertSame(responses, service.findAllMinistersOfTheWord());
 
-        verifyNoInteractions(repository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -189,22 +169,24 @@ class MinisterOfTheWordServiceImplTest {
                 .thenThrow(officialFailure);
 
         assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllMinistersOfTheWord()));
-        verifyNoInteractions(repository, mapper);
+        verifyNoInteractions(personMinistryCommandService, mapper);
     }
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingMinisterOfTheWord() {
-        when(repository.getReferenceById(99L)).thenThrow(new EntityNotFoundException());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateMinisterOfTheWord(99L, request()));
 
-        when(repository.existsById(99L)).thenReturn(false);
+        doThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L))
+                .when(personMinistryCommandService).removeMinistry(99L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL);
         assertThrows(ResourceNotFoundException.class, () -> service.deleteMinisterOfTheWord(99L));
     }
 
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedMinisterOfTheWord() {
-        when(repository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(personMinistryCommandService).removeMinistry(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL);
 
         assertThrows(DatabaseException.class, () -> service.deleteMinisterOfTheWord(1L));
     }

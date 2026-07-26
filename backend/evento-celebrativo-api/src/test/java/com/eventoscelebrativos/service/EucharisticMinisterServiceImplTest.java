@@ -11,19 +11,14 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.EucharisticMinisterRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.MinistryTypeResolver;
-import com.eventoscelebrativos.service.PersonMinistryCompatibilityService;
 import com.eventoscelebrativos.service.impl.EucharisticMinisterServiceImpl;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
@@ -37,9 +32,8 @@ import static org.mockito.Mockito.*;
 class EucharisticMinisterServiceImplTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1992, 3, 12);
-
-    @Mock
-    private EucharisticMinisterRepository repository;
+    private static final String FIND_ENTITY_LABEL = "Ministro De Eucaristia";
+    private static final String MUTATION_ENTITY_LABEL = "Ministro de Eucaristia";
 
     @Mock
     private EucharisticMinisterMapper mapper;
@@ -51,10 +45,7 @@ class EucharisticMinisterServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private PersonMinistryCompatibilityService personMinistryCompatibilityService;
-
-    @Mock
-    private MinistryTypeResolver ministryTypeResolver;
+    private PersonMinistryCommandService personMinistryCommandService;
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
@@ -73,18 +64,16 @@ class EucharisticMinisterServiceImplTest {
         when(mapper.toEntity(request)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(repository.save(any(EucharisticMinister.class))).thenReturn(saved);
-        when(ministryTypeResolver.resolve(saved)).thenReturn(MinistryType.EUCHARISTIC_MINISTER);
-        when(mapper.toDto(saved)).thenReturn(response);
+        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.EUCHARISTIC_MINISTER))).thenReturn(saved);
+        when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.createEucharisticMinister(request));
 
-        ArgumentCaptor<EucharisticMinister> captor = ArgumentCaptor.forClass(EucharisticMinister.class);
-        verify(repository).save(captor.capture());
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
+        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.EUCHARISTIC_MINISTER));
         assertEquals("encoded-password", captor.getValue().getPassword());
         assertNotEquals("raw-password", captor.getValue().getPassword());
         assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
-        verify(personMinistryCompatibilityService).ensureMinistry(saved, MinistryType.EUCHARISTIC_MINISTER);
     }
 
     @Test
@@ -95,15 +84,15 @@ class EucharisticMinisterServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.createEucharisticMinister(request));
-        verify(repository, never()).save(any());
+        verify(personMinistryCommandService, never()).create(any(), any());
     }
 
     @Test
     void shouldFindEucharisticMinisterByIdWhenExists() {
         EucharisticMinister entity = minister(1L, "encoded-password");
         EucharisticMinisterResponseDTO response = response(1L);
-        when(repository.findById(1L)).thenReturn(Optional.of(entity));
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.EUCHARISTIC_MINISTER, FIND_ENTITY_LABEL)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
 
         assertSame(response, service.findEucharisticMinistersById(1L));
     }
@@ -112,7 +101,8 @@ class EucharisticMinisterServiceImplTest {
     void shouldThrowWhenEucharisticMinisterIdIsInvalidOrMissing() {
         assertThrows(BusinessException.class, () -> service.findEucharisticMinistersById(null));
         assertThrows(BusinessException.class, () -> service.findEucharisticMinistersById(0L));
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.EUCHARISTIC_MINISTER, FIND_ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(FIND_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.findEucharisticMinistersById(99L));
     }
 
@@ -121,20 +111,15 @@ class EucharisticMinisterServiceImplTest {
         EucharisticMinister entity = minister(1L, "old-password");
         EucharisticMinisterResponseDTO response = response(1L);
 
-        when(repository.getReferenceById(1L)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(repository.save(entity)).thenReturn(entity);
-        when(ministryTypeResolver.resolve(entity)).thenReturn(MinistryType.EUCHARISTIC_MINISTER);
-        when(mapper.toDto(entity)).thenReturn(response);
+        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateEucharisticMinisters(1L, request()));
         assertEquals("encoded-password", entity.getPassword());
-        verify(personMinistryCompatibilityService).ensureMinistry(entity, MinistryType.EUCHARISTIC_MINISTER);
 
-        when(repository.existsById(1L)).thenReturn(true);
         service.deleteEucharisticMinisterById(1L);
-        var inOrder = inOrder(personMinistryCompatibilityService, repository);
-        inOrder.verify(personMinistryCompatibilityService).deleteAllForPerson(1L);
-        inOrder.verify(repository).deleteById(1L);
+        verify(personMinistryCommandService).removeMinistry(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL);
     }
 
     @Test
@@ -157,7 +142,7 @@ class EucharisticMinisterServiceImplTest {
 
         verify(personMinistryReadService).findAllActivePeopleByMinistry(MinistryType.EUCHARISTIC_MINISTER);
         verify(mapper).toDtoPersonList(people);
-        verifyNoInteractions(repository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -173,7 +158,7 @@ class EucharisticMinisterServiceImplTest {
 
         assertSame(responses, service.findAllEucharisticMinisters());
 
-        verifyNoInteractions(repository);
+        verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
@@ -184,22 +169,24 @@ class EucharisticMinisterServiceImplTest {
                 .thenThrow(officialFailure);
 
         assertSame(officialFailure, assertThrows(RuntimeException.class, () -> service.findAllEucharisticMinisters()));
-        verifyNoInteractions(repository, mapper);
+        verifyNoInteractions(personMinistryCommandService, mapper);
     }
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingEucharisticMinister() {
-        when(repository.getReferenceById(99L)).thenThrow(new EntityNotFoundException());
+        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL))
+                .thenThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateEucharisticMinisters(99L, request()));
 
-        when(repository.existsById(99L)).thenReturn(false);
+        doThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L))
+                .when(personMinistryCommandService).removeMinistry(99L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL);
         assertThrows(ResourceNotFoundException.class, () -> service.deleteEucharisticMinisterById(99L));
     }
 
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedEucharisticMinister() {
-        when(repository.existsById(1L)).thenReturn(true);
-        doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
+        doThrow(new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros."))
+                .when(personMinistryCommandService).removeMinistry(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL);
 
         assertThrows(DatabaseException.class, () -> service.deleteEucharisticMinisterById(1L));
     }

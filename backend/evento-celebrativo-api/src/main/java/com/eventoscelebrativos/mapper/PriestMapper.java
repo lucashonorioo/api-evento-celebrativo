@@ -34,5 +34,5 @@ public interface PriestMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    void updatePriestFromDto(PriestRequestDTO priestRequestDTO, @MappingTarget Priest priest);
+    void updatePriestFromDto(PriestRequestDTO priestRequestDTO, @MappingTarget Person person);
 }

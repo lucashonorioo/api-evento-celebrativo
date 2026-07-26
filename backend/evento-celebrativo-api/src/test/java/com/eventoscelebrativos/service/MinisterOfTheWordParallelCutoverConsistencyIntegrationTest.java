@@ -139,15 +139,22 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             assertFalse(getMinistersOfTheWord().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
 
             Thread.sleep(25);
+            // Update no longer reactivates an inactive ministry implicitly (official write authority
+            // treats an inactive PersonMinistry the same as absent for find/update purposes).
             putMinisterOfTheWord(ministerId, "Word Minister Cutover Gamma", updatePhoneNumber)
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNotFound());
+            assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, false);
 
+            reactivateMinisterMinistry(ministerId);
             MinistrySnapshot reactivatedMinistry = assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, true);
             assertEquals(createdMinistry.id(), reactivatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getMinistersOfTheWord(), ministerId);
             assertEquivalentLegacyAndParallelMinisterSources();
+
+            putMinisterOfTheWord(ministerId, "Word Minister Cutover Gamma", updatePhoneNumber)
+                    .andExpect(status().isOk());
 
             addMinistry(ministerId, MinistryType.READER);
             putMinisterOfTheWord(ministerId, "Word Minister Cutover Delta", updatePhoneNumber)
@@ -164,13 +171,15 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
             deleteMinisterOfTheWord(ministerId)
                     .andExpect(status().isNoContent());
 
-            assertFalse(personRepository.existsById(ministerId));
-            assertFalse(ministerOfTheWordRepository.existsById(ministerId));
-            assertEquals(0, countMinistries(ministerId));
+            // Person and the other ministry (READER) survive: the delete only removes the
+            // MINISTER_OF_THE_WORD association, never the shared Person row.
+            assertTrue(personRepository.existsById(ministerId));
+            assertTrue(ministerOfTheWordRepository.existsById(ministerId));
+            assertSingleMinistry(ministerId, MinistryType.MINISTER_OF_THE_WORD, false);
+            assertEquals(1, countMinistries(ministerId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(ministerId));
             assertFalse(getMinistersOfTheWord().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
-            assertEquals(initialMinisterIds, legacyMinisterIds());
-            assertEquivalentLegacyAndParallelMinisterSources();
+            assertFalse(activeMinisterIds().contains(ministerId));
         } finally {
             cleanupMinister(ministerId);
         }
@@ -313,6 +322,20 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                MinistryType.MINISTER_OF_THE_WORD.name()
+        ));
+    }
+
+    private void reactivateMinisterMinistry(Long personId) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?

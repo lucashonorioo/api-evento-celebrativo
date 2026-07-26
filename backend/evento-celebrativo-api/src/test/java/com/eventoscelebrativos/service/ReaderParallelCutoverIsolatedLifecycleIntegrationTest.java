@@ -70,9 +70,14 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
             assertFalse(isMinistryActive(readerId, MinistryType.READER));
             assertFalse(containsReader(getReaders(), readerId));
 
+            // Update no longer reactivates an inactive ministry implicitly (official write authority
+            // treats an inactive PersonMinistry the same as absent for find/update purposes).
             putPerson("/leitores/{id}", readerId, "Isolated Reader Reactivated", uniquePhoneNumber())
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNotFound());
+            assertFalse(isMinistryActive(readerId, MinistryType.READER));
+            assertFalse(containsReader(getReaders(), readerId));
 
+            reactivateMinistry(readerId, MinistryType.READER);
             assertEquals(1, countMinistries(readerId, MinistryType.READER));
             assertTrue(isMinistryActive(readerId, MinistryType.READER));
             assertContainsOnce(getReaders(), readerId);
@@ -88,10 +93,12 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
             deletePerson("/leitores/{id}", readerId)
                     .andExpect(status().isNoContent());
 
-            assertEquals(0, countPersonRows(readerId));
-            assertEquals(0, countMinistries(readerId));
+            // Person survives: the delete only removes the READER association, never the
+            // shared Person row (this reader had no other active ministry, but roles remain).
+            assertEquals(1, countPersonRows(readerId));
+            assertEquals(1, countMinistries(readerId));
+            assertFalse(isMinistryActive(readerId, MinistryType.READER));
             assertFalse(containsReader(getReaders(), readerId));
-            readerId = null;
         } finally {
             cleanupPerson(readerId);
             cleanupPerson(commentatorId);
@@ -174,6 +181,20 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
                 """
                 UPDATE tb_person_ministry
                 SET active = FALSE,
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE person_id = ?
+                  AND ministry_type = ?
+                """,
+                personId,
+                ministryType.name()
+        ));
+    }
+
+    private void reactivateMinistry(Long personId, MinistryType ministryType) {
+        assertEquals(1, jdbcTemplate.update(
+                """
+                UPDATE tb_person_ministry
+                SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
                   AND ministry_type = ?
