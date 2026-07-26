@@ -20,6 +20,8 @@ O backend ja possui as estruturas paralelas principais:
 
 Atualizacao posterior a esta auditoria: a auditoria operacional administrativa de `EventAssignment` (`GET /admin/event-assignments/consistency`) foi removida em `refactor/retire-event-assignment-operational-audit`. Em seguida, `refactor/disable-legacy-scale-mirror` desativou a escrita do espelho legado e removeu `ScaleLegacyCompatibilityValidator`: eventos novos nao gravam mais `tb_event_person`, eventos atualizados tem seus vinculos legados daquele evento limpos (sem recriar) na mesma transacao da escrita oficial, e a elegibilidade de escala passou a depender exclusivamente de `PersonMinistry`, sem verificar subtipo Java. Uma pessoa pode ocupar mais de uma funcao no mesmo evento quando possuir os `PersonMinistry` correspondentes (migration `V6` trocou a unicidade de `tb_event_assignment` para `event_id + person_id + assignment_type`). Os detalhes estao no roadmap, secao "Desativacao do espelho legado de escala e liberacao de multiplas funcoes por pessoa".
 
+Atualizacao posterior adicional (`refactor/remove-legacy-event-person-schema`): `tb_event_person` foi removida fisicamente pela migration `V7__remove_legacy_event_person_schema`, apos validar que todo vinculo legado possuia assignment oficial correspondente. `CelebrationEvent.people`/`@ManyToMany`/`@JoinTable(tb_event_person)`, a colecao inversa `Person.celebrationEvent` (`@ManyToMany(mappedBy = "people")`), `CelebrationEventRepository.findByIdWithPeople`, `EventAssignmentConsistencyService`/`EventAssignmentConsistencyServiceImpl`/`EventAssignmentConsistencyReport`/`EventAssignmentConsistencyIssue`/`EventAssignmentConsistencyIssueType` e `LegacyEventAssignmentSnapshotResolver` foram removidos por ficarem sem consumidor de producao ou de teste possivel. `tb_event_assignment` e agora a unica representacao persistente de escala; as secoes 3, 12 e 13 abaixo descrevem o estado anterior a esta remocao e permanecem como registro historico. Os detalhes estao no roadmap, secao "Remocao fisica de tb_event_person (V7)".
+
 Apesar disso, o modelo legado ainda e uma dependencia ativa. A remocao imediata de `tb_event_person`, `person_type` ou subclasses de `Person` nao e segura.
 
 Principais razoes:
@@ -343,9 +345,9 @@ Antes de remover `person_type` e subclasses:
 
 - CRUDs ministeriais ainda criam subclasses e nao uma pessoa com multiplos ministerios diretamente (embora a leitura/escrita de escala ja aceite multiplos `PersonMinistry` na mesma pessoa desde `refactor/disable-legacy-scale-mirror`).
 - `PersonAdminResponseDTO` e frontend admin ainda usam `personType`.
-- `tb_event_person` ainda existe fisicamente e pode conter linhas historicas de eventos nunca atualizados apos o cutover da escrita.
+- ~~`tb_event_person` ainda existe fisicamente e pode conter linhas historicas de eventos nunca atualizados apos o cutover da escrita.~~ Resolvido: removida fisicamente pela migration `V7` em `refactor/remove-legacy-event-person-schema` (ver atualizacao posterior no topo deste documento).
 - `tb_user_account` existe, mas login/roles atuais ainda usam `Person`.
-- Remocao destrutiva de schema ainda nao possui plano de migration/backout.
+- ~~Remocao destrutiva de schema ainda nao possui plano de migration/backout.~~ Resolvido para `tb_event_person` pela `V7`; ainda pendente para a remocao futura de `person_type` e subclasses.
 
 ## 17. Itens nao bloqueadores
 

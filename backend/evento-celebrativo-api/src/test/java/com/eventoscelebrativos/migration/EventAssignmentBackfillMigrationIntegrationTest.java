@@ -76,7 +76,7 @@ class EventAssignmentBackfillMigrationIntegrationTest {
                 secondEventPriestUpdatedAt
         );
 
-        MigrateResult result = migrateAll(dataSource);
+        MigrateResult result = migrateThroughV6(dataSource);
 
         assertEquals(2, result.migrationsExecuted);
         assertSuccessfulMigration(jdbcTemplate, "5");
@@ -141,7 +141,7 @@ class EventAssignmentBackfillMigrationIntegrationTest {
                 existingUpdatedAt
         );
 
-        FlywayException exception = assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        FlywayException exception = assertThrows(FlywayException.class, () -> migrateThroughV6(dataSource));
 
         assertTrue(hasMessageContaining(exception, "invalid_type"));
         assertTrue(hasMessageContaining(exception, "event_id=" + eventId));
@@ -174,7 +174,7 @@ class EventAssignmentBackfillMigrationIntegrationTest {
                 LocalDateTime.of(2026, 3, 1, 8, 30)
         );
 
-        FlywayException exception = assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        FlywayException exception = assertThrows(FlywayException.class, () -> migrateThroughV6(dataSource));
 
         assertTrue(hasMessageContaining(exception, "Assignments sem vinculo correspondente"));
         assertTrue(hasMessageContaining(exception, "event_id=" + extraEventId));
@@ -204,10 +204,13 @@ class EventAssignmentBackfillMigrationIntegrationTest {
                 .migrate();
     }
 
-    private MigrateResult migrateAll(DataSource dataSource) {
+    private MigrateResult migrateThroughV6(DataSource dataSource) {
+        // Historical regression: stops at V6 so tb_event_person is still observable here.
+        // V7's physical removal is validated separately by EventPersonSchemaRemovalMigrationIntegrationTest.
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
+                .target("6")
                 .load()
                 .migrate();
     }

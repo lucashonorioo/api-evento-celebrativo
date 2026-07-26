@@ -81,9 +81,11 @@ class EventAssignmentUniqueConstraintMigrationIntegrationTest {
     }
 
     private MigrateResult migrateAll(DataSource dataSource) {
+        // Historical regression: stops at V6, the migration under test here.
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
+                .target("6")
                 .load()
                 .migrate();
     }

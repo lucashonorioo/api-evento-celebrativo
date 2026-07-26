@@ -82,7 +82,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     @Test
     void shouldKeepBackfilledFixturesReadOnlyAcrossAllEndpoints() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
-        long eventPeopleBefore = count("tb_event_person");
 
         JsonNode parallelScaleDetail = getParallelEventScaleJson(EVENT_SCALE_URL, 2);
         assertScaleDetailContract(parallelScaleDetail);
@@ -97,7 +96,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
             assertEquals(type.name(), parallelMonthly.path("content").get(0).path("assignmentType").asText());
         }
 
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(assignmentsBefore, assignmentRows());
     }
 
@@ -154,7 +152,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         entityManager.flush();
 
         List<Map<String, Object>> assignmentsBeforeGets = assignmentRows();
-        long eventPeopleBeforeGets = count("tb_event_person");
 
         JsonNode scale = getParallelEventScaleJson("/eventos/" + eventId + "/escala", 2);
         assertEquals(priests.get(1).longValue(), scale.path("priest").path("id").asLong());
@@ -175,7 +172,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         assertTrue(sameDateMonthly.path("content").toString().contains(personName(readers.get(2))));
         assertFalse(sameDateMonthly.path("content").toString().contains(personName(readers.get(0))));
 
-        assertEquals(eventPeopleBeforeGets, count("tb_event_person"));
         assertEquals(assignmentsBeforeGets, assignmentRows());
     }
 
@@ -201,7 +197,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         assertPage(fixtureMonthlyUrl(EventScheduleType.EUCHARISTIC_MINISTER, 9, 2, false), 3, 0, 2);
         assertPage("/eventos/escalas?startDate=2030-01-01&endDate=2030-01-31&type=READER&page=0&size=10", 0, 0, 1);
 
-        long eventPeopleBefore = count("tb_event_person");
         Long personId = insertPerson("reader", "Reader Assigned As Eucharistic Minister");
         LocalDate eventDate = LocalDate.now().plusDays(61);
         Long eventId = insertEvent("Parallel Divergent Assignment", eventDate);
@@ -225,25 +220,18 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
                 urlForMonthlyDate(eventDate, EventScheduleType.EUCHARISTIC_MINISTER, 0, 10),
                 2
         ).path("content").toString().contains(personName(personId)));
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
     }
 
     private JsonNode getParallelEventScaleJson(String url, long expectedQueries) throws Exception {
-        JsonNode json = getWithParallelSqlAssertions(() -> getEventScaleJson(url), expectedQueries);
-        assertNoSqlContaining("tb_event_person");
-        return json;
+        return getWithParallelSqlAssertions(() -> getEventScaleJson(url), expectedQueries);
     }
 
     private JsonNode getParallelPublicJson(String url, long expectedQueries) throws Exception {
-        JsonNode json = getWithParallelSqlAssertions(() -> getPublicJson(url), expectedQueries);
-        assertNoSqlContaining("tb_event_person");
-        return json;
+        return getWithParallelSqlAssertions(() -> getPublicJson(url), expectedQueries);
     }
 
     private JsonNode getParallelMonthlyScheduleJson(String url, long expectedQueries) throws Exception {
-        JsonNode json = getWithParallelSqlAssertions(() -> getMonthlyScheduleJson(url), expectedQueries);
-        assertNoSqlContaining("tb_event_person");
-        return json;
+        return getWithParallelSqlAssertions(() -> getMonthlyScheduleJson(url), expectedQueries);
     }
 
     private JsonNode getWithParallelSqlAssertions(SqlCheckedRequest request, long expectedQueries) throws Exception {
@@ -460,11 +448,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private long count(String table) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
-        return count == null ? 0 : count;
-    }
-
     private List<Map<String, Object>> assignmentRows() {
         return jdbcTemplate.queryForList(
                 """
@@ -477,17 +460,6 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
 
     private Statistics statistics() {
         return entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
-    }
-
-    private boolean sqlContains(String text) {
-        String expected = text.toLowerCase();
-        return SqlCapture.statements().stream()
-                .map(String::toLowerCase)
-                .anyMatch(sql -> sql.contains(expected));
-    }
-
-    private void assertNoSqlContaining(String text) {
-        assertFalse(sqlContains(text), String.join("\n", SqlCapture.statements()));
     }
 
     private void assertNoWritesCaptured() {

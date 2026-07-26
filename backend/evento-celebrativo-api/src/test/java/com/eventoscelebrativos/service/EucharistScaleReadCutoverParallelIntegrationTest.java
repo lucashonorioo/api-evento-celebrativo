@@ -67,14 +67,12 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
     @Test
     void shouldUseBackfilledAssignmentsAsOfficialSourceWithoutChangingContractPaginationOrData() throws Exception {
         List<Map<String, Object>> assignmentsBefore = assignmentRows();
-        long eventPeopleBefore = count("tb_event_person");
         Statistics statistics = statistics();
         statistics.clear();
 
         String parallelJson = getPublicJson(FIXTURE_URL);
 
         assertEquals(3L, statistics.getPrepareStatementCount());
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(assignmentsBefore, assignmentRows());
 
         JsonNode root = objectMapper.readTree(parallelJson);
@@ -181,13 +179,11 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
                 personId,
                 EventAssignmentType.EUCHARISTIC_MINISTER.name()
         );
-        long eventPeopleBefore = count("tb_event_person");
         String personName = personName(personId);
 
         String json = getPublicJson(urlForDate(LocalDate.now().plusDays(90)));
 
         assertTrue(objectMapper.readTree(json).path("content").toString().contains(personName));
-        assertEquals(eventPeopleBefore, count("tb_event_person"));
         assertEquals(1, countAssignment(eventId, personId));
     }
 
@@ -310,11 +306,6 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
                 eventId,
                 personId
         );
-        return count == null ? 0 : count;
-    }
-
-    private long count(String table) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
         return count == null ? 0 : count;
     }
 

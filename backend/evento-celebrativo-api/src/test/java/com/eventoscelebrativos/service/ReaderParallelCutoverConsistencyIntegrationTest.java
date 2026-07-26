@@ -429,7 +429,6 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", readerId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", readerId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", readerId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", readerId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", readerId);

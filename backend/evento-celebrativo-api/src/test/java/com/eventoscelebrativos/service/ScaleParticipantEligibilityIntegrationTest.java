@@ -92,7 +92,6 @@ class ScaleParticipantEligibilityIntegrationTest {
                     .andExpect(status().isUnprocessableEntity());
 
             assertEquals(eventsBefore, countAllEvents());
-            assertEquals(0, countRows("tb_event_person", "person_id", priestId));
         } finally {
             cleanupPerson(priestId);
             cleanupLocation(locationId);
@@ -122,7 +121,6 @@ class ScaleParticipantEligibilityIntegrationTest {
                     .andReturn();
 
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
@@ -153,7 +151,6 @@ class ScaleParticipantEligibilityIntegrationTest {
                     .andReturn();
 
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
@@ -207,7 +204,6 @@ class ScaleParticipantEligibilityIntegrationTest {
                     eventRequest("Eligibility Partial Write Mass", locationId, priest.getId(), null, null, null, null)
             ).getEventId();
 
-            int peopleBefore = countRows("tb_event_person", "event_id", eventId);
             int assignmentsBefore = countRows("tb_event_assignment", "event_id", eventId);
 
             Long finalEventId = eventId;
@@ -218,7 +214,6 @@ class ScaleParticipantEligibilityIntegrationTest {
                     scaleRequest(finalLocationId, finalInvalidPriestId, null, null, null, null)
             ));
 
-            assertEquals(peopleBefore, countRows("tb_event_person", "event_id", eventId));
             assertEquals(assignmentsBefore, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
@@ -318,7 +313,6 @@ class ScaleParticipantEligibilityIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_event_location WHERE event_id = ?", eventId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_celebration_event WHERE id = ?", eventId);
     }
 
@@ -327,7 +321,6 @@ class ScaleParticipantEligibilityIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);

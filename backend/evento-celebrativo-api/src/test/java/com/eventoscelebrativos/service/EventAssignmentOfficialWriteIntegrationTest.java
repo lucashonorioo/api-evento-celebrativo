@@ -3,10 +3,7 @@ package com.eventoscelebrativos.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
-import com.eventoscelebrativos.model.Commentator;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.Location;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -34,20 +31,15 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Prova que, apos EventAssignment virar a fonte oficial da escrita de escala, o espelho legado
- * (tb_event_person) permanece consistente com o estado oficial: auditoria sem divergencias,
- * no-op preservando identidade dos assignments, e leitura LEGACY por override ainda semanticamente
- * equivalente a leitura oficial.
+ * Prova que EventAssignment e a fonte oficial da escrita de escala: no-op preservando identidade
+ * dos assignments e atomicidade quando a escrita oficial falha na criacao ou na atualizacao.
  */
 @SpringBootTest(properties = {
         "spring.jpa.show-sql=false",
@@ -86,87 +78,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void shouldNotWriteLegacyMirrorRowsWhenCreatingAndUpdatingScale() throws Exception {
-        Long eventId = null;
-        Long locationId = null;
-        List<Long> personIds = List.of();
-        try {
-            Priest priest = savePriest("No Mirror Priest");
-            Reader reader = saveReader("No Mirror Reader");
-            Commentator commentator = saveCommentator("No Mirror Commentator");
-            MinisterOfTheWord ministerOfTheWord = saveMinisterOfTheWord("No Mirror Word Minister");
-            EucharisticMinister eucharisticMinister = saveEucharisticMinister("No Mirror Eucharistic Minister");
-            personIds = List.of(priest.getId(), reader.getId(), commentator.getId(), ministerOfTheWord.getId(), eucharisticMinister.getId());
-            Location location = locationRepository.saveAndFlush(location("No Mirror Church"));
-            locationId = location.getId();
-
-            MvcResult result = mockMvc.perform(post("/eventos/com-escala")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(eventRequest(
-                                    "No Mirror Mass", locationId, priest.getId(),
-                                    List.of(reader.getId()), List.of(commentator.getId()),
-                                    List.of(ministerOfTheWord.getId()), List.of(eucharisticMinister.getId())
-                            ))))
-                    .andExpect(status().isCreated())
-                    .andReturn();
-            eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
-
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
-            assertEquals(5, countRows("tb_event_assignment", "event_id", eventId));
-
-            Long finalEventId = eventId;
-            mockMvc.perform(put("/eventos/{id}/escala", finalEventId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(scaleRequest(
-                                    locationId, priest.getId(), List.of(reader.getId()), null, null, null
-                            ))))
-                    .andExpect(status().isOk());
-
-            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
-            assertEquals(2, countRows("tb_event_assignment", "event_id", eventId));
-        } finally {
-            cleanupEvent(eventId);
-            personIds.forEach(this::cleanupPerson);
-            cleanupLocation(locationId);
-        }
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void shouldClearOnlyThatEventLegacyMirrorRowsWhenUpdatingScale() throws Exception {
-        Long firstEventId = null;
-        Long secondEventId = null;
-        Long locationId = null;
-        Long readerId = null;
-        try {
-            Reader reader = saveReader("Scoped Mirror Reader");
-            readerId = reader.getId();
-            Location location = locationRepository.saveAndFlush(location("Scoped Mirror Church"));
-            locationId = location.getId();
-
-            firstEventId = insertLegacyEventWithMirrorRow("Scoped Mirror First Mass", locationId, readerId);
-            secondEventId = insertLegacyEventWithMirrorRow("Scoped Mirror Second Mass", locationId, readerId);
-
-            Long finalFirstEventId = firstEventId;
-            mockMvc.perform(put("/eventos/{id}/escala", finalFirstEventId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(scaleRequest(
-                                    locationId, null, List.of(readerId), null, null, null
-                            ))))
-                    .andExpect(status().isOk());
-
-            assertEquals(0, countRows("tb_event_person", "event_id", firstEventId));
-            assertEquals(1, countRows("tb_event_person", "event_id", secondEventId));
-        } finally {
-            cleanupEvent(firstEventId);
-            cleanupEvent(secondEventId);
-            cleanupPerson(readerId);
-            cleanupLocation(locationId);
-        }
-    }
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -214,7 +125,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
     }
 
     @Test
-    void shouldRollbackEventAndLegacyMirrorCleanupWhenOfficialAssignmentWriteFailsOnCreate() {
+    void shouldRollbackEventWhenOfficialAssignmentWriteFailsOnCreate() {
         Long priestId = null;
         Long locationId = null;
         try {
@@ -236,7 +147,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
             assertSame(failure, result);
             assertEquals(eventsBefore, countAllEvents());
             assertEquals(0, countRows("tb_event_assignment", "person_id", priestId));
-            assertEquals(0, countRows("tb_event_person", "person_id", priestId));
         } finally {
             cleanupPerson(priestId);
             cleanupLocation(locationId);
@@ -245,7 +155,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldRollbackAssignmentsAndLegacyMirrorCleanupWhenOfficialAssignmentWriteFailsOnUpdate() throws Exception {
+    void shouldRollbackAssignmentsWhenOfficialAssignmentWriteFailsOnUpdate() throws Exception {
         Long eventId = null;
         Long locationId = null;
         Long readerId = null;
@@ -255,10 +165,9 @@ class EventAssignmentOfficialWriteIntegrationTest {
             Location location = locationRepository.saveAndFlush(location("Official Write Failure Update Church"));
             locationId = location.getId();
 
-            eventId = insertLegacyEventWithMirrorRow("Official Write Failure Update Mass", locationId, readerId);
+            eventId = insertEvent("Official Write Failure Update Mass", locationId);
 
             int assignmentsBefore = countRows("tb_event_assignment", "event_id", eventId);
-            int peopleBefore = countRows("tb_event_person", "event_id", eventId);
 
             RuntimeException failure = new IllegalStateException("official assignment write failed");
             doThrow(failure).when(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
@@ -274,7 +183,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
             assertSame(failure, result);
             assertEquals(assignmentsBefore, countRows("tb_event_assignment", "event_id", eventId));
-            assertEquals(peopleBefore, countRows("tb_event_person", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(readerId);
@@ -296,7 +204,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private Long insertLegacyEventWithMirrorRow(String name, Long locationId, Long personId) {
+    private Long insertEvent(String name, Long locationId) {
         String eventName = name + " " + UUID.randomUUID();
         jdbcTemplate.update(
                 """
@@ -317,11 +225,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
                 eventId,
                 locationId
         );
-        jdbcTemplate.update(
-                "INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)",
-                eventId,
-                personId
-        );
         return eventId;
     }
 
@@ -339,30 +242,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
         reader = (Reader) personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         return reader;
-    }
-
-    private Commentator saveCommentator(String name) {
-        Commentator commentator = new Commentator();
-        populatePerson(commentator, name);
-        commentator = (Commentator) personRepository.saveAndFlush(commentator);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(commentator, MinistryType.COMMENTATOR));
-        return commentator;
-    }
-
-    private MinisterOfTheWord saveMinisterOfTheWord(String name) {
-        MinisterOfTheWord minister = new MinisterOfTheWord();
-        populatePerson(minister, name);
-        minister = (MinisterOfTheWord) personRepository.saveAndFlush(minister);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.MINISTER_OF_THE_WORD));
-        return minister;
-    }
-
-    private EucharisticMinister saveEucharisticMinister(String name) {
-        EucharisticMinister minister = new EucharisticMinister();
-        populatePerson(minister, name);
-        minister = (EucharisticMinister) personRepository.saveAndFlush(minister);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.EUCHARISTIC_MINISTER));
-        return minister;
     }
 
     private void populatePerson(Person person, String name) {
@@ -418,7 +297,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_event_location WHERE event_id = ?", eventId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE event_id = ?", eventId);
         jdbcTemplate.update("DELETE FROM tb_celebration_event WHERE id = ?", eventId);
     }
 
@@ -427,7 +305,6 @@ class EventAssignmentOfficialWriteIntegrationTest {
             return;
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_event_person WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);

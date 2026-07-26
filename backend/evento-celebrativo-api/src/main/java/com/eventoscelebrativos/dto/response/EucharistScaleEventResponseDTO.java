@@ -1,8 +1,5 @@
 package com.eventoscelebrativos.dto.response;
 
-import com.eventoscelebrativos.model.CelebrationEvent;
-import com.eventoscelebrativos.model.Person;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -23,14 +20,6 @@ public class EucharistScaleEventResponseDTO {
         this.eventTime = eventTime;
         this.churchName = churchName;
         this.nameMinisters = new ArrayList<>();
-    }
-
-    public EucharistScaleEventResponseDTO(CelebrationEvent celebrationEvent) {
-        nameMassOrEvent = celebrationEvent.getNameMassOrEvent();
-        eventDate = celebrationEvent.getEventDate();
-        eventTime = celebrationEvent.getEventTime();
-        churchName = celebrationEvent.getLocations().get(0).getChurchName();
-        nameMinisters = celebrationEvent.getPeople().stream().filter(p -> "eucharistic_minister".equals(p.getPersonType())).map(Person::getName).toList();
     }
 
     public String getNameMassOrEvent() {
