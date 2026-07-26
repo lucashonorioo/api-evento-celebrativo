@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -74,7 +73,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             String updatePhoneNumber = uniquePhoneNumber();
 
             assertFalse(initialMinisters.stream().anyMatch(minister -> minister.phoneNumber().equals(createPhoneNumber)));
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             MvcResult createResult = postEucharisticMinister("Eucharistic Minister Cutover Alpha", createPhoneNumber)
                     .andExpect(status().isCreated())
@@ -90,7 +88,7 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             assertEquals(BIRTHDAY.toString(), createdMinister.birthdayDate());
             assertJsonContract(createResult);
 
-            assertPersonRow(ministerId, "Eucharistic Minister Cutover Alpha", createPhoneNumber, "eucharistic_minister");
+            assertPersonRow(ministerId, "Eucharistic Minister Cutover Alpha", createPhoneNumber);
             MinistrySnapshot createdMinistry = assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, true);
             assertNotNull(createdMinistry.createdAt());
             assertNotNull(createdMinistry.updatedAt());
@@ -101,7 +99,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             assertEquals(ministryRowsBeforeRead, countAllMinistries());
             assertContainsOnce(ministersAfterCreate, ministerId);
             assertEquals(idsOrderedByActiveEucharisticMinisterMinistry(), ministersAfterCreate.stream().map(PersonPayload::id).toList());
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             MvcResult updateResult = putEucharisticMinister(ministerId, "Eucharistic Minister Cutover Beta", updatePhoneNumber)
                     .andExpect(status().isOk())
@@ -113,7 +110,7 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             assertEquals(updatePhoneNumber, updatedMinister.phoneNumber());
             assertJsonContract(updateResult);
 
-            assertPersonRow(ministerId, "Eucharistic Minister Cutover Beta", updatePhoneNumber, "eucharistic_minister");
+            assertPersonRow(ministerId, "Eucharistic Minister Cutover Beta", updatePhoneNumber);
             MinistrySnapshot updatedMinistry = assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, true);
             assertEquals(createdMinistry.id(), updatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), updatedMinistry.createdAt());
@@ -131,11 +128,10 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
                             && minister.phoneNumber().equals(updatePhoneNumber)));
             assertFalse(ministersAfterUpdate.stream().anyMatch(minister -> minister.phoneNumber().equals(createPhoneNumber)));
             assertEquals(idsOrderedByActiveEucharisticMinisterMinistry(), ministersAfterUpdate.stream().map(PersonPayload::id).toList());
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             deactivateEucharisticMinisterMinistry(ministerId);
             MinistrySnapshot inactiveMinistry = assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, false);
-            assertTrue(legacyMinisterIds().contains(ministerId));
+            assertTrue(personRepository.existsById(ministerId));
             assertFalse(activeMinisterIds().contains(ministerId));
             assertFalse(getEucharisticMinisters().stream().anyMatch(minister -> minister.id().equals(createdMinisterId)));
 
@@ -152,7 +148,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getEucharisticMinisters(), ministerId);
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             putEucharisticMinister(ministerId, "Eucharistic Minister Cutover Gamma", updatePhoneNumber)
                     .andExpect(status().isOk());
@@ -167,7 +162,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             );
             assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, true);
             assertContainsOnce(getEucharisticMinisters(), ministerId);
-            assertEquivalentLegacyAndParallelMinisterSources();
 
             deleteEucharisticMinister(ministerId)
                     .andExpect(status().isNoContent());
@@ -175,7 +169,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // EUCHARISTIC_MINISTER association, never the shared Person row.
             assertTrue(personRepository.existsById(ministerId));
-            assertEquals("eucharistic_minister", personType(ministerId));
             assertSingleMinistry(ministerId, MinistryType.EUCHARISTIC_MINISTER, false);
             assertEquals(1, countMinistries(ministerId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(ministerId));
@@ -272,7 +265,7 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
         assertEquals(1, ministers.stream().filter(minister -> minister.id().equals(ministerId)).count());
     }
 
-    private void assertPersonRow(Long ministerId, String expectedName, String expectedPhoneNumber, String expectedPersonType) {
+    private void assertPersonRow(Long ministerId, String expectedName, String expectedPhoneNumber) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -280,16 +273,13 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
                 WHERE id = ?
                   AND name = ?
                   AND phone_number = ?
-                  AND person_type = ?
                 """,
                 Integer.class,
                 ministerId,
                 expectedName,
-                expectedPhoneNumber,
-                expectedPersonType
+                expectedPhoneNumber
         );
         assertEquals(1, count);
-        assertEquals(expectedPersonType, personType(ministerId));
     }
 
     private MinistrySnapshot assertSingleMinistry(Long personId, MinistryType ministryType, boolean active) {
@@ -357,14 +347,6 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
         ));
     }
 
-    private Set<Long> legacyMinisterIds() {
-        return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "eucharistic_minister"
-        ));
-    }
-
     private Set<Long> activeMinisterIds() {
         return new LinkedHashSet<>(idsOrderedByActiveEucharisticMinisterMinistry());
     }
@@ -384,20 +366,8 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
         );
     }
 
-    private void assertEquivalentLegacyAndParallelMinisterSources() {
-        assertEquals(legacyMinisterIds(), activeMinisterIds());
-    }
-
     private Set<Long> idsFrom(List<PersonPayload> ministers) {
         return new LinkedHashSet<>(ministers.stream().map(PersonPayload::id).toList());
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private List<MinistryType> ministryTypes(Long personId) {

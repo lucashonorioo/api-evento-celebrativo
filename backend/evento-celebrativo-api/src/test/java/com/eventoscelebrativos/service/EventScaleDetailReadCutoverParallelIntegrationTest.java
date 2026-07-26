@@ -2,6 +2,7 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.MinistryType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -85,11 +86,11 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldReadEventCreatedByWriteThroughFromParallelSource() throws Exception {
-        Long priestId = personIdByType("priest");
-        Long readerId = personIdByType("reader");
-        Long commentatorId = personIdByType("commentator");
-        Long ministerOfTheWordId = personIdByType("minister_of_the_word");
-        Long eucharisticMinisterId = personIdByType("eucharistic_minister");
+        Long priestId = personIdByMinistry(MinistryType.PRIEST);
+        Long readerId = personIdByMinistry(MinistryType.READER);
+        Long commentatorId = personIdByMinistry(MinistryType.COMMENTATOR);
+        Long ministerOfTheWordId = personIdByMinistry(MinistryType.MINISTER_OF_THE_WORD);
+        Long eucharisticMinisterId = personIdByMinistry(MinistryType.EUCHARISTIC_MINISTER);
         Long locationId = firstLocationId();
 
         String createdJson = mockMvc.perform(post("/eventos/com-escala")
@@ -133,7 +134,7 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldGroupPersonByAssignmentTypeWhenLegacySubtypeIsDifferent() throws Exception {
-        Long personId = insertPerson("reader", "Parallel Different Subtype Reader");
+        Long personId = insertPerson("Parallel Different Subtype Reader");
         Long eventId = insertEvent("Parallel Different Subtype Mass");
         Long locationId = firstLocationId();
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
@@ -198,11 +199,19 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         return request;
     }
 
-    private Long personIdByType(String personType) {
+    private Long personIdByMinistry(MinistryType ministryType) {
         return jdbcTemplate.queryForObject(
-                "SELECT id FROM tb_person WHERE person_type = ? ORDER BY id LIMIT 1",
+                """
+                SELECT p.id
+                FROM tb_person_ministry pm
+                INNER JOIN tb_person p ON p.id = pm.person_id
+                WHERE pm.ministry_type = ?
+                  AND pm.active = TRUE
+                ORDER BY p.id
+                LIMIT 1
+                """,
                 Long.class,
-                personType
+                ministryType.name()
         );
     }
 
@@ -210,16 +219,15 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_location ORDER BY id LIMIT 1", Long.class);
     }
 
-    private Long insertPerson(String personType, String name) {
+    private Long insertPerson(String name) {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type)
-                VALUES (?, ?, '1990-01-10', 'encoded-password', ?)
+                INSERT INTO tb_person(name, phone_number, birthday_date, password)
+                VALUES (?, ?, '1990-01-10', 'encoded-password')
                 """,
                 name + " " + UUID.randomUUID(),
-                phoneNumber,
-                personType
+                phoneNumber
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_person WHERE phone_number = ?",

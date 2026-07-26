@@ -74,7 +74,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
 
             assertFalse(initialCommentators.stream().anyMatch(commentator ->
                     commentator.phoneNumber().equals(createPhoneNumber)));
-            assertEquivalentLegacyAndParallelCommentatorSources();
 
             MvcResult createResult = postCommentator("Commentator Cutover Alpha", createPhoneNumber)
                     .andExpect(status().isCreated())
@@ -90,7 +89,7 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             assertEquals(BIRTHDAY.toString(), createdCommentator.birthdayDate());
             assertJsonContract(createResult);
 
-            assertPersonRow(commentatorId, "Commentator Cutover Alpha", createPhoneNumber, "commentator");
+            assertPersonRow(commentatorId, "Commentator Cutover Alpha", createPhoneNumber);
             MinistrySnapshot createdMinistry = assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, true);
             assertNotNull(createdMinistry.createdAt());
             assertNotNull(createdMinistry.updatedAt());
@@ -104,7 +103,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
                     idsOrderedByActiveCommentatorMinistry(),
                     commentatorsAfterCreate.stream().map(PersonPayload::id).toList()
             );
-            assertEquivalentLegacyAndParallelCommentatorSources();
 
             MvcResult updateResult = putCommentator(commentatorId, "Commentator Cutover Beta", updatePhoneNumber)
                     .andExpect(status().isOk())
@@ -116,7 +114,7 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             assertEquals(updatePhoneNumber, updatedCommentator.phoneNumber());
             assertJsonContract(updateResult);
 
-            assertPersonRow(commentatorId, "Commentator Cutover Beta", updatePhoneNumber, "commentator");
+            assertPersonRow(commentatorId, "Commentator Cutover Beta", updatePhoneNumber);
             MinistrySnapshot updatedMinistry = assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, true);
             assertEquals(createdMinistry.id(), updatedMinistry.id());
             assertEquals(createdMinistry.createdAt(), updatedMinistry.createdAt());
@@ -134,11 +132,10 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
                     idsOrderedByActiveCommentatorMinistry(),
                     commentatorsAfterUpdate.stream().map(PersonPayload::id).toList()
             );
-            assertEquivalentLegacyAndParallelCommentatorSources();
 
             deactivateCommentatorMinistry(commentatorId);
             MinistrySnapshot inactiveMinistry = assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, false);
-            assertTrue(legacyCommentatorIds().contains(commentatorId));
+            assertTrue(personRepository.existsById(commentatorId));
             assertFalse(activeCommentatorIds().contains(commentatorId));
             assertFalse(getCommentators().stream().anyMatch(commentator -> commentator.id().equals(createdCommentatorId)));
 
@@ -155,7 +152,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             assertEquals(createdMinistry.createdAt(), reactivatedMinistry.createdAt());
             assertNotEquals(inactiveMinistry.updatedAt(), reactivatedMinistry.updatedAt());
             assertContainsOnce(getCommentators(), commentatorId);
-            assertEquivalentLegacyAndParallelCommentatorSources();
 
             putCommentator(commentatorId, "Commentator Cutover Gamma", updatePhoneNumber)
                     .andExpect(status().isOk());
@@ -170,7 +166,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             );
             assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, true);
             assertContainsOnce(getCommentators(), commentatorId);
-            assertEquivalentLegacyAndParallelCommentatorSources();
 
             deleteCommentator(commentatorId)
                     .andExpect(status().isNoContent());
@@ -178,7 +173,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
             // Person and the other ministry (READER) survive: the delete only removes the
             // COMMENTATOR association, never the shared Person row.
             assertTrue(personRepository.existsById(commentatorId));
-            assertEquals("commentator", personType(commentatorId));
             assertSingleMinistry(commentatorId, MinistryType.COMMENTATOR, false);
             assertEquals(1, countMinistries(commentatorId, MinistryType.READER));
             assertEquals(0, countOrphanMinistries(commentatorId));
@@ -279,7 +273,7 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
         assertEquals(1, commentators.stream().filter(commentator -> commentator.id().equals(commentatorId)).count());
     }
 
-    private void assertPersonRow(Long commentatorId, String expectedName, String expectedPhoneNumber, String expectedPersonType) {
+    private void assertPersonRow(Long commentatorId, String expectedName, String expectedPhoneNumber) {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -287,16 +281,13 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
                 WHERE id = ?
                   AND name = ?
                   AND phone_number = ?
-                  AND person_type = ?
                 """,
                 Integer.class,
                 commentatorId,
                 expectedName,
-                expectedPhoneNumber,
-                expectedPersonType
+                expectedPhoneNumber
         );
         assertEquals(1, count);
-        assertEquals(expectedPersonType, personType(commentatorId));
     }
 
     private MinistrySnapshot assertSingleMinistry(Long personId, MinistryType ministryType, boolean active) {
@@ -364,14 +355,6 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
         ));
     }
 
-    private Set<Long> legacyCommentatorIds() {
-        return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "commentator"
-        ));
-    }
-
     private Set<Long> activeCommentatorIds() {
         return new LinkedHashSet<>(idsOrderedByActiveCommentatorMinistry());
     }
@@ -391,20 +374,8 @@ class CommentatorParallelCutoverConsistencyIntegrationTest {
         );
     }
 
-    private void assertEquivalentLegacyAndParallelCommentatorSources() {
-        assertEquals(legacyCommentatorIds(), activeCommentatorIds());
-    }
-
     private Set<Long> idsFrom(List<PersonPayload> commentators) {
         return new LinkedHashSet<>(commentators.stream().map(PersonPayload::id).toList());
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private List<MinistryType> ministryTypes(Long personId) {

@@ -3,7 +3,6 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
@@ -46,7 +45,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     @Override
     @Transactional
     public EucharisticMinisterResponseDTO createEucharisticMinister(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
-        EucharisticMinister eucharisticMinister = eucharisticMinisterMapper.toEntity(eucharisticMinisterRequestDTO);
+        Person eucharisticMinister = eucharisticMinisterMapper.toEntity(eucharisticMinisterRequestDTO);
 
         eucharisticMinister.setPassword(passwordEncoder.encode(eucharisticMinisterRequestDTO.getPassword()));
 

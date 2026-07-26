@@ -5,8 +5,6 @@ import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.service.impl.EventAssignmentReadServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -41,7 +39,7 @@ class EventAssignmentReadServiceImplTest {
     @Test
     void shouldReadIndividualEventAssignmentsAsSnapshots() {
         when(eventAssignmentRepository.findAllByEventIdWithPerson(1L)).thenReturn(List.of(
-                assignment(100L, 1L, person(new Reader(), 10L, "Reader", "reader"), EventAssignmentType.READER)
+                assignment(100L, 1L, person(10L, "Reader"), EventAssignmentType.READER)
         ));
 
         List<EventAssignmentSnapshot> result = service.findAllByEventId(1L);
@@ -82,7 +80,7 @@ class EventAssignmentReadServiceImplTest {
         EventAssignment secondEventAssignment = assignment(
                 200L,
                 2L,
-                person(new Reader(), 20L, "Reader 20", "reader"),
+                person(20L, "Reader 20"),
                 EventAssignmentType.READER
         );
         when(eventAssignmentRepository.findAllByEventIdInWithPerson(List.of(1L, 2L, 3L)))
@@ -111,9 +109,9 @@ class EventAssignmentReadServiceImplTest {
     @Test
     void shouldSortSnapshotsDeterministicallyAndGroupByFunction() {
         when(eventAssignmentRepository.findAllByEventIdWithPerson(1L)).thenReturn(List.of(
-                assignment(102L, 1L, person(new Reader(), 12L, "Bruno", "reader"), EventAssignmentType.READER),
-                assignment(100L, 1L, person(new Priest(), 10L, "Carlos", "priest"), EventAssignmentType.PRIEST),
-                assignment(101L, 1L, person(new Reader(), 11L, "Ana", "reader"), EventAssignmentType.READER)
+                assignment(102L, 1L, person(12L, "Bruno"), EventAssignmentType.READER),
+                assignment(100L, 1L, person(10L, "Carlos"), EventAssignmentType.PRIEST),
+                assignment(101L, 1L, person(11L, "Ana"), EventAssignmentType.READER)
         ));
 
         List<EventAssignmentSnapshot> snapshots = service.findAllByEventId(1L);
@@ -215,11 +213,11 @@ class EventAssignmentReadServiceImplTest {
         return event;
     }
 
-    private <T extends Person> T person(T person, Long personId, String name, String personType) {
+    private Person person(Long personId, String name) {
+        Person person = new Person();
         person.setId(personId);
         person.setName(name);
         person.setPhoneNumber("34976" + String.format("%06d", personId));
-        person.setPersonType(personType);
         return person;
     }
 }

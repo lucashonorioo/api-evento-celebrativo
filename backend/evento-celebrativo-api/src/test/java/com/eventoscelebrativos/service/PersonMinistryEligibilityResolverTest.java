@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
@@ -189,10 +188,10 @@ class PersonMinistryEligibilityResolverTest {
     }
 
     private Person person(Long id) {
-        Reader reader = new Reader();
-        reader.setId(id);
-        reader.setName("Person " + id);
-        return reader;
+        Person person = new Person();
+        person.setId(id);
+        person.setName("Person " + id);
+        return person;
     }
 
     private PersonMinistryRepository.PersonMinistryTypeView view(Long personId, MinistryType ministryType) {

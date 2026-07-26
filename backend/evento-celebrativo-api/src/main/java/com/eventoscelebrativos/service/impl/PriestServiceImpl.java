@@ -5,7 +5,6 @@ import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -48,7 +47,7 @@ public class PriestServiceImpl implements PriestService {
     @Override
     @Transactional
     public PriestResponseDTO createPriest(PriestRequestDTO priestRequestDTO) {
-        Priest priest = priestMapper.toEntity(priestRequestDTO);
+        Person priest = priestMapper.toEntity(priestRequestDTO);
 
         priest.setPassword(passwordEncoder.encode(priestRequestDTO.getPassword()));
 

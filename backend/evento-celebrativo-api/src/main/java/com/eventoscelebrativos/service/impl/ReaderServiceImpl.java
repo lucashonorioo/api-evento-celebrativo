@@ -5,7 +5,6 @@ import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -48,7 +47,7 @@ public class ReaderServiceImpl implements ReaderService {
     @Override
     @Transactional
     public ReaderResponseDTO createReader(ReaderRequestDTO readerRequestDTO) {
-        Reader reader = readerMapper.toEntity(readerRequestDTO);
+        Person reader = readerMapper.toEntity(readerRequestDTO);
 
         reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
 

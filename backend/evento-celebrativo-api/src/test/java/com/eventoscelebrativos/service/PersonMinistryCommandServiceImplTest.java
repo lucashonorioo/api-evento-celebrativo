@@ -3,12 +3,10 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -45,8 +43,8 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldCreatePersonAndMinistryAtomically() {
-        Reader reader = reader(null);
-        Reader saved = reader(1L);
+        Person reader = reader(null);
+        Person saved = reader(1L);
         when(personRepository.save(reader)).thenReturn(saved);
 
         Person result = service.create(reader, MinistryType.READER);
@@ -67,8 +65,8 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldTranslateMinistryConstraintViolationOnCreateToDatabaseException() {
-        Reader reader = reader(null);
-        Reader saved = reader(1L);
+        Person reader = reader(null);
+        Person saved = reader(1L);
         when(personRepository.save(reader)).thenReturn(saved);
         when(personMinistryRepository.save(any(PersonMinistry.class)))
                 .thenThrow(new DataIntegrityViolationException("constraint"));
@@ -78,25 +76,13 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldReturnPersonWhenMinistryIsActive() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.of(ministry));
 
         assertSame(reader, service.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL));
-    }
-
-    @Test
-    void shouldAcceptDivergentLegacySubtypeWhenMinistryIsActive() {
-        Commentator commentatorWithReaderMinistry = new Commentator();
-        commentatorWithReaderMinistry.setId(1L);
-        PersonMinistry readerMinistry = new PersonMinistry(commentatorWithReaderMinistry, MinistryType.READER);
-        when(personRepository.findById(1L)).thenReturn(Optional.of(commentatorWithReaderMinistry));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
-                .thenReturn(Optional.of(readerMinistry));
-
-        assertSame(commentatorWithReaderMinistry, service.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL));
     }
 
     @Test
@@ -109,7 +95,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenMinistryIsAbsent() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.empty());
@@ -120,7 +106,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenMinistryIsInactive() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
         ministry.setActive(false);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
@@ -140,7 +126,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldDelegateSaveToPersonRepository() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         when(personRepository.save(reader)).thenReturn(reader);
 
         assertSame(reader, service.save(reader));
@@ -149,7 +135,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldDeactivateOnlyTheRequestedMinistryWhenNoAssignmentConflictExists() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
@@ -168,7 +154,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldBlockRemovalWhenPersonHasEventAssignmentOfSameType() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
@@ -184,7 +170,7 @@ class PersonMinistryCommandServiceImplTest {
 
     @Test
     void shouldNotBlockRemovalWhenAssignmentIsOfADifferentType() {
-        Reader reader = reader(1L);
+        Person reader = reader(1L);
         PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
@@ -205,8 +191,8 @@ class PersonMinistryCommandServiceImplTest {
         verifyNoInteractions(eventAssignmentRepository);
     }
 
-    private Reader reader(Long id) {
-        Reader reader = new Reader();
+    private Person reader(Long id) {
+        Person reader = new Person();
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");

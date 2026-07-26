@@ -9,7 +9,8 @@ import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
-import com.eventoscelebrativos.model.Reader;
+import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
@@ -29,6 +30,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,6 +51,9 @@ class PersonServiceImplTest {
     @Mock
     private PersonRoleUpdateMapper personRoleUpdateMapper;
 
+    @Mock
+    private PersonMinistryReadService personMinistryReadService;
+
     @InjectMocks
     private PersonServiceImpl service;
 
@@ -60,13 +65,15 @@ class PersonServiceImplTest {
     @Test
     void shouldFindPeopleWithPaginationAndCombinedFilters() {
         PageRequest pageable = PageRequest.of(0, 10);
-        Reader first = person(2L, "Alice", "34911111111", "encoded-password");
-        Reader second = person(1L, "Alice", "34922222222", "encoded-password");
+        Person first = person(2L, "Alice", "34911111111", "encoded-password");
+        Person second = person(1L, "Alice", "34922222222", "encoded-password");
 
-        when(personRepository.findAdminPageIds("Ali", "349", "reader", "ROLE_ADMIN", pageable))
+        when(personRepository.findAdminPageIds("Ali", "349", MinistryType.READER, "ROLE_ADMIN", pageable))
                 .thenReturn(new PageImpl<>(List.of(2L, 1L), pageable, 2));
         when(personRepository.findAllByIdInWithRoles(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(2L, 1L)))
+                .thenReturn(Map.of());
         when(personAdminMapper.toDto(first)).thenReturn(adminResponse(2L, "Alice", "ROLE_ADMIN"));
         when(personAdminMapper.toDto(second)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
@@ -108,8 +115,10 @@ class PersonServiceImplTest {
 
     @Test
     void shouldFindPersonById() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
 
         PersonAdminResponseDTO response = service.findPersonById(1L);
@@ -136,13 +145,15 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdatePersonRoleToAdmin() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(operatorRole());
         Role adminRole = adminRole();
 
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
         when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
@@ -155,9 +166,9 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdatePersonRoleToOperatorWhenAnotherAdministratorExists() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
-        Reader otherAdmin = person(2L, "Admin", "34999999992", "encoded-password");
+        Person otherAdmin = person(2L, "Admin", "34999999992", "encoded-password");
         otherAdmin.addRole(adminRole());
         Role operatorRole = operatorRole();
 
@@ -165,6 +176,8 @@ class PersonServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person, otherAdmin));
         when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_OPERATOR"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_OPERATOR"));
@@ -176,17 +189,19 @@ class PersonServiceImplTest {
 
     @Test
     void shouldNotChangePasswordWhenUpdatingRole() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         Role adminRole = adminRole();
 
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
         when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
 
-        ArgumentCaptor<Reader> captor = ArgumentCaptor.forClass(Reader.class);
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
         verify(personRepository).save(captor.capture());
         assertEquals("encoded-password", captor.getValue().getPassword());
     }
@@ -222,7 +237,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenAllowedRoleDoesNotExistInDatabase() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.empty());
 
@@ -234,7 +249,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldBlockSelfAdminDemotion() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
         authenticateAs("34999999991");
 
@@ -251,13 +266,15 @@ class PersonServiceImplTest {
 
     @Test
     void shouldAllowCurrentUserToKeepAdminRole() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
         authenticateAs("34999999991");
 
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole()));
         when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
@@ -268,7 +285,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldBlockLastAdministratorDemotion() {
-        Reader person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
 
         when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
@@ -288,15 +305,14 @@ class PersonServiceImplTest {
         );
     }
 
-    private Reader person(Long id, String name, String phoneNumber, String password) {
-        Reader reader = new Reader();
-        reader.setId(id);
-        reader.setName(name);
-        reader.setPhoneNumber(phoneNumber);
-        reader.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        reader.setPassword(password);
-        reader.setPersonType("reader");
-        return reader;
+    private Person person(Long id, String name, String phoneNumber, String password) {
+        Person person = new Person();
+        person.setId(id);
+        person.setName(name);
+        person.setPhoneNumber(phoneNumber);
+        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        person.setPassword(password);
+        return person;
     }
 
     private Role adminRole() {

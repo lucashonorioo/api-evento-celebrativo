@@ -2,7 +2,6 @@ package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
-import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -14,9 +13,7 @@ import java.util.List;
 public interface CommentatorMapper {
 
     @Mapping(target = "id", ignore = true)
-    Commentator toEntity(CommentatorRequestDTO commentatorRequestDTO);
-
-    CommentatorResponseDTO toDto(Commentator commentator);
+    Person toEntity(CommentatorRequestDTO commentatorRequestDTO);
 
     default CommentatorResponseDTO toDtoFromPerson(Person person) {
         return new CommentatorResponseDTO(

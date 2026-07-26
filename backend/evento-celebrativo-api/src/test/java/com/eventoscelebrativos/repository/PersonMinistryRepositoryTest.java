@@ -1,8 +1,8 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -31,7 +31,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldSaveAndFindPersonMinistry() {
-        Reader reader = saveReader("Ministry Reader", "34971000001");
+        Person reader = saveReader("Ministry Person", "34971000001");
         PersonMinistry ministry = personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
 
         assertTrue(personMinistryRepository.existsByPersonIdAndMinistryType(reader.getId(), MinistryType.READER));
@@ -43,7 +43,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldListAllMinistriesForPerson() {
-        Reader reader = saveReader("Multi Ministry Reader", "34971000002");
+        Person reader = saveReader("Multi Ministry Person", "34971000002");
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.COMMENTATOR));
         personMinistryRepository.flush();
@@ -59,7 +59,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldEnforceUniquePersonAndMinistryType() {
-        Reader reader = saveReader("Unique Ministry Reader", "34971000003");
+        Person reader = saveReader("Unique Ministry Person", "34971000003");
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
 
         assertThrows(DataIntegrityViolationException.class,
@@ -68,7 +68,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldPersistEnumAsConstraintValue() {
-        Reader reader = saveReader("Enum Ministry Reader", "34971000004");
+        Person reader = saveReader("Enum Ministry Person", "34971000004");
         PersonMinistry ministry = personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.EUCHARISTIC_MINISTER));
 
         String value = jdbcTemplate.queryForObject(
@@ -82,7 +82,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldFillTimestampsWhenSaving() {
-        Reader reader = saveReader("Timestamp Ministry Reader", "34971000005");
+        Person reader = saveReader("Timestamp Ministry Person", "34971000005");
         PersonMinistry ministry = personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
 
         assertNotNull(ministry.getCreatedAt());
@@ -91,7 +91,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldReactivateInactiveMinistryWhenUpdated() {
-        Reader reader = saveReader("Inactive Ministry Reader", "34971000006");
+        Person reader = saveReader("Inactive Ministry Person", "34971000006");
         PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
         ministry.setActive(false);
         ministry = personMinistryRepository.saveAndFlush(ministry);
@@ -104,7 +104,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldDeleteAllMinistriesByPersonId() {
-        Reader reader = saveReader("Delete Ministry Reader", "34971000007");
+        Person reader = saveReader("Delete Ministry Person", "34971000007");
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.COMMENTATOR));
         personMinistryRepository.flush();
@@ -118,21 +118,21 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldNotCascadeDeletePersonWhenDeletingMinistry() {
-        Reader reader = saveReader("Cascade Ministry Reader", "34971000008");
+        Person reader = saveReader("Cascade Ministry Person", "34971000008");
         PersonMinistry ministry = personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
 
         personMinistryRepository.delete(ministry);
         personMinistryRepository.flush();
         entityManager.clear();
 
-        assertNotNull(entityManager.find(Reader.class, reader.getId()));
+        assertNotNull(entityManager.find(Person.class, reader.getId()));
     }
 
     @Test
     void shouldPageDistinctActivePersonIdsByMinistryOrderedByNameAndId() {
-        Reader first = saveReader("000 Ministry Page Same", "34971000101");
-        Reader second = saveReader("000 Ministry Page Same", "34971000102");
-        Reader inactive = saveReader("000 Ministry Page Inactive", "34971000103");
+        Person first = saveReader("000 Ministry Page Same", "34971000101");
+        Person second = saveReader("000 Ministry Page Same", "34971000102");
+        Person inactive = saveReader("000 Ministry Page Inactive", "34971000103");
 
         personMinistryRepository.save(new PersonMinistry(first, MinistryType.READER));
         personMinistryRepository.save(new PersonMinistry(second, MinistryType.READER));
@@ -154,7 +154,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldLoadActiveMinistryTypesByPersonIdsInOneBatchProjection() {
-        Reader reader = saveReader("Batch Active Ministry Reader", "34971000104");
+        Person reader = saveReader("Batch Active Ministry Person", "34971000104");
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
         PersonMinistry inactiveCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
         inactiveCommentator.setActive(false);
@@ -171,7 +171,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldLoadAllMinistryStatusesByPersonIdsInOneBatchProjection() {
-        Reader reader = saveReader("Batch Status Ministry Reader", "34971000105");
+        Person reader = saveReader("Batch Status Ministry Person", "34971000105");
         personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
         PersonMinistry inactiveCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
         inactiveCommentator.setActive(false);
@@ -192,8 +192,8 @@ class PersonMinistryRepositoryTest {
                         && Boolean.FALSE.equals(row.getActive())));
     }
 
-    private Reader saveReader(String name, String phoneNumber) {
-        Reader reader = new Reader();
+    private Person saveReader(String name, String phoneNumber) {
+        Person reader = new Person();
         reader.setName(name);
         reader.setPhoneNumber(phoneNumber);
         reader.setBirthdayDate(LocalDate.of(1990, 1, 10));

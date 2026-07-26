@@ -1,10 +1,8 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -59,23 +57,23 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldUseActiveMinisterOfTheWordMinistryAsOfficialSourceWithoutChangingData() throws Exception {
-        MinisterOfTheWord activeMinister = new MinisterOfTheWord();
+        Person activeMinister = new Person();
         populatePerson(activeMinister, "000 Cutover Active Word Minister");
         Person savedActiveMinister = personRepository.saveAndFlush(activeMinister);
         saveMinistry(savedActiveMinister, MinistryType.MINISTER_OF_THE_WORD, true);
 
-        Reader readerWithMinisterMinistry = new Reader();
+        Person readerWithMinisterMinistry = new Person();
         populatePerson(readerWithMinisterMinistry, "000 Cutover Reader Word Minister");
         Person savedReader = personRepository.saveAndFlush(readerWithMinisterMinistry);
         saveMinistry(savedReader, MinistryType.READER, true);
         saveMinistry(savedReader, MinistryType.MINISTER_OF_THE_WORD, true);
 
-        MinisterOfTheWord inactiveMinister = new MinisterOfTheWord();
+        Person inactiveMinister = new Person();
         populatePerson(inactiveMinister, "000 Cutover Inactive Word Minister");
         Person savedInactiveMinister = personRepository.saveAndFlush(inactiveMinister);
         saveMinistry(savedInactiveMinister, MinistryType.MINISTER_OF_THE_WORD, false);
 
-        MinisterOfTheWord multiMinistryMinister = new MinisterOfTheWord();
+        Person multiMinistryMinister = new Person();
         populatePerson(multiMinistryMinister, "000 Cutover Multi Word Minister");
         Person savedMultiMinistryMinister = personRepository.saveAndFlush(multiMinistryMinister);
         saveMinistry(savedMultiMinistryMinister, MinistryType.MINISTER_OF_THE_WORD, true);
@@ -94,8 +92,6 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
         assertTrue(responseIds.contains(savedMultiMinistryMinister.getId()));
         assertFalse(responseIds.contains(savedInactiveMinister.getId()));
         assertEquals(1, responseIds.stream().filter(savedMultiMinistryMinister.getId()::equals).count());
-        assertFalse(legacyMinisterIds().contains(savedReader.getId()));
-        assertEquals("reader", personType(savedReader.getId()));
         assertEquals(ministryRowsBefore, countPersonMinistryRows());
 
         PersonPayload readerPayload = payload.stream()
@@ -152,22 +148,6 @@ class MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest {
     private int countPersonMinistryRows() {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_person_ministry", Integer.class);
         return count == null ? 0 : count;
-    }
-
-    private List<Long> legacyMinisterIds() {
-        return jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "minister_of_the_word"
-        );
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private String uniquePhoneNumber() {

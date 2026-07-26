@@ -4,7 +4,6 @@ import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
-import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
@@ -47,7 +46,7 @@ public class CommentatorServiceImpl implements CommentatorService {
     @Override
     @Transactional
     public CommentatorResponseDTO createCommentator(CommentatorRequestDTO commentatorRequestDTO) {
-        Commentator commentator = commentatorMapper.toEntity(commentatorRequestDTO);
+        Person commentator = commentatorMapper.toEntity(commentatorRequestDTO);
 
         commentator.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
 

@@ -3,8 +3,6 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -59,23 +57,23 @@ class PriestMinistryReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldUseActivePriestMinistryAsOfficialSourceWithoutChangingData() throws Exception {
-        Priest activePriest = new Priest();
+        Person activePriest = new Person();
         populatePerson(activePriest, "000 Cutover Active Priest");
         Person savedActivePriest = personRepository.saveAndFlush(activePriest);
         saveMinistry(savedActivePriest, MinistryType.PRIEST, true);
 
-        Reader readerWithPriestMinistry = new Reader();
+        Person readerWithPriestMinistry = new Person();
         populatePerson(readerWithPriestMinistry, "000 Cutover Reader Priest");
         Person savedReader = personRepository.saveAndFlush(readerWithPriestMinistry);
         saveMinistry(savedReader, MinistryType.READER, true);
         saveMinistry(savedReader, MinistryType.PRIEST, true);
 
-        Priest inactivePriest = new Priest();
+        Person inactivePriest = new Person();
         populatePerson(inactivePriest, "000 Cutover Inactive Priest");
         Person savedInactivePriest = personRepository.saveAndFlush(inactivePriest);
         saveMinistry(savedInactivePriest, MinistryType.PRIEST, false);
 
-        Priest multiMinistryPriest = new Priest();
+        Person multiMinistryPriest = new Person();
         populatePerson(multiMinistryPriest, "000 Cutover Multi Priest");
         Person savedMultiMinistryPriest = personRepository.saveAndFlush(multiMinistryPriest);
         saveMinistry(savedMultiMinistryPriest, MinistryType.PRIEST, true);
@@ -94,8 +92,6 @@ class PriestMinistryReadCutoverParallelIntegrationTest {
         assertTrue(responseIds.contains(savedMultiMinistryPriest.getId()));
         assertFalse(responseIds.contains(savedInactivePriest.getId()));
         assertEquals(1, responseIds.stream().filter(savedMultiMinistryPriest.getId()::equals).count());
-        assertFalse(legacyPriestIds().contains(savedReader.getId()));
-        assertEquals("reader", personType(savedReader.getId()));
         assertEquals(ministryRowsBefore, countPersonMinistryRows());
 
         PersonPayload readerPayload = payload.stream()
@@ -152,22 +148,6 @@ class PriestMinistryReadCutoverParallelIntegrationTest {
     private int countPersonMinistryRows() {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_person_ministry", Integer.class);
         return count == null ? 0 : count;
-    }
-
-    private List<Long> legacyPriestIds() {
-        return jdbcTemplate.queryForList(
-                "SELECT id FROM tb_person WHERE person_type = ?",
-                Long.class,
-                "priest"
-        );
-    }
-
-    private String personType(Long personId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT person_type FROM tb_person WHERE id = ?",
-                String.class,
-                personId
-        );
     }
 
     private String uniquePhoneNumber() {

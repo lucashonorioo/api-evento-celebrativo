@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.model;
 
 import jakarta.persistence.*;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
@@ -10,9 +11,7 @@ import java.util.*;
 
 @Entity
 @Table(name = "tb_person")
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "person_type", discriminatorType = DiscriminatorType.STRING)
-public abstract class Person implements Serializable, UserDetails {
+public class Person implements Serializable, UserDetails {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -26,10 +25,6 @@ public abstract class Person implements Serializable, UserDetails {
     private LocalDate birthdayDate;
     private String password;
 
-
-    @Column(name = "person_type", insertable = false, updatable = false)
-    private String personType;
-
     @ManyToMany
     @JoinTable(
             name = "tb_person_role",
@@ -39,15 +34,6 @@ public abstract class Person implements Serializable, UserDetails {
 
     public Person(){
 
-    }
-
-    public Person(Long id, String name, String phoneNumber, LocalDate birthdayDate, String password, String personType) {
-        this.id = id;
-        this.name = name;
-        this.phoneNumber = phoneNumber;
-        this.birthdayDate = birthdayDate;
-        this.password = password;
-        this.personType = personType;
     }
 
     @Override
@@ -94,14 +80,6 @@ public abstract class Person implements Serializable, UserDetails {
         this.birthdayDate = birthdayDate;
     }
 
-    public String getPersonType() {
-        return personType;
-    }
-
-    public void setPersonType(String personType) {
-        this.personType = personType;
-    }
-
     public String getPassword() { return password;
     }
 
@@ -122,6 +100,36 @@ public abstract class Person implements Serializable, UserDetails {
             }
         }
         return false;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return roles;
+    }
+
+    @Override
+    public String getUsername() {
+        return getPhoneNumber();
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
     }
 
 }

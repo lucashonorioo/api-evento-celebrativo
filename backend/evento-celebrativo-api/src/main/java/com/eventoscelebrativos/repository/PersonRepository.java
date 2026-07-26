@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.repository;
 
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -31,7 +32,13 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                     FROM Person p
                     WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
                       AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
-                      AND (:personType IS NULL OR p.personType = :personType)
+                      AND (:ministryType IS NULL OR EXISTS (
+                          SELECT pm
+                          FROM PersonMinistry pm
+                          WHERE pm.person = p
+                            AND pm.ministryType = :ministryType
+                            AND pm.active = TRUE
+                      ))
                       AND (:role IS NULL OR EXISTS (
                           SELECT r.id
                           FROM p.roles r
@@ -44,7 +51,13 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                     FROM Person p
                     WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
                       AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
-                      AND (:personType IS NULL OR p.personType = :personType)
+                      AND (:ministryType IS NULL OR EXISTS (
+                          SELECT pm
+                          FROM PersonMinistry pm
+                          WHERE pm.person = p
+                            AND pm.ministryType = :ministryType
+                            AND pm.active = TRUE
+                      ))
                       AND (:role IS NULL OR EXISTS (
                           SELECT r.id
                           FROM p.roles r
@@ -55,7 +68,7 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     Page<Long> findAdminPageIds(
             @Param("name") String name,
             @Param("phoneNumber") String phoneNumber,
-            @Param("personType") String personType,
+            @Param("ministryType") MinistryType ministryType,
             @Param("role") String role,
             Pageable pageable
     );
@@ -65,16 +78,6 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
 
     @Query("SELECT p FROM Person p WHERE p.id IN :ids")
     List<Person> findAllByIdIn(@Param("ids") Collection<Long> ids);
-
-    @Query(
-            value = """
-                    SELECT p.id
-                    FROM Person p
-                    ORDER BY p.name ASC, p.id ASC
-                    """,
-            countQuery = "SELECT COUNT(p.id) FROM Person p"
-    )
-    Page<Long> findPersonIdsForMinistryAudit(Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

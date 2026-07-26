@@ -6,10 +6,8 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
-import com.eventoscelebrativos.model.Commentator;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.ReaderServiceImpl;
@@ -55,9 +53,9 @@ class ReaderServiceImplTest {
     @Test
     void shouldCreateReaderWithEncryptedPasswordAndOperatorRole() {
         ReaderRequestDTO request = request();
-        Reader entity = reader(null, "raw-password");
+        Person entity = reader(null, "raw-password");
         Role operatorRole = new Role(1L, "ROLE_OPERATOR");
-        Reader saved = reader(1L, "encoded-password");
+        Person saved = reader(1L, "encoded-password");
         saved.addRole(operatorRole);
         ReaderResponseDTO response = response(1L);
 
@@ -81,7 +79,7 @@ class ReaderServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenOperatorRoleDoesNotExist() {
         ReaderRequestDTO request = request();
-        Reader entity = reader(null, "raw-password");
+        Person entity = reader(null, "raw-password");
 
         when(readerMapper.toEntity(request)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
@@ -93,7 +91,7 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldFindReaderByIdWhenExists() {
-        Reader reader = reader(1L, "encoded-password");
+        Person reader = reader(1L, "encoded-password");
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(reader);
@@ -121,8 +119,8 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldListReadersUsingPersonMinistryWithoutCallingLegacyRepository() {
-        Reader reader = reader(1L, "encoded-password");
-        Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
+        Person reader = reader(1L, "encoded-password");
+        Person commentatorWithReaderMinistry = commentator(2L, "encoded-password");
         List<Person> people = List.of(reader, commentatorWithReaderMinistry);
         List<ReaderResponseDTO> responses = List.of(response(1L), response(2L));
 
@@ -138,8 +136,8 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldPreserveReadOrderReturnedByPersonMinistryReadService() {
-        Commentator commentatorWithReaderMinistry = commentator(2L, "encoded-password");
-        Reader reader = reader(1L, "encoded-password");
+        Person commentatorWithReaderMinistry = commentator(2L, "encoded-password");
+        Person reader = reader(1L, "encoded-password");
         List<Person> people = List.of(commentatorWithReaderMinistry, reader);
         List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
 
@@ -165,8 +163,8 @@ class ReaderServiceImplTest {
     @Test
     void shouldUpdateReaderWhenExists() {
         ReaderRequestDTO request = request();
-        Reader entity = reader(1L, "old-password");
-        Reader saved = reader(1L, "encoded-password");
+        Person entity = reader(1L, "old-password");
+        Person saved = reader(1L, "encoded-password");
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
@@ -215,8 +213,8 @@ class ReaderServiceImplTest {
         return new ReaderRequestDTO("Reader", "34999999991", BIRTHDAY, "raw-password");
     }
 
-    private Reader reader(Long id, String password) {
-        Reader reader = new Reader();
+    private Person reader(Long id, String password) {
+        Person reader = new Person();
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");
@@ -229,8 +227,8 @@ class ReaderServiceImplTest {
         return new ReaderResponseDTO(id, "Reader", "34999999991", BIRTHDAY);
     }
 
-    private Commentator commentator(Long id, String password) {
-        Commentator commentator = new Commentator();
+    private Person commentator(Long id, String password) {
+        Person commentator = new Person();
         commentator.setId(id);
         commentator.setName("Commentator");
         commentator.setPhoneNumber("34999999992");

@@ -104,7 +104,7 @@ class CelebrationEventRepositoryTest {
 
     @Test
     void shouldUseAssignmentTypeInsteadOfLegacyPersonTypeForParallelEucharistScale() {
-        Long personId = insertPerson("reader", "Reader Serving Eucharist");
+        Long personId = insertPerson("Reader Serving Eucharist");
         Long eventId = insertEvent("Parallel Eucharist By Assignment", LocalDate.of(2026, 3, 8));
         Long locationId = firstLocationId();
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
@@ -198,7 +198,7 @@ class CelebrationEventRepositoryTest {
 
     @Test
     void shouldUseAssignmentTypeInsteadOfLegacyPersonTypeForParallelMonthlySchedule() {
-        Long personId = insertPerson("reader", "Reader Serving As Commentator");
+        Long personId = insertPerson("Reader Serving As Commentator");
         Long eventId = insertEvent("Parallel Monthly By Assignment", LocalDate.of(2026, 3, 10));
         Long locationId = firstLocationId();
         jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
@@ -287,16 +287,15 @@ class CelebrationEventRepositoryTest {
         return type == EventScheduleType.PRIEST ? 2 : 3;
     }
 
-    private Long insertPerson(String personType, String name) {
+    private Long insertPerson(String name) {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date, password, person_type)
-                VALUES (?, ?, '1990-01-10', 'encoded-password', ?)
+                INSERT INTO tb_person(name, phone_number, birthday_date, password)
+                VALUES (?, ?, '1990-01-10', 'encoded-password')
                 """,
                 name + " " + UUID.randomUUID(),
-                phoneNumber,
-                personType
+                phoneNumber
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_person WHERE phone_number = ?",

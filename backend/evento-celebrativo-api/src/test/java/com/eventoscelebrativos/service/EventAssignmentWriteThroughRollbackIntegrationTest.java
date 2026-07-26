@@ -7,8 +7,6 @@ import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -69,7 +67,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
                 .when(eventAssignmentCompatibilityService)
                 .synchronizeAssignments(any(), anyCollection());
         try {
-            Priest priest = savePriest("Assignment Rollback Create Priest");
+            Person priest = savePriest("Assignment Rollback Create Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Rollback Create Church"));
             locationId = location.getId();
@@ -96,9 +94,9 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         Long oldReaderId = null;
         Long newReaderId = null;
         try {
-            Reader oldReader = saveReader("Assignment Rollback Update Old Reader");
+            Person oldReader = saveReader("Assignment Rollback Update Old Person");
             oldReaderId = oldReader.getId();
-            Reader newReader = saveReader("Assignment Rollback Update New Reader");
+            Person newReader = saveReader("Assignment Rollback Update New Person");
             newReaderId = newReader.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Rollback Update Church"));
             locationId = location.getId();
@@ -139,7 +137,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priest = savePriest("Assignment Rollback Delete Priest");
+            Person priest = savePriest("Assignment Rollback Delete Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Assignment Rollback Delete Church"));
             locationId = location.getId();
@@ -165,18 +163,18 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         }
     }
 
-    private Priest savePriest(String name) {
-        Priest priest = new Priest();
+    private Person savePriest(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
-        priest = (Priest) personRepository.saveAndFlush(priest);
+        priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
-    private Reader saveReader(String name) {
-        Reader reader = new Reader();
+    private Person saveReader(String name) {
+        Person reader = new Person();
         populatePerson(reader, name);
-        reader = (Reader) personRepository.saveAndFlush(reader);
+        reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         return reader;
     }

@@ -8,8 +8,6 @@ import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -77,7 +75,7 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priestWithoutMinistry = savePriestWithoutMinistry("Eligibility Missing Ministry Priest");
+            Person priestWithoutMinistry = savePriestWithoutMinistry("Eligibility Missing Ministry Person");
             priestId = priestWithoutMinistry.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Missing Ministry Church"));
             locationId = location.getId();
@@ -105,7 +103,7 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long personId = null;
         Long eventId = null;
         try {
-            Reader readerWithPriestMinistry = saveReaderWithExtraMinistry("Eligibility Divergent Type Reader", MinistryType.PRIEST);
+            Person readerWithPriestMinistry = saveReaderWithExtraMinistry("Eligibility Divergent Type Person", MinistryType.PRIEST);
             personId = readerWithPriestMinistry.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Divergent Type Church"));
             locationId = location.getId();
@@ -136,7 +134,7 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long priestId = null;
         Long eventId = null;
         try {
-            Priest priest = savePriestWithMinistry("Eligibility Valid Priest");
+            Person priest = savePriestWithMinistry("Eligibility Valid Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Valid Church"));
             locationId = location.getId();
@@ -165,7 +163,7 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long locationId = null;
         Long priestId = null;
         try {
-            Priest priest = savePriestWithMinistry("Eligibility Cross Role Priest");
+            Person priest = savePriestWithMinistry("Eligibility Cross Role Person");
             priestId = priest.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Cross Role Church"));
             locationId = location.getId();
@@ -193,9 +191,9 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long priestId = null;
         Long invalidPriestId = null;
         try {
-            Priest priest = savePriestWithMinistry("Eligibility Partial Write Priest");
+            Person priest = savePriestWithMinistry("Eligibility Partial Write Person");
             priestId = priest.getId();
-            Priest priestWithoutMinistry = savePriestWithoutMinistry("Eligibility Partial Write Invalid Priest");
+            Person priestWithoutMinistry = savePriestWithoutMinistry("Eligibility Partial Write Invalid Person");
             invalidPriestId = priestWithoutMinistry.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Partial Write Church"));
             locationId = location.getId();
@@ -223,24 +221,24 @@ class ScaleParticipantEligibilityIntegrationTest {
         }
     }
 
-    private Priest savePriestWithMinistry(String name) {
-        Priest priest = new Priest();
+    private Person savePriestWithMinistry(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
-        priest = (Priest) personRepository.saveAndFlush(priest);
+        priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
-    private Priest savePriestWithoutMinistry(String name) {
-        Priest priest = new Priest();
+    private Person savePriestWithoutMinistry(String name) {
+        Person priest = new Person();
         populatePerson(priest, name);
-        return (Priest) personRepository.saveAndFlush(priest);
+        return personRepository.saveAndFlush(priest);
     }
 
-    private Reader saveReaderWithExtraMinistry(String name, MinistryType extraMinistry) {
-        Reader reader = new Reader();
+    private Person saveReaderWithExtraMinistry(String name, MinistryType extraMinistry) {
+        Person reader = new Person();
         populatePerson(reader, name);
-        reader = (Reader) personRepository.saveAndFlush(reader);
+        reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, extraMinistry));
         return reader;
