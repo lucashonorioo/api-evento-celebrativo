@@ -18,14 +18,14 @@ O backend ja possui as estruturas paralelas principais:
 - cutovers configuraveis;
 - frontend administrativo para auditoria de assignments (sem endpoint correspondente desde a remocao da auditoria operacional em `refactor/retire-event-assignment-operational-audit`).
 
-Atualizacao posterior a esta auditoria: a auditoria operacional administrativa de `EventAssignment` (`GET /admin/event-assignments/consistency`) foi removida nesta branch. Os detalhes dessa remocao estao documentados no roadmap, secao "Remocao da auditoria operacional temporaria de EventAssignment".
+Atualizacao posterior a esta auditoria: a auditoria operacional administrativa de `EventAssignment` (`GET /admin/event-assignments/consistency`) foi removida em `refactor/retire-event-assignment-operational-audit`. Em seguida, `refactor/disable-legacy-scale-mirror` desativou a escrita do espelho legado e removeu `ScaleLegacyCompatibilityValidator`: eventos novos nao gravam mais `tb_event_person`, eventos atualizados tem seus vinculos legados daquele evento limpos (sem recriar) na mesma transacao da escrita oficial, e a elegibilidade de escala passou a depender exclusivamente de `PersonMinistry`, sem verificar subtipo Java. Uma pessoa pode ocupar mais de uma funcao no mesmo evento quando possuir os `PersonMinistry` correspondentes (migration `V6` trocou a unicidade de `tb_event_assignment` para `event_id + person_id + assignment_type`). Os detalhes estao no roadmap, secao "Desativacao do espelho legado de escala e liberacao de multiplas funcoes por pessoa".
 
 Apesar disso, o modelo legado ainda e uma dependencia ativa. A remocao imediata de `tb_event_person`, `person_type` ou subclasses de `Person` nao e segura.
 
 Principais razoes:
 
-- os fluxos de escrita de escala ainda montam `CelebrationEvent.people` e persistem `tb_event_person` antes de sincronizar `tb_event_assignment`;
-- a validacao de escala ainda exige subtipo Java (`Priest.class`, `Reader.class`, etc.), nao `PersonMinistry`;
+- `tb_event_person` ainda existe fisicamente e ainda pode conter linhas historicas de eventos legados nunca tocados por escrita apos o cutover; nenhuma limpeza global foi executada;
+- a validacao de escala nao depende mais de subtipo Java, mas os CRUDs ministeriais ainda criam subclasses concretas e a leitura de pessoas administrativa ainda expõe `person_type`;
 - os CRUDs ministeriais ainda criam subclasses concretas (`Reader`, `Commentator`, `Priest`, `MinisterOfTheWord`, `EucharisticMinister`);
 - a administracao de usuarios expõe e filtra `personType` no contrato HTTP consumido pelo frontend;
 - as leituras `LEGACY`, shadow read, auditorias e testes de rollback ainda dependem do legado;
@@ -73,10 +73,10 @@ Observacao: a frase operacional "todos os profiles usando `PARALLEL`" e verdadei
 
 | Arquivo | Metodo/trecho | Endpoint/fluxo | Leitura/escrita | Executado normalmente? | Somente rollback? | Pode remover agora? | Dependencia anterior |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `src/main/java/com/eventoscelebrativos/model/CelebrationEvent.java` | `people` com `@JoinTable(name = "tb_event_person")` | criacao/atualizacao de escala, exclusao de evento, mappers de escrita | leitura e escrita | Sim, em escrita de escala | Nao | Nao | Migrar escrita oficial para `EventAssignment`. |
-| `CelebrationEventServiceImpl.applyScaleToEvent` | `celebrationEvent.getPeople().clear/addAll` | `POST /eventos/com-escala`, `PUT /eventos/{id}/escala` | escrita | Sim | Nao | Nao | Novo fluxo que grave assignments como fonte primaria. |
-| `CelebrationEventServiceImpl.synchronizeAssignments` | resolve `event.getPeople()` para sincronizar assignments | write-through de escala | leitura do legado + escrita paralela | Sim | Nao | Nao | Resolver targets a partir do request ou de `EventAssignment`. |
-| `CelebrationEventScaleMapper` | agrupa `celebrationEvent.getPeople()` por subtipo | response de escrita de escala | leitura em memoria | Sim, nas respostas de POST/PUT escala | Nao | Nao | Mapper baseado em assignments ou DTO montado sem `people`. |
+| `src/main/java/com/eventoscelebrativos/model/CelebrationEvent.java` | `people` com `@JoinTable(name = "tb_event_person")` | mapeamento JPA preservado, sem uso funcional na escrita/leitura de escala desde `refactor/disable-legacy-scale-mirror` | mapeamento sem uso funcional | Nao mais | Nao | Nao, mapeamento fica ate migration destrutiva | Remover o mapeamento na migration destrutiva final. |
+| `CelebrationEventServiceImpl.updateEventScale` | `celebrationEvent.getPeople().clear()` (sem `addAll`), na mesma transacao da escrita oficial | `PUT /eventos/{id}/escala` | escrita (limpeza apenas) | Sim, so no update | Nao | Nao | Remocao fisica de `tb_event_person` e do metodo `clear()`. |
+| `CelebrationEventServiceImpl.createEventWithScale` | nenhuma escrita em `tb_event_person` | `POST /eventos/com-escala` | n/a | Nao, desde `refactor/disable-legacy-scale-mirror` | Nao | Ja concluido | Nenhuma; eventos novos nunca gravam o legado. |
+| `CelebrationEventScaleMapper` | agrupa `EventScaleAssignmentPlan.entries()` por `EventAssignmentType` | response de escrita de escala | leitura em memoria do plano, sem `people` | Sim, nas respostas de POST/PUT escala | Nao | Ja concluido | Nenhuma; mapper ja usa assignments, nao `people`. |
 | `CelebrationEventServiceImpl.findScaleByEventIdLegacy` | `findByIdWithPeople`, `peopleByType` | `GET /eventos/{id}/escala` em `LEGACY` | leitura | Nao no default, sim em rollback | Sim | Nao | Encerrar rollback do detalhe de escala. |
 | `CelebrationEventServiceImpl.findEventById` | `findByIdWithPeople` para shadow read opcional | `GET /eventos/{id}` | leitura | Sim quando shadow read do detalhe geral estiver habilitado | Nao | Nao | Decidir se detalhe geral tera contrato de participants ou remover shadow read. |
 | `CelebrationEventRepository.findByIdWithPeople` | `LEFT JOIN FETCH ce.people` | detalhe legado e shadow read | leitura | Sim em shadow/local e rollback | Parcial | Nao | Remover shadow/read legacy dependente de people. |
@@ -173,10 +173,10 @@ Auditorias:
 | Atualizacao de pessoa ministerial | Atualiza subclasse e senha | `ensureMinistry` garante vinculo | legado primeiro; mesma transacao | repository de subtipo | Transacao reverte atualizacao | Nao chega ao paralelo | Baixo | testes por service/write-through | Sim. |
 | Exclusao de pessoa ministerial | Delete por repository de subtipo | `deleteAllForPerson` antes do delete | paralelo primeiro, depois legado; mesma transacao | FK/constraint do legado | Transacao falha antes do delete | Transacao reverte delete de ministries | Baixo | testes de conflito/exclusao | Sim. |
 | Criacao de evento simples | `tb_celebration_event` | nenhum assignment | apenas legado | DTO de evento | n/a | falha aborta | n/a | controller/service tests | n/a. |
-| Criacao de evento com escala | `CelebrationEvent.people` grava `tb_event_person` | `synchronizeAssignments` grava `tb_event_assignment` | legado primeiro; mesma transacao | subtipo Java por campo do DTO | Transacao reverte evento e `tb_event_person` | Nao sincroniza paralelo | Baixo, dependente da transacao | `EventAssignmentLegacyCompatibilityIntegrationTest`, cutovers | Rollback de leitura sim. |
-| Atualizacao de escala | Limpa/regrava `people` e local | sincroniza assignments: cria, atualiza tipo, remove extras | legado primeiro; mesma transacao | subtipo Java por ID | Transacao reverte escala | Nao sincroniza paralelo | Baixo | `EventAssignmentWriteThroughRollbackIntegrationTest` | Sim. |
-| Remocao de participante | Remove de `people` | delete assignment correspondente | mesma transacao via synchronize | request de escala | rollback total | rollback total | Baixo | write-through tests | Sim. |
-| Troca de padre | troca `Priest` em `people` | remove/cria/atualiza assignment `PRIEST` | mesma transacao | `Priest.class` | rollback total | rollback total | Baixo | cutover/write-through tests | Sim. |
+| Criacao de evento com escala | nenhuma escrita em `tb_event_person` | `synchronizeAssignments` grava `tb_event_assignment` por par `personId+assignmentType` | apenas oficial; `tb_event_person` nunca gravada | `PersonMinistry` via `PersonMinistryEligibilityResolver` | Transacao reverte evento e assignments | n/a, legado nao e mais escrito | Baixo | `EventAssignmentLegacyCompatibilityIntegrationTest`, `ScaleParticipantEligibilityIntegrationTest` | Nenhum, legado nao e mais escrito. |
+| Atualizacao de escala | `celebrationEvent.getPeople().clear()` (sem recriar), so os vinculos daquele evento | sincroniza assignments por par: cria, remove, preserva pares inalterados (troca de tipo = remove par antigo + cria par novo) | oficial e limpeza do legado na mesma transacao | `PersonMinistry` via `PersonMinistryEligibilityResolver` | Transacao reverte escala e a limpeza do espelho | n/a, legado nao e mais recriado | Baixo | `EventAssignmentWriteThroughRollbackIntegrationTest`, `EventAssignmentOfficialWriteIntegrationTest` | Sim, `tb_event_person` permanece com os vinculos historicos ate a atualizacao. |
+| Remocao de participante | vinculo em `tb_event_person` some apenas se o evento for atualizado (clear geral, nao seletivo) | delete do par `personId+assignmentType` correspondente | mesma transacao via synchronize | request de escala | rollback total | rollback total | Baixo | write-through tests | Sim. |
+| Troca de padre | vinculo antigo some apenas se o evento for atualizado | remove par `PRIEST` antigo, cria par `PRIEST` novo | mesma transacao | `PersonMinistry.PRIEST` | rollback total | rollback total | Baixo | cutover/write-through tests | Sim. |
 | Exclusao de evento | `deleteById` remove evento e join table por JPA/FK | `deleteAllForEvent` antes de excluir evento | paralelo primeiro; mesma transacao | `existsById` + FK | aborta antes de excluir evento | reverte delete de assignments | Baixo | compatibility tests | Sim. |
 | Atualizacao de roles | `tb_person_role` | nenhum modelo novo de account | legado | regras administrativas | n/a | falha aborta | n/a | `PersonServiceImplTest`, HTTP/security | n/a. |
 
@@ -247,7 +247,7 @@ Recomendacao profissional:
 | --- | --- | --- | --- |
 | Reforcar constraints de `tb_person_ministry` | garantir FK/unique/indices definitivos e talvez historico de inativacao | API de ministerios estabilizada | Medio. |
 | Indices compostos em `tb_event_assignment` | otimizar filtros por `assignment_type`, periodo via join e event_id | volume real observado | Baixo/medio. |
-| Nova fonte oficial de escrita de escala | talvez constraints para permitir ou negar multipla funcao por pessoa/evento | decisao de dominio | Alto se contrato mudar. |
+| ~~Nova fonte oficial de escrita de escala~~ | Concluido: `V6__allow_multiple_event_assignments_per_person` trocou a unicidade de `tb_event_assignment` para `event_id + person_id + assignment_type`, permitindo multipla funcao por pessoa/evento | `refactor/disable-legacy-scale-mirror` | Concluido, sem mudanca de contrato HTTP. |
 | Remover FKs/joins legados | eliminar `tb_event_person` | rollback encerrado, auditoria concluida, frontend compativel | Alto/destrutivo. |
 | Remover `person_type` | trocar heranca por `Person` concreto + ministries | API unificada e auth desacoplada | Alto/destrutivo. |
 | Remover tabelas/colunas de compatibilidade | limpar `tb_event_person`, discriminator e talvez services legacy | periodo de estabilidade | Alto. |
@@ -341,11 +341,9 @@ Antes de remover `person_type` e subclasses:
 
 ## 16. Itens bloqueadores
 
-- Escala ainda valida funcao por subtipo Java, nao por `PersonMinistry`.
-- CRUDs ministeriais ainda criam subclasses e nao uma pessoa com multiplos ministerios.
+- CRUDs ministeriais ainda criam subclasses e nao uma pessoa com multiplos ministerios diretamente (embora a leitura/escrita de escala ja aceite multiplos `PersonMinistry` na mesma pessoa desde `refactor/disable-legacy-scale-mirror`).
 - `PersonAdminResponseDTO` e frontend admin ainda usam `personType`.
-- `EventAssignment` ainda e sincronizado a partir de `CelebrationEvent.people` nas escritas.
-- Auditoria operacional de assignments depende do legado como lado de comparacao.
+- `tb_event_person` ainda existe fisicamente e pode conter linhas historicas de eventos nunca atualizados apos o cutover da escrita.
 - `tb_user_account` existe, mas login/roles atuais ainda usam `Person`.
 - Remocao destrutiva de schema ainda nao possui plano de migration/backout.
 

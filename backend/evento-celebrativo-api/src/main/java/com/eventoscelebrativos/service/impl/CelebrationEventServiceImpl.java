@@ -14,16 +14,11 @@ import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
-import com.eventoscelebrativos.model.Commentator;
-import com.eventoscelebrativos.model.EucharisticMinister;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
-import com.eventoscelebrativos.model.MinisterOfTheWord;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Priest;
-import com.eventoscelebrativos.model.Reader;
 import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
@@ -36,9 +31,7 @@ import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
 import com.eventoscelebrativos.service.EventAssignmentGroup;
 import com.eventoscelebrativos.service.EventAssignmentReadService;
 import com.eventoscelebrativos.service.EventScaleAssignmentPlan;
-import com.eventoscelebrativos.service.LegacyScaleMirrorService;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
-import com.eventoscelebrativos.service.ScaleLegacyCompatibilityValidator;
 import com.eventoscelebrativos.service.ScaleParticipantEligibility;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -74,8 +67,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
     private final EventAssignmentReadService eventAssignmentReadService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
-    private final ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator;
-    private final LegacyScaleMirrorService legacyScaleMirrorService;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -85,9 +76,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
             EventAssignmentCompatibilityService eventAssignmentCompatibilityService,
             EventAssignmentReadService eventAssignmentReadService,
-            PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
-            ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator,
-            LegacyScaleMirrorService legacyScaleMirrorService
+            PersonMinistryEligibilityResolver personMinistryEligibilityResolver
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
@@ -97,8 +86,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventAssignmentCompatibilityService = eventAssignmentCompatibilityService;
         this.eventAssignmentReadService = eventAssignmentReadService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
-        this.scaleLegacyCompatibilityValidator = scaleLegacyCompatibilityValidator;
-        this.legacyScaleMirrorService = legacyScaleMirrorService;
     }
 
     @Override
@@ -237,9 +224,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, celebrationEventScaleRequestDTO);
 
         eventAssignmentCompatibilityService.synchronizeAssignments(celebrationEvent, plan.toTargets());
-        legacyScaleMirrorService.synchronizeMirror(celebrationEvent, plan.people());
+        celebrationEvent.getPeople().clear();
 
-        return celebrationEventScaleMapper.toDto(celebrationEvent);
+        return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
     }
 
     @Override
@@ -256,9 +243,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
 
         eventAssignmentCompatibilityService.synchronizeAssignments(savedEvent, plan.toTargets());
-        legacyScaleMirrorService.synchronizeMirror(savedEvent, plan.people());
 
-        return celebrationEventScaleMapper.toDto(savedEvent);
+        return celebrationEventScaleMapper.toDto(savedEvent, plan);
     }
 
     @Override
@@ -308,11 +294,11 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         EventScaleAssignmentPlan.Builder planBuilder = EventScaleAssignmentPlan.builder();
 
-        addOptionalPerson(planBuilder, dto.getPriestId(), MinistryType.PRIEST, Priest.class, "padre", eligibilityByMinistry);
-        addPeople(planBuilder, readerIds, MinistryType.READER, Reader.class, "leitor", eligibilityByMinistry);
-        addPeople(planBuilder, commentatorIds, MinistryType.COMMENTATOR, Commentator.class, "comentarista", eligibilityByMinistry);
-        addPeople(planBuilder, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, MinisterOfTheWord.class, "ministro da Palavra", eligibilityByMinistry);
-        addPeople(planBuilder, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, EucharisticMinister.class, "ministro da Eucaristia", eligibilityByMinistry);
+        addOptionalPerson(planBuilder, dto.getPriestId(), MinistryType.PRIEST, "padre", eligibilityByMinistry);
+        addPeople(planBuilder, readerIds, MinistryType.READER, "leitor", eligibilityByMinistry);
+        addPeople(planBuilder, commentatorIds, MinistryType.COMMENTATOR, "comentarista", eligibilityByMinistry);
+        addPeople(planBuilder, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, "ministro da Palavra", eligibilityByMinistry);
+        addPeople(planBuilder, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, "ministro da Eucaristia", eligibilityByMinistry);
 
         celebrationEvent.getLocations().clear();
         celebrationEvent.getLocations().add(location);
@@ -358,12 +344,11 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventScaleAssignmentPlan.Builder planBuilder,
             List<Long> ids,
             MinistryType ministryType,
-            Class<? extends Person> expectedLegacyType,
             String roleName,
             Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry
     ) {
         for (Long id : ids) {
-            addOptionalPerson(planBuilder, id, ministryType, expectedLegacyType, roleName, eligibilityByMinistry);
+            addOptionalPerson(planBuilder, id, ministryType, roleName, eligibilityByMinistry);
         }
     }
 
@@ -371,7 +356,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventScaleAssignmentPlan.Builder planBuilder,
             Long id,
             MinistryType ministryType,
-            Class<? extends Person> expectedLegacyType,
             String roleName,
             Map<MinistryType, Map<Long, ScaleParticipantEligibility>> eligibilityByMinistry
     ) {
@@ -394,7 +378,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
 
         Person person = eligibility.person();
-        scaleLegacyCompatibilityValidator.validate(person, expectedLegacyType, roleName);
 
         planBuilder.add(person, toAssignmentType(ministryType));
     }

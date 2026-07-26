@@ -121,8 +121,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
 
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
 
-            assertEquals(Set.copyOf(personIds), Set.copyOf(eventPersonIds(eventId)));
-            assertEventAssignmentPeopleMatchEventPeople(eventId);
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertAssignmentType(eventId, priest.getId(), EventAssignmentType.PRIEST);
             assertAssignmentType(eventId, reader.getId(), EventAssignmentType.READER);
             assertAssignmentType(eventId, commentator.getId(), EventAssignmentType.COMMENTATOR);
@@ -209,8 +208,8 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                     newWordMinister.getId(),
                     newEucharisticMinister.getId()
             );
-            assertEquals(expectedPeople, Set.copyOf(eventPersonIds(eventId)));
-            assertEventAssignmentPeopleMatchEventPeople(eventId);
+            assertEquals(expectedPeople, Set.copyOf(eventAssignmentPersonIds(eventId)));
+            assertTrue(eventPersonIds(eventId).isEmpty());
 
             AssignmentSnapshot keptReaderAfter = assignmentSnapshot(eventId, keptReader.getId());
             assertEquals(keptReaderBefore.id(), keptReaderAfter.id());
@@ -278,7 +277,7 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                     )
             );
 
-            assertEventAssignmentPeopleMatchEventPeople(eventId);
+            assertTrue(eventPersonIds(eventId).isEmpty());
             AssignmentSnapshot keptReaderAfter = assignmentSnapshot(eventId, keptReader.getId());
             assertEquals(keptReaderBefore.id(), keptReaderAfter.id());
             assertEquals(keptReaderBefore.createdAt(), keptReaderAfter.createdAt());
@@ -537,10 +536,6 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
                 Long.class,
                 eventId
         );
-    }
-
-    private void assertEventAssignmentPeopleMatchEventPeople(Long eventId) {
-        assertEquals(eventPersonIds(eventId), eventAssignmentPersonIds(eventId));
     }
 
     private void assertAssignmentType(Long eventId, Long personId, EventAssignmentType assignmentType) {

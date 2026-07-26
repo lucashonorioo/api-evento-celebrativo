@@ -35,9 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Prova, de ponta a ponta, que PersonMinistry passou a ser a fonte de elegibilidade das escalas:
- * subtipo legado correto sem PersonMinistry ativo e rejeitado, e PersonMinistry ativo com subtipo
- * legado divergente e rejeitado pela camada de compatibilidade - nunca o inverso.
+ * Prova, de ponta a ponta, que PersonMinistry e a unica fonte de elegibilidade das escalas:
+ * subtipo legado correto sem PersonMinistry ativo e rejeitado, e PersonMinistry ativo e aceito
+ * mesmo com subtipo legado divergente - a compatibilidade legada nao restringe mais a escrita.
  */
 @SpringBootTest(properties = {
         "spring.jpa.show-sql=false",
@@ -101,26 +101,31 @@ class ScaleParticipantEligibilityIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldRejectPersonWithActiveMinistryButDivergentLegacyType() throws Exception {
+    void shouldAcceptPersonWithActiveMinistryEvenWithDivergentLegacyType() throws Exception {
         Long locationId = null;
         Long personId = null;
+        Long eventId = null;
         try {
             Reader readerWithPriestMinistry = saveReaderWithExtraMinistry("Eligibility Divergent Type Reader", MinistryType.PRIEST);
             personId = readerWithPriestMinistry.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Divergent Type Church"));
             locationId = location.getId();
-            long eventsBefore = countAllEvents();
 
-            mockMvc.perform(post("/eventos/com-escala")
+            MvcResult result = mockMvc.perform(post("/eventos/com-escala")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(eventRequest(
                                     "Eligibility Divergent Type Mass", locationId, readerWithPriestMinistry.getId(),
                                     null, null, null, null
                             ))))
-                    .andExpect(status().isUnprocessableEntity());
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.priest.id").value(readerWithPriestMinistry.getId()))
+                    .andReturn();
 
-            assertEquals(eventsBefore, countAllEvents());
+            eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
+            assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
+            cleanupEvent(eventId);
             cleanupPerson(personId);
             cleanupLocation(locationId);
         }
@@ -148,7 +153,7 @@ class ScaleParticipantEligibilityIntegrationTest {
                     .andReturn();
 
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
-            assertEquals(1, countRows("tb_event_person", "event_id", eventId));
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
@@ -159,7 +164,7 @@ class ScaleParticipantEligibilityIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldRejectSamePersonUsedInTwoDifferentRolesEvenWhenFirstRoleIsValid() throws Exception {
+    void shouldRejectSamePersonUsedInTwoRolesWhenOnlyOneMinistryIsActive() throws Exception {
         Long locationId = null;
         Long priestId = null;
         try {

@@ -51,6 +51,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("3");
         assertSuccessfulMigration("4");
         assertSuccessfulMigration("5");
+        assertSuccessfulMigration("6");
         assertTableExists("flyway_schema_history");
 
         for (String table : CURRENT_TABLES) {
@@ -78,7 +79,7 @@ class FlywayMigrationIntegrationTest {
         assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_user_account");
         assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_role");
         assertMainConstraintExists("tb_event_assignment", "pk_tb_event_assignment");
-        assertMainConstraintExists("tb_event_assignment", "uk_tb_event_assignment_event_person");
+        assertMainConstraintExists("tb_event_assignment", "uk_tb_event_assignment_event_person_type");
         assertMainConstraintExists("tb_event_assignment", "chk_tb_event_assignment_type");
         assertMainConstraintExists("tb_event_assignment", "fk_tb_event_assignment_event");
         assertMainConstraintExists("tb_event_assignment", "fk_tb_event_assignment_person");
@@ -89,10 +90,10 @@ class FlywayMigrationIntegrationTest {
         assertEquals(0, countRows("tb_celebration_event"));
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4', '5') AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4', '5', '6') AND success = TRUE",
                 Integer.class
         );
-        assertEquals(5, successfulVersions);
+        assertEquals(6, successfulVersions);
     }
 
     @Test
@@ -108,6 +109,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("3");
         assertSuccessfulMigration("4");
         assertSuccessfulMigration("5");
+        assertSuccessfulMigration("6");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         for (String table : PARALLEL_DOMAIN_TABLES) {

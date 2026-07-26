@@ -53,9 +53,10 @@ class PersonMinistryBackfillMigrationIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(3, result.migrationsExecuted);
         assertSuccessfulMigration(jdbcTemplate, "4");
         assertSuccessfulMigration(jdbcTemplate, "5");
+        assertSuccessfulMigration(jdbcTemplate, "6");
         assertEquals(5, countRows(jdbcTemplate, "tb_person"));
         assertEquals(6, countRows(jdbcTemplate, "tb_person_ministry"));
         assertEquals(0, countRows(jdbcTemplate, "tb_event_assignment"));

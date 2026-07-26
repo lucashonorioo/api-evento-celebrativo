@@ -12,8 +12,9 @@ import java.util.Set;
 /**
  * Estado canonico de uma escala: pares pessoa/EventAssignmentType ja validados por
  * PersonMinistry e pela compatibilidade legada, na ordem em que foram aceitos. E o unico
- * insumo tanto da escrita oficial em tb_event_assignment quanto da derivacao do espelho
- * legado em tb_event_person - nao depende de person_type nem de subclasses de Person.
+ * insumo para validar e persistir a escala oficial em EventAssignment. Permite a mesma
+ * pessoa em tipos de atribuicao diferentes e nao depende de person_type, de subclasses
+ * de Person nem de tb_event_person.
  */
 public final class EventScaleAssignmentPlan {
 
@@ -50,7 +51,7 @@ public final class EventScaleAssignmentPlan {
 
     public static final class Builder {
         private final List<Entry> entries = new ArrayList<>();
-        private final Set<Long> usedPersonIds = new HashSet<>();
+        private final Set<PersonAssignmentTypeKey> usedPairs = new HashSet<>();
 
         private Builder() {
         }
@@ -59,8 +60,8 @@ public final class EventScaleAssignmentPlan {
             if (person == null || person.getId() == null || assignmentType == null) {
                 throw new BusinessException("Pessoa e tipo de atribuição do evento são obrigatórios");
             }
-            if (!usedPersonIds.add(person.getId())) {
-                throw new BusinessException("A mesma pessoa não pode ocupar mais de uma função na mesma escala");
+            if (!usedPairs.add(new PersonAssignmentTypeKey(person.getId(), assignmentType))) {
+                throw new BusinessException("A mesma pessoa não pode ocupar a mesma função duas vezes na mesma escala");
             }
             entries.add(new Entry(person, assignmentType));
             return this;
@@ -69,5 +70,8 @@ public final class EventScaleAssignmentPlan {
         public EventScaleAssignmentPlan build() {
             return new EventScaleAssignmentPlan(entries);
         }
+    }
+
+    private record PersonAssignmentTypeKey(Long personId, EventAssignmentType assignmentType) {
     }
 }

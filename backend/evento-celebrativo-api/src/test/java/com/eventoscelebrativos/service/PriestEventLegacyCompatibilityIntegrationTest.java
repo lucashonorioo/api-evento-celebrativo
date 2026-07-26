@@ -88,27 +88,31 @@ class PriestEventLegacyCompatibilityIntegrationTest {
     }
 
     @Test
-    void shouldRejectNonPriestSubtypeWithAdditionalPriestMinistryForEventScale() {
+    void shouldAcceptNonPriestSubtypeWithAdditionalPriestMinistryForEventScale() {
         Long readerId = null;
         Long locationId = null;
-        String eventName = "Event Reject Additional Priest " + UUID.randomUUID();
+        Long eventId = null;
+        String eventName = "Event Accept Additional Priest " + UUID.randomUUID();
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Priest Ministry"));
             readerId = reader.getId();
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.PRIEST));
-            Location location = locationRepository.saveAndFlush(location("Event Reject Church"));
+            Location location = locationRepository.saveAndFlush(location("Event Accept Church"));
             locationId = location.getId();
 
             Long savedReaderId = readerId;
-            Long savedLocationId = locationId;
-            assertThrows(BusinessException.class, () ->
-                    celebrationEventService.createEventWithScale(eventRequest(eventName, savedLocationId, savedReaderId)));
+            CelebrationEventScaleResponseDTO createdEvent = celebrationEventService.createEventWithScale(
+                    eventRequest(eventName, locationId, savedReaderId)
+            );
+            eventId = createdEvent.getEventId();
 
-            assertEquals(0, countEventsByName(eventName));
+            assertEquals(1, countEventsByName(eventName));
+            assertEquals(savedReaderId, createdEvent.getPriest().getId());
             assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.PRIEST));
         } finally {
+            cleanupEvent(eventId);
             cleanupEventsByName(eventName);
             cleanupPerson(readerId);
             cleanupLocation(locationId);
@@ -138,7 +142,7 @@ class PriestEventLegacyCompatibilityIntegrationTest {
             assertTrue(personRepository.existsById(priestId));
             assertEquals(ministriesBeforeDelete, countMinistries(priestId));
             assertEquals(1, countMinistries(priestId, MinistryType.PRIEST));
-            assertEquals(1, countEventPeople(eventId, priestId));
+            assertEquals(0, countEventPeople(eventId, priestId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(priestId);

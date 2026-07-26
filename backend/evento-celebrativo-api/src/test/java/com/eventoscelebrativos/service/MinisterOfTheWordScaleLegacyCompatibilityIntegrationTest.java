@@ -92,27 +92,33 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
     }
 
     @Test
-    void shouldRejectNonMinisterSubtypeWithAdditionalMinisterOfTheWordMinistryForEventScale() {
+    void shouldAcceptNonMinisterSubtypeWithAdditionalMinisterOfTheWordMinistryForEventScale() {
         Long readerId = null;
         Long locationId = null;
-        String eventName = "Scale Reject Additional Word Minister " + UUID.randomUUID();
+        Long eventId = null;
+        String eventName = "Scale Accept Additional Word Minister " + UUID.randomUUID();
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Word Minister Ministry"));
             readerId = reader.getId();
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.MINISTER_OF_THE_WORD));
-            Location location = locationRepository.saveAndFlush(location("Scale Reject Church"));
+            Location location = locationRepository.saveAndFlush(location("Scale Accept Church"));
             locationId = location.getId();
 
             Long savedReaderId = readerId;
-            Long savedLocationId = locationId;
-            assertThrows(BusinessException.class, () ->
-                    celebrationEventService.createEventWithScale(eventRequest(eventName, savedLocationId, List.of(savedReaderId))));
+            CelebrationEventScaleResponseDTO createdEvent = celebrationEventService.createEventWithScale(
+                    eventRequest(eventName, locationId, List.of(savedReaderId))
+            );
+            eventId = createdEvent.getEventId();
 
-            assertEquals(0, countEventsByName(eventName));
+            assertEquals(1, countEventsByName(eventName));
+            assertEquals(List.of(savedReaderId), createdEvent.getMinistersOfTheWord().stream()
+                    .map(person -> person.getId())
+                    .toList());
             assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.MINISTER_OF_THE_WORD));
         } finally {
+            cleanupEvent(eventId);
             cleanupEventsByName(eventName);
             cleanupPerson(readerId);
             cleanupLocation(locationId);
@@ -142,7 +148,7 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
             assertTrue(personRepository.existsById(ministerId));
             assertEquals(ministriesBeforeDelete, countMinistries(ministerId));
             assertEquals(1, countMinistries(ministerId, MinistryType.MINISTER_OF_THE_WORD));
-            assertEquals(1, countEventPeople(eventId, ministerId));
+            assertEquals(0, countEventPeople(eventId, ministerId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(ministerId);

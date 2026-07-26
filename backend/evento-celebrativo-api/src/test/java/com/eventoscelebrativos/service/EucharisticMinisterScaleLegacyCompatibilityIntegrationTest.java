@@ -125,36 +125,41 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
     }
 
     @Test
-    void shouldRejectNonEucharisticMinisterSubtypeWithAdditionalEucharisticMinisterMinistryForEventScale() {
+    void shouldAcceptNonEucharisticMinisterSubtypeWithAdditionalEucharisticMinisterMinistryForEventScale() {
         Long readerId = null;
         Long locationId = null;
-        String eventName = "Scale Reject Additional Eucharistic Minister " + UUID.randomUUID();
+        Long eventId = null;
+        String eventName = "Scale Accept Additional Eucharistic Minister " + UUID.randomUUID();
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Eucharistic Minister Ministry"));
             readerId = reader.getId();
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
             personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.EUCHARISTIC_MINISTER));
-            Location location = locationRepository.saveAndFlush(location("Scale Reject Eucharistic Church"));
+            Location location = locationRepository.saveAndFlush(location("Scale Accept Eucharistic Church"));
             locationId = location.getId();
 
             Long savedReaderId = readerId;
-            Long savedLocationId = locationId;
             assertTrue(eucharisticMinisterService.findAllEucharisticMinisters().stream()
                     .map(EucharisticMinisterResponseDTO::getId)
                     .toList()
                     .contains(savedReaderId));
-            assertThrows(BusinessException.class, () ->
-                    celebrationEventService.createEventWithScale(eventRequest(
-                            eventName,
-                            LocalDate.now().plusDays(16),
-                            savedLocationId,
-                            List.of(savedReaderId)
-                    )));
 
-            assertEquals(0, countEventsByName(eventName));
+            CelebrationEventScaleResponseDTO createdEvent = celebrationEventService.createEventWithScale(eventRequest(
+                    eventName,
+                    LocalDate.now().plusDays(16),
+                    locationId,
+                    List.of(savedReaderId)
+            ));
+            eventId = createdEvent.getEventId();
+
+            assertEquals(1, countEventsByName(eventName));
+            assertEquals(List.of(savedReaderId), createdEvent.getEucharisticMinisters().stream()
+                    .map(person -> person.getId())
+                    .toList());
             assertEquals("reader", personType(readerId));
             assertEquals(1, countMinistries(readerId, MinistryType.EUCHARISTIC_MINISTER));
         } finally {
+            cleanupEvent(eventId);
             cleanupEventsByName(eventName);
             cleanupPerson(readerId);
             cleanupLocation(locationId);
@@ -184,7 +189,7 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
             assertTrue(personRepository.existsById(ministerId));
             assertEquals(ministriesBeforeDelete, countMinistries(ministerId));
             assertEquals(1, countMinistries(ministerId, MinistryType.EUCHARISTIC_MINISTER));
-            assertEquals(1, countEventPeople(eventId, ministerId));
+            assertEquals(0, countEventPeople(eventId, ministerId));
         } finally {
             cleanupEvent(eventId);
             cleanupPerson(ministerId);
