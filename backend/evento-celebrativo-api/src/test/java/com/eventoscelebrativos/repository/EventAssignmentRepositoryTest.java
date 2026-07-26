@@ -89,14 +89,25 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
-    void shouldEnforceUniqueEventAndPerson() {
+    void shouldAllowSamePersonInDifferentAssignmentTypesForSameEvent() {
+        CelebrationEvent event = saveEvent("Assignment Multi Function Event");
+        Reader reader = saveReader("Assignment Multi Function Reader", "34973000003");
+        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
+
+        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.COMMENTATOR));
+
+        assertEquals(2, eventAssignmentRepository.findAllByEventId(event.getId()).size());
+    }
+
+    @Test
+    void shouldEnforceUniqueEventPersonAndAssignmentType() {
         CelebrationEvent event = saveEvent("Assignment Unique Event");
-        Reader reader = saveReader("Assignment Unique Reader", "34973000003");
+        Reader reader = saveReader("Assignment Unique Reader", "34973000103");
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 eventAssignmentRepository.saveAndFlush(
-                        new EventAssignment(event, reader, EventAssignmentType.COMMENTATOR)
+                        new EventAssignment(event, reader, EventAssignmentType.READER)
                 ));
     }
 

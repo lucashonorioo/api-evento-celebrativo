@@ -78,8 +78,9 @@ class EventAssignmentBackfillMigrationIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(1, result.migrationsExecuted);
+        assertEquals(2, result.migrationsExecuted);
         assertSuccessfulMigration(jdbcTemplate, "5");
+        assertSuccessfulMigration(jdbcTemplate, "6");
         assertEquals(countRows(jdbcTemplate, "tb_event_person"), countRows(jdbcTemplate, "tb_event_assignment"));
         assertAssignmentAuditIsClean(jdbcTemplate);
 

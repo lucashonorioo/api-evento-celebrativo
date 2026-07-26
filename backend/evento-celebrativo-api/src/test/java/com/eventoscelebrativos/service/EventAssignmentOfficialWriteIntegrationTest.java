@@ -12,7 +12,6 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Priest;
 import com.eventoscelebrativos.model.Reader;
-import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -71,16 +70,10 @@ class EventAssignmentOfficialWriteIntegrationTest {
     private CelebrationEventService celebrationEventService;
 
     @Autowired
-    private CelebrationEventRepository celebrationEventRepository;
-
-    @Autowired
     private EventAssignmentReadService eventAssignmentReadService;
 
     @MockitoSpyBean
-    private LegacyScaleMirrorService legacyScaleMirrorService;
-
-    @Autowired
-    private EventAssignmentConsistencyService eventAssignmentConsistencyService;
+    private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
 
     @Autowired
     private PersonRepository personRepository;
@@ -96,24 +89,24 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldReportNoConsistencyIssuesAfterCreatingAndUpdatingScale() throws Exception {
+    void shouldNotWriteLegacyMirrorRowsWhenCreatingAndUpdatingScale() throws Exception {
         Long eventId = null;
         Long locationId = null;
         List<Long> personIds = List.of();
         try {
-            Priest priest = savePriest("Consistency Priest");
-            Reader reader = saveReader("Consistency Reader");
-            Commentator commentator = saveCommentator("Consistency Commentator");
-            MinisterOfTheWord ministerOfTheWord = saveMinisterOfTheWord("Consistency Word Minister");
-            EucharisticMinister eucharisticMinister = saveEucharisticMinister("Consistency Eucharistic Minister");
+            Priest priest = savePriest("No Mirror Priest");
+            Reader reader = saveReader("No Mirror Reader");
+            Commentator commentator = saveCommentator("No Mirror Commentator");
+            MinisterOfTheWord ministerOfTheWord = saveMinisterOfTheWord("No Mirror Word Minister");
+            EucharisticMinister eucharisticMinister = saveEucharisticMinister("No Mirror Eucharistic Minister");
             personIds = List.of(priest.getId(), reader.getId(), commentator.getId(), ministerOfTheWord.getId(), eucharisticMinister.getId());
-            Location location = locationRepository.saveAndFlush(location("Consistency Church"));
+            Location location = locationRepository.saveAndFlush(location("No Mirror Church"));
             locationId = location.getId();
 
             MvcResult result = mockMvc.perform(post("/eventos/com-escala")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(eventRequest(
-                                    "Consistency Mass", locationId, priest.getId(),
+                                    "No Mirror Mass", locationId, priest.getId(),
                                     List.of(reader.getId()), List.of(commentator.getId()),
                                     List.of(ministerOfTheWord.getId()), List.of(eucharisticMinister.getId())
                             ))))
@@ -121,7 +114,8 @@ class EventAssignmentOfficialWriteIntegrationTest {
                     .andReturn();
             eventId = objectMapper.readTree(result.getResponse().getContentAsString()).get("eventId").asLong();
 
-            assertConsistent(eventId);
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
+            assertEquals(5, countRows("tb_event_assignment", "event_id", eventId));
 
             Long finalEventId = eventId;
             mockMvc.perform(put("/eventos/{id}/escala", finalEventId)
@@ -131,10 +125,45 @@ class EventAssignmentOfficialWriteIntegrationTest {
                             ))))
                     .andExpect(status().isOk());
 
-            assertConsistent(eventId);
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
+            assertEquals(2, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
             personIds.forEach(this::cleanupPerson);
+            cleanupLocation(locationId);
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldClearOnlyThatEventLegacyMirrorRowsWhenUpdatingScale() throws Exception {
+        Long firstEventId = null;
+        Long secondEventId = null;
+        Long locationId = null;
+        Long readerId = null;
+        try {
+            Reader reader = saveReader("Scoped Mirror Reader");
+            readerId = reader.getId();
+            Location location = locationRepository.saveAndFlush(location("Scoped Mirror Church"));
+            locationId = location.getId();
+
+            firstEventId = insertLegacyEventWithMirrorRow("Scoped Mirror First Mass", locationId, readerId);
+            secondEventId = insertLegacyEventWithMirrorRow("Scoped Mirror Second Mass", locationId, readerId);
+
+            Long finalFirstEventId = firstEventId;
+            mockMvc.perform(put("/eventos/{id}/escala", finalFirstEventId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(scaleRequest(
+                                    locationId, null, List.of(readerId), null, null, null
+                            ))))
+                    .andExpect(status().isOk());
+
+            assertEquals(0, countRows("tb_event_person", "event_id", firstEventId));
+            assertEquals(1, countRows("tb_event_person", "event_id", secondEventId));
+        } finally {
+            cleanupEvent(firstEventId);
+            cleanupEvent(secondEventId);
+            cleanupPerson(readerId);
             cleanupLocation(locationId);
         }
     }
@@ -185,20 +214,20 @@ class EventAssignmentOfficialWriteIntegrationTest {
     }
 
     @Test
-    void shouldRollbackOfficialAssignmentsWhenLegacyMirrorSyncFailsOnCreate() {
+    void shouldRollbackEventAndLegacyMirrorCleanupWhenOfficialAssignmentWriteFailsOnCreate() {
         Long priestId = null;
         Long locationId = null;
         try {
-            Priest priest = savePriest("Mirror Failure Create Priest");
+            Priest priest = savePriest("Official Write Failure Create Priest");
             priestId = priest.getId();
-            Location location = locationRepository.saveAndFlush(location("Mirror Failure Create Church"));
+            Location location = locationRepository.saveAndFlush(location("Official Write Failure Create Church"));
             locationId = location.getId();
             long eventsBefore = countAllEvents();
-            RuntimeException failure = new IllegalStateException("legacy mirror sync failed");
-            doThrow(failure).when(legacyScaleMirrorService).synchronizeMirror(any(), any());
+            RuntimeException failure = new IllegalStateException("official assignment write failed");
+            doThrow(failure).when(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
 
             CelebrationEventWithScaleRequestDTO request = eventRequest(
-                    "Mirror Failure Create Mass", locationId, priestId, null, null, null, null
+                    "Official Write Failure Create Mass", locationId, priestId, null, null, null, null
             );
 
             RuntimeException result = assertThrows(RuntimeException.class, () ->
@@ -216,59 +245,39 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldRollbackOfficialAssignmentsWhenLegacyMirrorSyncFailsOnUpdate() throws Exception {
+    void shouldRollbackAssignmentsAndLegacyMirrorCleanupWhenOfficialAssignmentWriteFailsOnUpdate() throws Exception {
         Long eventId = null;
         Long locationId = null;
-        Long oldReaderId = null;
-        Long newReaderId = null;
+        Long readerId = null;
         try {
-            Reader oldReader = saveReader("Mirror Failure Update Old Reader");
-            oldReaderId = oldReader.getId();
-            Reader newReader = saveReader("Mirror Failure Update New Reader");
-            newReaderId = newReader.getId();
-            Location location = locationRepository.saveAndFlush(location("Mirror Failure Update Church"));
+            Reader reader = saveReader("Official Write Failure Update Reader");
+            readerId = reader.getId();
+            Location location = locationRepository.saveAndFlush(location("Official Write Failure Update Church"));
             locationId = location.getId();
 
-            MvcResult createResult = mockMvc.perform(post("/eventos/com-escala")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(eventRequest(
-                                    "Mirror Failure Update Mass", locationId, null, List.of(oldReaderId), null, null, null
-                            ))))
-                    .andExpect(status().isCreated())
-                    .andReturn();
-            eventId = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("eventId").asLong();
+            eventId = insertLegacyEventWithMirrorRow("Official Write Failure Update Mass", locationId, readerId);
 
-            List<Long> assignmentIdsBefore = eventAssignmentReadService.findAllByEventId(eventId).stream()
-                    .map(EventAssignmentSnapshot::assignmentId)
-                    .sorted()
-                    .toList();
             int assignmentsBefore = countRows("tb_event_assignment", "event_id", eventId);
             int peopleBefore = countRows("tb_event_person", "event_id", eventId);
 
-            RuntimeException failure = new IllegalStateException("legacy mirror sync failed");
-            doThrow(failure).when(legacyScaleMirrorService).synchronizeMirror(any(), any());
+            RuntimeException failure = new IllegalStateException("official assignment write failed");
+            doThrow(failure).when(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
 
             Long finalEventId = eventId;
             Long finalLocationId = locationId;
-            Long finalNewReaderId = newReaderId;
+            Long finalReaderId = readerId;
             RuntimeException result = assertThrows(RuntimeException.class, () ->
                     celebrationEventService.updateEventScale(
                             finalEventId,
-                            scaleRequest(finalLocationId, null, List.of(finalNewReaderId), null, null, null)
+                            scaleRequest(finalLocationId, null, List.of(finalReaderId), null, null, null)
                     ));
 
             assertSame(failure, result);
-            List<Long> assignmentIdsAfter = eventAssignmentReadService.findAllByEventId(eventId).stream()
-                    .map(EventAssignmentSnapshot::assignmentId)
-                    .sorted()
-                    .toList();
-            assertEquals(assignmentIdsBefore, assignmentIdsAfter);
             assertEquals(assignmentsBefore, countRows("tb_event_assignment", "event_id", eventId));
             assertEquals(peopleBefore, countRows("tb_event_person", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);
-            cleanupPerson(oldReaderId);
-            cleanupPerson(newReaderId);
+            cleanupPerson(readerId);
             cleanupLocation(locationId);
         }
     }
@@ -287,14 +296,33 @@ class EventAssignmentOfficialWriteIntegrationTest {
         return count == null ? 0 : count;
     }
 
-    private void assertConsistent(Long eventId) {
-        var legacyEvent = celebrationEventRepository.findByIdWithPeople(eventId).orElseThrow();
-        List<EventAssignmentSnapshot> parallelAssignments = eventAssignmentReadService.findAllByEventId(eventId);
-
-        EventAssignmentConsistencyReport report = eventAssignmentConsistencyService.compareEvent(legacyEvent, parallelAssignments);
-
-        assertTrue(report.consistent(), () -> "issues: " + report.issues());
-        assertEquals(0, report.issues().size());
+    private Long insertLegacyEventWithMirrorRow(String name, Long locationId, Long personId) {
+        String eventName = name + " " + UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                VALUES (?, ?, ?, TRUE)
+                """,
+                eventName,
+                LocalDate.now().plusDays(30),
+                LocalTime.of(19, 0)
+        );
+        Long eventId = jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
+                Long.class,
+                eventName
+        );
+        jdbcTemplate.update(
+                "INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)",
+                eventId,
+                locationId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO tb_event_person(event_id, person_id) VALUES (?, ?)",
+                eventId,
+                personId
+        );
+        return eventId;
     }
 
     private Priest savePriest(String name) {

@@ -148,10 +148,23 @@ class EventAssignmentReadServiceImplTest {
     }
 
     @Test
-    void shouldRejectDuplicatedPersonWhenGrouping() {
+    void shouldAllowSamePersonInDifferentAssignmentTypesWhenGrouping() {
         List<EventAssignmentSnapshot> snapshots = List.of(
                 snapshot(1L, 10L, EventAssignmentType.READER),
                 snapshot(1L, 10L, EventAssignmentType.COMMENTATOR)
+        );
+
+        EventAssignmentGroup group = EventAssignmentGroup.from(1L, snapshots);
+
+        assertEquals(1, group.readers().size());
+        assertEquals(1, group.commentators().size());
+    }
+
+    @Test
+    void shouldRejectDuplicatedPersonAndTypePairWhenGrouping() {
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(1L, 10L, EventAssignmentType.READER),
+                snapshot(1L, 10L, EventAssignmentType.READER)
         );
 
         assertThrows(BusinessException.class, () -> EventAssignmentGroup.from(1L, snapshots));

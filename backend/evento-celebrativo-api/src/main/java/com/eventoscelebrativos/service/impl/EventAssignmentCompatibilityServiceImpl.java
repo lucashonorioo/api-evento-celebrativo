@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service.impl;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
 import com.eventoscelebrativos.service.EventAssignmentTarget;
@@ -33,28 +34,29 @@ public class EventAssignmentCompatibilityServiceImpl implements EventAssignmentC
         List<EventAssignmentTarget> validatedTargets = validateTargets(targets);
 
         List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventId(event.getId());
-        Map<Long, EventAssignment> currentByPersonId = new HashMap<>();
+        Map<PersonAssignmentTypeKey, EventAssignment> currentByPair = new HashMap<>();
         for (EventAssignment assignment : currentAssignments) {
-            currentByPersonId.put(assignment.getPerson().getId(), assignment);
+            currentByPair.put(
+                    new PersonAssignmentTypeKey(assignment.getPerson().getId(), assignment.getAssignmentType()),
+                    assignment
+            );
         }
 
-        Set<Long> targetPersonIds = new HashSet<>();
+        Set<PersonAssignmentTypeKey> targetPairs = new HashSet<>();
         List<EventAssignment> assignmentsToSave = new ArrayList<>();
 
         for (EventAssignmentTarget target : validatedTargets) {
-            Long personId = target.person().getId();
-            targetPersonIds.add(personId);
-            EventAssignment current = currentByPersonId.get(personId);
-            if (current == null) {
+            PersonAssignmentTypeKey key = new PersonAssignmentTypeKey(target.person().getId(), target.assignmentType());
+            targetPairs.add(key);
+            if (!currentByPair.containsKey(key)) {
                 assignmentsToSave.add(new EventAssignment(event, target.person(), target.assignmentType()));
-            } else if (current.getAssignmentType() != target.assignmentType()) {
-                current.setAssignmentType(target.assignmentType());
-                assignmentsToSave.add(current);
             }
         }
 
         List<EventAssignment> assignmentsToRemove = currentAssignments.stream()
-                .filter(assignment -> !targetPersonIds.contains(assignment.getPerson().getId()))
+                .filter(assignment -> !targetPairs.contains(
+                        new PersonAssignmentTypeKey(assignment.getPerson().getId(), assignment.getAssignmentType())
+                ))
                 .toList();
 
         if (!assignmentsToRemove.isEmpty()) {
@@ -86,16 +88,19 @@ public class EventAssignmentCompatibilityServiceImpl implements EventAssignmentC
         }
 
         List<EventAssignmentTarget> validatedTargets = new ArrayList<>(targets.size());
-        Set<Long> personIds = new HashSet<>();
+        Set<PersonAssignmentTypeKey> seenPairs = new HashSet<>();
         for (EventAssignmentTarget target : targets) {
             if (target == null || target.person() == null || target.person().getId() == null || target.assignmentType() == null) {
                 throw new BusinessException("Pessoa e tipo de atribuicao do evento sao obrigatorios");
             }
-            if (!personIds.add(target.person().getId())) {
-                throw new BusinessException("A mesma pessoa nao pode ocupar mais de uma funcao na mesma escala");
+            if (!seenPairs.add(new PersonAssignmentTypeKey(target.person().getId(), target.assignmentType()))) {
+                throw new BusinessException("A mesma pessoa nao pode ocupar a mesma funcao duas vezes na mesma escala");
             }
             validatedTargets.add(target);
         }
         return validatedTargets;
+    }
+
+    private record PersonAssignmentTypeKey(Long personId, EventAssignmentType assignmentType) {
     }
 }

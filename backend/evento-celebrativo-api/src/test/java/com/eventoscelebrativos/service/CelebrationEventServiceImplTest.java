@@ -69,9 +69,6 @@ class CelebrationEventServiceImplTest {
     @Mock
     private PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
 
-    @Spy
-    private ScaleLegacyCompatibilityValidator scaleLegacyCompatibilityValidator = new ScaleLegacyCompatibilityValidator();
-
     @Mock
     private CelebrationEventMapper mapper;
 
@@ -83,9 +80,6 @@ class CelebrationEventServiceImplTest {
 
     @Mock
     private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
-
-    @Mock
-    private LegacyScaleMirrorService legacyScaleMirrorService;
 
     @Mock
     private EventAssignmentReadService eventAssignmentReadService;
@@ -105,7 +99,7 @@ class CelebrationEventServiceImplTest {
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createEvent(request));
-        verifyNoInteractions(eventAssignmentCompatibilityService, legacyScaleMirrorService);
+        verifyNoInteractions(eventAssignmentCompatibilityService);
     }
 
     @Test
@@ -279,12 +273,33 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldRejectParallelEventScaleWithDuplicatedPersonAssignment() {
+    void shouldAllowParallelEventScaleWithSamePersonInDifferentAssignmentTypes() {
         CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
                 snapshot(100L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader"),
                 snapshot(101L, 1L, 10L, EventAssignmentType.COMMENTATOR, "Pessoa", "reader")
+        ));
+        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
+                .thenReturn(detailResponse());
+
+        service.findScaleByEventId(1L);
+
+        ArgumentCaptor<EventAssignmentGroup> groupCaptor = ArgumentCaptor.forClass(EventAssignmentGroup.class);
+        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), groupCaptor.capture());
+        EventAssignmentGroup group = groupCaptor.getValue();
+        assertEquals(List.of(10L), group.readers().stream().map(EventAssignmentSnapshot::personId).toList());
+        assertEquals(List.of(10L), group.commentators().stream().map(EventAssignmentSnapshot::personId).toList());
+    }
+
+    @Test
+    void shouldRejectParallelEventScaleWithDuplicatedPersonAndTypePair() {
+        CelebrationEvent event = event(1L);
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(List.of(
+                snapshot(100L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader"),
+                snapshot(101L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader")
         ));
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
@@ -646,7 +661,7 @@ class CelebrationEventServiceImplTest {
 
         assertSame(response, service.updateEvent(1L, request));
         verify(mapper).updateCelebrationEventMapperFromDto(request, entity);
-        verifyNoInteractions(eventAssignmentCompatibilityService, legacyScaleMirrorService);
+        verifyNoInteractions(eventAssignmentCompatibilityService);
     }
 
     @Test
@@ -705,7 +720,7 @@ class CelebrationEventServiceImplTest {
                 eligible(ministerOfTheWord, MinistryType.MINISTER_OF_THE_WORD),
                 eligible(eucharisticMinister, MinistryType.EUCHARISTIC_MINISTER)
         ));
-        when(scaleMapper.toDto(event)).thenReturn(response);
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
 
         assertSame(response, service.updateEventScale(1L, request));
         assertEquals(List.of(location), event.getLocations());
@@ -717,13 +732,8 @@ class CelebrationEventServiceImplTest {
                 new EventAssignmentTarget(ministerOfTheWord, EventAssignmentType.MINISTER_OF_THE_WORD),
                 new EventAssignmentTarget(eucharisticMinister, EventAssignmentType.EUCHARISTIC_MINISTER)
         );
-        List<Person> expectedPeople = List.of(priest, reader, commentator, ministerOfTheWord, eucharisticMinister);
         verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
-        verify(legacyScaleMirrorService).synchronizeMirror(event, expectedPeople);
-
-        InOrder inOrder = inOrder(eventAssignmentCompatibilityService, legacyScaleMirrorService);
-        inOrder.verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
-        inOrder.verify(legacyScaleMirrorService).synchronizeMirror(event, expectedPeople);
+        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test
@@ -739,7 +749,7 @@ class CelebrationEventServiceImplTest {
             event.setId(1L);
             return event;
         });
-        when(scaleMapper.toDto(any(CelebrationEvent.class))).thenReturn(response);
+        when(scaleMapper.toDto(any(CelebrationEvent.class), any(EventScaleAssignmentPlan.class))).thenReturn(response);
 
         assertSame(response, service.createEventWithScale(eventWithScaleRequest()));
         verify(repository).save(argThat(event ->
@@ -751,12 +761,10 @@ class CelebrationEventServiceImplTest {
 
         List<EventAssignmentTarget> expectedTargets = List.of(new EventAssignmentTarget(priest, EventAssignmentType.PRIEST));
         verify(eventAssignmentCompatibilityService).synchronizeAssignments(any(CelebrationEvent.class), eq(expectedTargets));
-        verify(legacyScaleMirrorService).synchronizeMirror(any(CelebrationEvent.class), eq(List.of(priest)));
 
-        InOrder inOrder = inOrder(repository, eventAssignmentCompatibilityService, legacyScaleMirrorService);
+        InOrder inOrder = inOrder(repository, eventAssignmentCompatibilityService);
         inOrder.verify(repository).save(any(CelebrationEvent.class));
         inOrder.verify(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
-        inOrder.verify(legacyScaleMirrorService).synchronizeMirror(any(), any());
     }
 
     @Test
@@ -771,17 +779,17 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of());
-        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(newLocation), event.getLocations());
         verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, List.of());
-        verify(legacyScaleMirrorService).synchronizeMirror(event, List.of());
+        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test
-    void shouldNotSynchronizeMirrorWhenOfficialAssignmentWriteFailsOnUpdate() {
+    void shouldNotClearLegacyMirrorWhenOfficialAssignmentWriteFailsOnUpdate() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
         Priest priest = person(new Priest(), 8L, "Padre");
@@ -796,11 +804,11 @@ class CelebrationEventServiceImplTest {
                 service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
 
         assertSame(failure, result);
-        verifyNoInteractions(legacyScaleMirrorService);
+        assertEquals(List.of(), event.getPeople());
     }
 
     @Test
-    void shouldNotSynchronizeMirrorWhenOfficialAssignmentWriteFailsOnCreate() {
+    void shouldNotSaveEventWithScaleWhenOfficialAssignmentWriteFailsOnCreate() {
         Location location = location(1L);
         Priest priest = person(new Priest(), 8L, "Padre");
 
@@ -818,7 +826,6 @@ class CelebrationEventServiceImplTest {
                 service.createEventWithScale(eventWithScaleRequest()));
 
         assertSame(failure, result);
-        verifyNoInteractions(legacyScaleMirrorService);
     }
 
     @Test
@@ -847,18 +854,21 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldThrowBusinessExceptionWhenScalePersonHasActiveMinistryButIncompatibleLegacyType() {
-        when(repository.findById(1L)).thenReturn(Optional.of(event(1L)));
+    void shouldAcceptScalePersonWithActiveMinistryRegardlessOfLegacySubtype() {
+        CelebrationEvent event = event(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
         Reader personWithPriestMinistry = person(new Reader(), 8L, "Leitor");
         when(personMinistryEligibilityResolver.resolve(any()))
                 .thenReturn(List.of(eligible(personWithPriestMinistry, MinistryType.PRIEST)));
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
 
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> service.updateEventScale(1L, scaleRequest())
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null));
+
+        verify(eventAssignmentCompatibilityService).synchronizeAssignments(
+                event,
+                List.of(new EventAssignmentTarget(personWithPriestMinistry, EventAssignmentType.PRIEST))
         );
-        assertTrue(exception.getMessage().contains("compatível"));
     }
 
     @Test
@@ -870,7 +880,6 @@ class CelebrationEventServiceImplTest {
                 .thenReturn(List.of(ministryNotAssigned(priestWithoutActiveMinistry, MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.updateEventScale(1L, scaleRequest()));
-        verify(scaleLegacyCompatibilityValidator, never()).validate(any(), any(), any());
     }
 
     @Test
@@ -895,12 +904,12 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of());
-        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(location), event.getLocations());
-        verify(legacyScaleMirrorService).synchronizeMirror(event, List.of());
+        assertTrue(event.getPeople().isEmpty());
     }
 
     @Test
@@ -926,7 +935,7 @@ class CelebrationEventServiceImplTest {
         when(repository.findById(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
-        when(scaleMapper.toDto(event)).thenReturn(new CelebrationEventScaleResponseDTO());
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null));
 
@@ -938,12 +947,38 @@ class CelebrationEventServiceImplTest {
     void shouldNotCreateEventWithScaleWhenScaleIsInvalid() {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
         when(personMinistryEligibilityResolver.resolve(any()))
-                .thenReturn(List.of(eligible(person(new Reader(), 8L, "Leitor"), MinistryType.PRIEST)));
+                .thenReturn(List.of(ministryNotAssigned(person(new Reader(), 8L, "Leitor"), MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
         verifyNoInteractions(eventAssignmentCompatibilityService);
-        verifyNoInteractions(legacyScaleMirrorService);
+    }
+
+    @Test
+    void shouldAllowSamePersonInMultipleAssignmentTypesWhenEligibleForBoth() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Priest priestAndReader = person(new Priest(), 8L, "Padre Leitor");
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+
+        when(repository.findById(1L)).thenReturn(Optional.of(event));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
+                eligible(priestAndReader, MinistryType.PRIEST),
+                eligible(priestAndReader, MinistryType.READER)
+        ));
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
+
+        CelebrationEventScaleRequestDTO request =
+                new CelebrationEventScaleRequestDTO(1L, 8L, List.of(8L), null, null, null);
+
+        assertSame(response, service.updateEventScale(1L, request));
+
+        List<EventAssignmentTarget> expectedTargets = List.of(
+                new EventAssignmentTarget(priestAndReader, EventAssignmentType.PRIEST),
+                new EventAssignmentTarget(priestAndReader, EventAssignmentType.READER)
+        );
+        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
     }
 
     private CelebrationEventRequestDTO request() {

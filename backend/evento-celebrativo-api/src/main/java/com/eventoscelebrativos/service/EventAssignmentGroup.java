@@ -26,11 +26,11 @@ public record EventAssignmentGroup(
 
     public static EventAssignmentGroup from(Long eventId, Collection<EventAssignmentSnapshot> snapshots) {
         validateEventId(eventId);
-        Set<Long> personIds = new HashSet<>();
+        Set<PersonAssignmentTypeKey> seenPairs = new HashSet<>();
         List<EventAssignmentSnapshot> safeSnapshots = snapshots == null
                 ? List.of()
                 : snapshots.stream()
-                        .peek(snapshot -> validateSnapshot(eventId, snapshot, personIds))
+                        .peek(snapshot -> validateSnapshot(eventId, snapshot, seenPairs))
                         .sorted(EventAssignmentSnapshot.deterministicOrder())
                         .toList();
 
@@ -65,7 +65,11 @@ public record EventAssignmentGroup(
         }
     }
 
-    private static void validateSnapshot(Long eventId, EventAssignmentSnapshot snapshot, Set<Long> personIds) {
+    private static void validateSnapshot(
+            Long eventId,
+            EventAssignmentSnapshot snapshot,
+            Set<PersonAssignmentTypeKey> seenPairs
+    ) {
         if (snapshot == null || !eventId.equals(snapshot.eventId())) {
             throw new BusinessException("Atribuicao paralela pertence a outro evento");
         }
@@ -75,9 +79,12 @@ public record EventAssignmentGroup(
         if (snapshot.assignmentType() == null) {
             throw new BusinessException("Tipo da atribuicao paralela e obrigatorio");
         }
-        if (!personIds.add(snapshot.personId())) {
-            throw new BusinessException("A mesma pessoa possui mais de uma atribuicao paralela no evento");
+        if (!seenPairs.add(new PersonAssignmentTypeKey(snapshot.personId(), snapshot.assignmentType()))) {
+            throw new BusinessException("A mesma pessoa possui a mesma funcao duplicada no evento");
         }
+    }
+
+    private record PersonAssignmentTypeKey(Long personId, EventAssignmentType assignmentType) {
     }
 
     private static List<EventAssignmentSnapshot> immutableList(List<EventAssignmentSnapshot> snapshots) {

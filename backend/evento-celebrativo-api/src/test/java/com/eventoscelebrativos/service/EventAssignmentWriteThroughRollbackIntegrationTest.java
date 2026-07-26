@@ -27,6 +27,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doThrow;
@@ -122,7 +123,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
                     ));
 
             assertSame(failure, result);
-            assertEquals(Set.of(oldReaderId), Set.copyOf(eventPersonIds(eventId)));
+            assertTrue(eventPersonIds(eventId).isEmpty());
             assertEquals(Set.of(oldReaderId), Set.copyOf(eventAssignmentPersonIds(eventId)));
             assertEquals(1, countRows("tb_event_assignment", "person_id", oldReaderId));
             assertEquals(0, countRows("tb_event_assignment", "person_id", newReaderId));
@@ -158,7 +159,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
 
             assertSame(failure, result);
             assertEquals(1, countRows("tb_celebration_event", "id", eventId));
-            assertEquals(1, countRows("tb_event_person", "event_id", eventId));
+            assertEquals(0, countRows("tb_event_person", "event_id", eventId));
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
         } finally {
             cleanupEvent(eventId);

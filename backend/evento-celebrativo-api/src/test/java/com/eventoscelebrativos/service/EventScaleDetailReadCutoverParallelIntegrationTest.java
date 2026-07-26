@@ -114,7 +114,7 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         Long eventId = objectMapper.readTree(createdJson).path("eventId").asLong();
         entityManager.flush();
 
-        assertEquals(5, countRows("tb_event_person", "event_id", eventId));
+        assertEquals(0, countRows("tb_event_person", "event_id", eventId));
         assertEquals(5, countRows("tb_event_assignment", "event_id", eventId));
         assertAssignmentType(eventId, priestId, EventAssignmentType.PRIEST);
         assertAssignmentType(eventId, readerId, EventAssignmentType.READER);
