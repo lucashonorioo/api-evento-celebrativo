@@ -1,6 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import {
   AbstractControl,
   FormControl,
@@ -14,6 +21,25 @@ import { finalize } from 'rxjs';
 
 import { CelebrationEventRequest, CelebrationEventResponse } from '../event.models';
 import { EventService } from '../event.service';
+
+type EventPeriodFilter = 'upcoming' | 'past' | 'all';
+type EventTypeFilter = 'all' | 'mass' | 'celebration';
+
+interface EventFilters {
+  readonly period: EventPeriodFilter;
+  readonly search: string;
+  readonly type: EventTypeFilter;
+}
+
+interface EventPeriodOption {
+  readonly value: EventPeriodFilter;
+  readonly label: string;
+}
+
+interface EventTypeOption {
+  readonly value: EventTypeFilter;
+  readonly label: string;
+}
 
 @Component({
   selector: 'app-event-management',
@@ -53,6 +79,60 @@ export class EventManagementComponent implements OnInit {
   readonly successMessage = signal<string | null>(null);
   readonly pendingDeletion = signal<CelebrationEventResponse | null>(null);
 
+  readonly periodFilter = signal<EventPeriodFilter>('upcoming');
+  readonly searchTerm = signal('');
+  readonly typeFilter = signal<EventTypeFilter>('all');
+
+  readonly periodOptions: readonly EventPeriodOption[] = [
+    { value: 'upcoming', label: 'Próximos' },
+    { value: 'past', label: 'Passados' },
+    { value: 'all', label: 'Todos' },
+  ];
+
+  readonly typeOptions: readonly EventTypeOption[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'mass', label: 'Missa' },
+    { value: 'celebration', label: 'Celebração' },
+  ];
+
+  readonly visibleEvents = computed(() =>
+    applyEventFilters(this.events(), {
+      period: this.periodFilter(),
+      search: this.searchTerm(),
+      type: this.typeFilter(),
+    }),
+  );
+
+  readonly resultCountLabel = computed(() => resultCountLabelFor(this.visibleEvents().length));
+
+  readonly emptyStateMessage = computed(() => {
+    if (this.visibleEvents().length > 0) {
+      return null;
+    }
+
+    if (this.events().length === 0) {
+      return 'Nenhum evento cadastrado foi encontrado.';
+    }
+
+    const hasActiveSearchOrType = this.searchTerm().trim().length > 0 || this.typeFilter() !== 'all';
+
+    if (!hasActiveSearchOrType) {
+      if (this.periodFilter() === 'upcoming') {
+        return 'Nenhum próximo evento cadastrado foi encontrado.';
+      }
+
+      if (this.periodFilter() === 'past') {
+        return 'Nenhum evento passado foi encontrado.';
+      }
+    }
+
+    return 'Nenhum evento corresponde aos filtros informados.';
+  });
+
+  readonly showClearFiltersInEmptyState = computed(
+    () => this.events().length > 0 && this.visibleEvents().length === 0,
+  );
+
   get isEditing(): boolean {
     return this.editingEventId() !== null;
   }
@@ -62,6 +142,10 @@ export class EventManagementComponent implements OnInit {
   }
 
   loadEvents(clearErrorMessage = true): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     this.isLoading.set(true);
 
     if (clearErrorMessage) {
@@ -233,6 +317,36 @@ export class EventManagementComponent implements OnInit {
     return eventTime.slice(0, 5);
   }
 
+  setPeriodFilter(period: EventPeriodFilter): void {
+    this.periodFilter.set(period);
+  }
+
+  setSearchTerm(event: Event): void {
+    const target = event.target;
+
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+
+    this.searchTerm.set(target.value);
+  }
+
+  setTypeFilter(event: Event): void {
+    const target = event.target;
+
+    if (!(target instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    this.typeFilter.set(target.value as EventTypeFilter);
+  }
+
+  clearFilters(): void {
+    this.periodFilter.set('upcoming');
+    this.searchTerm.set('');
+    this.typeFilter.set('all');
+  }
+
   private eventRequest(): CelebrationEventRequest | null {
     const value = this.form.getRawValue();
 
@@ -300,6 +414,78 @@ function todayLocalDate(): string {
   const day = String(today.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function applyEventFilters(
+  events: readonly CelebrationEventResponse[],
+  filters: EventFilters,
+  now: Date = new Date(),
+): CelebrationEventResponse[] {
+  const nowTime = now.getTime();
+
+  return events
+    .filter((event) => {
+      const eventTime = toLocalDateTime(event.eventDate, event.eventTime).getTime();
+
+      if (filters.period === 'upcoming' && eventTime < nowTime) {
+        return false;
+      }
+
+      if (filters.period === 'past' && eventTime >= nowTime) {
+        return false;
+      }
+
+      return matchesEventType(event, filters.type) && matchesEventSearch(event, filters.search);
+    })
+    .sort((first, second) => {
+      const firstTime = toLocalDateTime(first.eventDate, first.eventTime).getTime();
+      const secondTime = toLocalDateTime(second.eventDate, second.eventTime).getTime();
+
+      return filters.period === 'past' ? secondTime - firstTime : firstTime - secondTime;
+    });
+}
+
+function matchesEventType(event: CelebrationEventResponse, type: EventTypeFilter): boolean {
+  if (type === 'mass') {
+    return event.massOrCelebration;
+  }
+
+  if (type === 'celebration') {
+    return !event.massOrCelebration;
+  }
+
+  return true;
+}
+
+function matchesEventSearch(event: CelebrationEventResponse, search: string): boolean {
+  const normalizedSearch = normalizeForSearch(search);
+
+  if (normalizedSearch.length === 0) {
+    return true;
+  }
+
+  return normalizeForSearch(event.nameMassOrEvent).includes(normalizedSearch);
+}
+
+const DIACRITIC_MARKS_PATTERN = /\p{Diacritic}/gu;
+
+function normalizeForSearch(value: string): string {
+  return value
+    .trim()
+    .toLocaleLowerCase()
+    .normalize('NFD')
+    .replace(DIACRITIC_MARKS_PATTERN, '');
+}
+
+function resultCountLabelFor(count: number): string {
+  return count === 1 ? '1 evento encontrado' : `${count} eventos encontrados`;
+}
+
+function toLocalDateTime(eventDate: string, eventTime: string): Date {
+  const [year, month, day] = eventDate.split('-').map(Number);
+  const [hours, minutes, seconds] = eventTime.split(':').map(Number);
+
+  return new Date(year, month - 1, day, hours, minutes, seconds ?? 0, 0);
 }
 
 function saveErrorMessageFor(error: unknown): string {
