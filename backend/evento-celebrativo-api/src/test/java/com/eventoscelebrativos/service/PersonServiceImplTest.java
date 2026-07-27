@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -32,6 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -53,6 +56,9 @@ class PersonServiceImplTest {
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
+
+    @Mock
+    private PersonMinistryCommandService personMinistryCommandService;
 
     @InjectMocks
     private PersonServiceImpl service;
@@ -297,6 +303,143 @@ class PersonServiceImplTest {
 
         assertEquals("O ultimo administrador do sistema nao pode ter seu perfil alterado.", exception.getMessage());
         verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldFindPersonMinistriesWithZeroMinistries() {
+        when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L))).thenReturn(Map.of());
+
+        PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
+
+        assertEquals(1L, response.getId());
+        assertEquals(List.of(), response.getMinistries());
+    }
+
+    @Test
+    void shouldFindPersonMinistriesWithOneMinistry() {
+        when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
+
+        PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
+
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
+    }
+
+    @Test
+    void shouldFindPersonMinistriesWithSeveralMinistriesSortedByNaturalOrder() {
+        when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
+
+        PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
+
+        assertEquals(
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                response.getMinistries()
+        );
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenFindingMinistriesOfMissingPerson() {
+        when(personRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findPersonMinistries(99L));
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenFindMinistriesIdIsInvalid() {
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> service.findPersonMinistries(null)),
+                () -> assertThrows(BusinessException.class, () -> service.findPersonMinistries(0L)),
+                () -> assertThrows(BusinessException.class, () -> service.findPersonMinistries(-1L))
+        );
+        verifyNoInteractions(personRepository);
+    }
+
+    @Test
+    void shouldUpdatePersonMinistriesDelegatingParsedSetToCommandService() {
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person,
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                Set.of(MinistryType.COMMENTATOR),
+                Set.of(),
+                Set.of(),
+                Set.of(MinistryType.READER)
+        );
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)))
+                .thenReturn(result);
+
+        PersonMinistriesResponseDTO response = service.updatePersonMinistries(
+                1L,
+                new PersonMinistriesUpdateRequestDTO(List.of("READER", "COMMENTATOR"))
+        );
+
+        assertEquals(1L, response.getId());
+        assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
+    }
+
+    @Test
+    void shouldAllowEmptyMinistriesListInUpdateRequestMeaningRemoveAll() {
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person, Set.of(), Set.of(), Set.of(), Set.of(MinistryType.READER), Set.of()
+        );
+        when(personMinistryCommandService.syncMinistries(1L, Set.of())).thenReturn(result);
+
+        PersonMinistriesResponseDTO response = service.updatePersonMinistries(
+                1L,
+                new PersonMinistriesUpdateRequestDTO(List.of())
+        );
+
+        assertEquals(List.of(), response.getMinistries());
+    }
+
+    @Test
+    void shouldRejectNullMinistriesListInUpdateRequest() {
+        assertThrows(BusinessException.class,
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(null)));
+        verifyNoInteractions(personMinistryCommandService);
+    }
+
+    @Test
+    void shouldRejectDuplicateMinistryInUpdateRequest() {
+        assertThrows(BusinessException.class,
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of("READER", "READER"))));
+        verifyNoInteractions(personMinistryCommandService);
+    }
+
+    @Test
+    void shouldRejectInvalidMinistryValueInUpdateRequest() {
+        assertThrows(BadRequestException.class,
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of("BISHOP"))));
+        verifyNoInteractions(personMinistryCommandService);
+    }
+
+    @Test
+    void shouldRejectBlankMinistryValueInUpdateRequest() {
+        assertThrows(BadRequestException.class,
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of(" "))));
+        verifyNoInteractions(personMinistryCommandService);
+    }
+
+    @Test
+    void shouldAcceptMinistryValueRegardlessOfCase() {
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person, Set.of(MinistryType.READER), Set.of(MinistryType.READER), Set.of(), Set.of(), Set.of()
+        );
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER))).thenReturn(result);
+
+        PersonMinistriesResponseDTO response = service.updatePersonMinistries(
+                1L,
+                new PersonMinistriesUpdateRequestDTO(List.of("reader"))
+        );
+
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
     }
 
     private void authenticateAs(String username) {

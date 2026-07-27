@@ -1,10 +1,14 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
+import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.service.PersonService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -255,6 +259,178 @@ class PersonControllerTest {
                         .content("""
                                 {
                                   "role": "ROLE_ADMIN"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldFindPersonMinistriesWhenUserIsAdmin() throws Exception {
+        when(personService.findPersonMinistries(1L))
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+
+        mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                .andExpect(jsonPath("$.ministries[1]").value("COMMENTATOR"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnNotFoundWhenFindingMinistriesOfMissingPerson() throws Exception {
+        when(personService.findPersonMinistries(99L))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
+
+        mockMvc.perform(get("/pessoas/99/ministries"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorFindsPersonMinistries() throws Exception {
+        mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldUpdatePersonMinistriesWhenUserIsAdmin() throws Exception {
+        when(personService.updatePersonMinistries(eq(1L), any()))
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER)));
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": ["READER"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldAllowEmptyMinistriesListToRemoveAll() throws Exception {
+        when(personService.updatePersonMinistries(eq(1L), any()))
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of()));
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": []
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ministries").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnBadRequestWhenMinistriesFieldIsMissing() throws Exception {
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnBadRequestWhenMinistryValueIsInvalid() throws Exception {
+        when(personService.updatePersonMinistries(eq(1L), any()))
+                .thenThrow(new BadRequestException("Tipo de ministerio invalido: BISHOP"));
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": ["BISHOP"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnUnprocessableEntityWhenMinistryIsDuplicatedInRequest() throws Exception {
+        when(personService.updatePersonMinistries(eq(1L), any()))
+                .thenThrow(new BusinessException("Ministerio duplicado no request: READER"));
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": ["READER", "READER"]
+                                }
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnConflictWhenRemovingMinistryUsedByEventAssignment() throws Exception {
+        when(personService.updatePersonMinistries(eq(1L), any()))
+                .thenThrow(new DatabaseException(
+                        "Não é possível remover os seguintes ministérios, pois possuem vínculos com escalas: READER"));
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": []
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnNotFoundWhenUpdatingMinistriesOfMissingPerson() throws Exception {
+        when(personService.updatePersonMinistries(eq(99L), any()))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
+
+        mockMvc.perform(put("/pessoas/99/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": ["READER"]
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorUpdatesMinistries() throws Exception {
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ministries": ["READER"]
                                 }
                                 """))
                 .andExpect(status().isForbidden());

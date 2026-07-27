@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import org.springframework.data.domain.Page;
 
@@ -19,4 +21,8 @@ public interface PersonService {
     PersonAdminResponseDTO findPersonById(Long id);
 
     PersonRoleUpdateResponseDTO updatePersonRole(Long id, PersonRoleUpdateRequestDTO requestDTO);
+
+    PersonMinistriesResponseDTO findPersonMinistries(Long id);
+
+    PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO);
 }

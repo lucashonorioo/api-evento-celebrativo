@@ -67,6 +67,14 @@ class EndpointSecurityTest {
         mockMvc.perform(get("/pessoas/1"))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ministriesPayload()))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/leitores"))
                 .andExpect(status().isUnauthorized());
 
@@ -119,6 +127,14 @@ class EndpointSecurityTest {
         mockMvc.perform(get("/pessoas/1"))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ministriesPayload()))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/eventos/com-escala")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEventWithScalePayload()))
@@ -156,6 +172,14 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/1"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ministriesPayload()))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/eventos/com-escala")
@@ -204,6 +228,14 @@ class EndpointSecurityTest {
         return """
                 {
                   "role": "ROLE_OPERATOR"
+                }
+                """;
+    }
+
+    private String ministriesPayload() {
+        return """
+                {
+                  "ministries": ["COMMENTATOR"]
                 }
                 """;
     }

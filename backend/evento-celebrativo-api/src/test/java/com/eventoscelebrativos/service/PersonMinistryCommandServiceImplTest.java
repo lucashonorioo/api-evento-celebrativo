@@ -19,7 +19,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -189,6 +191,204 @@ class PersonMinistryCommandServiceImplTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> service.removeMinistry(99L, MinistryType.READER, ENTITY_LABEL));
         verifyNoInteractions(eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldAddNewMinistriesWhenPersonHasNone() {
+        Person reader = reader(1L);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR));
+
+        assertSame(reader, result.person());
+        assertEquals(Set.of(MinistryType.READER, MinistryType.COMMENTATOR), result.activeMinistries());
+        assertEquals(Set.of(MinistryType.READER, MinistryType.COMMENTATOR), result.added());
+        assertTrue(result.reactivated().isEmpty());
+        assertTrue(result.deactivated().isEmpty());
+        assertTrue(result.unchanged().isEmpty());
+        ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
+        verify(personMinistryRepository, times(2)).save(captor.capture());
+        assertTrue(captor.getAllValues().stream().allMatch(pm -> pm.getPerson() == reader));
+    }
+
+    @Test
+    void shouldReactivateInactiveMinistryDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry inactiveMinistry = new PersonMinistry(reader, MinistryType.READER);
+        inactiveMinistry.setActive(false);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(inactiveMinistry));
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of(MinistryType.READER));
+
+        assertEquals(Set.of(MinistryType.READER), result.reactivated());
+        assertTrue(inactiveMinistry.getActive());
+        verify(personMinistryRepository).save(inactiveMinistry);
+    }
+
+    @Test
+    void shouldDeactivateActiveMinistryAbsentFromDesiredSetDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(false);
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
+
+        assertEquals(Set.of(MinistryType.READER), result.deactivated());
+        assertTrue(result.activeMinistries().isEmpty());
+        assertFalse(activeMinistry.getActive());
+        verify(personMinistryRepository).save(activeMinistry);
+    }
+
+    @Test
+    void shouldPreserveUnchangedMinistryDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of(MinistryType.READER));
+
+        assertEquals(Set.of(MinistryType.READER), result.unchanged());
+        assertTrue(result.added().isEmpty());
+        assertTrue(result.reactivated().isEmpty());
+        assertTrue(result.deactivated().isEmpty());
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldApplyAllFourCategoriesInSingleSync() {
+        Person reader = reader(1L);
+        PersonMinistry unchangedReader = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry reactivatedCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        reactivatedCommentator.setActive(false);
+        PersonMinistry deactivatedPriest = new PersonMinistry(reader, MinistryType.PRIEST);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L))
+                .thenReturn(List.of(unchangedReader, reactivatedCommentator, deactivatedPriest));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.PRIEST))
+                .thenReturn(false);
+
+        PersonMinistrySyncResult result = service.syncMinistries(
+                1L,
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR, MinistryType.EUCHARISTIC_MINISTER)
+        );
+
+        assertEquals(Set.of(MinistryType.EUCHARISTIC_MINISTER), result.added());
+        assertEquals(Set.of(MinistryType.COMMENTATOR), result.reactivated());
+        assertEquals(Set.of(MinistryType.PRIEST), result.deactivated());
+        assertEquals(Set.of(MinistryType.READER), result.unchanged());
+        assertEquals(
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR, MinistryType.EUCHARISTIC_MINISTER),
+                result.activeMinistries()
+        );
+        assertTrue(reactivatedCommentator.getActive());
+        assertFalse(deactivatedPriest.getActive());
+    }
+
+    @Test
+    void shouldBlockSyncAndApplyNoMutationWhenDeactivationConflictsWithEventAssignment() {
+        Person reader = reader(1L);
+        PersonMinistry activeReaderMinistry = new PersonMinistry(reader, MinistryType.READER);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeReaderMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(true);
+
+        assertThrows(DatabaseException.class, () -> service.syncMinistries(1L, Set.of()));
+
+        assertTrue(activeReaderMinistry.getActive());
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldBlockEntireSyncWhenAnyDeactivationConflictsEvenIfOtherChangesWouldSucceed() {
+        Person reader = reader(1L);
+        PersonMinistry activeReaderMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry activeCommentatorMinistry = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L))
+                .thenReturn(List.of(activeReaderMinistry, activeCommentatorMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(true);
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.COMMENTATOR))
+                .thenReturn(false);
+
+        assertThrows(DatabaseException.class,
+                () -> service.syncMinistries(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER)));
+
+        assertTrue(activeReaderMinistry.getActive());
+        assertTrue(activeCommentatorMinistry.getActive());
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldNotBlockSyncWhenConflictingAssignmentIsOfADifferentTypeDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(false);
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
+
+        assertEquals(Set.of(MinistryType.READER), result.deactivated());
+        assertFalse(activeMinistry.getActive());
+    }
+
+    @Test
+    void shouldTreatEmptyDesiredSetAndNoExistingMinistriesAsNoOp() {
+        Person reader = reader(1L);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
+
+        assertTrue(result.activeMinistries().isEmpty());
+        assertTrue(result.added().isEmpty());
+        assertTrue(result.reactivated().isEmpty());
+        assertTrue(result.deactivated().isEmpty());
+        assertTrue(result.unchanged().isEmpty());
+        verify(personMinistryRepository, never()).save(any());
+        verifyNoInteractions(eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectSyncWithInvalidId() {
+        assertThrows(BusinessException.class, () -> service.syncMinistries(null, Set.of(MinistryType.READER)));
+        assertThrows(BusinessException.class, () -> service.syncMinistries(0L, Set.of(MinistryType.READER)));
+        assertThrows(BusinessException.class, () -> service.syncMinistries(-1L, Set.of(MinistryType.READER)));
+        verifyNoInteractions(personRepository);
+    }
+
+    @Test
+    void shouldRejectSyncWithNullDesiredSet() {
+        assertThrows(BusinessException.class, () -> service.syncMinistries(1L, null));
+        verifyNoInteractions(personRepository);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenSyncingMinistriesOfMissingPerson() {
+        when(personRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.syncMinistries(99L, Set.of(MinistryType.READER)));
+        verifyNoInteractions(personMinistryRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldTranslateConstraintViolationOnSyncAddToDatabaseException() {
+        Person reader = reader(1L);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
+        when(personMinistryRepository.save(any(PersonMinistry.class)))
+                .thenThrow(new DataIntegrityViolationException("constraint"));
+
+        assertThrows(DatabaseException.class, () -> service.syncMinistries(1L, Set.of(MinistryType.READER)));
     }
 
     private Person reader(Long id) {

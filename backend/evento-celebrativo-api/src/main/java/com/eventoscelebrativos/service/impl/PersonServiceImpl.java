@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -14,7 +16,9 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
+import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import com.eventoscelebrativos.service.PersonService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,19 +57,22 @@ public class PersonServiceImpl implements PersonService {
     private final PersonAdminMapper personAdminMapper;
     private final PersonRoleUpdateMapper personRoleUpdateMapper;
     private final PersonMinistryReadService personMinistryReadService;
+    private final PersonMinistryCommandService personMinistryCommandService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
             RoleRepository roleRepository,
             PersonAdminMapper personAdminMapper,
             PersonRoleUpdateMapper personRoleUpdateMapper,
-            PersonMinistryReadService personMinistryReadService
+            PersonMinistryReadService personMinistryReadService,
+            PersonMinistryCommandService personMinistryCommandService
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
         this.personAdminMapper = personAdminMapper;
         this.personRoleUpdateMapper = personRoleUpdateMapper;
         this.personMinistryReadService = personMinistryReadService;
+        this.personMinistryCommandService = personMinistryCommandService;
     }
 
     @Override
@@ -153,6 +161,58 @@ public class PersonServiceImpl implements PersonService {
                 legacyPersonTypeForOne(savedPerson.getId()),
                 dto.getRoles()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PersonMinistriesResponseDTO findPersonMinistries(Long id) {
+        validateId(id);
+        if (!personRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Pessoa", id);
+        }
+        Set<MinistryType> activeMinistries = personMinistryReadService
+                .findActiveMinistriesByPersonIds(List.of(id))
+                .getOrDefault(id, Set.of());
+        return toMinistriesResponseDTO(id, activeMinistries);
+    }
+
+    @Override
+    @Transactional
+    public PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO) {
+        Set<MinistryType> desiredMinistries = parseDesiredMinistries(requestDTO.getMinistries());
+        PersonMinistrySyncResult result = personMinistryCommandService.syncMinistries(id, desiredMinistries);
+        return toMinistriesResponseDTO(result.person().getId(), result.activeMinistries());
+    }
+
+    private PersonMinistriesResponseDTO toMinistriesResponseDTO(Long id, Set<MinistryType> ministries) {
+        List<MinistryType> sortedMinistries = ministries.stream().sorted(Comparator.naturalOrder()).toList();
+        return new PersonMinistriesResponseDTO(id, sortedMinistries);
+    }
+
+    private Set<MinistryType> parseDesiredMinistries(List<String> rawMinistries) {
+        if (rawMinistries == null) {
+            throw new BusinessException("O conjunto de ministerios e obrigatorio");
+        }
+        Set<MinistryType> desired = new LinkedHashSet<>();
+        for (String rawMinistry : rawMinistries) {
+            MinistryType ministryType = parseMinistryType(rawMinistry);
+            if (!desired.add(ministryType)) {
+                throw new BusinessException("Ministerio duplicado no request: " + ministryType.name());
+            }
+        }
+        return desired;
+    }
+
+    private MinistryType parseMinistryType(String rawMinistry) {
+        String normalized = normalizeOptionalFilter(rawMinistry);
+        if (normalized == null) {
+            throw new BadRequestException("Tipo de ministerio invalido");
+        }
+        try {
+            return MinistryType.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Tipo de ministerio invalido: " + rawMinistry);
+        }
     }
 
     private String legacyPersonTypeForOne(Long personId) {
