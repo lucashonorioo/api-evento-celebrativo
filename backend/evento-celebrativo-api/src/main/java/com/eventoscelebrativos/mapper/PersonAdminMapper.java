@@ -12,7 +12,7 @@ import java.util.Set;
 @Mapper(componentModel = "spring")
 public interface PersonAdminMapper {
 
-    @Mapping(target = "personType", ignore = true)
+    @Mapping(target = "ministries", ignore = true)
     PersonAdminResponseDTO toDto(Person person);
 
     default List<String> map(Set<Role> roles) {

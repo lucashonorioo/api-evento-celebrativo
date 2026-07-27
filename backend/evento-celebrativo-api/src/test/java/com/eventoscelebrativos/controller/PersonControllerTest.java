@@ -11,6 +11,8 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.service.PersonService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -48,14 +50,14 @@ class PersonControllerTest {
     void shouldListPeopleWhenUserIsAdmin() throws Exception {
         when(personService.findPeople("Alice", null, "reader", "ROLE_ADMIN", 0, 10))
                 .thenReturn(new PageImpl<>(
-                        List.of(adminResponse(1L, "Alice", List.of("ROLE_ADMIN", "ROLE_OPERATOR"))),
+                        List.of(adminResponse(1L, "Alice", List.of(MinistryType.READER), List.of("ROLE_ADMIN", "ROLE_OPERATOR"))),
                         PageRequest.of(0, 10),
                         1
                 ));
 
         mockMvc.perform(get("/pessoas")
                         .param("name", "Alice")
-                        .param("personType", "reader")
+                        .param("ministry", "reader")
                         .param("role", "ROLE_ADMIN")
                         .param("page", "0")
                         .param("size", "10"))
@@ -63,23 +65,81 @@ class PersonControllerTest {
                 .andExpect(jsonPath("$.content[0].id").value(1))
                 .andExpect(jsonPath("$.content[0].name").value("Alice"))
                 .andExpect(jsonPath("$.content[0].phoneNumber").value("34999999991"))
-                .andExpect(jsonPath("$.content[0].personType").value("reader"))
+                .andExpect(jsonPath("$.content[0].ministries[0]").value("READER"))
+                .andExpect(jsonPath("$.content[0].ministries.length()").value(1))
                 .andExpect(jsonPath("$.content[0].roles[0]").value("ROLE_ADMIN"))
                 .andExpect(jsonPath("$.content[0].roles[1]").value("ROLE_OPERATOR"))
-                .andExpect(jsonPath("$.content[0].password").doesNotExist());
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
+                .andExpect(jsonPath("$.content[0].personType").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldListPersonWithNoActiveMinistriesReturningEmptyList() throws Exception {
+        when(personService.findPeople(null, null, null, null, 0, 10))
+                .thenReturn(new PageImpl<>(
+                        List.of(adminResponse(1L, "Alice", List.of(), List.of("ROLE_OPERATOR"))),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].ministries").isArray())
+                .andExpect(jsonPath("$.content[0].ministries").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldListPersonWithSeveralMinistriesSortedDeterministically() throws Exception {
+        when(personService.findPeople(null, null, null, null, 0, 10))
+                .thenReturn(new PageImpl<>(
+                        List.of(adminResponse(
+                                1L,
+                                "Alice",
+                                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                                List.of("ROLE_OPERATOR")
+                        )),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].ministries[0]").value("PRIEST"))
+                .andExpect(jsonPath("$.content[0].ministries[1]").value("READER"))
+                .andExpect(jsonPath("$.content[0].ministries[2]").value("EUCHARISTIC_MINISTER"))
+                .andExpect(jsonPath("$.content[0].ministries.length()").value(3));
+    }
+
+    @ParameterizedTest
+    @EnumSource(MinistryType.class)
+    @WithMockUser(roles = "ADMIN")
+    void shouldFilterPeopleByEachMinistryType(MinistryType ministryType) throws Exception {
+        String filterValue = ministryType.name().toLowerCase();
+        when(personService.findPeople(null, null, filterValue, null, 0, 10))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        mockMvc.perform(get("/pessoas").param("ministry", filterValue))
+                .andExpect(status().isOk());
+
+        verify(personService).findPeople(null, null, filterValue, null, 0, 10);
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void shouldFindPersonByIdWhenUserIsAdmin() throws Exception {
         when(personService.findPersonById(1L))
-                .thenReturn(adminResponse(1L, "Alice", List.of("ROLE_OPERATOR")));
+                .thenReturn(adminResponse(1L, "Alice", List.of(MinistryType.READER, MinistryType.COMMENTATOR), List.of("ROLE_OPERATOR")));
 
         mockMvc.perform(get("/pessoas/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                .andExpect(jsonPath("$.ministries[1]").value("COMMENTATOR"))
                 .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
-                .andExpect(jsonPath("$.password").doesNotExist());
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.personType").doesNotExist());
     }
 
     @Test
@@ -97,10 +157,10 @@ class PersonControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldReturnBadRequestWhenListFilterIsInvalid() throws Exception {
         when(personService.findPeople(null, null, "invalid", null, 0, 10))
-                .thenThrow(new BadRequestException("Tipo de pessoa invalido"));
+                .thenThrow(new BadRequestException("Ministerio invalido"));
 
         mockMvc.perform(get("/pessoas")
-                        .param("personType", "invalid"))
+                        .param("ministry", "invalid"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
     }
@@ -121,8 +181,10 @@ class PersonControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"))
                 .andExpect(jsonPath("$.roles[0]").value("ROLE_ADMIN"))
-                .andExpect(jsonPath("$.password").doesNotExist());
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.personType").doesNotExist());
     }
 
     @Test
@@ -438,12 +500,12 @@ class PersonControllerTest {
         verifyNoInteractions(personService);
     }
 
-    private PersonAdminResponseDTO adminResponse(Long id, String name, List<String> roles) {
+    private PersonAdminResponseDTO adminResponse(Long id, String name, List<MinistryType> ministries, List<String> roles) {
         return new PersonAdminResponseDTO(
                 id,
                 name,
                 "3499999999" + id,
-                "reader",
+                ministries,
                 roles
         );
     }
@@ -453,7 +515,7 @@ class PersonControllerTest {
                 1L,
                 "Reader",
                 "34999999991",
-                "reader",
+                List.of(MinistryType.READER),
                 List.of(role)
         );
     }

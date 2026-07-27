@@ -12,7 +12,7 @@ public interface PersonService {
     Page<PersonAdminResponseDTO> findPeople(
             String name,
             String phoneNumber,
-            String personType,
+            String ministry,
             String role,
             int page,
             int size

@@ -20,6 +20,8 @@ import com.eventoscelebrativos.service.impl.PersonServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -79,7 +81,7 @@ class PersonServiceImplTest {
         when(personRepository.findAllByIdInWithRoles(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(2L, 1L)))
-                .thenReturn(Map.of());
+                .thenReturn(Map.of(2L, Set.of(MinistryType.READER)));
         when(personAdminMapper.toDto(first)).thenReturn(adminResponse(2L, "Alice", "ROLE_ADMIN"));
         when(personAdminMapper.toDto(second)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
@@ -87,7 +89,31 @@ class PersonServiceImplTest {
 
         assertEquals(2, result.getTotalElements());
         assertEquals(2L, result.getContent().get(0).getId());
+        assertEquals(List.of(MinistryType.READER), result.getContent().get(0).getMinistries());
         assertEquals(1L, result.getContent().get(1).getId());
+        assertEquals(List.of(), result.getContent().get(1).getMinistries());
+        verify(personMinistryReadService, times(1)).findActiveMinistriesByPersonIds(List.of(2L, 1L));
+    }
+
+    @Test
+    void shouldFindPeopleWithSeveralMinistriesSortedDeterministicallyWithoutDuplicates() {
+        PageRequest pageable = PageRequest.of(0, 10);
+        Person person = person(1L, "Alice", "34911111111", "encoded-password");
+
+        when(personRepository.findAdminPageIds(null, null, null, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(1L), pageable, 1));
+        when(personRepository.findAllByIdInWithRoles(List.of(1L)))
+                .thenReturn(List.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
+        when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
+
+        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, null, null, 0, 10);
+
+        assertEquals(
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                result.getContent().get(0).getMinistries()
+        );
     }
 
     @Test
@@ -119,6 +145,20 @@ class PersonServiceImplTest {
         );
     }
 
+    @ParameterizedTest
+    @EnumSource(MinistryType.class)
+    void shouldFilterPeopleByEachOfTheFiveMinistryTypes(MinistryType ministryType) {
+        PageRequest pageable = PageRequest.of(0, 10);
+        String filterValue = ministryType.name().toLowerCase();
+        when(personRepository.findAdminPageIds(null, null, ministryType, null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, filterValue, null, 0, 10);
+
+        assertEquals(0, result.getTotalElements());
+        verify(personRepository).findAdminPageIds(null, null, ministryType, null, pageable);
+    }
+
     @Test
     void shouldFindPersonById() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
@@ -131,6 +171,23 @@ class PersonServiceImplTest {
 
         assertEquals(1L, response.getId());
         assertEquals("Reader", response.getName());
+        assertEquals(List.of(), response.getMinistries());
+    }
+
+    @Test
+    void shouldFindPersonByIdWithSeveralMinistriesSortedDeterministically() {
+        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
+        when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
+
+        PersonAdminResponseDTO response = service.findPersonById(1L);
+
+        assertEquals(
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                response.getMinistries()
+        );
     }
 
     @Test
@@ -159,13 +216,14 @@ class PersonServiceImplTest {
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
-                .thenReturn(Map.of());
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
 
         assertEquals(1L, response.getId());
         assertEquals("ROLE_ADMIN", response.getRoles().get(0));
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
         assertTrue(person.hasRole("ROLE_ADMIN"));
         assertFalse(person.hasRole("ROLE_OPERATOR"));
     }
@@ -471,7 +529,7 @@ class PersonServiceImplTest {
                 id,
                 name,
                 "3499999999" + id,
-                "reader",
+                List.of(),
                 List.of(role)
         );
     }
@@ -481,7 +539,7 @@ class PersonServiceImplTest {
                 1L,
                 "Reader",
                 "34999999991",
-                "reader",
+                List.of(),
                 List.of(role)
         );
     }

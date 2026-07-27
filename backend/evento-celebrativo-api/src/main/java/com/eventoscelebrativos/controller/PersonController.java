@@ -43,8 +43,8 @@ public class PersonController {
     public ResponseEntity<Page<PersonAdminResponseDTO>> findPeople(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phoneNumber,
-            @Parameter(description = "Tipo de pessoa: reader, commentator, minister_of_the_word, eucharistic_minister, priest")
-            @RequestParam(required = false) String personType,
+            @Parameter(description = "Ministerio ativo: reader, commentator, minister_of_the_word, eucharistic_minister, priest")
+            @RequestParam(required = false) String ministry,
             @Parameter(description = "Perfil de acesso: ROLE_ADMIN ou ROLE_OPERATOR")
             @RequestParam(required = false) String role,
             @RequestParam(defaultValue = "0") int page,
@@ -53,7 +53,7 @@ public class PersonController {
         Page<PersonAdminResponseDTO> people = personService.findPeople(
                 name,
                 phoneNumber,
-                personType,
+                ministry,
                 role,
                 page,
                 size
