@@ -1,0 +1,17 @@
+# Graphify — saída gerada localmente
+/graphify-out/
+
+# Claude Code — configurações específicas de cada computador
+**/.claude/settings.local.json
+
+# IntelliJ — configurações locais do monorepo
+/.idea/
+/*.iml
+
+# VS Code — configurações locais da raiz
+/.vscode/
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
