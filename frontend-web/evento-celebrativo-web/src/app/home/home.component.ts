@@ -6,6 +6,7 @@ import { finalize } from 'rxjs';
 import { AuthSessionService } from '../auth-session.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
+import { compareEventsByDateTimeAscending, eventLocalTimestamp } from '../events/event-view.utils';
 
 const MAX_UPCOMING_EVENTS = 5;
 
@@ -116,18 +117,7 @@ function selectUpcomingEvents(
   now: Date = new Date(),
 ): CelebrationEventResponse[] {
   return [...events]
-    .filter((event) => toLocalDateTime(event.eventDate, event.eventTime).getTime() >= now.getTime())
-    .sort(
-      (first, second) =>
-        toLocalDateTime(first.eventDate, first.eventTime).getTime() -
-        toLocalDateTime(second.eventDate, second.eventTime).getTime(),
-    )
+    .filter((event) => eventLocalTimestamp(event) >= now.getTime())
+    .sort(compareEventsByDateTimeAscending)
     .slice(0, MAX_UPCOMING_EVENTS);
-}
-
-function toLocalDateTime(eventDate: string, eventTime: string): Date {
-  const [year, month, day] = eventDate.split('-').map(Number);
-  const [hours, minutes, seconds] = eventTime.split(':').map(Number);
-
-  return new Date(year, month - 1, day, hours, minutes, seconds ?? 0, 0);
 }

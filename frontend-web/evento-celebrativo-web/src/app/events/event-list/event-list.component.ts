@@ -6,6 +6,12 @@ import { finalize } from 'rxjs';
 import { AuthSessionService } from '../../auth-session.service';
 import { CelebrationEventResponse } from '../event.models';
 import { EventService } from '../event.service';
+import {
+  compareEventsByDateTimeAscending,
+  compareEventsByDateTimeDescending,
+  eventLocalTimestamp,
+  normalizeEventSearchText,
+} from '../event-view.utils';
 
 type PeriodFilter = 'upcoming' | 'past' | 'all';
 type TypeFilter = 'all' | 'mass' | 'celebration';
@@ -176,7 +182,7 @@ function applyEventFilters(
 
   return events
     .filter((event) => {
-      const eventTime = toLocalDateTime(event.eventDate, event.eventTime).getTime();
+      const eventTime = eventLocalTimestamp(event);
 
       if (filters.period === 'upcoming' && eventTime < nowTime) {
         return false;
@@ -188,12 +194,9 @@ function applyEventFilters(
 
       return matchesType(event, filters.type) && matchesSearch(event, filters.search);
     })
-    .sort((first, second) => {
-      const firstTime = toLocalDateTime(first.eventDate, first.eventTime).getTime();
-      const secondTime = toLocalDateTime(second.eventDate, second.eventTime).getTime();
-
-      return filters.period === 'past' ? secondTime - firstTime : firstTime - secondTime;
-    });
+    .sort(
+      filters.period === 'past' ? compareEventsByDateTimeDescending : compareEventsByDateTimeAscending,
+    );
 }
 
 function matchesType(event: CelebrationEventResponse, type: TypeFilter): boolean {
@@ -209,32 +212,15 @@ function matchesType(event: CelebrationEventResponse, type: TypeFilter): boolean
 }
 
 function matchesSearch(event: CelebrationEventResponse, search: string): boolean {
-  const normalizedSearch = normalizeForSearch(search);
+  const normalizedSearch = normalizeEventSearchText(search);
 
   if (normalizedSearch.length === 0) {
     return true;
   }
 
-  return normalizeForSearch(event.nameMassOrEvent).includes(normalizedSearch);
-}
-
-const DIACRITIC_MARKS_PATTERN = /\p{Diacritic}/gu;
-
-function normalizeForSearch(value: string): string {
-  return value
-    .trim()
-    .toLocaleLowerCase()
-    .normalize('NFD')
-    .replace(DIACRITIC_MARKS_PATTERN, '');
+  return normalizeEventSearchText(event.nameMassOrEvent).includes(normalizedSearch);
 }
 
 function resultCountLabelFor(count: number): string {
   return count === 1 ? '1 evento encontrado' : `${count} eventos encontrados`;
-}
-
-function toLocalDateTime(eventDate: string, eventTime: string): Date {
-  const [year, month, day] = eventDate.split('-').map(Number);
-  const [hours, minutes, seconds] = eventTime.split(':').map(Number);
-
-  return new Date(year, month - 1, day, hours, minutes, seconds ?? 0, 0);
 }
