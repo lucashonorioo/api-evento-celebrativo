@@ -24,8 +24,61 @@
   color: #4f5358;
 }
 
+.events__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+
+.events__period {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+}
+
+.events__period legend,
+.events__field label {
+  margin-bottom: 0.4rem;
+  color: #202124;
+  font-weight: 700;
+}
+
+.events__period-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.events__field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.events__field input,
+.events__field select {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #d7dadf;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.events__count {
+  margin: 0 0 1rem;
+  color: #4f5358;
+  font-weight: 700;
+}
+
 .events__status,
 .events__feedback {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
   padding: 1rem;
   border: 1px solid #d7dadf;
   border-radius: 0.5rem;
@@ -39,7 +92,6 @@
 
 .events__button {
   min-height: 2.5rem;
-  margin-top: 0.75rem;
   padding: 0.625rem 1rem;
   border: 1px solid #202124;
   border-radius: 0.5rem;
@@ -54,7 +106,19 @@
   background: #34383d;
 }
 
-.events__button:focus-visible {
+.events__button--secondary {
+  background: #ffffff;
+  color: #202124;
+}
+
+.events__button--secondary:hover {
+  background: #f1f2f4;
+}
+
+.events__button:focus-visible,
+.events__period-option input:focus-visible,
+.events__field input:focus-visible,
+.events__field select:focus-visible {
   outline: 3px solid #7aa7ff;
   outline-offset: 3px;
 }
@@ -138,6 +202,15 @@
 @media (max-width: 36rem) {
   .events__header {
     flex-direction: column;
+  }
+
+  .events__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .events__button {
+    width: 100%;
   }
 
   .event-card__main,
