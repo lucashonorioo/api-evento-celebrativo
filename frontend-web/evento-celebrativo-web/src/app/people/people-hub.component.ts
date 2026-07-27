@@ -49,7 +49,7 @@ export class PeopleHubComponent {
     },
     {
       title: 'Usuários',
-      description: 'Gerencie os perfis de acesso das pessoas cadastradas.',
+      description: 'Gerencie os perfis de acesso e os ministérios das pessoas cadastradas.',
       path: '/app/admin/usuarios',
       adminOnly: true,
     },

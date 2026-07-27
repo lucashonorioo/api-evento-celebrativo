@@ -1,9 +1,9 @@
-export type PersonType =
-  | 'reader'
-  | 'commentator'
-  | 'minister_of_the_word'
-  | 'eucharistic_minister'
-  | 'priest';
+export type MinistryType =
+  | 'PRIEST'
+  | 'READER'
+  | 'COMMENTATOR'
+  | 'MINISTER_OF_THE_WORD'
+  | 'EUCHARISTIC_MINISTER';
 
 export type UserRole = 'ROLE_ADMIN' | 'ROLE_OPERATOR';
 
@@ -11,14 +11,14 @@ export interface PersonAdmin {
   readonly id: number;
   readonly name: string;
   readonly phoneNumber: string;
-  readonly personType: PersonType;
+  readonly ministries: MinistryType[];
   readonly roles: UserRole[];
 }
 
 export interface PersonAdminFilters {
   readonly name?: string;
   readonly phoneNumber?: string;
-  readonly personType?: PersonType;
+  readonly ministry?: MinistryType;
   readonly role?: UserRole;
   readonly page: number;
   readonly size: number;
@@ -37,4 +37,13 @@ export interface PersonAdminPage {
   readonly first: boolean;
   readonly last: boolean;
   readonly empty: boolean;
+}
+
+export interface PersonMinistriesResponse {
+  readonly id: number;
+  readonly ministries: MinistryType[];
+}
+
+export interface PersonMinistriesUpdateRequest {
+  readonly ministries: MinistryType[];
 }

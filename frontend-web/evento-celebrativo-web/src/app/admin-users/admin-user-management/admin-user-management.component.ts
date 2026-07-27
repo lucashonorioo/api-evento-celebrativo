@@ -14,18 +14,19 @@ import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
 import {
+  MinistryType,
   PersonAdmin,
   PersonAdminFilters,
   PersonAdminPage,
-  PersonType,
+  PersonMinistriesResponse,
   UserRole,
 } from '../admin-user.models';
 import { AdminUserService } from '../admin-user.service';
 
 const DEFAULT_PAGE_SIZE = 10;
 
-interface PersonTypeOption {
-  readonly value: PersonType;
+interface MinistryTypeOption {
+  readonly value: MinistryType;
   readonly label: string;
 }
 
@@ -46,6 +47,18 @@ type QueryResult =
       readonly error: unknown;
     };
 
+type MinistriesQueryResult =
+  | {
+      readonly type: 'success';
+      readonly personId: number;
+      readonly response: PersonMinistriesResponse;
+    }
+  | {
+      readonly type: 'error';
+      readonly personId: number;
+      readonly error: unknown;
+    };
+
 @Component({
   selector: 'app-admin-user-management',
   standalone: true,
@@ -61,21 +74,23 @@ export class AdminUserManagementComponent implements OnInit {
   private readonly formBuilder = inject(NonNullableFormBuilder);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly queryRequests = new Subject<PersonAdminFilters>();
+  private readonly ministriesRequests = new Subject<number>();
   private lastRoleChangeButton: HTMLButtonElement | null = null;
+  private lastMinistriesButton: HTMLButtonElement | null = null;
 
   readonly filtersForm = this.formBuilder.group({
     name: [''],
     phoneNumber: [''],
-    personType: ['' as PersonType | ''],
+    ministry: ['' as MinistryType | ''],
     role: ['' as UserRole | ''],
   });
 
-  readonly personTypeOptions: readonly PersonTypeOption[] = [
-    { value: 'reader', label: 'Leitor' },
-    { value: 'commentator', label: 'Comentarista' },
-    { value: 'minister_of_the_word', label: 'Ministro da Palavra' },
-    { value: 'eucharistic_minister', label: 'Ministro da Eucaristia' },
-    { value: 'priest', label: 'Padre' },
+  readonly ministryTypeOptions: readonly MinistryTypeOption[] = [
+    { value: 'PRIEST', label: 'Padre' },
+    { value: 'READER', label: 'Leitor' },
+    { value: 'COMMENTATOR', label: 'Comentarista' },
+    { value: 'MINISTER_OF_THE_WORD', label: 'Ministro da Palavra' },
+    { value: 'EUCHARISTIC_MINISTER', label: 'Ministro da Eucaristia' },
   ];
   readonly roleOptions: readonly UserRoleOption[] = [
     { value: 'ROLE_ADMIN', label: 'Administrador' },
@@ -96,6 +111,13 @@ export class AdminUserManagementComponent implements OnInit {
   readonly activeFilters = signal<PersonAdminFilters>(emptyFilters());
   readonly pendingRoleChange = signal<PersonAdmin | null>(null);
   readonly selectedRole = signal<UserRole | null>(null);
+
+  readonly pendingMinistriesChange = signal<PersonAdmin | null>(null);
+  readonly selectedMinistries = signal<MinistryType[]>([]);
+  readonly isMinistriesLoading = signal(false);
+  readonly isMinistriesLoaded = signal(false);
+  readonly isSavingMinistries = signal(false);
+  readonly ministriesErrorMessage = signal<string | null>(null);
 
   private readonly authenticatedUsername = this.authSessionService.getUsername();
 
@@ -128,6 +150,38 @@ export class AdminUserManagementComponent implements OnInit {
         this.applyPage(result.page);
       });
 
+    this.ministriesRequests
+      .pipe(
+        switchMap((personId) =>
+          this.adminUserService.findMinistries(personId).pipe(
+            map((response): MinistriesQueryResult => ({ type: 'success', personId, response })),
+            catchError((error: unknown) =>
+              of({ type: 'error', personId, error } satisfies MinistriesQueryResult),
+            ),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        const current = this.pendingMinistriesChange();
+
+        if (current === null || current.id !== result.personId) {
+          return;
+        }
+
+        this.isMinistriesLoading.set(false);
+
+        if (result.type === 'error') {
+          this.ministriesErrorMessage.set(ministriesLoadErrorMessageFor(result.error));
+          this.focusMinistriesPanel(result.personId);
+          return;
+        }
+
+        this.selectedMinistries.set(dedupeMinistries(result.response.ministries));
+        this.isMinistriesLoaded.set(true);
+        this.focusMinistriesPanel(result.personId);
+      });
+
     this.loadPage(0);
   }
 
@@ -139,7 +193,7 @@ export class AdminUserManagementComponent implements OnInit {
     this.filtersForm.reset({
       name: '',
       phoneNumber: '',
-      personType: '',
+      ministry: '',
       role: '',
     });
     this.loadPage(0, emptyFilters());
@@ -167,6 +221,7 @@ export class AdminUserManagementComponent implements OnInit {
   }
 
   openRoleChange(person: PersonAdmin, trigger: HTMLButtonElement): void {
+    this.resetMinistriesPanelState();
     this.errorMessage.set(null);
     this.roleChangeErrorMessage.set(null);
     this.successMessage.set(null);
@@ -181,9 +236,7 @@ export class AdminUserManagementComponent implements OnInit {
       return;
     }
 
-    this.pendingRoleChange.set(null);
-    this.selectedRole.set(null);
-    this.roleChangeErrorMessage.set(null);
+    this.resetRolePanelState();
     this.focusLastRoleChangeButton();
   }
 
@@ -213,8 +266,7 @@ export class AdminUserManagementComponent implements OnInit {
     this.adminUserService.updateRole(person.id, role).subscribe({
       next: () => {
         this.isSaving.set(false);
-        this.pendingRoleChange.set(null);
-        this.selectedRole.set(null);
+        this.resetRolePanelState();
         this.successMessage.set('Perfil atualizado com sucesso.');
         this.reloadCurrentPage();
       },
@@ -225,11 +277,84 @@ export class AdminUserManagementComponent implements OnInit {
     });
   }
 
-  personTypeLabel(personType: PersonType): string {
-    return (
-      this.personTypeOptions.find((option) => option.value === personType)?.label ??
-      'Categoria desconhecida'
+  openMinistriesChange(person: PersonAdmin, trigger: HTMLButtonElement): void {
+    this.resetRolePanelState();
+    this.errorMessage.set(null);
+    this.successMessage.set(null);
+    this.lastMinistriesButton = trigger;
+    this.pendingMinistriesChange.set(person);
+    this.selectedMinistries.set([]);
+    this.ministriesErrorMessage.set(null);
+    this.isMinistriesLoaded.set(false);
+    this.isMinistriesLoading.set(true);
+    this.ministriesRequests.next(person.id);
+  }
+
+  cancelMinistriesChange(): void {
+    if (this.isSavingMinistries()) {
+      return;
+    }
+
+    this.resetMinistriesPanelState();
+    this.focusLastMinistriesButton();
+  }
+
+  toggleMinistry(ministry: MinistryType): void {
+    const current = this.selectedMinistries();
+
+    this.selectedMinistries.set(
+      current.includes(ministry)
+        ? current.filter((value) => value !== ministry)
+        : dedupeMinistries([...current, ministry]),
     );
+  }
+
+  isMinistrySelected(ministry: MinistryType): boolean {
+    return this.selectedMinistries().includes(ministry);
+  }
+
+  confirmMinistriesChange(): void {
+    const person = this.pendingMinistriesChange();
+
+    if (
+      person === null ||
+      this.isSavingMinistries() ||
+      this.isMinistriesLoading() ||
+      !this.isMinistriesLoaded()
+    ) {
+      return;
+    }
+
+    const ministries = dedupeMinistries(this.selectedMinistries());
+
+    this.isSavingMinistries.set(true);
+    this.ministriesErrorMessage.set(null);
+    this.successMessage.set(null);
+
+    this.adminUserService.updateMinistries(person.id, ministries).subscribe({
+      next: () => {
+        this.isSavingMinistries.set(false);
+        this.resetMinistriesPanelState();
+        this.successMessage.set('Ministérios atualizados com sucesso.');
+        this.reloadCurrentPage();
+      },
+      error: (error: unknown) => {
+        this.isSavingMinistries.set(false);
+        this.ministriesErrorMessage.set(ministriesUpdateErrorMessageFor(error));
+      },
+    });
+  }
+
+  ministryLabel(ministry: MinistryType): string {
+    return (
+      this.ministryTypeOptions.find((option) => option.value === ministry)?.label ?? ministry
+    );
+  }
+
+  ministriesLabel(ministries: readonly MinistryType[]): string {
+    return ministries.length === 0
+      ? 'Sem ministérios'
+      : ministries.map((ministry) => this.ministryLabel(ministry)).join(', ');
   }
 
   roleLabel(role: UserRole): string {
@@ -257,7 +382,7 @@ export class AdminUserManagementComponent implements OnInit {
   hasActiveFilters(): boolean {
     const filters = this.activeFilters();
 
-    return Boolean(filters.name || filters.phoneNumber || filters.personType || filters.role);
+    return Boolean(filters.name || filters.phoneNumber || filters.ministry || filters.role);
   }
 
   isConfirmDisabled(person: PersonAdmin): boolean {
@@ -291,6 +416,22 @@ export class AdminUserManagementComponent implements OnInit {
     return `role-change-title-${person.id}`;
   }
 
+  isMinistriesChangeOpen(person: PersonAdmin): boolean {
+    return this.pendingMinistriesChange()?.id === person.id;
+  }
+
+  ministriesPanelId(person: PersonAdmin): string {
+    return `ministries-panel-${person.id}`;
+  }
+
+  ministriesTitleId(person: PersonAdmin): string {
+    return `ministries-title-${person.id}`;
+  }
+
+  ministryCheckboxId(person: PersonAdmin, ministry: MinistryType): string {
+    return `ministry-checkbox-${person.id}-${ministry}`;
+  }
+
   private loadPage(
     page: number,
     filters: PersonAdminFilters | null = null,
@@ -316,7 +457,7 @@ export class AdminUserManagementComponent implements OnInit {
     return {
       name: trimmedOrUndefined(value.name),
       phoneNumber: trimmedOrUndefined(value.phoneNumber),
-      personType: value.personType || undefined,
+      ministry: value.ministry || undefined,
       role: value.role || undefined,
       page,
       size: DEFAULT_PAGE_SIZE,
@@ -336,6 +477,20 @@ export class AdminUserManagementComponent implements OnInit {
     return person.roles.length === 1 && person.roles[0] === role;
   }
 
+  private resetRolePanelState(): void {
+    this.pendingRoleChange.set(null);
+    this.selectedRole.set(null);
+    this.roleChangeErrorMessage.set(null);
+  }
+
+  private resetMinistriesPanelState(): void {
+    this.pendingMinistriesChange.set(null);
+    this.selectedMinistries.set([]);
+    this.ministriesErrorMessage.set(null);
+    this.isMinistriesLoading.set(false);
+    this.isMinistriesLoaded.set(false);
+  }
+
   private focusFirstRoleOption(personId: number): void {
     window.setTimeout(() => {
       this.host.nativeElement
@@ -351,6 +506,29 @@ export class AdminUserManagementComponent implements OnInit {
       this.lastRoleChangeButton?.focus();
     });
   }
+
+  private focusMinistriesPanel(personId: number): void {
+    window.setTimeout(() => {
+      const firstCheckbox = this.host.nativeElement.querySelector<HTMLInputElement>(
+        `#ministries-panel-${personId} input[type="checkbox"]:not(:disabled)`,
+      );
+
+      if (firstCheckbox) {
+        firstCheckbox.focus();
+        return;
+      }
+
+      this.host.nativeElement
+        .querySelector<HTMLElement>(`#ministries-title-${personId}`)
+        ?.focus();
+    });
+  }
+
+  private focusLastMinistriesButton(): void {
+    window.setTimeout(() => {
+      this.lastMinistriesButton?.focus();
+    });
+  }
 }
 
 function emptyFilters(): PersonAdminFilters {
@@ -358,6 +536,10 @@ function emptyFilters(): PersonAdminFilters {
     page: 0,
     size: DEFAULT_PAGE_SIZE,
   };
+}
+
+function dedupeMinistries(ministries: readonly MinistryType[]): MinistryType[] {
+  return [...new Set(ministries)];
 }
 
 function trimmedOrUndefined(value: string): string | undefined {
@@ -400,6 +582,46 @@ function roleUpdateErrorMessageFor(error: unknown): string {
   }
 
   return 'Não foi possível alterar o perfil. Tente novamente.';
+}
+
+function ministriesLoadErrorMessageFor(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 403) {
+      return 'Você não possui permissão para gerenciar usuários.';
+    }
+
+    if (error.status === 404) {
+      return 'A pessoa selecionada não foi encontrada.';
+    }
+  }
+
+  return 'Não foi possível carregar os ministérios. Tente novamente.';
+}
+
+function ministriesUpdateErrorMessageFor(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 400) {
+      return 'O ministério informado não é válido.';
+    }
+
+    if (error.status === 403) {
+      return 'Você não possui permissão para gerenciar usuários.';
+    }
+
+    if (error.status === 404) {
+      return 'A pessoa selecionada não foi encontrada.';
+    }
+
+    if (error.status === 409) {
+      return 'Não é possível remover um ministério vinculado a uma escala.';
+    }
+
+    if (error.status === 422) {
+      return 'O conjunto de ministérios informado não é válido.';
+    }
+  }
+
+  return 'Não foi possível atualizar os ministérios. Tente novamente.';
 }
 
 function conflictMessageFor(value: unknown): string {

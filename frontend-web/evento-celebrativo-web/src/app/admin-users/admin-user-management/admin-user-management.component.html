@@ -19,10 +19,10 @@
     </div>
 
     <div class="admin-users__field">
-      <label for="user-person-type">Categoria da pessoa</label>
-      <select id="user-person-type" formControlName="personType">
-        <option value="">Todas</option>
-        @for (option of personTypeOptions; track option.value) {
+      <label for="user-ministry">Ministério</label>
+      <select id="user-ministry" formControlName="ministry">
+        <option value="">Todos</option>
+        @for (option of ministryTypeOptions; track option.value) {
           <option [value]="option.value">{{ option.label }}</option>
         }
       </select>
@@ -93,29 +93,44 @@
             <tr>
               <th scope="col">Nome</th>
               <th scope="col">Telefone</th>
-              <th scope="col">Categoria da pessoa</th>
+              <th scope="col">Ministérios</th>
               <th scope="col">Perfil de acesso atual</th>
               <th scope="col">Ações</th>
             </tr>
           </thead>
           <tbody>
             @for (person of people(); track person.id) {
-              <tr [class.admin-users__row--selected]="isRoleChangeOpen(person)">
+              <tr
+                [class.admin-users__row--selected]="
+                  isRoleChangeOpen(person) || isMinistriesChangeOpen(person)
+                "
+              >
                 <td data-label="Nome">{{ person.name }}</td>
                 <td data-label="Telefone">{{ formatPhone(person.phoneNumber) }}</td>
-                <td data-label="Categoria da pessoa">{{ personTypeLabel(person.personType) }}</td>
+                <td data-label="Ministérios">{{ ministriesLabel(person.ministries) }}</td>
                 <td data-label="Perfil de acesso atual">{{ rolesLabel(person.roles) }}</td>
-                <td data-label="Ações">
+                <td data-label="Ações" class="admin-users__confirmation-actions">
                   <button
                     #roleChangeButton
                     class="admin-users__button admin-users__button--secondary"
                     type="button"
                     [attr.aria-controls]="roleChangePanelId(person)"
                     [attr.aria-expanded]="isRoleChangeOpen(person)"
-                    [disabled]="isSaving() || isLoading()"
+                    [disabled]="isSaving() || isLoading() || isSavingMinistries()"
                     (click)="openRoleChange(person, roleChangeButton)"
                   >
                     Alterar perfil
+                  </button>
+                  <button
+                    #ministriesChangeButton
+                    class="admin-users__button admin-users__button--secondary"
+                    type="button"
+                    [attr.aria-controls]="ministriesPanelId(person)"
+                    [attr.aria-expanded]="isMinistriesChangeOpen(person)"
+                    [disabled]="isSaving() || isLoading() || isSavingMinistries()"
+                    (click)="openMinistriesChange(person, ministriesChangeButton)"
+                  >
+                    Gerenciar ministérios
                   </button>
                 </td>
               </tr>
@@ -141,8 +156,8 @@
                           <dd>{{ person.name }}</dd>
                         </div>
                         <div>
-                          <dt>Categoria da pessoa</dt>
-                          <dd>{{ personTypeLabel(person.personType) }}</dd>
+                          <dt>Ministérios</dt>
+                          <dd>{{ ministriesLabel(person.ministries) }}</dd>
                         </div>
                         <div>
                           <dt>Perfil de acesso atual</dt>
@@ -199,6 +214,77 @@
                           type="button"
                           [disabled]="isSaving()"
                           (click)="cancelRoleChange()"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </section>
+                  </td>
+                </tr>
+              }
+
+              @if (isMinistriesChangeOpen(person)) {
+                <tr class="admin-users__details-row">
+                  <td colspan="5">
+                    <section
+                      [id]="ministriesPanelId(person)"
+                      class="admin-users__confirmation"
+                      [attr.aria-labelledby]="ministriesTitleId(person)"
+                    >
+                      <div>
+                        <p class="admin-users__panel-eyebrow">Ministérios</p>
+                        <h3 [id]="ministriesTitleId(person)" tabindex="-1">
+                          Gerenciar ministérios de {{ person.name }}
+                        </h3>
+                      </div>
+
+                      @if (isMinistriesLoading()) {
+                        <p class="admin-users__status" role="status">Carregando ministérios...</p>
+                      }
+
+                      @if (ministriesErrorMessage()) {
+                        <p class="admin-users__feedback admin-users__feedback--error" role="alert">
+                          {{ ministriesErrorMessage() }}
+                        </p>
+                      }
+
+                      @if (isMinistriesLoaded()) {
+                        <fieldset
+                          class="admin-users__role-options"
+                          [disabled]="isSavingMinistries()"
+                        >
+                          <legend>Ministérios da pessoa</legend>
+
+                          @for (option of ministryTypeOptions; track option.value) {
+                            <label class="admin-users__role-option">
+                              <input
+                                type="checkbox"
+                                [id]="ministryCheckboxId(person, option.value)"
+                                [checked]="isMinistrySelected(option.value)"
+                                (change)="toggleMinistry(option.value)"
+                              />
+                              <span>{{ option.label }}</span>
+                            </label>
+                          }
+                        </fieldset>
+                      }
+
+                      <div class="admin-users__confirmation-actions">
+                        @if (isMinistriesLoaded()) {
+                          <button
+                            class="admin-users__button"
+                            type="button"
+                            [disabled]="isSavingMinistries()"
+                            (click)="confirmMinistriesChange()"
+                          >
+                            Salvar ministérios
+                          </button>
+                        }
+                        <button
+                          class="admin-users__button admin-users__button--secondary"
+                          type="button"
+                          [disabled]="isSavingMinistries()"
+                          (click)="cancelMinistriesChange()"
                         >
                           Cancelar
                         </button>
