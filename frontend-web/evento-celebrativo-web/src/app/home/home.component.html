@@ -2,10 +2,54 @@
   <header class="page-header">
     <div class="page-header__content">
       <p class="page-header__eyebrow">Inicio</p>
-      <h1 id="home-title">Painel da Paroquia</h1>
-      <p>Bem-vindo, {{ username }}. Acesse rapidamente as areas principais do sistema.</p>
+      <h1 id="home-title">Painel da Paróquia</h1>
+      <p class="home__greeting">Bem-vindo, {{ username }}.</p>
+      <p>Acompanhe os próximos eventos e acesse rapidamente as principais áreas do sistema.</p>
     </div>
   </header>
+
+  <section class="home__upcoming surface-card" aria-labelledby="upcoming-events-title">
+    <h2 id="upcoming-events-title">Próximos eventos</h2>
+
+    <div aria-live="polite">
+      @if (isLoadingEvents()) {
+        <p class="home__status" role="status">Carregando próximos eventos...</p>
+      } @else if (eventsErrorMessage()) {
+        <div class="home__feedback home__feedback--error" role="alert">
+          <p>{{ eventsErrorMessage() }}</p>
+          <button class="home__button" type="button" (click)="loadEvents()">Tentar novamente</button>
+        </div>
+      } @else if (upcomingEvents().length === 0) {
+        <p class="home__feedback">Nenhum próximo evento foi encontrado.</p>
+      } @else {
+        <ul class="home__events-list" aria-label="Lista de próximos eventos">
+          @for (event of upcomingEvents(); track event.id) {
+            <li class="home__event-card">
+              <div class="home__event-card-main">
+                <h3>{{ event.nameMassOrEvent }}</h3>
+                <span class="home__event-type">{{ eventTypeLabel(event) }}</span>
+              </div>
+
+              <dl class="home__event-details">
+                <div>
+                  <dt>Data</dt>
+                  <dd>{{ event.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+                </div>
+                <div>
+                  <dt>Horário</dt>
+                  <dd>{{ formatEventTime(event.eventTime) }}</dd>
+                </div>
+              </dl>
+
+              <a class="home__event-link" [routerLink]="['/app/eventos', event.id]">
+                Ver evento
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </section>
 
   <section class="home__quick-access" aria-labelledby="quick-access-title">
     <h2 id="quick-access-title">Acessos rapidos</h2>
@@ -19,4 +63,18 @@
       }
     </div>
   </section>
+
+  @if (isAdmin) {
+    <section class="home__admin surface-card" aria-labelledby="admin-actions-title">
+      <h2 id="admin-actions-title">Administração</h2>
+
+      <div class="home__grid">
+        @for (link of adminActionLinks; track link.path) {
+          <a class="home__card home__card--admin" [routerLink]="link.path">
+            <span>{{ link.label }}</span>
+          </a>
+        }
+      </div>
+    </section>
+  }
 </section>
