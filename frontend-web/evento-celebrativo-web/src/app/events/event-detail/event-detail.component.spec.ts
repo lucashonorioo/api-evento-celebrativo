@@ -291,4 +291,79 @@ describe('EventDetailComponent', () => {
 
     expect(link?.getAttribute('href')).toBe('/app/eventos');
   });
+
+  it('should preserve period, search and type query parameters in the public back link', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'eventos', component: EmptyTestComponent },
+          { path: 'eventos/:id', component: EventDetailComponent },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create(
+      '/eventos/1?period=past&search=missa&type=mass',
+    );
+    const link = harness.routeNativeElement?.querySelector(
+      '.event-detail__back',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/eventos?period=past&search=missa&type=mass');
+    expect(eventService.findById).toHaveBeenCalledOnceWith(1);
+  });
+
+  it('should preserve period, search and type query parameters in the authenticated back link', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EmptyTestComponent },
+              { path: 'eventos/:id', component: EventDetailComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos/1?period=past&search=missa');
+    const link = harness.routeNativeElement?.querySelector(
+      '.event-detail__back',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/app/eventos?period=past&search=missa');
+  });
+
+  it('should preserve unknown query parameters present in the detail URL', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'eventos', component: EmptyTestComponent },
+          { path: 'eventos/:id', component: EventDetailComponent },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/eventos/1?foo=bar&period=past');
+    const link = harness.routeNativeElement?.querySelector(
+      '.event-detail__back',
+    ) as HTMLAnchorElement | null;
+
+    expect(link?.getAttribute('href')).toBe('/eventos?foo=bar&period=past');
+  });
 });

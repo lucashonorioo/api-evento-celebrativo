@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -32,6 +32,14 @@ interface TypeOption {
   readonly label: string;
 }
 
+const DEFAULT_PERIOD_FILTER: PeriodFilter = 'upcoming';
+const DEFAULT_TYPE_FILTER: TypeFilter = 'all';
+const PERIOD_FILTER_VALUES: readonly PeriodFilter[] = ['upcoming', 'past', 'all'];
+const TYPE_FILTER_VALUES: readonly TypeFilter[] = ['all', 'mass', 'celebration'];
+const FILTER_QUERY_PARAM_KEYS = ['period', 'search', 'type'] as const;
+
+type FilterQueryParams = Record<(typeof FILTER_QUERY_PARAM_KEYS)[number], string | null>;
+
 @Component({
   selector: 'app-event-list',
   standalone: true,
@@ -44,15 +52,20 @@ export class EventListComponent implements OnInit {
   private readonly authSessionService = inject(AuthSessionService);
   private readonly eventService = inject(EventService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly allEvents = signal<CelebrationEventResponse[]>([]);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
-  readonly periodFilter = signal<PeriodFilter>('upcoming');
-  readonly searchTerm = signal('');
-  readonly typeFilter = signal<TypeFilter>('all');
+  readonly periodFilter = signal<PeriodFilter>(
+    periodFilterFromQueryParam(this.route.snapshot.queryParamMap.get('period')),
+  );
+  readonly searchTerm = signal(searchTermFromQueryParam(this.route.snapshot.queryParamMap.get('search')));
+  readonly typeFilter = signal<TypeFilter>(
+    typeFilterFromQueryParam(this.route.snapshot.queryParamMap.get('type')),
+  );
 
   readonly periodOptions: readonly PeriodOption[] = [
     { value: 'upcoming', label: 'Próximos' },
@@ -106,6 +119,7 @@ export class EventListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadEvents();
+    this.syncQueryParams();
   }
 
   loadEvents(): void {
@@ -132,6 +146,7 @@ export class EventListComponent implements OnInit {
 
   setPeriodFilter(period: PeriodFilter): void {
     this.periodFilter.set(period);
+    this.syncQueryParams();
   }
 
   setSearchTerm(event: Event): void {
@@ -142,6 +157,7 @@ export class EventListComponent implements OnInit {
     }
 
     this.searchTerm.set(target.value);
+    this.syncQueryParams();
   }
 
   setTypeFilter(event: Event): void {
@@ -152,12 +168,14 @@ export class EventListComponent implements OnInit {
     }
 
     this.typeFilter.set(target.value as TypeFilter);
+    this.syncQueryParams();
   }
 
   clearFilters(): void {
-    this.periodFilter.set('upcoming');
+    this.periodFilter.set(DEFAULT_PERIOD_FILTER);
     this.searchTerm.set('');
-    this.typeFilter.set('all');
+    this.typeFilter.set(DEFAULT_TYPE_FILTER);
+    this.syncQueryParams();
   }
 
   getEventType(event: CelebrationEventResponse): string {
@@ -171,6 +189,58 @@ export class EventListComponent implements OnInit {
   canManageEvents(): boolean {
     return this.isAdmin && this.router.url.startsWith('/app/eventos');
   }
+
+  private syncQueryParams(): void {
+    const desired = filterQueryParamsFor(this.periodFilter(), this.searchTerm(), this.typeFilter());
+    const current = this.route.snapshot.queryParamMap;
+
+    const hasChanges = FILTER_QUERY_PARAM_KEYS.some((key) => (current.get(key) ?? null) !== desired[key]);
+
+    if (!hasChanges) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: desired,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+}
+
+function periodFilterFromQueryParam(value: string | null): PeriodFilter {
+  return isPeriodFilterValue(value) ? value : DEFAULT_PERIOD_FILTER;
+}
+
+function typeFilterFromQueryParam(value: string | null): TypeFilter {
+  return isTypeFilterValue(value) ? value : DEFAULT_TYPE_FILTER;
+}
+
+function searchTermFromQueryParam(value: string | null): string {
+  return value?.trim() ?? '';
+}
+
+function isPeriodFilterValue(value: string | null): value is PeriodFilter {
+  return (PERIOD_FILTER_VALUES as readonly string[]).includes(value ?? '');
+}
+
+function isTypeFilterValue(value: string | null): value is TypeFilter {
+  return (TYPE_FILTER_VALUES as readonly string[]).includes(value ?? '');
+}
+
+function filterQueryParamsFor(
+  period: PeriodFilter,
+  search: string,
+  type: TypeFilter,
+): FilterQueryParams {
+  const trimmedSearch = search.trim();
+
+  return {
+    period: period === DEFAULT_PERIOD_FILTER ? null : period,
+    search: trimmedSearch.length === 0 ? null : trimmedSearch,
+    type: type === DEFAULT_TYPE_FILTER ? null : type,
+  };
 }
 
 function applyEventFilters(

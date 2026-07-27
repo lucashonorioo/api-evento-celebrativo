@@ -1,5 +1,5 @@
 <section class="event-detail" aria-labelledby="event-detail-title">
-  <a class="event-detail__back" routerLink="..">Voltar para eventos</a>
+  <a class="event-detail__back" routerLink=".." queryParamsHandling="preserve">Voltar para eventos</a>
 
   @if (isLoading()) {
     <p class="event-detail__status" role="status">Carregando evento...</p>
