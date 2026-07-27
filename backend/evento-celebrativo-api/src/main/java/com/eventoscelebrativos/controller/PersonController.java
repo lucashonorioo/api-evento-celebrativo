@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -89,6 +91,40 @@ public class PersonController {
             @Valid @RequestBody PersonRoleUpdateRequestDTO requestDTO
     ) {
         PersonRoleUpdateResponseDTO responseDTO = personService.updatePersonRole(id, requestDTO);
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(summary = "Lista os ministerios ativos de uma pessoa")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ministerios listados com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/{id}/ministries")
+    public ResponseEntity<PersonMinistriesResponseDTO> findPersonMinistries(@PathVariable Long id) {
+        PersonMinistriesResponseDTO responseDTO = personService.findPersonMinistries(id);
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(summary = "Atualiza atomicamente o conjunto de ministerios de uma pessoa")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ministerios atualizados com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Remocao de ministerio com vinculo em escala"),
+            @ApiResponse(responseCode = "422", description = "Ministerio duplicado no request")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}/ministries")
+    public ResponseEntity<PersonMinistriesResponseDTO> updatePersonMinistries(
+            @PathVariable Long id,
+            @Valid @RequestBody PersonMinistriesUpdateRequestDTO requestDTO
+    ) {
+        PersonMinistriesResponseDTO responseDTO = personService.updatePersonMinistries(id, requestDTO);
         return ResponseEntity.ok(responseDTO);
     }
 }

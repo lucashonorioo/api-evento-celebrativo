@@ -11,9 +11,15 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
+import com.eventoscelebrativos.service.PersonMinistryDiff;
+import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandService {
@@ -78,5 +84,62 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         personMinistry.deactivate();
         personMinistryRepository.save(personMinistry);
+    }
+
+    @Override
+    @Transactional
+    public PersonMinistrySyncResult syncMinistries(Long personId, Set<MinistryType> desiredMinistries) {
+        if (personId == null || personId <= 0) {
+            throw new BusinessException("O Id deve ser positivo e não nulo");
+        }
+        if (desiredMinistries == null) {
+            throw new BusinessException("O conjunto de ministérios é obrigatório");
+        }
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+
+        List<PersonMinistry> existing = personMinistryRepository.findAllByPersonId(personId);
+        PersonMinistryDiff diff = PersonMinistryDiff.compute(desiredMinistries, existing);
+
+        validateNoAssignmentConflicts(personId, diff.toDeactivate());
+
+        try {
+            for (MinistryType type : diff.toAdd()) {
+                personMinistryRepository.save(new PersonMinistry(person, type));
+            }
+        } catch (DataIntegrityViolationException e) {
+            throw new DatabaseException("Não é possível associar esta pessoa às funções ministeriais informadas.");
+        }
+        for (PersonMinistry ministry : diff.toReactivate()) {
+            ministry.activate();
+            personMinistryRepository.save(ministry);
+        }
+        for (PersonMinistry ministry : diff.toDeactivate()) {
+            ministry.deactivate();
+            personMinistryRepository.save(ministry);
+        }
+
+        return new PersonMinistrySyncResult(
+                person,
+                desiredMinistries,
+                diff.toAdd(),
+                diff.toReactivate().stream().map(PersonMinistry::getMinistryType).collect(Collectors.toUnmodifiableSet()),
+                diff.toDeactivate().stream().map(PersonMinistry::getMinistryType).collect(Collectors.toUnmodifiableSet()),
+                diff.unchanged()
+        );
+    }
+
+    private void validateNoAssignmentConflicts(Long personId, List<PersonMinistry> toDeactivate) {
+        List<MinistryType> conflicting = toDeactivate.stream()
+                .map(PersonMinistry::getMinistryType)
+                .filter(type -> eventAssignmentRepository.existsByPersonIdAndAssignmentType(
+                        personId, EventAssignmentType.valueOf(type.name())))
+                .toList();
+        if (!conflicting.isEmpty()) {
+            String types = conflicting.stream().map(Enum::name).collect(Collectors.joining(", "));
+            throw new DatabaseException(
+                    "Não é possível remover os seguintes ministérios, pois possuem vínculos com escalas: " + types
+            );
+        }
     }
 }

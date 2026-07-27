@@ -90,9 +90,9 @@
     "semantic_hash": "d5eae7e88dc45735873ea82073062b5e"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/config/ResourceServerConfig.java": {
-    "mtime": 1785000405.14589,
-    "ast_hash": "d3ef3f8b66611dc61fe1c9656b07a07d",
-    "semantic_hash": "d3ef3f8b66611dc61fe1c9656b07a07d"
+    "mtime": 1785109945.3251703,
+    "ast_hash": "304bbf3824d2064f6a0e283460edb454",
+    "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/config/SecurityConfig.java": {
     "mtime": 1754356266.2829378,
@@ -145,9 +145,9 @@
     "semantic_hash": "b2b7e5d3b768b977fd2f9a32a0ad2613"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/controller/PersonController.java": {
-    "mtime": 1784379726.6016786,
-    "ast_hash": "682f408545c06f1e108d901647e215ad",
-    "semantic_hash": "682f408545c06f1e108d901647e215ad"
+    "mtime": 1785109935.014629,
+    "ast_hash": "2c00b97b7ffabd7b8129eb262666158e",
+    "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/controller/PriestController.java": {
     "mtime": 1783893581.9909985,
@@ -360,13 +360,13 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/CommentatorMapper.java": {
-    "mtime": 1785087124.620835,
-    "ast_hash": "0b5851901299b072ab4241fe310f3833",
+    "mtime": 1785109333.7298074,
+    "ast_hash": "6c794b90b60a53112bc0e6075a310d57",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/EucharisticMinisterMapper.java": {
-    "mtime": 1785087158.8114405,
-    "ast_hash": "06f20ce5850a23a54c86b09b295a2b60",
+    "mtime": 1785109333.7307897,
+    "ast_hash": "d2e5711f1d97be12e25679f9841fcb77",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/LocationMapper.java": {
@@ -375,28 +375,28 @@
     "semantic_hash": "df9986b802bb397989de051235b923d3"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/MinisterOfTheWordMapper.java": {
-    "mtime": 1785087147.5097218,
-    "ast_hash": "f78101fcccec7aa757d84d6be7c4705a",
+    "mtime": 1785109333.7307897,
+    "ast_hash": "eea0f5c1cff75e842e8131cef79446ae",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/PersonAdminMapper.java": {
-    "mtime": 1785087397.617638,
+    "mtime": 1785109333.7318435,
     "ast_hash": "8077b475a135da21b74f8490b12a858c",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/PersonRoleUpdateMapper.java": {
-    "mtime": 1785087408.6901326,
+    "mtime": 1785109333.73279,
     "ast_hash": "565b6840b01ee1b7e37a317fea1ba329",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/PriestMapper.java": {
-    "mtime": 1785087136.214319,
-    "ast_hash": "92adc2604b20e2b4641ff35b09127b67",
+    "mtime": 1785109333.73279,
+    "ast_hash": "a686d34e61c39a86de92f033a73ca372",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/mapper/ReaderMapper.java": {
-    "mtime": 1785087106.5340335,
-    "ast_hash": "994f361ac6adb834f6fc0a63b0bc9abd",
+    "mtime": 1785109333.7337873,
+    "ast_hash": "2b8db3957829de3e800c350bac727dc4",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/model/CelebrationEvent.java": {
@@ -430,8 +430,8 @@
     "semantic_hash": "2b0e6d52ec4d58df2f8d58491827b95b"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/model/Person.java": {
-    "mtime": 1785087072.994354,
-    "ast_hash": "33a8e9cf6baa57a8d6a92126c3887e03",
+    "mtime": 1785109333.7348099,
+    "ast_hash": "1c67da8d5da0ff8899e8052256641c62",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/model/PersonMinistry.java": {
@@ -490,7 +490,7 @@
     "semantic_hash": "a561664a5503ea713f78341ba4b39a93"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/repository/PersonRepository.java": {
-    "mtime": 1785087384.2279668,
+    "mtime": 1785109333.7357888,
     "ast_hash": "f4d43a888039327f2426a05dbaa61269",
     "semantic_hash": ""
   },
@@ -565,9 +565,9 @@
     "semantic_hash": "3045b4cbfa5c35c478de68b570d20e5f"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/PersonService.java": {
-    "mtime": 1784379726.6266782,
-    "ast_hash": "afe59a534dc2d06673ba63d3d3ba1d53",
-    "semantic_hash": "afe59a534dc2d06673ba63d3d3ba1d53"
+    "mtime": 1785109846.3121638,
+    "ast_hash": "89bda63a6c5b586d117cc935dbb73038",
+    "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/PriestService.java": {
     "mtime": 1753739926.2213595,
@@ -590,12 +590,12 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/CommentatorServiceImpl.java": {
-    "mtime": 1785087210.2122557,
+    "mtime": 1785109333.7367866,
     "ast_hash": "d684248632397ce5b4b30e81e4b25d22",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/EucharisticMinisterServiceImpl.java": {
-    "mtime": 1785087241.2422938,
+    "mtime": 1785109333.7367866,
     "ast_hash": "b6ebfd0825801e607508ed12e25b4d13",
     "semantic_hash": ""
   },
@@ -605,7 +605,7 @@
     "semantic_hash": "ee9df662e33a4f2c26ad28e1a7a27e80"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/EventAssignmentReadServiceImpl.java": {
-    "mtime": 1785087336.5083048,
+    "mtime": 1785109333.737789,
     "ast_hash": "9c3a332b1b98f0c5fb4cfb7faaa11811",
     "semantic_hash": ""
   },
@@ -615,7 +615,7 @@
     "semantic_hash": "5de77e2d4758f9e769ddcd050a34df07"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/MinisterOfTheWordServiceImpl.java": {
-    "mtime": 1785087230.9025178,
+    "mtime": 1785109333.738788,
     "ast_hash": "043e59d43563af6c92e90220e4db34e1",
     "semantic_hash": ""
   },
@@ -630,17 +630,17 @@
     "semantic_hash": "34167934bad15bd51592e92600ee9a5a"
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/PersonServiceImpl.java": {
-    "mtime": 1785087486.6833656,
-    "ast_hash": "5b7c3ce08aa81a8227fc916aac5c24dc",
+    "mtime": 1785109904.5769851,
+    "ast_hash": "1b6de692a2fcd11b95ca7f3d9f6201e0",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/PriestServiceImpl.java": {
-    "mtime": 1785087220.570608,
+    "mtime": 1785109333.740412,
     "ast_hash": "93e02d5d4a6477e06e960633d2a7c1a7",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/ReaderServiceImpl.java": {
-    "mtime": 1785087182.4645655,
+    "mtime": 1785109333.740412,
     "ast_hash": "2350663f6335b2ae6e193b963c80a0dd",
     "semantic_hash": ""
   },
@@ -660,8 +660,8 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/resources/db/local/R__load_local_demo_data.sql": {
-    "mtime": 1785087577.0885787,
-    "ast_hash": "c39c9c93cd829746a0f2f5622dc3473e",
+    "mtime": 1785109333.74141,
+    "ast_hash": "531ee72294c5c6865fae6aff0a69cd5b",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/resources/db/migration/V1__create_current_schema.sql": {
@@ -695,9 +695,9 @@
     "semantic_hash": "d2206e2111eb48c2be547e64561f95ce"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/controller/EndpointSecurityTest.java": {
-    "mtime": 1785000405.1468902,
-    "ast_hash": "538dae7c4e0661bbec5b696e5d2ab8ea",
-    "semantic_hash": "538dae7c4e0661bbec5b696e5d2ab8ea"
+    "mtime": 1785110341.3524203,
+    "ast_hash": "05379eafa1adc7e73a24bd8865994831",
+    "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/controller/EucharisticMinisterControllerTest.java": {
     "mtime": 1783808878.1131794,
@@ -715,9 +715,9 @@
     "semantic_hash": "97e81b4d992ac2dd124b5f311c1cc7a2"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/controller/PersonControllerTest.java": {
-    "mtime": 1784379726.6457136,
-    "ast_hash": "0ce56ad7e37273ba6142629b8d5037f4",
-    "semantic_hash": "0ce56ad7e37273ba6142629b8d5037f4"
+    "mtime": 1785110245.2152667,
+    "ast_hash": "4effaeb710b4f93075787d79c412f936",
+    "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/controller/PriestControllerTest.java": {
     "mtime": 1783808878.1152873,
@@ -740,12 +740,12 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/migration/FlywayMigrationIntegrationTest.java": {
-    "mtime": 1785087777.3626554,
+    "mtime": 1785109333.74241,
     "ast_hash": "554a24a1de211d7a4874fb5c6df06bc1",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/migration/LocalFlywayMigrationIntegrationTest.java": {
-    "mtime": 1785087826.248759,
+    "mtime": 1785109333.7434154,
     "ast_hash": "5d937e35f9f7ac0a31226d98cb542e1c",
     "semantic_hash": ""
   },
@@ -755,33 +755,33 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/migration/TestProfileFlywayIntegrationTest.java": {
-    "mtime": 1785087876.863283,
+    "mtime": 1785109333.7444105,
     "ast_hash": "a3e1321ec0f66accd5a1934825a612f5",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/repository/CelebrationEventRepositoryTest.java": {
-    "mtime": 1785106665.5736916,
-    "ast_hash": "59d5eb65cd39049585e5f1f279d49e0f",
+    "mtime": 1785109333.7444105,
+    "ast_hash": "2e4d5c1a6f88919be4dfb4196b05ca59",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/repository/EventAssignmentRepositoryTest.java": {
-    "mtime": 1785105266.745143,
-    "ast_hash": "c5637a741c5b05b781a5f5cb71e13553",
+    "mtime": 1785109333.7454104,
+    "ast_hash": "2c2b89fb36c28aa08f35802baeb97b9f",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/repository/PersonMinistryRepositoryTest.java": {
-    "mtime": 1785105832.8187797,
-    "ast_hash": "ba54fbabe6433856c416a184c3fe8c88",
+    "mtime": 1785109333.7454104,
+    "ast_hash": "ff5eba0ba85fe052f73517131f06b8d5",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/repository/PersonRepositoryTest.java": {
-    "mtime": 1785088558.4280481,
-    "ast_hash": "9b7e1b57bfcb514a8b1674b743e6c70e",
+    "mtime": 1785109333.7454104,
+    "ast_hash": "aec16dcdd9542d994e361bff7dad8731",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/CelebrationEventServiceImplTest.java": {
-    "mtime": 1785105374.1689024,
-    "ast_hash": "be5a7a460e7722fc0e5e902c3bc08485",
+    "mtime": 1785109333.7464101,
+    "ast_hash": "f2c9b0c7a8c91c6e5ccd63f9b5792891",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/CommentatorMinistryReadCutoverParallelFailureIntegrationTest.java": {
@@ -790,17 +790,17 @@
     "semantic_hash": "0a9151782ed6389b2eb2c03c4a50c2b0"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/CommentatorMinistryReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785105481.4189079,
+    "mtime": 1785109333.74741,
     "ast_hash": "fb0fefaa9beaa35e256e8225f3575f08",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/CommentatorParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785106348.9414363,
+    "mtime": 1785109333.74741,
     "ast_hash": "24fcd536b13fd8af62de1333f2654790",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/CommentatorServiceImplTest.java": {
-    "mtime": 1785088257.3742063,
+    "mtime": 1785109333.74741,
     "ast_hash": "a036bad3cfbdf39e23b7fdc418884c36",
     "semantic_hash": ""
   },
@@ -815,7 +815,7 @@
     "semantic_hash": "9c973d6a082081e62f8144a7e0425081"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EucharistScaleReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785106569.8692422,
+    "mtime": 1785109333.7484097,
     "ast_hash": "277bbbdf932ef5f220681a50fdc40288",
     "semantic_hash": ""
   },
@@ -825,22 +825,22 @@
     "semantic_hash": "a523e90765d0fc3c052e79a5607e4a98"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EucharisticMinisterMinistryReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785105527.8283517,
+    "mtime": 1785109333.7484097,
     "ast_hash": "14dc457fdf34c654e0cdaee99a60870b",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EucharisticMinisterParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785105749.663845,
+    "mtime": 1785109333.74941,
     "ast_hash": "15aac6da95c7f13884b99fce5dec8dbf",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EucharisticMinisterScaleLegacyCompatibilityIntegrationTest.java": {
-    "mtime": 1785105795.4035065,
+    "mtime": 1785109333.74941,
     "ast_hash": "ed9e6c52826d3378e40193bf48216bd0",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EucharisticMinisterServiceImplTest.java": {
-    "mtime": 1785088404.242484,
+    "mtime": 1785109333.7504103,
     "ast_hash": "14b8828e2443496d4828a988874c22d8",
     "semantic_hash": ""
   },
@@ -850,8 +850,8 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentCompatibilityServiceImplTest.java": {
-    "mtime": 1785105843.8788486,
-    "ast_hash": "393a95c62c265523b5d65a65d26e5f1b",
+    "mtime": 1785109333.7504103,
+    "ast_hash": "270e4e423eaa86ff9a1922c618baa79f",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentGroupTest.java": {
@@ -860,32 +860,32 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentLegacyCompatibilityIntegrationTest.java": {
-    "mtime": 1785105866.898066,
-    "ast_hash": "a84f4278ee4439d36d86527730215e1c",
+    "mtime": 1785109333.75141,
+    "ast_hash": "9b4f3dcf1c1eaa7ca3c3ae391c1c6d2e",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentOfficialWriteIntegrationTest.java": {
-    "mtime": 1785105874.5810645,
-    "ast_hash": "39f9082a7d2784aac54526f83a9b3c38",
+    "mtime": 1785109333.75141,
+    "ast_hash": "e539e8aedceb2dfa6f07809dca6b6802",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785106630.1536293,
+    "mtime": 1785109333.75241,
     "ast_hash": "ee2efd45d7f4929d57110c658ce74ccd",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentReadServiceImplTest.java": {
-    "mtime": 1785105221.5754273,
+    "mtime": 1785109333.75241,
     "ast_hash": "b9d96c95c36bfdffa7d5ce47d6c8508a",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventAssignmentWriteThroughRollbackIntegrationTest.java": {
-    "mtime": 1785105881.87597,
-    "ast_hash": "6e0de487abd0e41c7c2253a16b8e1165",
+    "mtime": 1785109333.7534108,
+    "ast_hash": "d3a097da00820c22b57e30ff9de5e31e",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventScaleAssignmentPlanTest.java": {
-    "mtime": 1785105169.5376093,
+    "mtime": 1785109333.7534108,
     "ast_hash": "b19d4f456a181e6bc9200e041a5f503b",
     "semantic_hash": ""
   },
@@ -895,7 +895,7 @@
     "semantic_hash": "cc748df48d705ac80e4b3eff66c085f0"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/EventScaleDetailReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785106511.8250709,
+    "mtime": 1785109333.7544124,
     "ast_hash": "ee84034a9a8f067824201b5c91dc2497",
     "semantic_hash": ""
   },
@@ -910,22 +910,22 @@
     "semantic_hash": "8dc548847aadd4fbbdf75e64926281cb"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/MinisterOfTheWordMinistryReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785105573.4585807,
+    "mtime": 1785109333.7544124,
     "ast_hash": "29043c1561e39eb70f3197104416fac5",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/MinisterOfTheWordParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785106234.5495415,
+    "mtime": 1785109333.755978,
     "ast_hash": "0293f5a14c74c27608c98abae5887fec",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest.java": {
-    "mtime": 1785105930.1120932,
+    "mtime": 1785109333.755978,
     "ast_hash": "da96ee66dd9c95b502db70aa6b6bf923",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/MinisterOfTheWordServiceImplTest.java": {
-    "mtime": 1785088351.3399665,
+    "mtime": 1785109333.7569788,
     "ast_hash": "2f007b7899706407b2d5852bdac64917",
     "semantic_hash": ""
   },
@@ -940,32 +940,32 @@
     "semantic_hash": "822455052b5a394047113d06ced3c9c8"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/MonthlyScheduleReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785106451.578688,
+    "mtime": 1785109333.7569788,
     "ast_hash": "a081dc59392a7e86362aba9885cf205b",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryEligibilityResolverTest.java": {
-    "mtime": 1785088499.735021,
+    "mtime": 1785109333.7579794,
     "ast_hash": "19f3e8d5aa0a1291a36d7ed69ed63df3",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryParallelReadIntegrationTest.java": {
-    "mtime": 1785087316.4690452,
-    "ast_hash": "a574797b29e7d3ed9c19974f931e1c94",
+    "mtime": 1785109333.7589767,
+    "ast_hash": "52c571354a7544b2231e0f3ef5233b68",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryReadServiceImplTest.java": {
-    "mtime": 1785088520.0686212,
+    "mtime": 1785109333.7589767,
     "ast_hash": "5080da59e4e604feef566e4f92256523",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonServiceImplTest.java": {
-    "mtime": 1785105353.6719193,
-    "ast_hash": "0787609aadc92a924736a9a5218bb3dd",
+    "mtime": 1785110169.280641,
+    "ast_hash": "deda65fac69fa37a5cd9778f7c66c2aa",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PriestEventLegacyCompatibilityIntegrationTest.java": {
-    "mtime": 1785105969.8211818,
+    "mtime": 1785109333.7599802,
     "ast_hash": "a3335457dbf23badb7e16f4a89274945",
     "semantic_hash": ""
   },
@@ -975,17 +975,17 @@
     "semantic_hash": "d0f2f42f9cd5a21e555151fed5082114"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PriestMinistryReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785105619.2254524,
+    "mtime": 1785109333.7609785,
     "ast_hash": "fe2b59f4a875332589808bd10c62c290",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PriestParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785106114.2980072,
+    "mtime": 1785109333.7609785,
     "ast_hash": "b695706ebb79b2142959d4c285bcdae7",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PriestServiceImplTest.java": {
-    "mtime": 1785088305.468537,
+    "mtime": 1785109333.7619765,
     "ast_hash": "fb74c06b78819cac2f8ab4eaeac0d248",
     "semantic_hash": ""
   },
@@ -1000,22 +1000,22 @@
     "semantic_hash": "0da3af8e67523db2c26dc7f4544615cf"
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/ReaderMinistryReadCutoverParallelIntegrationTest.java": {
-    "mtime": 1785105433.0547009,
+    "mtime": 1785109333.7619765,
     "ast_hash": "13c6f5c2bb8c86f45fd39037fb182a05",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/ReaderParallelCutoverConsistencyIntegrationTest.java": {
-    "mtime": 1785088040.200682,
+    "mtime": 1785109333.7629788,
     "ast_hash": "21d73424736c245aded1b2b70b0f7b70",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/ReaderParallelCutoverIsolatedLifecycleIntegrationTest.java": {
-    "mtime": 1785106384.5061877,
+    "mtime": 1785109333.7629788,
     "ast_hash": "42265ac239454ac7bee2806f1f424742",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/ReaderServiceImplTest.java": {
-    "mtime": 1785088181.6521244,
+    "mtime": 1785109333.7639778,
     "ast_hash": "b33478b8f6b4c582d3b86faf09286506",
     "semantic_hash": ""
   },
@@ -1025,13 +1025,13 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/ScaleParticipantEligibilityIntegrationTest.java": {
-    "mtime": 1785105978.2239287,
-    "ast_hash": "8bcc4d4940407d941831fb127d18c1b0",
+    "mtime": 1785109333.7639778,
+    "ast_hash": "bcd3764033631ca5eca82c5785cd1076",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/resources/db/test/R__load_test_fixtures.sql": {
-    "mtime": 1785087635.8507464,
-    "ast_hash": "c39c9c93cd829746a0f2f5622dc3473e",
+    "mtime": 1785109333.7649772,
+    "ast_hash": "531ee72294c5c6865fae6aff0a69cd5b",
     "semantic_hash": ""
   },
   "frontend-web/evento-celebrativo-web/.vscode/extensions.json": {
@@ -1815,13 +1815,13 @@
     "semantic_hash": "33e006d066b3ab4cf30a57679d496e4e"
   },
   "backend/evento-celebrativo-api/docs/architecture/person-domain-legacy-dependency-audit.md": {
-    "mtime": 1785108525.08202,
-    "ast_hash": "c74d33bb3a438ecc1a22b305e7f4eb6a",
+    "mtime": 1785110958.6696749,
+    "ast_hash": "d4637630a5a196f37ae11f58dbdf75e8",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/docs/architecture/person-domain-migration-roadmap.md": {
-    "mtime": 1785108463.2937908,
-    "ast_hash": "845bf968e643adeb15fbb0f8e6a86b7f",
+    "mtime": 1785110935.7575269,
+    "ast_hash": "82ebefc14bea6c1f087610ff35b4d4f0",
     "semantic_hash": ""
   },
   "frontend-web/evento-celebrativo-web/AGENTS.md": {
@@ -1990,23 +1990,23 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/migration/EventPersonSchemaRemovalMigrationIntegrationTest.java": {
-    "mtime": 1785087727.9065814,
+    "mtime": 1785109333.74241,
     "ast_hash": "37e2a6ad115c1e6265883095bbbf0af9",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/PersonMinistryCommandService.java": {
-    "mtime": 1785084573.7862983,
-    "ast_hash": "f822a1426324b330248bf76e39f96097",
+    "mtime": 1785109792.6788197,
+    "ast_hash": "fdd19ee2929fcf76ad968a138e68b8c7",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/impl/PersonMinistryCommandServiceImpl.java": {
-    "mtime": 1785084573.7892914,
-    "ast_hash": "c22c45ed474df70555cff97387c9fe50",
+    "mtime": 1785109822.3748198,
+    "ast_hash": "946b88835ca7fc9d6a36ade4a2a05cd1",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryCommandServiceImplTest.java": {
-    "mtime": 1785088477.5642595,
-    "ast_hash": "af9e8067ec0efdd4f0d8f0823c5f27d3",
+    "mtime": 1785110083.3598938,
+    "ast_hash": "393517cd740bc3cb545e6ac424a736e2",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryOfficialWriteIntegrationTest.java": {
@@ -2015,13 +2015,43 @@
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/main/java/db/migration/V8__remove_legacy_person_discriminator.java": {
-    "mtime": 1785087522.59289,
-    "ast_hash": "8eaeb405bf794d9da4ea420199d1c45a",
+    "mtime": 1785109333.74141,
+    "ast_hash": "c5e8212cdf2fd343ef8d8cc6850b2f0c",
     "semantic_hash": ""
   },
   "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/migration/PersonDiscriminatorRemovalMigrationIntegrationTest.java": {
-    "mtime": 1785106814.940655,
-    "ast_hash": "e1dc40624951983868a3bf15dc2ab40c",
+    "mtime": 1785109333.7434154,
+    "ast_hash": "1a63ccd2dd55a4a21f720ab703831d80",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/dto/request/PersonMinistriesUpdateRequestDTO.java": {
+    "mtime": 1785109827.5934606,
+    "ast_hash": "da807131d20d0e3ef7aa384f8a467653",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/dto/response/PersonMinistriesResponseDTO.java": {
+    "mtime": 1785109833.797339,
+    "ast_hash": "400149f461d44f71cea47cf92f272800",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/PersonMinistryDiff.java": {
+    "mtime": 1785109773.0526934,
+    "ast_hash": "8d0c079e011667a3db508b032db09dce",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/main/java/com/eventoscelebrativos/service/PersonMinistrySyncResult.java": {
+    "mtime": 1785109778.8132596,
+    "ast_hash": "d8508a2b3f64c861d160a2e203a47644",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryDiffTest.java": {
+    "mtime": 1785109998.7357512,
+    "ast_hash": "a949e048966aa5e53a234651373763fa",
+    "semantic_hash": ""
+  },
+  "backend/evento-celebrativo-api/src/test/java/com/eventoscelebrativos/service/PersonMinistryManagementIntegrationTest.java": {
+    "mtime": 1785110505.733562,
+    "ast_hash": "29386f1e29ebed14affc61672d9d566e",
     "semantic_hash": ""
   }
 }

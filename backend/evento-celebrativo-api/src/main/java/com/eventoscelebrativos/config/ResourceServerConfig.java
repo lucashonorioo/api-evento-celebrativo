@@ -55,6 +55,8 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
 				.requestMatchers(HttpMethod.GET, "/pessoas", "/pessoas/*").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/roles").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.GET, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.PUT, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
 				.anyRequest().authenticated());
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
 		http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
