@@ -17,6 +17,9 @@ interface ParticipantSection {
   readonly people: readonly EventSchedulePersonSummary[];
 }
 
+const SCHEDULE_LIST_ROUTE_PATH = 'escalas/eventos/:id';
+const EVENT_DETAIL_ROUTE_PATH = 'eventos/:id/escala';
+
 @Component({
   selector: 'app-event-schedule-detail',
   standalone: true,
@@ -35,6 +38,18 @@ export class EventScheduleDetailComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly eventId = signal<number | null>(null);
   readonly backQueryParams = signal<Params>({});
+
+  private readonly routeConfigPath = this.activatedRoute.snapshot.routeConfig?.path;
+  private readonly isEventDetailContext = this.routeConfigPath === EVENT_DETAIL_ROUTE_PATH;
+  private readonly isRecognizedContext =
+    this.routeConfigPath === SCHEDULE_LIST_ROUTE_PATH || this.isEventDetailContext;
+  private readonly rawEventIdParam = this.activatedRoute.snapshot.paramMap.get('id') ?? '';
+
+  readonly backLabel = this.isEventDetailContext ? 'Voltar para o evento' : 'Voltar para Escalas';
+  readonly backCommands: readonly string[] = this.isEventDetailContext
+    ? ['/app/eventos', this.rawEventIdParam]
+    : ['/app/escalas'];
+  readonly backQueryParamsHandling: 'preserve' | '' = this.isEventDetailContext ? 'preserve' : '';
 
   ngOnInit(): void {
     this.backQueryParams.set(validBackQueryParams(this.activatedRoute.snapshot.queryParamMap));
@@ -75,7 +90,7 @@ export class EventScheduleDetailComponent implements OnInit {
   }
 
   isAdmin(): boolean {
-    return this.authSessionService.hasAuthority('ROLE_ADMIN');
+    return this.isRecognizedContext && this.authSessionService.hasAuthority('ROLE_ADMIN');
   }
 
   participantSections(schedule: EventScheduleDetailResponse): readonly ParticipantSection[] {

@@ -67,6 +67,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'eventos/:id/escala',
+        loadComponent: () =>
+          import('./event-schedules/event-schedule-detail/event-schedule-detail.component').then(
+            ({ EventScheduleDetailComponent }) => EventScheduleDetailComponent,
+          ),
+      },
+      {
         path: 'admin/eventos',
         loadComponent: () =>
           import('./events/event-management/event-management.component').then(

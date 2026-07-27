@@ -30,6 +30,12 @@
           <dd>{{ formatTime(selectedEvent.eventTime) }}</dd>
         </div>
       </dl>
+
+      @if (canViewSchedule()) {
+        <a class="page-action" [routerLink]="['escala']" queryParamsHandling="preserve">
+          Ver escala do evento
+        </a>
+      }
     </article>
   }
 </section>

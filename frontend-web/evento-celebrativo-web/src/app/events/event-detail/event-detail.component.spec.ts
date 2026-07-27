@@ -11,6 +11,7 @@ import {
 import { RouterTestingHarness } from '@angular/router/testing';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
+import { EventScheduleService } from '../../event-schedules/event-schedule.service';
 import { CelebrationEventResponse } from '../event.models';
 import { EventService } from '../event.service';
 import { EventDetailComponent } from './event-detail.component';
@@ -365,5 +366,197 @@ describe('EventDetailComponent', () => {
     ) as HTMLAnchorElement | null;
 
     expect(link?.getAttribute('href')).toBe('/eventos?foo=bar&period=past');
+  });
+
+  it('should not render the schedule link in the public context', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'eventos', component: EmptyTestComponent },
+          { path: 'eventos/:id', component: EventDetailComponent },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/eventos/1');
+    const links = Array.from(
+      harness.routeNativeElement?.querySelectorAll('a') ?? [],
+    ) as HTMLAnchorElement[];
+
+    expect(links.some((link) => link.textContent?.includes('Ver escala do evento'))).toBeFalse();
+  });
+
+  it('should render the schedule link relative to the authenticated detail route', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EmptyTestComponent },
+              { path: 'eventos/:id', component: EventDetailComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos/1');
+    const links = Array.from(
+      harness.routeNativeElement?.querySelectorAll('a') ?? [],
+    ) as HTMLAnchorElement[];
+    const scheduleLink = links.find((link) => link.textContent?.includes('Ver escala do evento'));
+
+    expect(scheduleLink?.getAttribute('href')).toBe('/app/eventos/1/escala');
+  });
+
+  it('should preserve period, search and type query parameters in the schedule link', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EmptyTestComponent },
+              { path: 'eventos/:id', component: EventDetailComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos/1?period=past&type=mass');
+    const links = Array.from(
+      harness.routeNativeElement?.querySelectorAll('a') ?? [],
+    ) as HTMLAnchorElement[];
+    const scheduleLink = links.find((link) => link.textContent?.includes('Ver escala do evento'));
+
+    expect(scheduleLink?.getAttribute('href')).toBe('/app/eventos/1/escala?period=past&type=mass');
+  });
+
+  it('should preserve unknown query parameters in the schedule link', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EmptyTestComponent },
+              { path: 'eventos/:id', component: EventDetailComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos/1?foo=bar');
+    const links = Array.from(
+      harness.routeNativeElement?.querySelectorAll('a') ?? [],
+    ) as HTMLAnchorElement[];
+    const scheduleLink = links.find((link) => link.textContent?.includes('Ver escala do evento'));
+
+    expect(scheduleLink?.getAttribute('href')).toBe('/app/eventos/1/escala?foo=bar');
+  });
+
+  it('should not render the schedule link while the event is loading', async () => {
+    const pendingEvent = new Subject<CelebrationEventResponse>();
+    await setup('1', pendingEvent.asObservable());
+
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).not.toContain('Ver escala do evento');
+
+    pendingEvent.next(massEvent);
+    pendingEvent.complete();
+  });
+
+  it('should not render the schedule link for an invalid event id', async () => {
+    await setup('abc');
+
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).not.toContain('Ver escala do evento');
+  });
+
+  it('should not render the schedule link after a 404 error', async () => {
+    await setup(
+      '99',
+      throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+    );
+
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).not.toContain('Ver escala do evento');
+  });
+
+  it('should not render the schedule link after a generic error', async () => {
+    await setup(
+      '1',
+      throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+    );
+
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).not.toContain('Ver escala do evento');
+  });
+
+  it('should not request the event schedule from the event detail component', async () => {
+    eventService = jasmine.createSpyObj<EventService>('EventService', ['findById']);
+    eventService.findById.and.returnValue(of(massEvent));
+    const eventScheduleService = jasmine.createSpyObj<EventScheduleService>('EventScheduleService', [
+      'findByEventId',
+    ]);
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'app',
+            component: TestShellComponent,
+            children: [
+              { path: 'eventos', component: EmptyTestComponent },
+              { path: 'eventos/:id', component: EventDetailComponent },
+            ],
+          },
+        ]),
+        { provide: EventService, useValue: eventService },
+        { provide: EventScheduleService, useValue: eventScheduleService },
+      ],
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create('/app/eventos/1');
+    const links = Array.from(
+      harness.routeNativeElement?.querySelectorAll('a') ?? [],
+    ) as HTMLAnchorElement[];
+
+    expect(links.some((link) => link.textContent?.includes('Ver escala do evento'))).toBeTrue();
+    expect(eventScheduleService.findByEventId).not.toHaveBeenCalled();
   });
 });

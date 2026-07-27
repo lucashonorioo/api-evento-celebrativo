@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -19,6 +20,7 @@ describe('EventScheduleDetailComponent', () => {
     response: EventScheduleDetailResponse = createDetail(),
     queryParams: Record<string, string> = {},
     isAdmin = false,
+    routeConfigPath = 'escalas/eventos/:id',
   ): Promise<void> {
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
       'hasAuthority',
@@ -41,6 +43,7 @@ describe('EventScheduleDetailComponent', () => {
             snapshot: {
               paramMap: convertToParamMap(routeId === null ? {} : { id: routeId }),
               queryParamMap: convertToParamMap(queryParams),
+              routeConfig: { path: routeConfigPath },
             },
           },
         },
@@ -404,6 +407,72 @@ describe('EventScheduleDetailComponent', () => {
     expect(text).not.toContain('Adicionar participante');
     expect(text).not.toContain('Remover participante');
     expect(text).not.toContain('Criar evento');
+  });
+
+  describe('event detail context', () => {
+    it('should use the event context wording and destination when accessed from the event detail route', async () => {
+      const harness = await createEventDetailContextHarness('/eventos/1/escala');
+      const backLink = harness.routeNativeElement?.querySelector('.page-action') as HTMLAnchorElement;
+
+      expect(backLink.textContent).toContain('Voltar para o evento');
+      expect(backLink.getAttribute('href')).toBe('/app/eventos/1');
+    });
+
+    it('should preserve all query parameters, including unknown ones, in the event context return link', async () => {
+      const harness = await createEventDetailContextHarness(
+        '/eventos/1/escala?period=past&search=domingo&type=mass&foo=bar',
+      );
+      const backLink = harness.routeNativeElement?.querySelector('.page-action') as HTMLAnchorElement;
+      const href = backLink.getAttribute('href') ?? '';
+
+      expect(href).toContain('/app/eventos/1');
+      expect(href).toContain('period=past');
+      expect(href).toContain('search=domingo');
+      expect(href).toContain('type=mass');
+      expect(href).toContain('foo=bar');
+    });
+
+    it('should show the edit action for administrators in the event detail context', async () => {
+      const harness = await createEventDetailContextHarness('/eventos/1/escala', true);
+      const links = Array.from(
+        harness.routeNativeElement?.querySelectorAll('.page-action') ?? [],
+      ) as HTMLAnchorElement[];
+      const editLink = links.find((link) => link.textContent?.includes('Editar escala'));
+
+      expect(editLink).toBeDefined();
+      expect(editLink?.getAttribute('href')).toContain('/app/admin/escalas/eventos/1/editar');
+    });
+
+    it('should hide the edit action for operators in the event detail context', async () => {
+      const harness = await createEventDetailContextHarness('/eventos/1/escala', false);
+
+      expect(harness.routeNativeElement?.textContent).not.toContain('Editar escala');
+    });
+
+    async function createEventDetailContextHarness(
+      url: string,
+      isAdmin = false,
+    ): Promise<RouterTestingHarness> {
+      const authSessionServiceStub = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+        'hasAuthority',
+      ]);
+      authSessionServiceStub.hasAuthority.and.returnValue(isAdmin);
+      const eventScheduleServiceStub = jasmine.createSpyObj<EventScheduleService>(
+        'EventScheduleService',
+        ['findByEventId'],
+      );
+      eventScheduleServiceStub.findByEventId.and.returnValue(of(createDetail()));
+
+      await TestBed.configureTestingModule({
+        providers: [
+          provideRouter([{ path: 'eventos/:id/escala', component: EventScheduleDetailComponent }]),
+          { provide: AuthSessionService, useValue: authSessionServiceStub },
+          { provide: EventScheduleService, useValue: eventScheduleServiceStub },
+        ],
+      }).compileComponents();
+
+      return RouterTestingHarness.create(url);
+    }
   });
 
   function textContent(): string {
