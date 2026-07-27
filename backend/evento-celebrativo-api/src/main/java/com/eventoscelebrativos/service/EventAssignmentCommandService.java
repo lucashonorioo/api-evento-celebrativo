@@ -4,7 +4,7 @@ import com.eventoscelebrativos.model.CelebrationEvent;
 
 import java.util.Collection;
 
-public interface EventAssignmentCompatibilityService {
+public interface EventAssignmentCommandService {
 
     void synchronizeAssignments(CelebrationEvent event, Collection<EventAssignmentTarget> targets);
 

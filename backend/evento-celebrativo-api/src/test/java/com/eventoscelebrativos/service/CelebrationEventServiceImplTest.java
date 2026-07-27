@@ -74,7 +74,7 @@ class CelebrationEventServiceImplTest {
     private CelebrationEventScaleDetailMapper scaleDetailMapper;
 
     @Mock
-    private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
+    private EventAssignmentCommandService eventAssignmentCommandService;
 
     @Mock
     private EventAssignmentReadService eventAssignmentReadService;
@@ -94,7 +94,7 @@ class CelebrationEventServiceImplTest {
         when(mapper.toDto(saved)).thenReturn(response);
 
         assertSame(response, service.createEvent(request));
-        verifyNoInteractions(eventAssignmentCompatibilityService);
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -647,7 +647,7 @@ class CelebrationEventServiceImplTest {
 
         assertSame(response, service.updateEvent(1L, request));
         verify(mapper).updateCelebrationEventMapperFromDto(request, entity);
-        verifyNoInteractions(eventAssignmentCompatibilityService);
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -663,7 +663,7 @@ class CelebrationEventServiceImplTest {
 
         service.deleteEventById(1L);
 
-        verify(eventAssignmentCompatibilityService).deleteAllForEvent(1L);
+        verify(eventAssignmentCommandService).deleteAllForEvent(1L);
         verify(repository).deleteById(1L);
     }
 
@@ -673,7 +673,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(ResourceNotFoundException.class, () -> service.deleteEventById(99L));
         verify(repository, never()).deleteById(anyLong());
-        verifyNoInteractions(eventAssignmentCompatibilityService);
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -682,7 +682,7 @@ class CelebrationEventServiceImplTest {
         doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
 
         assertThrows(DatabaseException.class, () -> service.deleteEventById(1L));
-        verify(eventAssignmentCompatibilityService).deleteAllForEvent(1L);
+        verify(eventAssignmentCommandService).deleteAllForEvent(1L);
     }
 
     @Test
@@ -718,7 +718,7 @@ class CelebrationEventServiceImplTest {
                 new EventAssignmentTarget(ministerOfTheWord, EventAssignmentType.MINISTER_OF_THE_WORD),
                 new EventAssignmentTarget(eucharisticMinister, EventAssignmentType.EUCHARISTIC_MINISTER)
         );
-        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
+        verify(eventAssignmentCommandService).synchronizeAssignments(event, expectedTargets);
     }
 
     @Test
@@ -745,11 +745,11 @@ class CelebrationEventServiceImplTest {
         ));
 
         List<EventAssignmentTarget> expectedTargets = List.of(new EventAssignmentTarget(priest, EventAssignmentType.PRIEST));
-        verify(eventAssignmentCompatibilityService).synchronizeAssignments(any(CelebrationEvent.class), eq(expectedTargets));
+        verify(eventAssignmentCommandService).synchronizeAssignments(any(CelebrationEvent.class), eq(expectedTargets));
 
-        InOrder inOrder = inOrder(repository, eventAssignmentCompatibilityService);
+        InOrder inOrder = inOrder(repository, eventAssignmentCommandService);
         inOrder.verify(repository).save(any(CelebrationEvent.class));
-        inOrder.verify(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
+        inOrder.verify(eventAssignmentCommandService).synchronizeAssignments(any(), any());
     }
 
     @Test
@@ -767,7 +767,7 @@ class CelebrationEventServiceImplTest {
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(newLocation), event.getLocations());
-        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, List.of());
+        verify(eventAssignmentCommandService).synchronizeAssignments(event, List.of());
     }
 
     @Test
@@ -780,7 +780,7 @@ class CelebrationEventServiceImplTest {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
-        doThrow(failure).when(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
+        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
 
         RuntimeException result = assertThrows(RuntimeException.class, () ->
                 service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
@@ -801,7 +801,7 @@ class CelebrationEventServiceImplTest {
             return event;
         });
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
-        doThrow(failure).when(eventAssignmentCompatibilityService).synchronizeAssignments(any(), any());
+        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
 
         RuntimeException result = assertThrows(RuntimeException.class, () ->
                 service.createEventWithScale(eventWithScaleRequest()));
@@ -846,7 +846,7 @@ class CelebrationEventServiceImplTest {
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null));
 
-        verify(eventAssignmentCompatibilityService).synchronizeAssignments(
+        verify(eventAssignmentCommandService).synchronizeAssignments(
                 event,
                 List.of(new EventAssignmentTarget(personWithPriestMinistry, EventAssignmentType.PRIEST))
         );
@@ -931,7 +931,7 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
-        verifyNoInteractions(eventAssignmentCompatibilityService);
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -958,7 +958,7 @@ class CelebrationEventServiceImplTest {
                 new EventAssignmentTarget(priestAndReader, EventAssignmentType.PRIEST),
                 new EventAssignmentTarget(priestAndReader, EventAssignmentType.READER)
         );
-        verify(eventAssignmentCompatibilityService).synchronizeAssignments(event, expectedTargets);
+        verify(eventAssignmentCommandService).synchronizeAssignments(event, expectedTargets);
     }
 
     private CelebrationEventRequestDTO request() {
