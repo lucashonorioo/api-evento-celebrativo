@@ -126,17 +126,78 @@
   <section class="event-management__list-section" aria-labelledby="event-list-title">
     <h2 id="event-list-title">Eventos cadastrados</h2>
 
+    <div class="event-management__filters">
+      <fieldset class="event-management__period">
+        <legend>Período</legend>
+
+        @for (option of periodOptions; track option.value) {
+          <label class="event-management__period-option">
+            <input
+              type="radio"
+              name="event-management-period"
+              [value]="option.value"
+              [checked]="periodFilter() === option.value"
+              (change)="setPeriodFilter(option.value)"
+            />
+            <span>{{ option.label }}</span>
+          </label>
+        }
+      </fieldset>
+
+      <div class="event-management__field">
+        <label for="event-management-search">Pesquisar evento</label>
+        <input
+          id="event-management-search"
+          type="search"
+          [value]="searchTerm()"
+          (input)="setSearchTerm($event)"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="event-management__field">
+        <label for="event-management-type">Tipo de evento</label>
+        <select id="event-management-type" [value]="typeFilter()" (change)="setTypeFilter($event)">
+          @for (option of typeOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+
+      <button
+        class="event-management__button event-management__button--secondary"
+        type="button"
+        (click)="clearFilters()"
+      >
+        Limpar filtros
+      </button>
+    </div>
+
     @if (isLoading()) {
       <p class="event-management__status" role="status">Carregando eventos...</p>
     } @else if (errorMessage() && events().length === 0) {
       <button class="event-management__button" type="button" (click)="loadEvents()">
         Tentar novamente
       </button>
-    } @else if (events().length === 0) {
-      <p class="event-management__feedback">Nenhum evento cadastrado foi encontrado.</p>
+    } @else if (visibleEvents().length === 0) {
+      <div class="event-management__feedback-block" aria-live="polite">
+        <p class="event-management__feedback">{{ emptyStateMessage() }}</p>
+
+        @if (showClearFiltersInEmptyState()) {
+          <button
+            class="event-management__button event-management__button--secondary"
+            type="button"
+            (click)="clearFilters()"
+          >
+            Limpar filtros
+          </button>
+        }
+      </div>
     } @else {
+      <p class="event-management__count" aria-live="polite">{{ resultCountLabel() }}</p>
+
       <ul class="event-management__list" aria-label="Lista de eventos cadastrados">
-        @for (event of events(); track event.id) {
+        @for (event of visibleEvents(); track event.id) {
           <li class="event-management__item">
             <div class="event-management__item-content">
               <h3>{{ event.nameMassOrEvent }}</h3>
