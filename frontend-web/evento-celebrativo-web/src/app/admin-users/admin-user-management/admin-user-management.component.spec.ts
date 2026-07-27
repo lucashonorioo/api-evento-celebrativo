@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -33,6 +34,7 @@ describe('AdminUserManagementComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AdminUserManagementComponent],
       providers: [
+        provideRouter([]),
         { provide: AdminUserService, useValue: adminUserService },
         { provide: AuthSessionService, useValue: authSessionService },
       ],
@@ -50,11 +52,45 @@ describe('AdminUserManagementComponent', () => {
     await setup();
 
     expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
-    expect(textContent()).toContain('Usuários do sistema');
+    expect(textContent()).toContain('Pessoas e acessos');
     expect(textContent()).toContain('Maria Silva');
     expect(textContent()).toContain('(34) 99999-9999');
     expect(textContent()).toContain('Leitor');
     expect(textContent()).toContain('Administrador');
+  });
+
+  it('should present itself as the people and access directory', async () => {
+    await setup();
+
+    const text = textContent();
+
+    expect(text).toContain('Pessoas e acessos');
+    expect(text).toContain('Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.');
+    expect(text).toContain('Pessoas cadastradas');
+  });
+
+  it('should render a secondary action linking to the ministerial categories hub', async () => {
+    await setup();
+
+    const action = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('a'),
+    ).find((link) => link.textContent?.trim() === 'Consultar categorias ministeriais') as
+      | HTMLAnchorElement
+      | undefined;
+
+    expect(action).toBeDefined();
+    expect(action?.getAttribute('href')).toBe('/app/pessoas');
+  });
+
+  it('should not add generic create, edit or delete person actions', async () => {
+    await setup();
+
+    const text = textContent();
+
+    expect(text).not.toContain('Cadastrar pessoa');
+    expect(text).not.toContain('Nova pessoa');
+    expect(text).not.toContain('Editar pessoa');
+    expect(text).not.toContain('Excluir pessoa');
   });
 
   it('should render empty states with and without filters', async () => {
@@ -88,6 +124,7 @@ describe('AdminUserManagementComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AdminUserManagementComponent],
       providers: [
+        provideRouter([]),
         { provide: AdminUserService, useValue: adminUserService },
         { provide: AuthSessionService, useValue: authSessionService },
       ],

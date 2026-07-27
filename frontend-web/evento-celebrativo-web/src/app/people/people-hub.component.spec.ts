@@ -54,25 +54,25 @@ describe('PeopleHubComponent', () => {
     expect(linkTargets).toContain('/app/ministros-eucaristia');
   });
 
-  it('should render the user management card for administrators', async () => {
+  it('should render the people and access directory card for administrators', async () => {
     await setup(true);
 
     const text = textContent();
     const linkTargets = links().map((link) => link.getAttribute('href'));
 
-    expect(text).toContain('Usuários');
-    expect(text).toContain('Gerencie os perfis de acesso e os ministérios das pessoas cadastradas.');
+    expect(text).toContain('Pessoas e acessos');
+    expect(text).toContain('Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.');
     expect(linkTargets).toContain('/app/admin/usuarios');
     expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
   });
 
-  it('should not render the user management card for operators', async () => {
+  it('should not render the people and access directory card for operators', async () => {
     await setup(false);
 
     const text = textContent();
     const linkTargets = links().map((link) => link.getAttribute('href'));
 
-    expect(text).not.toContain('Usuários');
+    expect(text).not.toContain('Pessoas e acessos');
     expect(linkTargets).not.toContain('/app/admin/usuarios');
   });
 
