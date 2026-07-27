@@ -184,6 +184,25 @@ describe('EventScheduleDetailComponent', () => {
     expect(text).not.toContain('telefone');
   });
 
+  it('should render the same person as a distinct entry in both the reader and commentator sections', async () => {
+    await setup(
+      '1',
+      createDetail({
+        readers: [{ id: 10, name: 'Marcos Pereira' }],
+        commentators: [{ id: 10, name: 'Marcos Pereira' }],
+      }),
+    );
+
+    fixture.detectChanges();
+
+    const readerSection = sectionByTitle('Leitores');
+    const commentatorSection = sectionByTitle('Comentaristas');
+
+    expect(readerSection).not.toBe(commentatorSection);
+    expect(namesIn(readerSection)).toEqual(['Marcos Pereira']);
+    expect(namesIn(commentatorSection)).toEqual(['Marcos Pereira']);
+  });
+
   it('should render celebration when the event is not a mass', async () => {
     await setup('1', createDetail({ massOrCelebration: false }));
 
@@ -389,6 +408,21 @@ describe('EventScheduleDetailComponent', () => {
 
   function textContent(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  function sectionByTitle(title: string): HTMLElement {
+    const sections = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.schedule-section'),
+    ) as HTMLElement[];
+    const section = sections.find((element) => element.querySelector('h2')?.textContent?.trim() === title);
+
+    expect(section).toBeDefined();
+
+    return section as HTMLElement;
+  }
+
+  function namesIn(section: HTMLElement): (string | undefined)[] {
+    return Array.from(section.querySelectorAll('li')).map((item) => item.textContent?.trim());
   }
 });
 
