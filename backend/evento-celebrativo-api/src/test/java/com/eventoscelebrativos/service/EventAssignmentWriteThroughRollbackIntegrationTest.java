@@ -55,7 +55,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @MockitoBean
-    private EventAssignmentCompatibilityService eventAssignmentCompatibilityService;
+    private EventAssignmentCommandService eventAssignmentCommandService;
 
     @Test
     void shouldRollbackEventCreationWhenAssignmentWriteThroughFails() {
@@ -64,7 +64,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         String eventName = "Assignment Rollback Create " + UUID.randomUUID();
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
         doThrow(failure)
-                .when(eventAssignmentCompatibilityService)
+                .when(eventAssignmentCommandService)
                 .synchronizeAssignments(any(), anyCollection());
         try {
             Person priest = savePriest("Assignment Rollback Create Person");
@@ -104,10 +104,10 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
                     eventRequest("Assignment Rollback Update " + UUID.randomUUID(), locationId, null, List.of(oldReaderId))
             ).getEventId();
             insertAssignment(eventId, oldReaderId, EventAssignmentType.READER);
-            reset(eventAssignmentCompatibilityService);
+            reset(eventAssignmentCommandService);
             RuntimeException failure = new IllegalStateException("assignment update failed");
             doThrow(failure)
-                    .when(eventAssignmentCompatibilityService)
+                    .when(eventAssignmentCommandService)
                     .synchronizeAssignments(any(), anyCollection());
 
             Long savedEventId = eventId;
@@ -145,9 +145,9 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
                     eventRequest("Assignment Rollback Delete " + UUID.randomUUID(), locationId, priestId)
             ).getEventId();
             insertAssignment(eventId, priestId, EventAssignmentType.PRIEST);
-            reset(eventAssignmentCompatibilityService);
+            reset(eventAssignmentCommandService);
             RuntimeException failure = new IllegalStateException("assignment delete failed");
-            doThrow(failure).when(eventAssignmentCompatibilityService).deleteAllForEvent(eventId);
+            doThrow(failure).when(eventAssignmentCommandService).deleteAllForEvent(eventId);
 
             Long savedEventId = eventId;
             RuntimeException result = assertThrows(RuntimeException.class, () ->

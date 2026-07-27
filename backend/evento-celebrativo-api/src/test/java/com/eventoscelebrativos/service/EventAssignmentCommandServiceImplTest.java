@@ -6,7 +6,7 @@ import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
-import com.eventoscelebrativos.service.impl.EventAssignmentCompatibilityServiceImpl;
+import com.eventoscelebrativos.service.impl.EventAssignmentCommandServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,13 +29,13 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class EventAssignmentCompatibilityServiceImplTest {
+class EventAssignmentCommandServiceImplTest {
 
     @Mock
     private EventAssignmentRepository eventAssignmentRepository;
 
     @InjectMocks
-    private EventAssignmentCompatibilityServiceImpl service;
+    private EventAssignmentCommandServiceImpl service;
 
     @Test
     void shouldHandleEventWithoutAssignments() {

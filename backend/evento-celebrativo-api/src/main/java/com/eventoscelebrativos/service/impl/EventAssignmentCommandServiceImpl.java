@@ -5,7 +5,7 @@ import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
-import com.eventoscelebrativos.service.EventAssignmentCompatibilityService;
+import com.eventoscelebrativos.service.EventAssignmentCommandService;
 import com.eventoscelebrativos.service.EventAssignmentTarget;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +19,11 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
-public class EventAssignmentCompatibilityServiceImpl implements EventAssignmentCompatibilityService {
+public class EventAssignmentCommandServiceImpl implements EventAssignmentCommandService {
 
     private final EventAssignmentRepository eventAssignmentRepository;
 
-    public EventAssignmentCompatibilityServiceImpl(EventAssignmentRepository eventAssignmentRepository) {
+    public EventAssignmentCommandServiceImpl(EventAssignmentRepository eventAssignmentRepository) {
         this.eventAssignmentRepository = eventAssignmentRepository;
     }
 
