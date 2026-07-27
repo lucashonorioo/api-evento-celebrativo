@@ -231,6 +231,96 @@ describe('EventScheduleEditComponent', () => {
     expect(component.form.controls.readerIds.value).toContain(5);
   });
 
+  it('should fill readerIds and commentatorIds with the same person id without discarding either selection', async () => {
+    await setup('1', overlappingSchedule());
+    readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+    commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+
+    fixture.detectChanges();
+
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+    expect(component.form.controls.commentatorIds.value).toEqual([10]);
+  });
+
+  it('should preserve the same person id in both readerIds and commentatorIds when saving without changes', async () => {
+    await setup('1', overlappingSchedule());
+    readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+    commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+    fixture.detectChanges();
+
+    component.onSubmit();
+
+    expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+      1,
+      jasmine.objectContaining({
+        readerIds: [10],
+        commentatorIds: [10],
+      }),
+    );
+  });
+
+  it('should remove the person from readers only, preserving the commentator selection', async () => {
+    await setup('1', overlappingSchedule());
+    readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+    commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, false);
+
+    expect(component.form.controls.readerIds.value).toEqual([]);
+    expect(component.form.controls.commentatorIds.value).toEqual([10]);
+  });
+
+  it('should not duplicate the id when re-adding to readers after removing it', async () => {
+    await setup('1', overlappingSchedule());
+    readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+    commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, false);
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('readerIds', 10, true);
+
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+    expect(component.form.controls.commentatorIds.value).toEqual([10]);
+  });
+
+  it('should filter one section locally without affecting selections in another section', async () => {
+    await setup('1', overlappingSchedule());
+    readerService.findAll.and.returnValue(
+      of([overlappingPersonOption, { id: 5, name: 'Arthur Costa', phoneNumber: null, birthdayDate: null }]),
+    );
+    commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+    fixture.detectChanges();
+
+    component.readerSearch.set('arthur');
+
+    expect(component.filteredReaders().map((reader) => reader.name)).toEqual(['Arthur Costa']);
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+    expect(component.form.controls.commentatorIds.value).toEqual([10]);
+  });
+
+  it('should allow the same person to be priest and hold a ministerial role, with priestId staying singular', async () => {
+    await setup(
+      '1',
+      createDetail({
+        priest: { id: 10, name: 'Marcos Pereira' },
+        readers: [{ id: 10, name: 'Marcos Pereira' }],
+      }),
+    );
+    priestService.findAll.and.returnValue(of([...priests, overlappingPersonOption]));
+    readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+    fixture.detectChanges();
+
+    expect(component.form.controls.priestId.value).toBe(10);
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+
+    component.form.controls.priestId.setValue(13);
+
+    expect(component.form.controls.priestId.value).toBe(13);
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+  });
+
   it('should show empty option messages', async () => {
     await setup();
     readerService.findAll.and.returnValue(of([]));
@@ -501,6 +591,20 @@ const ministersOfTheWord = [
 const eucharisticMinisters = [
   { id: 10, name: 'Mariana Ferraz', phoneNumber: null, birthdayDate: null },
 ];
+
+const overlappingPersonOption = {
+  id: 10,
+  name: 'Marcos Pereira',
+  phoneNumber: null,
+  birthdayDate: null,
+};
+
+function overlappingSchedule(): EventScheduleDetailResponse {
+  return createDetail({
+    readers: [{ id: 10, name: 'Marcos Pereira' }],
+    commentators: [{ id: 10, name: 'Marcos Pereira' }],
+  });
+}
 
 function createDetail(
   overrides: Partial<EventScheduleDetailResponse> = {},

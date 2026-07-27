@@ -253,6 +253,118 @@ describe('EventScheduleCreateComponent', () => {
     expect(component.selectedCount('readerIds')).toBe(1);
   });
 
+  it('should allow the same person to be selected as reader and commentator', async () => {
+    await setup();
+    configureOverlappingReaderAndCommentator();
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+
+    expect(component.isSelected('readerIds', 10)).toBeTrue();
+    expect(component.isSelected('commentatorIds', 10)).toBeTrue();
+  });
+
+  it('should not remove a person from one role when selecting a different role for the same person', async () => {
+    await setup();
+    configureOverlappingReaderAndCommentator();
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+
+    expect(component.isSelected('readerIds', 10)).toBeTrue();
+  });
+
+  it('should not remove a person from one role when deselecting a different role for the same person', async () => {
+    await setup();
+    configureOverlappingReaderAndCommentator();
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+    component.toggleSelection('readerIds', 10, false);
+
+    expect(component.isSelected('readerIds', 10)).toBeFalse();
+    expect(component.isSelected('commentatorIds', 10)).toBeTrue();
+  });
+
+  it('should not duplicate the same id within each individual role list', async () => {
+    await setup();
+    configureOverlappingReaderAndCommentator();
+    fixture.detectChanges();
+
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+
+    expect(component.form.controls.readerIds.value).toEqual([10]);
+    expect(component.form.controls.commentatorIds.value).toEqual([10]);
+  });
+
+  it('should send the same person id in both readerIds and commentatorIds while other lists stay unaffected', async () => {
+    await setup();
+    configureOverlappingReaderAndCommentator();
+    fixture.detectChanges();
+    fillValidForm();
+
+    component.toggleSelection('readerIds', 10, true);
+    component.toggleSelection('commentatorIds', 10, true);
+    component.toggleSelection('ministerOfTheWordIds', 6, true);
+
+    component.onSubmit();
+
+    const request = eventScheduleService.createEventWithSchedule.calls.mostRecent()
+      .args[0] as CreateEventWithScheduleRequest;
+
+    expect(request.readerIds).toEqual([10]);
+    expect(request.commentatorIds).toEqual([10]);
+    expect(request.ministerOfTheWordIds).toEqual([6]);
+    expect(request.eucharisticMinisterIds).toEqual([]);
+  });
+
+  it('should allow the same person to be priest and hold a ministerial role at the same time', async () => {
+    await setup();
+    priestService.findAll.and.returnValue(
+      of([
+        { id: 3, name: 'Padre Antonio', phoneNumber: '3333', birthdayDate: '1980-03-03' },
+        overlappingPerson(),
+      ]),
+    );
+    readerService.findAll.and.returnValue(
+      of([{ id: 5, name: 'Alice Lima', phoneNumber: '5555', birthdayDate: '1995-05-05' }, overlappingPerson()]),
+    );
+    fixture.detectChanges();
+
+    component.form.controls.priestId.setValue(10);
+    component.toggleSelection('readerIds', 10, true);
+
+    expect(component.form.controls.priestId.value).toBe(10);
+    expect(component.isSelected('readerIds', 10)).toBeTrue();
+  });
+
+  it('should keep priestId as a single value with no way to select two priests', async () => {
+    await setup();
+    priestService.findAll.and.returnValue(
+      of([
+        { id: 3, name: 'Padre Antonio', phoneNumber: '3333', birthdayDate: '1980-03-03' },
+        overlappingPerson(),
+      ]),
+    );
+    fixture.detectChanges();
+
+    const priestSelect = fixture.nativeElement.querySelector('#priestId') as HTMLSelectElement;
+
+    expect(priestSelect.tagName).toBe('SELECT');
+    expect(priestSelect.multiple).toBeFalse();
+
+    component.form.controls.priestId.setValue(3);
+    component.form.controls.priestId.setValue(10);
+
+    expect(component.form.controls.priestId.value).toBe(10);
+  });
+
   it('should prevent duplicate submissions while saving', async () => {
     const pendingSave = new Subject<CreateEventWithScheduleResponse>();
     await setup();
@@ -360,6 +472,20 @@ describe('EventScheduleCreateComponent', () => {
 
   function textContent(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  function overlappingPerson(): { id: number; name: string; phoneNumber: string; birthdayDate: string } {
+    return { id: 10, name: 'Marcos Pereira', phoneNumber: '1010', birthdayDate: '1990-10-10' };
+  }
+
+  function configureOverlappingReaderAndCommentator(): void {
+    readerService.findAll.and.returnValue(
+      of([
+        { id: 5, name: 'Alice Lima', phoneNumber: '5555', birthdayDate: '1995-05-05' },
+        overlappingPerson(),
+      ]),
+    );
+    commentatorService.findAll.and.returnValue(of([overlappingPerson()]));
   }
 });
 
