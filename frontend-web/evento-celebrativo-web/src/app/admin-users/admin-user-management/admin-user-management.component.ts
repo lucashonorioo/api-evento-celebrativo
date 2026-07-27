@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -25,6 +25,7 @@ import {
 import { AdminUserService } from '../admin-user.service';
 
 const DEFAULT_PAGE_SIZE = 10;
+const QUERY_PARAM_KEYS = ['name', 'phoneNumber', 'ministry', 'role', 'page'] as const;
 
 interface MinistryTypeOption {
   readonly value: MinistryType;
@@ -69,6 +70,8 @@ type MinistriesQueryResult =
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminUserManagementComponent implements OnInit {
+  private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly adminUserService = inject(AdminUserService);
   private readonly authSessionService = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
@@ -149,6 +152,12 @@ export class AdminUserManagementComponent implements OnInit {
         }
 
         this.applyPage(result.page);
+
+        if (result.page.number !== result.query.page) {
+          const correctedFilters = { ...result.query, page: result.page.number };
+          this.activeFilters.set(correctedFilters);
+          this.syncQueryParams(correctedFilters);
+        }
       });
 
     this.ministriesRequests
@@ -183,10 +192,18 @@ export class AdminUserManagementComponent implements OnInit {
         this.focusMinistriesPanel(result.personId);
       });
 
-    this.loadPage(0);
+    const restoredFilters = this.restoreFiltersFromQueryParams();
+    this.loadPage(restoredFilters.page, restoredFilters);
   }
 
   applyFilters(): void {
+    const rawValue = this.filtersForm.getRawValue();
+
+    this.filtersForm.patchValue(
+      { name: rawValue.name.trim(), phoneNumber: rawValue.phoneNumber.trim() },
+      { emitEvent: false },
+    );
+
     this.loadPage(0, this.createFiltersFromForm(0));
   }
 
@@ -202,6 +219,7 @@ export class AdminUserManagementComponent implements OnInit {
 
   retry(): void {
     this.errorMessage.set(null);
+    this.syncQueryParams(this.activeFilters());
     this.queryRequests.next(this.activeFilters());
   }
 
@@ -445,7 +463,62 @@ export class AdminUserManagementComponent implements OnInit {
     }
 
     this.activeFilters.set(query);
+    this.syncQueryParams(query);
     this.queryRequests.next(query);
+  }
+
+  private syncQueryParams(filters: PersonAdminFilters): void {
+    const desired: Params = {
+      name: filters.name ?? null,
+      phoneNumber: filters.phoneNumber ?? null,
+      ministry: filters.ministry ?? null,
+      role: filters.role ?? null,
+      page: filters.page === 0 ? null : String(filters.page),
+    };
+
+    const current = this.activatedRoute.snapshot.queryParamMap;
+    const hasChanges = QUERY_PARAM_KEYS.some((key) => current.get(key) !== desired[key]);
+
+    if (!hasChanges) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.activatedRoute,
+      queryParams: desired,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private restoreFiltersFromQueryParams(): PersonAdminFilters {
+    const queryParamMap = this.activatedRoute.snapshot.queryParamMap;
+    const name = trimmedOrUndefined(queryParamMap.get('name') ?? '');
+    const phoneNumber = trimmedOrUndefined(queryParamMap.get('phoneNumber') ?? '');
+    const ministryParam = queryParamMap.get('ministry');
+    const roleParam = queryParamMap.get('role');
+    const ministry = isMinistryType(ministryParam) ? ministryParam : undefined;
+    const role = isUserRole(roleParam) ? roleParam : undefined;
+    const page = validPageOrDefault(queryParamMap.get('page'));
+
+    this.filtersForm.patchValue(
+      {
+        name: name ?? '',
+        phoneNumber: phoneNumber ?? '',
+        ministry: ministry ?? '',
+        role: role ?? '',
+      },
+      { emitEvent: false },
+    );
+
+    return {
+      ...(name !== undefined ? { name } : {}),
+      ...(phoneNumber !== undefined ? { phoneNumber } : {}),
+      ...(ministry !== undefined ? { ministry } : {}),
+      ...(role !== undefined ? { role } : {}),
+      page,
+      size: DEFAULT_PAGE_SIZE,
+    };
   }
 
   private reloadCurrentPage(clearErrorMessage = true): void {
@@ -547,6 +620,28 @@ function trimmedOrUndefined(value: string): string | undefined {
   const trimmedValue = value.trim();
 
   return trimmedValue.length === 0 ? undefined : trimmedValue;
+}
+
+function isMinistryType(value: string | null): value is MinistryType {
+  return (
+    value === 'PRIEST' ||
+    value === 'READER' ||
+    value === 'COMMENTATOR' ||
+    value === 'MINISTER_OF_THE_WORD' ||
+    value === 'EUCHARISTIC_MINISTER'
+  );
+}
+
+function isUserRole(value: string | null): value is UserRole {
+  return value === 'ROLE_ADMIN' || value === 'ROLE_OPERATOR';
+}
+
+function validPageOrDefault(value: string | null): number {
+  if (value === null || !/^\d+$/.test(value)) {
+    return 0;
+  }
+
+  return Number(value);
 }
 
 function listErrorMessageFor(error: unknown): string {
