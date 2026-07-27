@@ -1,6 +1,8 @@
+import { Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -9,13 +11,18 @@ import { AdminUserService } from '../admin-user.service';
 import { AdminUserManagementComponent } from './admin-user-management.component';
 
 describe('AdminUserManagementComponent', () => {
-  let fixture: ComponentFixture<AdminUserManagementComponent>;
+  let harness: RouterTestingHarness;
+  let component: AdminUserManagementComponent;
   let adminUserService: jasmine.SpyObj<AdminUserService>;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
+  let router: Router;
+  let location: Location;
+  let navigateSpy: jasmine.Spy;
 
   async function setup(
     page: PersonAdminPage = pageResponse(),
     username: string | null = '34000000000',
+    url = '/admin/usuarios',
   ): Promise<void> {
     adminUserService = jasmine.createSpyObj<AdminUserService>('AdminUserService', [
       'findAll',
@@ -32,16 +39,19 @@ describe('AdminUserManagementComponent', () => {
     authSessionService.getUsername.and.returnValue(username);
 
     await TestBed.configureTestingModule({
-      imports: [AdminUserManagementComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: 'admin/usuarios', component: AdminUserManagementComponent }]),
         { provide: AdminUserService, useValue: adminUserService },
         { provide: AuthSessionService, useValue: authSessionService },
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(AdminUserManagementComponent);
-    fixture.detectChanges();
+    router = TestBed.inject(Router);
+    location = TestBed.inject(Location);
+    navigateSpy = spyOn(router, 'navigate').and.callThrough();
+
+    harness = await RouterTestingHarness.create(url);
+    component = harness.routeDebugElement?.componentInstance as AdminUserManagementComponent;
   }
 
   afterEach(() => {
@@ -72,11 +82,9 @@ describe('AdminUserManagementComponent', () => {
   it('should render a secondary action linking to the ministerial categories hub', async () => {
     await setup();
 
-    const action = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('a'),
-    ).find((link) => link.textContent?.trim() === 'Consultar categorias ministeriais') as
-      | HTMLAnchorElement
-      | undefined;
+    const action = Array.from(harness.routeNativeElement?.querySelectorAll('a') ?? []).find(
+      (link) => link.textContent?.trim() === 'Consultar categorias ministeriais',
+    ) as HTMLAnchorElement | undefined;
 
     expect(action).toBeDefined();
     expect(action?.getAttribute('href')).toBe('/app/pessoas');
@@ -122,16 +130,14 @@ describe('AdminUserManagementComponent', () => {
     authSessionService.getUsername.and.returnValue('34999999999');
 
     await TestBed.configureTestingModule({
-      imports: [AdminUserManagementComponent],
       providers: [
-        provideRouter([]),
+        provideRouter([{ path: 'admin/usuarios', component: AdminUserManagementComponent }]),
         { provide: AdminUserService, useValue: adminUserService },
         { provide: AuthSessionService, useValue: authSessionService },
       ],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(AdminUserManagementComponent);
-    fixture.detectChanges();
+    harness = await RouterTestingHarness.create('/admin/usuarios');
 
     expect(textContent()).toContain('Você não possui permissão para gerenciar usuários.');
 
@@ -340,7 +346,7 @@ describe('AdminUserManagementComponent', () => {
 
     updateRoleResponse.next(person({ roles: ['ROLE_OPERATOR'] }));
     updateRoleResponse.complete();
-    fixture.detectChanges();
+    harness.detectChanges();
 
     expect(textContent()).toContain('Perfil atualizado com sucesso.');
     expect(adminUserService.findAll).toHaveBeenCalledTimes(2);
@@ -462,17 +468,17 @@ describe('AdminUserManagementComponent', () => {
     expect(textContent()).toContain('Você não pode remover o seu próprio perfil administrativo.');
     expect(textContent()).toContain('Maria Silva');
 
-    fixture.componentInstance.selectRole('ROLE_OPERATOR');
-    fixture.componentInstance.confirmRoleChange();
-    fixture.detectChanges();
+    component.selectRole('ROLE_OPERATOR');
+    component.confirmRoleChange();
+    harness.detectChanges();
 
     expect(textContent()).toContain(
       'Não é possível remover o perfil do último administrador do sistema.',
     );
 
-    fixture.componentInstance.selectRole('ROLE_OPERATOR');
-    fixture.componentInstance.confirmRoleChange();
-    fixture.detectChanges();
+    component.selectRole('ROLE_OPERATOR');
+    component.confirmRoleChange();
+    harness.detectChanges();
 
     expect(textContent()).toContain(
       'Não foi possível alterar o perfil devido a uma regra administrativa.',
@@ -541,7 +547,7 @@ describe('AdminUserManagementComponent', () => {
 
     updateResponse.next(ministriesResponse({ ministries: ['READER', 'COMMENTATOR', 'PRIEST'] }));
     updateResponse.complete();
-    fixture.detectChanges();
+    harness.detectChanges();
 
     expect(textContent()).toContain('Ministérios atualizados com sucesso.');
     expect(adminUserService.findAll).toHaveBeenCalledTimes(2);
@@ -635,14 +641,14 @@ describe('AdminUserManagementComponent', () => {
 
     firstRequest.next(ministriesResponse({ id: 1, ministries: ['PRIEST'] }));
     firstRequest.complete();
-    fixture.detectChanges();
+    harness.detectChanges();
 
     expect(textContent()).toContain('Gerenciar ministérios de João Souza');
     expect(textContent()).toContain('Carregando ministérios...');
 
     secondRequest.next(ministriesResponse({ id: 2, ministries: ['READER'] }));
     secondRequest.complete();
-    fixture.detectChanges();
+    harness.detectChanges();
 
     expect(ministryCheckbox(2, 'READER').checked).toBeTrue();
     expect(adminUserService.findMinistries).toHaveBeenCalledTimes(2);
@@ -778,8 +784,575 @@ describe('AdminUserManagementComponent', () => {
     expect(document.activeElement).toBe(ministryCheckbox(1, 'PRIEST'));
   });
 
+  describe('query parameter restoration', () => {
+    it('should use defaults when no query parameters are present', async () => {
+      await setup();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+    });
+
+    it('should keep the URL clean when no query parameters are present', async () => {
+      await setup();
+      await harness.fixture.whenStable();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should restore name from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?name=Maria');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ name: 'Maria' }),
+      );
+      expect((query('#user-name') as HTMLInputElement).value).toBe('Maria');
+    });
+
+    it('should restore phoneNumber from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?phoneNumber=34999999999');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ phoneNumber: '34999999999' }),
+      );
+      expect((query('#user-phone') as HTMLInputElement).value).toBe('34999999999');
+    });
+
+    it('should restore a valid ministry from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=READER');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ ministry: 'READER' }),
+      );
+      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('READER');
+    });
+
+    it('should restore a valid role from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?role=ROLE_ADMIN');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ role: 'ROLE_ADMIN' }),
+      );
+      expect((query('#user-role') as HTMLSelectElement).value).toBe('ROLE_ADMIN');
+    });
+
+    it('should restore a valid page from the URL', async () => {
+      await setup(
+        pageResponse({ number: 2, totalPages: 3, totalElements: 25, first: false, last: false }),
+        '34000000000',
+        '/admin/usuarios?page=2',
+      );
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ page: 2 }),
+      );
+    });
+
+    it('should restore the complete combination of filters from the URL', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&page=1',
+      );
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({
+        name: 'Joao',
+        phoneNumber: '34999999999',
+        ministry: 'PRIEST',
+        role: 'ROLE_OPERATOR',
+        page: 1,
+        size: 10,
+      });
+      expect((query('#user-name') as HTMLInputElement).value).toBe('Joao');
+      expect((query('#user-phone') as HTMLInputElement).value).toBe('34999999999');
+      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('PRIEST');
+      expect((query('#user-role') as HTMLSelectElement).value).toBe('ROLE_OPERATOR');
+    });
+
+    it('should execute only one request on initialization regardless of query params', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&page=0',
+      );
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trim a restored name', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?name=%20%20Maria%20%20');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ name: 'Maria' }),
+      );
+      expect((query('#user-name') as HTMLInputElement).value).toBe('Maria');
+    });
+
+    it('should trim a restored phoneNumber', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?phoneNumber=%20%2034999999999%20');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ phoneNumber: '34999999999' }),
+      );
+    });
+  });
+
+  describe('applyFilters URL synchronization', () => {
+    it('should update the URL when applying filters', async () => {
+      await setup();
+      navigateSpy.calls.reset();
+
+      setInputValue('#user-name', 'Maria');
+      submitFilters();
+      await harness.fixture.whenStable();
+
+      expect(location.path()).toBe('/admin/usuarios?name=Maria');
+    });
+
+    it('should use replaceUrl when applying filters', async () => {
+      await setup();
+      navigateSpy.calls.reset();
+
+      setInputValue('#user-name', 'Maria');
+      submitFilters();
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy.calls.mostRecent().args[1].replaceUrl).toBeTrue();
+      expect(navigateSpy.calls.mostRecent().args[1].queryParamsHandling).toBe('merge');
+    });
+
+    it('should reset page to zero in the URL when applying filters from a non-zero page', async () => {
+      await setup(
+        pageResponse({ number: 3, totalPages: 5, totalElements: 50, first: false, last: false }),
+        '34000000000',
+        '/admin/usuarios?page=3',
+      );
+      await harness.fixture.whenStable();
+      expect(location.path()).toContain('page=3');
+
+      adminUserService.findAll.and.returnValue(of(pageResponse({ number: 0 })));
+      setInputValue('#user-name', 'Maria');
+      submitFilters();
+      await harness.fixture.whenStable();
+
+      expect(location.path()).not.toContain('page=');
+      expect(location.path()).toContain('name=Maria');
+    });
+
+    it('should execute only one request when applying filters', async () => {
+      await setup();
+      adminUserService.findAll.calls.reset();
+
+      setInputValue('#user-name', 'Maria');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the trimmed value in the form after applying filters with surrounding spaces', async () => {
+      await setup();
+
+      setInputValue('#user-name', '  Maria Silva  ');
+      setInputValue('#user-phone', '  34999999999  ');
+      submitFilters();
+      await harness.fixture.whenStable();
+
+      expect((query('#user-name') as HTMLInputElement).value).toBe('Maria Silva');
+      expect((query('#user-phone') as HTMLInputElement).value).toBe('34999999999');
+      expect(location.path()).toContain('name=Maria%20Silva');
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ name: 'Maria Silva', phoneNumber: '34999999999' }),
+      );
+    });
+  });
+
+  describe('clearFilters URL synchronization', () => {
+    it('should remove the known parameters from the URL when clearing filters', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?name=Maria&phoneNumber=34999999999&ministry=READER&role=ROLE_ADMIN&page=1',
+      );
+      await harness.fixture.whenStable();
+
+      clickButton('Limpar filtros');
+      await harness.fixture.whenStable();
+
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should preserve an unknown query parameter when clearing filters', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?name=Maria&foo=bar');
+      await harness.fixture.whenStable();
+
+      clickButton('Limpar filtros');
+      await harness.fixture.whenStable();
+
+      expect(location.path()).toBe('/admin/usuarios?foo=bar');
+    });
+
+    it('should execute only one request when clearing filters', async () => {
+      await setup();
+      adminUserService.findAll.calls.reset();
+
+      clickButton('Limpar filtros');
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('pagination URL synchronization', () => {
+    it('should only change page in the URL when going to the previous page', async () => {
+      await setup(
+        pageResponse({
+          number: 1,
+          totalPages: 3,
+          totalElements: 25,
+          first: false,
+          last: false,
+        }),
+        '34000000000',
+        '/admin/usuarios?name=Maria&role=ROLE_ADMIN&page=1',
+      );
+      await harness.fixture.whenStable();
+      adminUserService.findAll.and.returnValue(
+        of(pageResponse({ number: 0, totalPages: 3, totalElements: 25, first: true, last: false })),
+      );
+
+      clickButton('Página anterior');
+      await harness.fixture.whenStable();
+
+      const path = location.path();
+
+      expect(path).toContain('name=Maria');
+      expect(path).toContain('role=ROLE_ADMIN');
+      expect(path).not.toContain('page=');
+    });
+
+    it('should only change page in the URL when going to the next page', async () => {
+      await setup(
+        pageResponse({
+          number: 0,
+          totalPages: 3,
+          totalElements: 25,
+          first: true,
+          last: false,
+        }),
+        '34000000000',
+        '/admin/usuarios?name=Maria&role=ROLE_ADMIN',
+      );
+      await harness.fixture.whenStable();
+      adminUserService.findAll.and.returnValue(
+        of(
+          pageResponse({
+            number: 1,
+            totalPages: 3,
+            totalElements: 25,
+            first: false,
+            last: false,
+          }),
+        ),
+      );
+
+      clickButton('Próxima página');
+      await harness.fixture.whenStable();
+
+      const path = location.path();
+
+      expect(path).toContain('name=Maria');
+      expect(path).toContain('role=ROLE_ADMIN');
+      expect(path).toContain('page=1');
+    });
+
+    it('should send the active filters, not the form values, while paginating', async () => {
+      await setup(
+        pageResponse({
+          number: 0,
+          totalPages: 3,
+          totalElements: 25,
+          first: true,
+          last: false,
+        }),
+      );
+
+      setInputValue('#user-name', 'Maria');
+      submitFilters();
+
+      setInputValue('#user-name', 'Changed but not submitted');
+
+      adminUserService.findAll.calls.reset();
+      clickButton('Próxima página');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ name: 'Maria', page: 1 }),
+      );
+    });
+  });
+
+  describe('invalid query parameters', () => {
+    it('should remove an invalid ministry from the URL and use no filter', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=INVALID');
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should remove an invalid role from the URL and use no filter', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?role=ADMIN');
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should remove a negative page from the URL and use zero', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?page=-1');
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should remove a decimal page from the URL and use zero', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?page=1.5');
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should remove a textual page from the URL and use zero', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?page=abc');
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should not duplicate the request when correcting invalid query params', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?ministry=INVALID&role=ADMIN&page=-1',
+      );
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve unknown query parameters while correcting invalid ones', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=INVALID&foo=bar');
+      await harness.fixture.whenStable();
+
+      expect(location.path()).toContain('foo=bar');
+      expect(location.path()).not.toContain('ministry=');
+    });
+  });
+
+  describe('page.number normalization', () => {
+    it('should correct activeFilters to reflect the effective page returned by the backend', async () => {
+      await setup(
+        pageResponse({ number: 0, totalPages: 1, totalElements: 1 }),
+        '34000000000',
+        '/admin/usuarios?page=5',
+      );
+      await harness.fixture.whenStable();
+
+      expect(component.activeFilters().page).toBe(0);
+    });
+
+    it('should correct the URL page when the backend returns a different page number', async () => {
+      await setup(
+        pageResponse({ number: 0, totalPages: 1, totalElements: 1 }),
+        '34000000000',
+        '/admin/usuarios?page=5',
+      );
+      await harness.fixture.whenStable();
+
+      expect(location.path()).not.toContain('page=5');
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should not call the backend again when normalizing page.number', async () => {
+      await setup(
+        pageResponse({ number: 0, totalPages: 1, totalElements: 1 }),
+        '34000000000',
+        '/admin/usuarios?page=5',
+      );
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('empty page after change', () => {
+    it('should load the previous page when it becomes empty', async () => {
+      await setup(pageResponse({ number: 1, totalPages: 2, totalElements: 11, first: false }));
+      adminUserService.findAll.and.returnValues(
+        of(
+          pageResponse({
+            content: [],
+            number: 1,
+            totalPages: 1,
+            totalElements: 1,
+            first: false,
+            empty: true,
+          }),
+        ),
+        of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
+      );
+      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+
+      expect(textContent()).toContain('Ana Lima');
+    });
+
+    it('should correct the URL page before requesting the previous page', async () => {
+      await setup(
+        pageResponse({ number: 1, totalPages: 2, totalElements: 11, first: false }),
+        '34000000000',
+        '/admin/usuarios?page=1',
+      );
+      await harness.fixture.whenStable();
+      adminUserService.findAll.and.returnValues(
+        of(
+          pageResponse({
+            content: [],
+            number: 1,
+            totalPages: 1,
+            totalElements: 1,
+            first: false,
+            empty: true,
+          }),
+        ),
+        of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
+      );
+      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+      await harness.fixture.whenStable();
+
+      expect(location.path()).not.toContain('page=1');
+    });
+  });
+
+  describe('role and ministries updates preserving context', () => {
+    it('should preserve filters and page in the URL after a role update', async () => {
+      await setup(
+        pageResponse({ number: 0, totalPages: 1 }),
+        '34000000000',
+        '/admin/usuarios?name=Maria&role=ROLE_ADMIN',
+      );
+      await harness.fixture.whenStable();
+      navigateSpy.calls.reset();
+      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_ADMIN'] })));
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+      await harness.fixture.whenStable();
+
+      const path = location.path();
+
+      expect(path).toContain('name=Maria');
+      expect(path).toContain('role=ROLE_ADMIN');
+    });
+
+    it('should preserve filters and page in the URL after a ministries update', async () => {
+      await setup(
+        pageResponse({ number: 0, totalPages: 1 }),
+        '34000000000',
+        '/admin/usuarios?name=Maria&ministry=READER',
+      );
+      await harness.fixture.whenStable();
+      adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: [] })));
+
+      clickButton('Gerenciar ministérios');
+      toggleMinistryCheckbox(1, 'READER');
+      clickButton('Salvar ministérios');
+      await harness.fixture.whenStable();
+
+      const path = location.path();
+
+      expect(path).toContain('name=Maria');
+      expect(path).toContain('ministry=READER');
+    });
+
+    it('should let a person disappear from the page after a role update that no longer matches the active filter', async () => {
+      await setup(
+        pageResponse({ content: [person({ roles: ['ROLE_ADMIN'] })], number: 0, totalPages: 1 }),
+        '34000000000',
+        '/admin/usuarios?role=ROLE_ADMIN',
+      );
+      adminUserService.findAll.and.returnValue(
+        of(pageResponse({ content: [], number: 0, totalPages: 0, totalElements: 0, empty: true })),
+      );
+      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+
+      expect(textContent()).toContain('Nenhuma pessoa foi encontrada com os filtros informados.');
+    });
+
+    it('should let a person disappear from the page after a ministries update that no longer matches the active filter', async () => {
+      await setup(
+        pageResponse({ content: [person({ ministries: ['READER'] })], number: 0, totalPages: 1 }),
+        '34000000000',
+        '/admin/usuarios?ministry=READER',
+      );
+      adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+      adminUserService.findAll.and.returnValue(
+        of(pageResponse({ content: [], number: 0, totalPages: 0, totalElements: 0, empty: true })),
+      );
+      adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: ['PRIEST'] })));
+
+      clickButton('Gerenciar ministérios');
+      toggleMinistryCheckbox(1, 'READER');
+      toggleMinistryCheckbox(1, 'PRIEST');
+      clickButton('Salvar ministérios');
+
+      expect(textContent()).toContain('Nenhuma pessoa foi encontrada com os filtros informados.');
+    });
+  });
+
+  describe('retry', () => {
+    it('should reuse activeFilters on retry', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?name=Maria&role=ROLE_ADMIN');
+      adminUserService.findAll.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
+
+      setInputValue('#user-name', 'Changed but not submitted');
+
+      adminUserService.findAll.calls.reset();
+      adminUserService.findAll.and.returnValue(of(pageResponse()));
+      component.retry();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ name: 'Maria', role: 'ROLE_ADMIN' }),
+      );
+    });
+
+    it('should not change the URL on retry when it already represents activeFilters', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?name=Maria');
+      await harness.fixture.whenStable();
+      navigateSpy.calls.reset();
+
+      component.retry();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
+
   function query(selector: string): Element {
-    const element = (fixture.nativeElement as HTMLElement).querySelector(selector);
+    const element = harness.routeNativeElement?.querySelector(selector) ?? null;
 
     expect(element).not.toBeNull();
 
@@ -787,33 +1360,32 @@ describe('AdminUserManagementComponent', () => {
   }
 
   function queryAll(selector: string): Element[] {
-    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll(selector));
+    return Array.from(harness.routeNativeElement?.querySelectorAll(selector) ?? []);
   }
 
   function setInputValue(selector: string, value: string): void {
     const input = query(selector) as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function setSelectValue(selector: string, value: string): void {
     const select = query(selector) as HTMLSelectElement;
     select.value = value;
     select.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function submitFilters(): void {
     const form = query('form') as HTMLFormElement;
     form.dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function buttonByLabel(label: string, index = 0): HTMLButtonElement {
-    const button = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-    ).filter((currentButton) => currentButton.textContent?.trim() === label)[index] as
+    const button = Array.from(harness.routeNativeElement?.querySelectorAll('button') ?? [])
+      .filter((currentButton) => currentButton.textContent?.trim() === label)[index] as
       | HTMLButtonElement
       | undefined;
 
@@ -824,18 +1396,18 @@ describe('AdminUserManagementComponent', () => {
   function clickButton(label: string, index = 0): void {
     const button = buttonByLabel(label, index);
     button.click();
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function selectRole(role: string): void {
     const input = query(`input[value="${role}"]`) as HTMLInputElement;
     input.checked = true;
     input.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function confirmButton(): HTMLButtonElement {
-    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+    return Array.from(harness.routeNativeElement?.querySelectorAll('button') ?? []).find(
       (button) => button.textContent?.trim() === 'Salvar perfil',
     ) as HTMLButtonElement;
   }
@@ -848,11 +1420,11 @@ describe('AdminUserManagementComponent', () => {
     const checkbox = ministryCheckbox(personId, ministry);
     checkbox.checked = !checkbox.checked;
     checkbox.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
+    harness.detectChanges();
   }
 
   function textContent(): string {
-    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    return harness.routeNativeElement?.textContent ?? '';
   }
 
   function waitForTimers(): Promise<void> {
