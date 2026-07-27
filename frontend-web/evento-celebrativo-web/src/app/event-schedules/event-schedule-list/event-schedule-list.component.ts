@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Params, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -15,6 +15,9 @@ import {
 import { EventScheduleService } from '../event-schedule.service';
 
 const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_TYPE: EventScheduleType = 'READER';
+const DEFAULT_INCLUDE_UNASSIGNED = false;
+const QUERY_PARAM_KEYS = ['type', 'month', 'includeUnassigned', 'page'] as const;
 
 interface EventScheduleTypeOption {
   readonly label: string;
@@ -31,6 +34,7 @@ interface EventScheduleTypeOption {
 })
 export class EventScheduleListComponent implements OnInit {
   private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly authSessionService = inject(AuthSessionService);
   private readonly eventScheduleService = inject(EventScheduleService);
 
@@ -52,9 +56,9 @@ export class EventScheduleListComponent implements OnInit {
   readonly isFirstPage = signal(true);
   readonly isLastPage = signal(true);
 
-  selectedType: EventScheduleType = 'READER';
+  selectedType: EventScheduleType = DEFAULT_TYPE;
   selectedMonth = formatYearMonth(new Date());
-  includeUnassigned = false;
+  includeUnassigned = DEFAULT_INCLUDE_UNASSIGNED;
 
   readonly pageSize = DEFAULT_PAGE_SIZE;
 
@@ -67,28 +71,45 @@ export class EventScheduleListComponent implements OnInit {
   }
 
   onSubmit(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     this.loadPage(0);
   }
 
   previousMonth(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     this.selectedMonth = shiftMonth(this.selectedMonth, -1);
     this.loadPage(0);
   }
 
   nextMonth(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     this.selectedMonth = shiftMonth(this.selectedMonth, 1);
     this.loadPage(0);
   }
 
   retry(): void {
-    if (this.lastValidQuery === null) {
+    if (this.isLoading() || this.lastValidQuery === null) {
       return;
     }
 
+    this.syncQueryParams(this.lastValidQuery);
     this.loadSchedules(this.lastValidQuery);
   }
 
   previousPage(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     const previousPage = this.currentPage() - 1;
 
     if (previousPage < 0) {
@@ -99,6 +120,10 @@ export class EventScheduleListComponent implements OnInit {
   }
 
   nextPage(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
     const nextPage = this.currentPage() + 1;
 
     if (nextPage >= this.totalPages()) {
@@ -148,6 +173,7 @@ export class EventScheduleListComponent implements OnInit {
       return;
     }
 
+    this.syncQueryParams(query);
     this.loadSchedules(query);
   }
 
@@ -182,11 +208,38 @@ export class EventScheduleListComponent implements OnInit {
       .subscribe({
         next: (page) => {
           this.applyPage(page);
+
+          if (page.number !== query.page) {
+            this.syncQueryParams({ ...query, page: page.number });
+          }
         },
         error: (error: unknown) => {
           this.errorMessage.set(errorMessageFor(error));
         },
       });
+  }
+
+  private syncQueryParams(query: EventScheduleQuery): void {
+    const desired: Params = {
+      type: query.type,
+      month: query.startDate.slice(0, 7),
+      includeUnassigned: String(query.includeUnassigned),
+      page: String(query.page),
+    };
+
+    const current = this.activatedRoute.snapshot.queryParamMap;
+    const hasChanges = QUERY_PARAM_KEYS.some((key) => current.get(key) !== desired[key]);
+
+    if (!hasChanges) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.activatedRoute,
+      queryParams: desired,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   private applyPage(page: EventSchedulePage): void {
@@ -254,7 +307,13 @@ function errorMessageFor(error: unknown): string {
 }
 
 function isYearMonth(value: string): boolean {
-  return /^\d{4}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const month = Number(value.slice(5, 7));
+
+  return month >= 1 && month <= 12;
 }
 
 function periodForMonth(yearMonth: string): { readonly startDate: string; readonly endDate: string } {
