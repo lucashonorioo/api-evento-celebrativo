@@ -4,9 +4,12 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
 import {
+  MinistryType,
   PersonAdmin,
   PersonAdminFilters,
   PersonAdminPage,
+  PersonMinistriesResponse,
+  PersonMinistriesUpdateRequest,
   PersonRoleUpdateRequest,
   UserRole,
 } from './admin-user.models';
@@ -33,12 +36,25 @@ export class AdminUserService {
     return this.http.put<PersonAdmin>(`${API_BASE_URL}/pessoas/${id}/roles`, request);
   }
 
+  findMinistries(id: number): Observable<PersonMinistriesResponse> {
+    return this.http.get<PersonMinistriesResponse>(`${API_BASE_URL}/pessoas/${id}/ministries`);
+  }
+
+  updateMinistries(id: number, ministries: MinistryType[]): Observable<PersonMinistriesResponse> {
+    const request: PersonMinistriesUpdateRequest = { ministries };
+
+    return this.http.put<PersonMinistriesResponse>(
+      `${API_BASE_URL}/pessoas/${id}/ministries`,
+      request,
+    );
+  }
+
   private paramsFor(filters: PersonAdminFilters): HttpParams {
     let params = new HttpParams().set('page', String(filters.page)).set('size', String(filters.size));
 
     params = appendTrimmedParam(params, 'name', filters.name);
     params = appendTrimmedParam(params, 'phoneNumber', filters.phoneNumber);
-    params = appendTrimmedParam(params, 'personType', filters.personType);
+    params = appendTrimmedParam(params, 'ministry', filters.ministry);
     params = appendTrimmedParam(params, 'role', filters.role);
 
     return params;

@@ -61,7 +61,7 @@ describe('PeopleHubComponent', () => {
     const linkTargets = links().map((link) => link.getAttribute('href'));
 
     expect(text).toContain('Usuários');
-    expect(text).toContain('Gerencie os perfis de acesso das pessoas cadastradas.');
+    expect(text).toContain('Gerencie os perfis de acesso e os ministérios das pessoas cadastradas.');
     expect(linkTargets).toContain('/app/admin/usuarios');
     expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
   });
