@@ -115,20 +115,12 @@ describe('EventScheduleListComponent', () => {
     expect(createAction?.getAttribute('href')).toContain('/app/admin/escalas/novo-evento');
   });
 
-  it('should render the event assignment audit action for administrators', async () => {
+  it('should not render the event assignment audit action for administrators', async () => {
     await setup(createPage(), {}, true);
 
     fixture.detectChanges();
 
-    const links = Array.from(
-      fixture.nativeElement.querySelectorAll('.page-action'),
-    ) as HTMLAnchorElement[];
-    const auditAction = links.find((link) =>
-      link.textContent?.includes('Auditoria de consistência'),
-    );
-
-    expect(auditAction).toBeDefined();
-    expect(auditAction?.getAttribute('href')).toContain('/app/admin/auditoria-de-escalas');
+    expect(textContent()).not.toContain('Auditoria de consistência');
   });
 
   it('should not render the event with schedule creation action for operators', async () => {
