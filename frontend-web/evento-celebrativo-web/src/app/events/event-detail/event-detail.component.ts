@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, EMPTY, finalize, Observable, switchMap } from 'rxjs';
 
 import { CelebrationEventResponse } from '../event.models';
@@ -25,6 +25,7 @@ import { EventService } from '../event.service';
 })
 export class EventDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly eventService = inject(EventService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -73,6 +74,10 @@ export class EventDetailComponent implements OnInit {
 
   formatTime(eventTime: string): string {
     return eventTime.slice(0, 5);
+  }
+
+  canViewSchedule(): boolean {
+    return this.router.url.startsWith('/app/eventos');
   }
 
   private loadEvent(eventId: number): Observable<CelebrationEventResponse> {

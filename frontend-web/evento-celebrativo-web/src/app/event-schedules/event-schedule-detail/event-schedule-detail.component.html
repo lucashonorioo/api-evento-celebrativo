@@ -17,8 +17,13 @@
         </a>
       }
 
-      <a class="page-action" routerLink="/app/escalas" [queryParams]="backQueryParams()">
-        Voltar para Escalas
+      <a
+        class="page-action"
+        [routerLink]="backCommands"
+        [queryParams]="backQueryParams()"
+        [queryParamsHandling]="backQueryParamsHandling"
+      >
+        {{ backLabel }}
       </a>
     </div>
   </header>
@@ -38,8 +43,13 @@
           </button>
         }
 
-        <a class="event-schedule-detail__link" routerLink="/app/escalas" [queryParams]="backQueryParams()">
-          Voltar para Escalas
+        <a
+          class="event-schedule-detail__link"
+          [routerLink]="backCommands"
+          [queryParams]="backQueryParams()"
+          [queryParamsHandling]="backQueryParamsHandling"
+        >
+          {{ backLabel }}
         </a>
       </div>
     </div>

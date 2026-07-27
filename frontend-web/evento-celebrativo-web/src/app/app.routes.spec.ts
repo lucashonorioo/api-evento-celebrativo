@@ -82,6 +82,7 @@ describe('routes', () => {
       'ministros-eucaristia',
       'admin/ministros-eucaristia',
       'escalas/eventos/:id',
+      'eventos/:id/escala',
       'admin/escalas/eventos/:id/editar',
       'admin/escalas/novo-evento',
     ];
@@ -134,6 +135,14 @@ describe('routes', () => {
     expectAppRouteProtection();
     await expectLazyComponent(appScheduleDetailRoute, EventScheduleDetailComponent);
     expect(appScheduleDetailRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render the event schedule detail from the event detail route inside the protected app route', async () => {
+    const appEventScheduleRoute = findAppChildRoute('eventos/:id/escala');
+
+    expectAppRouteProtection();
+    await expectLazyComponent(appEventScheduleRoute, EventScheduleDetailComponent);
+    expect(appEventScheduleRoute?.canActivate).toBeUndefined();
   });
 
   it('should render schedule editing inside the protected app route for admins only', async () => {
