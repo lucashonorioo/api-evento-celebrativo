@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.dto.response;
 
+import com.eventoscelebrativos.model.MinistryType;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,17 +10,17 @@ public class PersonAdminResponseDTO {
     private Long id;
     private String name;
     private String phoneNumber;
-    private String personType;
+    private List<MinistryType> ministries = new ArrayList<>();
     private List<String> roles = new ArrayList<>();
 
     public PersonAdminResponseDTO() {
     }
 
-    public PersonAdminResponseDTO(Long id, String name, String phoneNumber, String personType, List<String> roles) {
+    public PersonAdminResponseDTO(Long id, String name, String phoneNumber, List<MinistryType> ministries, List<String> roles) {
         this.id = id;
         this.name = name;
         this.phoneNumber = phoneNumber;
-        this.personType = personType;
+        this.ministries = ministries;
         this.roles = roles;
     }
 
@@ -46,12 +48,12 @@ public class PersonAdminResponseDTO {
         this.phoneNumber = phoneNumber;
     }
 
-    public String getPersonType() {
-        return personType;
+    public List<MinistryType> getMinistries() {
+        return ministries;
     }
 
-    public void setPersonType(String personType) {
-        this.personType = personType;
+    public void setMinistries(List<MinistryType> ministries) {
+        this.ministries = ministries;
     }
 
     public List<String> getRoles() {
