@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, RouterLinkActive } from '@angular/router';
+import { By } from '@angular/platform-browser';
 
 import { AuthSessionService } from '../auth-session.service';
 import { AuthService } from '../auth.service';
@@ -128,6 +129,32 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(sidebarText).toContain('Locais');
   });
 
+  it('should link Pessoas to the public people directory for operators', async () => {
+    await setup('11999999999', false);
+
+    const peopleLinks = sidebarLinks().filter((link) => link.textContent?.trim() === 'Pessoas');
+
+    expect(peopleLinks.length).toBe(1);
+    expect(peopleLinks[0].getAttribute('href')).toBe('/app/pessoas');
+  });
+
+  it('should link Pessoas to the administrative people and access directory for administrators', async () => {
+    await setup('11999999999', true);
+
+    const peopleLinks = sidebarLinks().filter((link) => link.textContent?.trim() === 'Pessoas');
+
+    expect(peopleLinks.length).toBe(1);
+    expect(peopleLinks[0].getAttribute('href')).toBe('/app/admin/usuarios');
+  });
+
+  it('should keep routerLinkActive configured on every sidebar link', async () => {
+    await setup();
+
+    const activeDirectives = fixture.debugElement.queryAll(By.directive(RouterLinkActive));
+
+    expect(activeDirectives.length).toBe(sidebarLinks().length);
+  });
+
   it('should not render individual person links in the sidebar', async () => {
     await setup();
 
@@ -191,7 +218,7 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(fixture.componentInstance.isSidebarOpen()).toBeFalse();
   });
 
-  it('should keep the same main sidebar links for administrators', async () => {
+  it('should keep the same main sidebar items for administrators, with Pessoas pointing to the admin directory', async () => {
     await setup('11999999999', true);
 
     const linkTargets = sidebarLinks().map((link) => link.getAttribute('href'));
@@ -202,7 +229,7 @@ describe('AuthenticatedLayoutComponent', () => {
       '/app/inicio',
       '/app/eventos',
       '/app/escalas',
-      '/app/pessoas',
+      '/app/admin/usuarios',
       '/app/locais',
     ]);
     expect(sidebarText).not.toContain('Gerenciar locais');

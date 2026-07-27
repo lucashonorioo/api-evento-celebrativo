@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
@@ -62,7 +63,7 @@ type MinistriesQueryResult =
 @Component({
   selector: 'app-admin-user-management',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   templateUrl: './admin-user-management.component.html',
   styleUrl: './admin-user-management.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

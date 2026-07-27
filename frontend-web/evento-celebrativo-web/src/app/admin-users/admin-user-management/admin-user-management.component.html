@@ -2,9 +2,11 @@
   <header class="page-header">
     <div class="page-header__content">
       <p class="page-header__eyebrow">Administração</p>
-      <h1 id="admin-users-title">Usuários do sistema</h1>
-      <p>Gerencie os perfis de acesso das pessoas cadastradas.</p>
+      <h1 id="admin-users-title">Pessoas e acessos</h1>
+      <p>Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.</p>
     </div>
+
+    <a class="page-action" routerLink="/app/pessoas">Consultar categorias ministeriais</a>
   </header>
 
   <form class="admin-users__filters surface-card" [formGroup]="filtersForm" (ngSubmit)="applyFilters()">
@@ -72,10 +74,10 @@
     </div>
 
     @if (isLoading()) {
-      <p class="admin-users__status" role="status">Carregando usuários...</p>
+      <p class="admin-users__status" role="status">Carregando pessoas...</p>
     } @else if (errorMessage() && people().length === 0) {
       <div class="admin-users__empty-state">
-        <p>Não foi possível exibir a lista de usuários.</p>
+        <p>Não foi possível exibir a lista de pessoas.</p>
         <button class="admin-users__button" type="button" (click)="retry()">Tentar novamente</button>
       </div>
     } @else if (people().length === 0) {

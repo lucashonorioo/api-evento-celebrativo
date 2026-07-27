@@ -18,6 +18,7 @@ export class AuthenticatedLayoutComponent {
 
   readonly username = this.authSessionService.getUsername() ?? 'Usuario';
   readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
+  readonly peopleLink = this.isAdmin ? '/app/admin/usuarios' : '/app/pessoas';
   readonly isSidebarOpen = signal(false);
   readonly isUserMenuOpen = signal(false);
   readonly userInitials = initialsFor(this.username);

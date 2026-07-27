@@ -48,8 +48,8 @@ export class PeopleHubComponent {
       path: '/app/ministros-eucaristia',
     },
     {
-      title: 'Usuários',
-      description: 'Gerencie os perfis de acesso e os ministérios das pessoas cadastradas.',
+      title: 'Pessoas e acessos',
+      description: 'Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.',
       path: '/app/admin/usuarios',
       adminOnly: true,
     },
