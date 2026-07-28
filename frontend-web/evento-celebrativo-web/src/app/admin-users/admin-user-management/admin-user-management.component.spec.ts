@@ -446,7 +446,7 @@ describe('AdminUserManagementComponent', () => {
         () =>
           new HttpErrorResponse({
             status: 409,
-            error: { message: 'Voce nao pode remover o seu proprio perfil administrativo.' },
+            error: { error: 'Voce nao pode remover o seu proprio perfil administrativo.' },
           }),
       ),
       throwError(
@@ -454,11 +454,11 @@ describe('AdminUserManagementComponent', () => {
           new HttpErrorResponse({
             status: 409,
             error: {
-              message: 'O ultimo administrador do sistema nao pode ter seu perfil alterado.',
+              error: 'O ultimo administrador do sistema nao pode ter seu perfil alterado.',
             },
           }),
       ),
-      throwError(() => new HttpErrorResponse({ status: 409, error: { message: 'Outra regra' } })),
+      throwError(() => new HttpErrorResponse({ status: 409, error: { error: 'Outra regra' } })),
     );
 
     clickButton('Alterar perfil');
