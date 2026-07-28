@@ -10,6 +10,7 @@ import { authGuard } from './auth.guard';
 import { CommentatorListComponent } from './commentators/commentator-list/commentator-list.component';
 import { CommentatorManagementComponent } from './commentators/commentator-management/commentator-management.component';
 import { CurrentUserProfileComponent } from './current-user-profile/current-user-profile.component';
+import { CurrentUserSchedulesComponent } from './current-user-schedules/current-user-schedules.component';
 import { EucharisticMinisterListComponent } from './eucharistic-ministers/eucharistic-minister-list/eucharistic-minister-list.component';
 import { EucharisticMinisterManagementComponent } from './eucharistic-ministers/eucharistic-minister-management/eucharistic-minister-management.component';
 import { EucharistScheduleListComponent } from './eucharist-schedule/eucharist-schedule-list/eucharist-schedule-list.component';
@@ -87,6 +88,7 @@ describe('routes', () => {
       'admin/escalas/eventos/:id/editar',
       'admin/escalas/novo-evento',
       'perfil',
+      'minhas-escalas',
     ];
 
     for (const path of privatePaths) {
@@ -297,6 +299,14 @@ describe('routes', () => {
     expectAppRouteProtection();
     await expectLazyComponent(profileRoute, CurrentUserProfileComponent);
     expect(profileRoute?.canActivate).toBeUndefined();
+  });
+
+  it('should render the current user schedules inside the protected app route for any authenticated role', async () => {
+    const myScheduleRoute = findAppChildRoute('minhas-escalas');
+
+    expectAppRouteProtection();
+    await expectLazyComponent(myScheduleRoute, CurrentUserSchedulesComponent);
+    expect(myScheduleRoute?.canActivate).toBeUndefined();
   });
 
   function findPublicRoute(path: string): Route | undefined {

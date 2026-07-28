@@ -7,6 +7,7 @@ import { Observable, of, Subject, throwError } from 'rxjs';
 import { AuthSessionService } from '../auth-session.service';
 import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
 import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
+import { CurrentUserScheduleService } from '../current-user-schedules/current-user-schedule.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
 import { HomeComponent } from './home.component';
@@ -27,6 +28,7 @@ describe('HomeComponent', () => {
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eventService: jasmine.SpyObj<EventService>;
   let currentUserProfileService: CurrentUserProfileServiceDouble;
+  let currentUserScheduleService: jasmine.SpyObj<CurrentUserScheduleService>;
 
   async function setup(
     isAdmin = false,
@@ -57,6 +59,11 @@ describe('HomeComponent', () => {
       clearProfile: jasmine.createSpy('clearProfile'),
     };
 
+    currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
+      'CurrentUserScheduleService',
+      ['findSchedules'],
+    );
+
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
@@ -64,6 +71,7 @@ describe('HomeComponent', () => {
         { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventService, useValue: eventService },
         { provide: CurrentUserProfileService, useValue: currentUserProfileService },
+        { provide: CurrentUserScheduleService, useValue: currentUserScheduleService },
       ],
     }).compileComponents();
 
@@ -343,20 +351,46 @@ describe('HomeComponent', () => {
     pending.complete();
   });
 
-  it('should render the four quick access links as real, unique anchors', async () => {
+  it('should render the five quick access links as real, unique anchors', async () => {
     await setup();
 
     const anchors = quickAccessAnchors();
     const labels = anchors.map((anchor) => anchor.querySelector('span')?.textContent?.trim());
     const targets = anchors.map((anchor) => anchor.getAttribute('href'));
 
-    expect(anchors.length).toBe(4);
+    expect(anchors.length).toBe(5);
     anchors.forEach((anchor) => expect(anchor.tagName).toBe('A'));
-    expect(labels).toEqual(['Eventos', 'Escalas', 'Pessoas', 'Locais']);
+    expect(labels).toEqual(['Eventos', 'Minhas escalas', 'Escalas', 'Pessoas', 'Locais']);
     expect(labels.filter((label) => label === 'Pessoas').length).toBe(1);
     expect(targets).toContain('/app/eventos');
+    expect(targets).toContain('/app/minhas-escalas');
     expect(targets).toContain('/app/escalas');
     expect(targets).toContain('/app/locais');
+  });
+
+  it('should show the "Minhas escalas" quick access pointing to the authenticated route for operators', async () => {
+    await setup(false);
+
+    const operatorCard = quickAccessCardByLabel('Minhas escalas');
+
+    expect(operatorCard.getAttribute('href')).toBe('/app/minhas-escalas');
+    expect(operatorCard.textContent).toContain(
+      'Consulte os eventos em que você está escalado.',
+    );
+  });
+
+  it('should show the "Minhas escalas" quick access pointing to the authenticated route for administrators', async () => {
+    await setup(true);
+
+    const adminCard = quickAccessCardByLabel('Minhas escalas');
+
+    expect(adminCard.getAttribute('href')).toBe('/app/minhas-escalas');
+  });
+
+  it('should not call CurrentUserScheduleService from the Home component', async () => {
+    await setup();
+
+    expect(currentUserScheduleService.findSchedules).not.toHaveBeenCalled();
   });
 
   it('should point Pessoas to the admin directory and show the admin description for administrators', async () => {

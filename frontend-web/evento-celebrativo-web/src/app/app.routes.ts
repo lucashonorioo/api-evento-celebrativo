@@ -89,6 +89,13 @@ export const routes: Routes = [
         canActivate: [adminGuard],
       },
       {
+        path: 'minhas-escalas',
+        loadComponent: () =>
+          import('./current-user-schedules/current-user-schedules.component').then(
+            ({ CurrentUserSchedulesComponent }) => CurrentUserSchedulesComponent,
+          ),
+      },
+      {
         path: 'escalas',
         loadComponent: () =>
           import('./event-schedules/event-schedule-list/event-schedule-list.component').then(

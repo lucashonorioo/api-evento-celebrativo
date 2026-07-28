@@ -48,6 +48,11 @@ export class HomeComponent implements OnInit {
       path: '/app/eventos',
     },
     {
+      label: 'Minhas escalas',
+      description: 'Consulte os eventos em que você está escalado.',
+      path: '/app/minhas-escalas',
+    },
+    {
       label: 'Escalas',
       description: 'Acesse a consulta mensal de escalas.',
       path: '/app/escalas',
