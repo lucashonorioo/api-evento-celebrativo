@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -14,9 +15,13 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CurrentUserProfileMapper;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
+import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.PersonServiceImpl;
@@ -36,6 +41,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +73,9 @@ class PersonServiceImplTest {
 
     @Mock
     private PersonMinistryCommandService personMinistryCommandService;
+
+    @Mock
+    private EventAssignmentRepository eventAssignmentRepository;
 
     @InjectMocks
     private PersonServiceImpl service;
@@ -690,6 +699,268 @@ class PersonServiceImplTest {
         verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
         verify(personRepository, times(1)).save(any());
         verify(personRepository).save(authenticatedPerson);
+    }
+
+    @Test
+    void shouldFindCurrentUserSchedulesByPhoneNumberOfAuthenticatedPerson() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(
+                        List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
+                        pageable,
+                        1
+                ));
+        when(eventAssignmentRepository.findAssignmentTypesByPersonIdAndEventIdIn(10L, List.of(15L)))
+                .thenReturn(List.of(assignmentProjection(15L, "READER")));
+
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(15L, result.getContent().get(0).getEventId());
+        assertEquals("Missa das 19h", result.getContent().get(0).getEventName());
+        assertEquals(2L, result.getContent().get(0).getLocationId());
+        assertEquals("Igreja Matriz", result.getContent().get(0).getLocationName());
+        verify(eventAssignmentRepository).findScheduleEventsByPersonId(10L, startDate, endDate, pageable);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.findCurrentUserSchedules("34900000000", startDate, endDate, 0, 10));
+        verifyNoInteractions(eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectMissingStartDateOnFindSchedules() {
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", null, endDate, 0, 10));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectMissingEndDateOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", startDate, null, 0, 10));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectInvertedDateRangeOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 31);
+        LocalDate endDate = LocalDate.of(2026, 8, 1);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectNegativePageOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, -1, 10));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectSizeLessThanOneOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 0));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldRejectSizeGreaterThanOneHundredOnFindSchedules() {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+        assertThrows(BadRequestException.class,
+                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 101));
+        verifyNoInteractions(personRepository, eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldKeepMultipleAssignmentsSortedByEnumNaturalOrderWithoutDuplicates() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(
+                        List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
+                        pageable,
+                        1
+                ));
+        when(eventAssignmentRepository.findAssignmentTypesByPersonIdAndEventIdIn(10L, List.of(15L)))
+                .thenReturn(List.of(
+                        assignmentProjection(15L, "COMMENTATOR"),
+                        assignmentProjection(15L, "READER"),
+                        assignmentProjection(15L, "READER")
+                ));
+
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        assertEquals(
+                List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR),
+                result.getContent().get(0).getAssignments()
+        );
+    }
+
+    @Test
+    void shouldPreserveEventOrderReturnedByRepositoryOnFindSchedules() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(
+                        List.of(
+                                eventProjection(5L, "Evento Cedo", LocalDate.of(2026, 8, 5), LocalTime.of(8, 0), true, null, null),
+                                eventProjection(20L, "Evento Tarde", LocalDate.of(2026, 8, 5), LocalTime.of(19, 0), true, null, null)
+                        ),
+                        pageable,
+                        2
+                ));
+        when(eventAssignmentRepository.findAssignmentTypesByPersonIdAndEventIdIn(10L, List.of(5L, 20L)))
+                .thenReturn(List.of(assignmentProjection(5L, "READER"), assignmentProjection(20L, "PRIEST")));
+
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        assertEquals(List.of(5L, 20L), result.getContent().stream().map(CurrentUserScheduleResponseDTO::getEventId).toList());
+    }
+
+    @Test
+    void shouldReturnEmptyPageWithoutFetchingAssignmentsWhenNoEventsMatchOnFindSchedules() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+        verify(eventAssignmentRepository, never()).findAssignmentTypesByPersonIdAndEventIdIn(any(), any());
+    }
+
+    @Test
+    void shouldNotConsultMinistriesToDecideScheduleResults() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(
+                        List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
+                        pageable,
+                        1
+                ));
+        when(eventAssignmentRepository.findAssignmentTypesByPersonIdAndEventIdIn(10L, List.of(15L)))
+                .thenReturn(List.of(assignmentProjection(15L, "READER")));
+
+        service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldUseIdFoundByAuthenticatedPrincipalNotAnotherPerson() {
+        Person authenticatedPerson = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        PageRequest pageable = PageRequest.of(0, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 31);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(authenticatedPerson));
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+
+        verify(eventAssignmentRepository).findScheduleEventsByPersonId(eq(10L), eq(startDate), eq(endDate), eq(pageable));
+        verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
+    }
+
+    private PersonScheduleEventProjection eventProjection(
+            Long eventId,
+            String eventName,
+            LocalDate eventDate,
+            LocalTime eventTime,
+            Boolean massOrCelebration,
+            Long locationId,
+            String locationName
+    ) {
+        return new PersonScheduleEventProjection() {
+            @Override
+            public Long getEventId() {
+                return eventId;
+            }
+
+            @Override
+            public String getEventName() {
+                return eventName;
+            }
+
+            @Override
+            public LocalDate getEventDate() {
+                return eventDate;
+            }
+
+            @Override
+            public LocalTime getEventTime() {
+                return eventTime;
+            }
+
+            @Override
+            public Boolean getMassOrCelebration() {
+                return massOrCelebration;
+            }
+
+            @Override
+            public Long getLocationId() {
+                return locationId;
+            }
+
+            @Override
+            public String getLocationName() {
+                return locationName;
+            }
+        };
+    }
+
+    private PersonScheduleAssignmentProjection assignmentProjection(Long eventId, String assignmentType) {
+        return new PersonScheduleAssignmentProjection() {
+            @Override
+            public Long getEventId() {
+                return eventId;
+            }
+
+            @Override
+            public String getAssignmentType() {
+                return assignmentType;
+            }
+        };
     }
 
     private CurrentUserProfileResponseDTO currentProfileResponse(

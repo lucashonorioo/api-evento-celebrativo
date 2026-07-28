@@ -76,6 +76,11 @@ class EndpointSecurityTest {
         mockMvc.perform(get("/pessoas/1"))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2025-07-01")
+                        .param("endDate", "2025-07-31"))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/pessoas/1/ministries"))
                 .andExpect(status().isUnauthorized());
 
@@ -180,6 +185,11 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.phoneNumber").value("34962165544"));
 
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2000-01-01")
+                        .param("endDate", "2030-12-31"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/pessoas"))
                 .andExpect(status().isForbidden());
 
@@ -220,6 +230,11 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/1/ministries"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2000-01-01")
+                        .param("endDate", "2030-12-31"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(put("/pessoas/1/ministries")

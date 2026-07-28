@@ -55,6 +55,7 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
 				.requestMatchers(HttpMethod.GET, "/pessoas/me").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/me").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
+				.requestMatchers(HttpMethod.GET, "/pessoas/me/escalas").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
 				.requestMatchers(HttpMethod.GET, "/pessoas", "/pessoas/*").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/roles").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")

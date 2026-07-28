@@ -3,7 +3,12 @@ package com.eventoscelebrativos.repository;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.Location;
+import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.PersonMinistry;
+import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -13,16 +18,21 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +51,9 @@ class EventAssignmentRepositoryTest {
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
+
+    @Autowired
+    private PersonMinistryRepository personMinistryRepository;
 
     @Test
     void shouldPersistEventAssignmentWithEnumAsStringAndTimestamps() {
@@ -250,12 +263,319 @@ class EventAssignmentRepositoryTest {
         assertEquals(assignmentIds.stream().distinct().count(), assignmentIds.size());
     }
 
+    @Test
+    void shouldReturnOnlyEventsOfGivenPerson() {
+        Person reader = savePerson("Schedule Reader", "34974000001");
+        Person other = savePerson("Schedule Other", "34974000002");
+        CelebrationEvent ownEvent = saveEvent("Schedule Own Event", LocalDate.of(2026, 8, 10), LocalTime.of(10, 0));
+        CelebrationEvent otherEvent = saveEvent("Schedule Other Event", LocalDate.of(2026, 8, 11), LocalTime.of(10, 0));
+        saveAssignment(ownEvent, reader, EventAssignmentType.READER);
+        saveAssignment(otherEvent, other, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(ownEvent.getId(), result.getContent().get(0).getEventId());
+    }
+
+    @Test
+    void shouldExcludeEventBelongingOnlyToAnotherPerson() {
+        Person reader = savePerson("Schedule Isolation Reader", "34974000003");
+        Person other = savePerson("Schedule Isolation Other", "34974000004");
+        CelebrationEvent otherEvent = saveEvent("Schedule Isolation Event", LocalDate.of(2026, 8, 12), LocalTime.of(10, 0));
+        saveAssignment(otherEvent, other, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    void shouldIncludeEventOnStartDateBoundary() {
+        Person reader = savePerson("Schedule Start Boundary Reader", "34974000005");
+        CelebrationEvent event = saveEvent("Schedule Start Boundary Event", LocalDate.of(2026, 8, 1), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void shouldIncludeEventOnEndDateBoundary() {
+        Person reader = savePerson("Schedule End Boundary Reader", "34974000006");
+        CelebrationEvent event = saveEvent("Schedule End Boundary Event", LocalDate.of(2026, 8, 31), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void shouldExcludeEventBeforePeriod() {
+        Person reader = savePerson("Schedule Before Reader", "34974000007");
+        CelebrationEvent event = saveEvent("Schedule Before Event", LocalDate.of(2026, 7, 31), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
+    void shouldExcludeEventAfterPeriod() {
+        Person reader = savePerson("Schedule After Reader", "34974000008");
+        CelebrationEvent event = saveEvent("Schedule After Event", LocalDate.of(2026, 9, 1), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
+    void shouldOrderScheduleEventsByDateThenTime() {
+        Person reader = savePerson("Schedule Order Reader", "34974000009");
+        CelebrationEvent later = saveEvent("Schedule Order Later Event", LocalDate.of(2026, 8, 10), LocalTime.of(19, 0));
+        CelebrationEvent earlierSameDay = saveEvent("Schedule Order Earlier Event", LocalDate.of(2026, 8, 10), LocalTime.of(8, 0));
+        CelebrationEvent earliestDate = saveEvent("Schedule Order Earliest Event", LocalDate.of(2026, 8, 5), LocalTime.of(23, 0));
+        saveAssignment(later, reader, EventAssignmentType.READER);
+        saveAssignment(earlierSameDay, reader, EventAssignmentType.READER);
+        saveAssignment(earliestDate, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 0, 10);
+
+        assertEquals(
+                List.of(earliestDate.getId(), earlierSameDay.getId(), later.getId()),
+                result.getContent().stream().map(PersonScheduleEventProjection::getEventId).toList()
+        );
+    }
+
+    @Test
+    void shouldTieBreakByEventIdWhenDateAndTimeAreEqual() {
+        Person reader = savePerson("Schedule TieBreak Reader", "34974000010");
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        LocalTime time = LocalTime.of(10, 0);
+        CelebrationEvent second = saveEvent("Schedule TieBreak Second Event", date, time);
+        CelebrationEvent first = saveEvent("Schedule TieBreak First Event", date, time);
+        saveAssignment(second, reader, EventAssignmentType.READER);
+        saveAssignment(first, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, date, date, 0, 10);
+
+        List<Long> orderedByIdAsc = List.of(second.getId(), first.getId()).stream().sorted().toList();
+        assertEquals(orderedByIdAsc, result.getContent().stream().map(PersonScheduleEventProjection::getEventId).toList());
+    }
+
+    @Test
+    void shouldPaginateByDistinctEventNotByAssignmentRowAndCountDistinctEvents() {
+        Person reader = savePerson("Schedule Pagination Reader", "34974000011");
+        CelebrationEvent multiFunctionEvent = saveEvent("Schedule Pagination MultiFunction Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        CelebrationEvent secondEvent = saveEvent("Schedule Pagination Second Event", LocalDate.of(2026, 8, 6), LocalTime.of(10, 0));
+        saveAssignment(multiFunctionEvent, reader, EventAssignmentType.READER);
+        saveAssignment(multiFunctionEvent, reader, EventAssignmentType.COMMENTATOR);
+        saveAssignment(secondEvent, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> firstPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 0, 1);
+
+        assertEquals(2, firstPage.getTotalElements());
+        assertEquals(2, firstPage.getTotalPages());
+        assertEquals(1, firstPage.getContent().size());
+        assertEquals(multiFunctionEvent.getId(), firstPage.getContent().get(0).getEventId());
+
+        Page<PersonScheduleEventProjection> secondPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 1, 1);
+
+        assertEquals(1, secondPage.getContent().size());
+        assertEquals(secondEvent.getId(), secondPage.getContent().get(0).getEventId());
+    }
+
+    @Test
+    void shouldReturnEmptyPageWhenNoAssignmentInPeriod() {
+        Person reader = savePerson("Schedule Empty Reader", "34974000012");
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
+    void shouldReturnEmptyPageWhenRequestingPageBeyondTotal() {
+        Person reader = savePerson("Schedule Beyond Reader", "34974000013");
+        CelebrationEvent event = saveEvent("Schedule Beyond Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 5, 10);
+
+        assertTrue(result.getContent().isEmpty());
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void shouldReturnLocationOfEvent() {
+        Person reader = savePerson("Schedule Location Reader", "34974000014");
+        CelebrationEvent event = saveEvent("Schedule Location Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        Location location = saveLocation("Schedule Location Church");
+        attachLocation(event, location);
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        PersonScheduleEventProjection result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31))
+                .getContent().get(0);
+
+        assertEquals(location.getId(), result.getLocationId());
+        assertEquals("Schedule Location Church", result.getLocationName());
+    }
+
+    @Test
+    void shouldReturnNullLocationWhenEventHasNoLocation() {
+        Person reader = savePerson("Schedule No Location Reader", "34974000015");
+        CelebrationEvent event = saveEvent("Schedule No Location Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        PersonScheduleEventProjection result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31))
+                .getContent().get(0);
+
+        assertNull(result.getLocationId());
+        assertNull(result.getLocationName());
+    }
+
+    @Test
+    void shouldGroupBothAssignmentTypesOfSamePersonInSameEvent() {
+        Person reader = savePerson("Schedule MultiFunction Reader", "34974000016");
+        CelebrationEvent event = saveEvent("Schedule MultiFunction Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        saveAssignment(event, reader, EventAssignmentType.COMMENTATOR);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<PersonScheduleAssignmentProjection> assignments = eventAssignmentRepository
+                .findAssignmentTypesByPersonIdAndEventIdIn(reader.getId(), List.of(event.getId()));
+
+        List<String> types = assignments.stream().map(PersonScheduleAssignmentProjection::getAssignmentType).sorted().toList();
+        assertEquals(List.of("COMMENTATOR", "READER"), types);
+    }
+
+    @Test
+    void shouldNotReturnAssignmentsOfOtherPeopleInSameEvent() {
+        Person reader = savePerson("Schedule Own Assignment Reader", "34974000017");
+        Person otherPerson = savePerson("Schedule Own Assignment Other", "34974000018");
+        CelebrationEvent event = saveEvent("Schedule Own Assignment Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        saveAssignment(event, otherPerson, EventAssignmentType.PRIEST);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<PersonScheduleAssignmentProjection> assignments = eventAssignmentRepository
+                .findAssignmentTypesByPersonIdAndEventIdIn(reader.getId(), List.of(event.getId()));
+
+        assertEquals(1, assignments.size());
+        assertEquals("READER", assignments.get(0).getAssignmentType());
+    }
+
+    @Test
+    void shouldNotDependOnActivePersonMinistryToReturnSchedule() {
+        Person reader = savePerson("Schedule Legacy Ministry Reader", "34974000019");
+        CelebrationEvent event = saveEvent("Schedule Legacy Ministry Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        PersonMinistry ministry = personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
+        ministry.deactivate();
+        personMinistryRepository.save(ministry);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void shouldAvoidNPlusOneWhenLoadingScheduleEventsAndAssignments() {
+        Person reader = savePerson("Schedule NPlusOne Reader", "34974000020");
+        CelebrationEvent firstEvent = saveEvent("Schedule NPlusOne First Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
+        CelebrationEvent secondEvent = saveEvent("Schedule NPlusOne Second Event", LocalDate.of(2026, 8, 6), LocalTime.of(10, 0));
+        saveAssignment(firstEvent, reader, EventAssignmentType.READER);
+        saveAssignment(secondEvent, reader, EventAssignmentType.COMMENTATOR);
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = hibernateStatistics();
+        statistics.clear();
+
+        Page<PersonScheduleEventProjection> eventPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+        List<Long> eventIds = eventPage.getContent().stream().map(PersonScheduleEventProjection::getEventId).toList();
+        Map<Long, List<String>> assignmentsByEvent = eventAssignmentRepository
+                .findAssignmentTypesByPersonIdAndEventIdIn(reader.getId(), eventIds).stream()
+                .collect(Collectors.groupingBy(
+                        PersonScheduleAssignmentProjection::getEventId,
+                        Collectors.mapping(PersonScheduleAssignmentProjection::getAssignmentType, Collectors.toList())
+                ));
+
+        assertEquals(2, assignmentsByEvent.size());
+        assertTrue(statistics.getPrepareStatementCount() <= 3);
+    }
+
+    private Page<PersonScheduleEventProjection> findSchedule(Person person, LocalDate startDate, LocalDate endDate) {
+        return findSchedule(person, startDate, endDate, 0, 10);
+    }
+
+    private Page<PersonScheduleEventProjection> findSchedule(Person person, LocalDate startDate, LocalDate endDate, int page, int size) {
+        return eventAssignmentRepository.findScheduleEventsByPersonId(
+                person.getId(),
+                startDate,
+                endDate,
+                PageRequest.of(page, size)
+        );
+    }
+
+    private Location saveLocation(String churchName) {
+        Location location = new Location(null, churchName, "Address " + churchName);
+        entityManager.persist(location);
+        entityManager.flush();
+        return location;
+    }
+
+    private void attachLocation(CelebrationEvent event, Location location) {
+        event.getLocations().add(location);
+        entityManager.persist(event);
+        entityManager.flush();
+    }
+
     private CelebrationEvent saveEvent(String name) {
+        return saveEvent(name, LocalDate.of(2026, 9, 1), LocalTime.of(19, 0));
+    }
+
+    private CelebrationEvent saveEvent(String name, LocalDate eventDate, LocalTime eventTime) {
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name,
-                LocalDate.of(2026, 9, 1),
-                LocalTime.of(19, 0),
+                eventDate,
+                eventTime,
                 true
         );
         entityManager.persist(event);

@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -14,9 +15,13 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CurrentUserProfileMapper;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
+import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
+import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -31,8 +36,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +62,7 @@ public class PersonServiceImpl implements PersonService {
     private final CurrentUserProfileMapper currentUserProfileMapper;
     private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryCommandService personMinistryCommandService;
+    private final EventAssignmentRepository eventAssignmentRepository;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -63,7 +71,8 @@ public class PersonServiceImpl implements PersonService {
             PersonRoleUpdateMapper personRoleUpdateMapper,
             CurrentUserProfileMapper currentUserProfileMapper,
             PersonMinistryReadService personMinistryReadService,
-            PersonMinistryCommandService personMinistryCommandService
+            PersonMinistryCommandService personMinistryCommandService,
+            EventAssignmentRepository eventAssignmentRepository
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
@@ -72,6 +81,7 @@ public class PersonServiceImpl implements PersonService {
         this.currentUserProfileMapper = currentUserProfileMapper;
         this.personMinistryReadService = personMinistryReadService;
         this.personMinistryCommandService = personMinistryCommandService;
+        this.eventAssignmentRepository = eventAssignmentRepository;
     }
 
     @Override
@@ -198,6 +208,80 @@ public class PersonServiceImpl implements PersonService {
         person.setBirthdayDate(requestDTO.getBirthdayDate());
         Person savedPerson = personRepository.save(person);
         return toCurrentUserProfileDTO(savedPerson);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CurrentUserScheduleResponseDTO> findCurrentUserSchedules(
+            String phoneNumber,
+            LocalDate startDate,
+            LocalDate endDate,
+            int page,
+            int size
+    ) {
+        validateScheduleQuery(startDate, endDate, page, size);
+        Person person = findAuthenticatedPerson(phoneNumber);
+
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<PersonScheduleEventProjection> eventPage = eventAssignmentRepository.findScheduleEventsByPersonId(
+                person.getId(),
+                startDate,
+                endDate,
+                pageable
+        );
+
+        if (eventPage.isEmpty()) {
+            return new PageImpl<>(Collections.emptyList(), pageable, eventPage.getTotalElements());
+        }
+
+        List<Long> eventIds = eventPage.getContent().stream()
+                .map(PersonScheduleEventProjection::getEventId)
+                .toList();
+
+        Map<Long, EnumSet<EventAssignmentType>> assignmentsByEvent = eventAssignmentRepository
+                .findAssignmentTypesByPersonIdAndEventIdIn(person.getId(), eventIds).stream()
+                .collect(Collectors.groupingBy(
+                        PersonScheduleAssignmentProjection::getEventId,
+                        Collectors.mapping(
+                                projection -> EventAssignmentType.valueOf(projection.getAssignmentType()),
+                                Collectors.toCollection(() -> EnumSet.noneOf(EventAssignmentType.class))
+                        )
+                ));
+
+        List<CurrentUserScheduleResponseDTO> content = eventPage.getContent().stream()
+                .map(event -> toCurrentUserScheduleDTO(
+                        event,
+                        assignmentsByEvent.getOrDefault(event.getEventId(), EnumSet.noneOf(EventAssignmentType.class))
+                ))
+                .toList();
+
+        return new PageImpl<>(content, pageable, eventPage.getTotalElements());
+    }
+
+    private void validateScheduleQuery(LocalDate startDate, LocalDate endDate, int page, int size) {
+        if (startDate == null || endDate == null) {
+            throw new BadRequestException("As datas de início e fim são obrigatórias");
+        }
+        if (startDate.isAfter(endDate)) {
+            throw new BadRequestException("A data inicial não pode ser posterior à data final");
+        }
+        validatePage(page, size);
+    }
+
+    private CurrentUserScheduleResponseDTO toCurrentUserScheduleDTO(
+            PersonScheduleEventProjection event,
+            EnumSet<EventAssignmentType> assignmentTypes
+    ) {
+        return new CurrentUserScheduleResponseDTO(
+                event.getEventId(),
+                event.getEventName(),
+                event.getEventDate(),
+                event.getEventTime(),
+                event.getMassOrCelebration(),
+                event.getLocationId(),
+                event.getLocationName(),
+                List.copyOf(assignmentTypes)
+        );
     }
 
     private Person findAuthenticatedPerson(String phoneNumber) {
