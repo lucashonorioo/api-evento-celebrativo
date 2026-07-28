@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -9,6 +10,7 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.service.PersonService;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -665,6 +668,211 @@ class PersonControllerTest {
                 .andExpect(jsonPath("$.phoneNumber").value("34999999999"))
                 .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
                 .andExpect(jsonPath("$.ministries[0]").value("READER"));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenGettingCurrentUserSchedulesWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldGetCurrentUserSchedulesWhenUserIsOperator() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                .thenReturn(new PageImpl<>(
+                        List.of(scheduleResponse(
+                                15L, "Missa das 19h", LocalDate.of(2026, 7, 20), LocalTime.of(19, 0),
+                                true, 2L, "Igreja Matriz",
+                                List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR)
+                        )),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].eventId").value(15))
+                .andExpect(jsonPath("$.content[0].eventName").value("Missa das 19h"))
+                .andExpect(jsonPath("$.content[0].eventDate").value("2026-07-20"))
+                .andExpect(jsonPath("$.content[0].massOrCelebration").value(true))
+                .andExpect(jsonPath("$.content[0].locationId").value(2))
+                .andExpect(jsonPath("$.content[0].locationName").value("Igreja Matriz"))
+                .andExpect(jsonPath("$.content[0].assignments[0]").value("READER"))
+                .andExpect(jsonPath("$.content[0].assignments[1]").value("COMMENTATOR"))
+                .andExpect(jsonPath("$.content[0].assignments.length()").value(2))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.number").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.content[0].password").doesNotExist())
+                .andExpect(jsonPath("$.content[0].phoneNumber").doesNotExist())
+                .andExpect(jsonPath("$.content[0].roles").doesNotExist())
+                .andExpect(jsonPath("$.content[0].ministries").doesNotExist())
+                .andExpect(jsonPath("$.content[0].personId").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    void shouldGetCurrentUserSchedulesWhenUserIsAdmin() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999998", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenStartDateIsMissingOnCurrentUserSchedules() throws Exception {
+        mockMvc.perform(get("/pessoas/me/escalas").param("endDate", "2026-07-31"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenEndDateIsMissingOnCurrentUserSchedules() throws Exception {
+        mockMvc.perform(get("/pessoas/me/escalas").param("startDate", "2026-07-01"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenStartDateFormatIsInvalidOnCurrentUserSchedules() throws Exception {
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "01-07-2026")
+                        .param("endDate", "2026-07-31"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenEndDateFormatIsInvalidOnCurrentUserSchedules() throws Exception {
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "31-07-2026"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenDateRangeIsInvertedOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 31), LocalDate.of(2026, 7, 1), 0, 10))
+                .thenThrow(new BadRequestException("A data inicial não pode ser posterior à data final"));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-31")
+                        .param("endDate", "2026-07-01"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenPageIsNegativeOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), -1, 10))
+                .thenThrow(new BadRequestException("O numero da pagina deve ser maior ou igual a zero"));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31")
+                        .param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenSizeIsZeroOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 0))
+                .thenThrow(new BadRequestException("O tamanho da pagina deve ser maior que zero e menor ou igual a 100"));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31")
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenSizeIsGreaterThanOneHundredOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 101))
+                .thenThrow(new BadRequestException("O tamanho da pagina deve ser maior que zero e menor ou igual a 100"));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31")
+                        .param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    void shouldReturnNotFoundWhenPrincipalDoesNotExistOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34900000000", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldIgnoreUnknownPersonIdParameterOnCurrentUserSchedules() throws Exception {
+        when(personService.findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        mockMvc.perform(get("/pessoas/me/escalas")
+                        .param("startDate", "2026-07-01")
+                        .param("endDate", "2026-07-31")
+                        .param("personId", "999"))
+                .andExpect(status().isOk());
+
+        verify(personService).findCurrentUserSchedules(
+                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10);
+    }
+
+    private CurrentUserScheduleResponseDTO scheduleResponse(
+            Long eventId,
+            String eventName,
+            LocalDate eventDate,
+            LocalTime eventTime,
+            Boolean massOrCelebration,
+            Long locationId,
+            String locationName,
+            List<EventAssignmentType> assignments
+    ) {
+        return new CurrentUserScheduleResponseDTO(
+                eventId, eventName, eventDate, eventTime, massOrCelebration, locationId, locationName, assignments
+        );
     }
 
     private CurrentUserProfileResponseDTO currentProfileResponse(

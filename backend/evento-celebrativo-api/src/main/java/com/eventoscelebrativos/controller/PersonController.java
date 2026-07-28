@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -17,10 +18,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping(value = "/pessoas")
@@ -62,6 +66,37 @@ public class PersonController {
     ) {
         CurrentUserProfileResponseDTO responseDTO = personService.updateCurrentUserProfile(authentication.getName(), requestDTO);
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(summary = "Lista as escalas da pessoa autenticada em um período. A pessoa e determinada pelo token, nao por parametro.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Escalas listadas com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Periodo ou paginacao invalidos"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
+    @GetMapping(value = "/me/escalas")
+    public ResponseEntity<Page<CurrentUserScheduleResponseDTO>> findCurrentUserSchedules(
+            Authentication authentication,
+            @Parameter(description = "Data inicial do periodo, inclusive. Formato ISO yyyy-MM-dd")
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "Data final do periodo, inclusive. Formato ISO yyyy-MM-dd")
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Numero da pagina, iniciando em 0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Quantidade de registros por pagina. Maximo: 100")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<CurrentUserScheduleResponseDTO> schedules = personService.findCurrentUserSchedules(
+                authentication.getName(),
+                startDate,
+                endDate,
+                page,
+                size
+        );
+        return ResponseEntity.ok(schedules);
     }
 
     @Operation(summary = "Lista pessoas para administracao de usuarios")
