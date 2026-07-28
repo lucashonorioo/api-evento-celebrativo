@@ -1,24 +1,53 @@
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, RouterLinkActive } from '@angular/router';
 import { By } from '@angular/platform-browser';
 
 import { AuthSessionService } from '../auth-session.service';
 import { AuthService } from '../auth.service';
+import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
+import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
 import { AuthenticatedLayoutComponent } from './authenticated-layout.component';
+
+interface CurrentUserProfileServiceDouble {
+  readonly profile: WritableSignal<CurrentUserProfile | null>;
+  readonly isLoading: WritableSignal<boolean>;
+  readonly errorMessage: WritableSignal<string | null>;
+  readonly loadProfile: jasmine.Spy;
+  readonly updateProfile: jasmine.Spy;
+  readonly clearProfile: jasmine.Spy;
+}
+
+interface ProfileSetupOptions {
+  readonly profile?: CurrentUserProfile | null;
+  readonly isLoading?: boolean;
+  readonly errorMessage?: string | null;
+  readonly jwtUsername?: string | null;
+}
 
 describe('AuthenticatedLayoutComponent', () => {
   let fixture: ComponentFixture<AuthenticatedLayoutComponent>;
   let authService: jasmine.SpyObj<AuthService>;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
+  let currentUserProfileService: CurrentUserProfileServiceDouble;
 
-  async function setup(username: string | null = '11999999999', isAdmin = false): Promise<void> {
+  async function setup(isAdmin = false, options: ProfileSetupOptions = {}): Promise<void> {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['logout']);
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
       'getUsername',
       'hasAuthority',
     ]);
-    authSessionService.getUsername.and.returnValue(username);
+    authSessionService.getUsername.and.returnValue(options.jwtUsername ?? '34999999999');
     authSessionService.hasAuthority.and.returnValue(isAdmin);
+
+    currentUserProfileService = {
+      profile: signal(options.profile === undefined ? createProfile() : options.profile),
+      isLoading: signal(options.isLoading ?? false),
+      errorMessage: signal(options.errorMessage ?? null),
+      loadProfile: jasmine.createSpy('loadProfile'),
+      updateProfile: jasmine.createSpy('updateProfile'),
+      clearProfile: jasmine.createSpy('clearProfile'),
+    };
 
     await TestBed.configureTestingModule({
       imports: [AuthenticatedLayoutComponent],
@@ -26,6 +55,7 @@ describe('AuthenticatedLayoutComponent', () => {
         provideRouter([]),
         { provide: AuthService, useValue: authService },
         { provide: AuthSessionService, useValue: authSessionService },
+        { provide: CurrentUserProfileService, useValue: currentUserProfileService },
       ],
     }).compileComponents();
 
@@ -52,22 +82,65 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(text).toContain('Celebrativo');
   });
 
-  it('should render the username and initials in the topbar', async () => {
-    await setup('Maria Silva');
+  it('should load the profile on initialization', async () => {
+    await setup();
 
-    const compiled = fixture.nativeElement as HTMLElement;
-
-    expect(compiled.querySelector('.user-menu__name')?.textContent).toContain('Maria Silva');
-    expect(compiled.querySelector('.user-menu__avatar')?.textContent).toContain('MS');
+    expect(currentUserProfileService.loadProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('should render safe fallback data when username is not available', async () => {
-    await setup(null);
+  it('should render the name coming from the profile', async () => {
+    await setup(false, { profile: createProfile({ name: 'João da Silva' }) });
 
-    const compiled = fixture.nativeElement as HTMLElement;
+    expect(userMenuName()?.textContent).toContain('João da Silva');
+  });
 
-    expect(compiled.querySelector('.user-menu__name')?.textContent).toContain('Usuario');
-    expect(compiled.querySelector('.user-menu__avatar')?.textContent).toContain('US');
+  it('should not render the JWT-derived phone number as the display name', async () => {
+    await setup(false, {
+      profile: createProfile({ name: 'João da Silva' }),
+      jwtUsername: '34999999999',
+    });
+
+    const nameText = userMenuName()?.textContent ?? '';
+
+    expect(nameText).not.toContain('34999999999');
+    expect(nameText).toContain('João da Silva');
+  });
+
+  it('should render only the first initial in the avatar for a multi-word name', async () => {
+    await setup(false, { profile: createProfile({ name: 'João da Silva' }) });
+
+    expect(userMenuAvatar()?.textContent?.trim()).toBe('J');
+  });
+
+  it('should render a single initial for a one-word name', async () => {
+    await setup(false, { profile: createProfile({ name: 'Maria' }) });
+
+    expect(userMenuAvatar()?.textContent?.trim()).toBe('M');
+  });
+
+  it('should trim surrounding spaces from the profile name for display and initial', async () => {
+    await setup(false, { profile: createProfile({ name: '  João da Silva  ' }) });
+
+    expect(userMenuName()?.textContent?.trim()).toBe('João da Silva');
+    expect(userMenuAvatar()?.textContent?.trim()).toBe('J');
+  });
+
+  it('should show a neutral loading state before the profile arrives', async () => {
+    await setup(false, { profile: null, isLoading: true });
+
+    expect(userMenuName()?.textContent).toContain('Carregando perfil...');
+    expect(userMenuAvatar()?.textContent?.trim()).toBe('?');
+  });
+
+  it('should show a neutral error state when the profile fails to load', async () => {
+    await setup(false, {
+      profile: null,
+      isLoading: false,
+      errorMessage: 'Não foi possível carregar o seu perfil. Tente novamente.',
+    });
+
+    expect(userMenuName()?.textContent).toContain('Perfil indisponível');
+    expect(userMenuAvatar()?.textContent?.trim()).toBe('?');
   });
 
   it('should open and close the user menu', async () => {
@@ -93,16 +166,45 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(fixture.nativeElement.querySelector('.user-menu__panel')).toBeNull();
   });
 
+  it('should render a real "Meu perfil" link pointing to /app/perfil', async () => {
+    await setup();
+
+    userMenuTrigger().click();
+    fixture.detectChanges();
+
+    const link = myProfileLink();
+
+    expect(link.tagName).toBe('A');
+    expect(link.textContent).toContain('Meu perfil');
+    expect(link.getAttribute('href')).toBe('/app/perfil');
+    expect(link.getAttribute('role')).toBe('menuitem');
+  });
+
+  it('should close the user menu after clicking Meu perfil', async () => {
+    await setup();
+
+    userMenuTrigger().click();
+    fixture.detectChanges();
+
+    myProfileLink().click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.isUserMenuOpen()).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.user-menu__panel')).toBeNull();
+  });
+
   it('should request logout from the user menu and close it', async () => {
     await setup();
 
     userMenuTrigger().click();
     fixture.detectChanges();
 
-    const logoutButton = fixture.nativeElement.querySelector(
-      '.user-menu__item',
-    ) as HTMLButtonElement;
-    logoutButton.click();
+    const logoutButton = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.user-menu__item'),
+    ).find((element): element is HTMLButtonElement => element.textContent?.trim() === 'Sair') as
+      | HTMLButtonElement
+      | undefined;
+    logoutButton?.click();
     fixture.detectChanges();
 
     expect(authService.logout).toHaveBeenCalledOnceWith();
@@ -130,7 +232,7 @@ describe('AuthenticatedLayoutComponent', () => {
   });
 
   it('should link Pessoas to the public people directory for operators', async () => {
-    await setup('11999999999', false);
+    await setup(false);
 
     const peopleLinks = sidebarLinks().filter((link) => link.textContent?.trim() === 'Pessoas');
 
@@ -139,7 +241,7 @@ describe('AuthenticatedLayoutComponent', () => {
   });
 
   it('should link Pessoas to the administrative people and access directory for administrators', async () => {
-    await setup('11999999999', true);
+    await setup(true);
 
     const peopleLinks = sidebarLinks().filter((link) => link.textContent?.trim() === 'Pessoas');
 
@@ -219,7 +321,7 @@ describe('AuthenticatedLayoutComponent', () => {
   });
 
   it('should keep the same main sidebar items for administrators, with Pessoas pointing to the admin directory', async () => {
-    await setup('11999999999', true);
+    await setup(true);
 
     const linkTargets = sidebarLinks().map((link) => link.getAttribute('href'));
     const sidebarText = sidebar().textContent ?? '';
@@ -253,7 +355,31 @@ describe('AuthenticatedLayoutComponent', () => {
     return fixture.nativeElement.querySelector('.user-menu__trigger') as HTMLButtonElement;
   }
 
+  function userMenuName(): Element | null {
+    return fixture.nativeElement.querySelector('.user-menu__name');
+  }
+
+  function userMenuAvatar(): Element | null {
+    return fixture.nativeElement.querySelector('.user-menu__avatar');
+  }
+
+  function myProfileLink(): HTMLAnchorElement {
+    return fixture.nativeElement.querySelector('.user-menu__item--link') as HTMLAnchorElement;
+  }
+
   function textContent(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  function createProfile(overrides: Partial<CurrentUserProfile> = {}): CurrentUserProfile {
+    return {
+      id: 10,
+      name: 'Maria Silva',
+      phoneNumber: '34999999999',
+      birthdayDate: '1990-01-01',
+      roles: ['ROLE_OPERATOR'],
+      ministries: ['READER'],
+      ...overrides,
+    };
   }
 });

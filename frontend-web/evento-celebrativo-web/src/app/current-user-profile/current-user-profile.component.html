@@ -1,0 +1,129 @@
+<section class="current-user-profile page-shell" aria-labelledby="current-user-profile-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Perfil</p>
+      <h1 id="current-user-profile-title">Meu perfil</h1>
+      <p>Consulte seus dados e mantenha suas informações pessoais atualizadas.</p>
+    </div>
+  </header>
+
+  <div aria-live="polite">
+    @if (isLoading()) {
+      <p class="current-user-profile__status" role="status">Carregando perfil...</p>
+    } @else if (loadErrorMessage(); as message) {
+      <div class="current-user-profile__feedback current-user-profile__feedback--error" role="alert">
+        <p>{{ message }}</p>
+        <button class="current-user-profile__button" type="button" (click)="retryLoad()">
+          Tentar novamente
+        </button>
+      </div>
+    } @else if (profile(); as currentProfile) {
+      <form class="current-user-profile__form surface-card" [formGroup]="form" (ngSubmit)="submit()">
+        <h2>Dados pessoais</h2>
+
+        @if (successMessage()) {
+          <p
+            class="current-user-profile__feedback current-user-profile__feedback--success"
+            aria-live="polite"
+          >
+            {{ successMessage() }}
+          </p>
+        }
+
+        @if (saveErrorMessage()) {
+          <p class="current-user-profile__feedback current-user-profile__feedback--error" role="alert">
+            {{ saveErrorMessage() }}
+          </p>
+        }
+
+        <div class="current-user-profile__field">
+          <label for="profile-name">Nome</label>
+          <input
+            id="profile-name"
+            type="text"
+            formControlName="name"
+            autocomplete="name"
+            [attr.aria-invalid]="fieldErrorMessage('name') !== null"
+            [attr.aria-describedby]="fieldErrorMessage('name') !== null ? 'profile-name-error' : null"
+          />
+
+          @if (fieldErrorMessage('name'); as message) {
+            <p id="profile-name-error" class="current-user-profile__field-error" role="alert">
+              {{ message }}
+            </p>
+          }
+        </div>
+
+        <div class="current-user-profile__field">
+          <label for="profile-birthday">Data de nascimento</label>
+          <input
+            id="profile-birthday"
+            type="date"
+            formControlName="birthdayDate"
+            [attr.aria-invalid]="fieldErrorMessage('birthdayDate') !== null"
+            [attr.aria-describedby]="
+              fieldErrorMessage('birthdayDate') !== null ? 'profile-birthday-error' : null
+            "
+          />
+
+          @if (fieldErrorMessage('birthdayDate'); as message) {
+            <p id="profile-birthday-error" class="current-user-profile__field-error" role="alert">
+              {{ message }}
+            </p>
+          }
+        </div>
+
+        <button class="current-user-profile__button" type="submit" [disabled]="isSaving()">
+          @if (isSaving()) {
+            Salvando...
+          } @else {
+            Salvar alterações
+          }
+        </button>
+      </form>
+
+      <section
+        class="current-user-profile__readonly surface-card"
+        aria-labelledby="current-user-profile-readonly-title"
+      >
+        <h2 id="current-user-profile-readonly-title">Informações da conta</h2>
+
+        <dl class="current-user-profile__details">
+          <div>
+            <dt>Telefone de acesso</dt>
+            <dd>
+              {{ currentProfile.phoneNumber }}
+              <span class="current-user-profile__readonly-tag">(somente leitura)</span>
+            </dd>
+          </div>
+        </dl>
+
+        <div class="current-user-profile__list-block">
+          <h3>Perfil de acesso</h3>
+
+          <ul class="current-user-profile__tag-list" aria-label="Perfis de acesso">
+            @for (role of currentProfile.roles; track role) {
+              <li>{{ roleLabel(role) }}</li>
+            } @empty {
+              <li>Nenhum perfil de acesso.</li>
+            }
+          </ul>
+        </div>
+
+        <div class="current-user-profile__list-block">
+          <h3>Ministérios ativos</h3>
+
+          @if (currentProfile.ministries.length === 0) {
+            <p>Nenhum ministério ativo.</p>
+          } @else {
+            <ul class="current-user-profile__tag-list" aria-label="Ministérios ativos">
+              @for (ministry of currentProfile.ministries; track ministry) {
+                <li>{{ ministryLabel(ministry) }}</li>
+              }
+            </ul>
+          }
+        </div>
+      </section>
+    }
+  </div>
+</section>

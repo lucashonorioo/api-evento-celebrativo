@@ -173,19 +173,30 @@
 }
 
 .user-menu__item {
+  display: block;
   width: 100%;
   min-height: 2.5rem;
+  padding: 0.4rem 0.5rem;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-danger);
   font-weight: 700;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
 .user-menu__item:hover {
   background: #fff4f4;
+}
+
+.user-menu__item--link {
+  color: var(--color-text);
+}
+
+.user-menu__item--link:hover {
+  background: var(--color-primary-soft);
 }
 
 .topbar__menu-button:focus-visible,

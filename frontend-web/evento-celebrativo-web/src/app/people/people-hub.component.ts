@@ -7,7 +7,6 @@ interface PeopleLink {
   readonly title: string;
   readonly description: string;
   readonly path: string;
-  readonly adminOnly?: boolean;
 }
 
 @Component({
@@ -46,12 +45,6 @@ export class PeopleHubComponent {
       title: 'Ministros da Eucaristia',
       description: 'Consulte os ministros da Eucaristia.',
       path: '/app/ministros-eucaristia',
-    },
-    {
-      title: 'Pessoas e acessos',
-      description: 'Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.',
-      path: '/app/admin/usuarios',
-      adminOnly: true,
     },
   ];
 

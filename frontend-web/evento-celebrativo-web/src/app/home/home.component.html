@@ -3,7 +3,13 @@
     <div class="page-header__content">
       <p class="page-header__eyebrow">Inicio</p>
       <h1 id="home-title">Painel da Paróquia</h1>
-      <p class="home__greeting">Bem-vindo, {{ username }}.</p>
+      <p class="home__greeting">
+        @if (profileName(); as name) {
+          Bem-vindo, {{ name }}.
+        } @else {
+          Bem-vindo.
+        }
+      </p>
       <p>Acompanhe os próximos eventos e acesse rapidamente as principais áreas do sistema.</p>
     </div>
   </header>

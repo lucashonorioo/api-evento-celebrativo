@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthSessionService } from '../auth-session.service';
 import { AuthService } from '../auth.service';
+import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
 
 @Component({
   selector: 'app-authenticated-layout',
@@ -12,16 +13,24 @@ import { AuthService } from '../auth.service';
   styleUrl: './authenticated-layout.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AuthenticatedLayoutComponent {
+export class AuthenticatedLayoutComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly authSessionService = inject(AuthSessionService);
+  private readonly currentUserProfileService = inject(CurrentUserProfileService);
 
-  readonly username = this.authSessionService.getUsername() ?? 'Usuario';
   readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly peopleLink = this.isAdmin ? '/app/admin/usuarios' : '/app/pessoas';
   readonly isSidebarOpen = signal(false);
   readonly isUserMenuOpen = signal(false);
-  readonly userInitials = initialsFor(this.username);
+
+  readonly isProfileLoading = this.currentUserProfileService.isLoading;
+  readonly profileErrorMessage = this.currentUserProfileService.errorMessage;
+  readonly displayName = computed(() => displayNameFor(this.currentUserProfileService.profile()));
+  readonly userInitial = computed(() => initialFor(this.displayName()));
+
+  ngOnInit(): void {
+    this.currentUserProfileService.loadProfile();
+  }
 
   onLogout(): void {
     this.isUserMenuOpen.set(false);
@@ -39,20 +48,26 @@ export class AuthenticatedLayoutComponent {
   toggleUserMenu(): void {
     this.isUserMenuOpen.update((isOpen) => !isOpen);
   }
+
+  closeUserMenu(): void {
+    this.isUserMenuOpen.set(false);
+  }
 }
 
-function initialsFor(username: string): string {
-  const trimmedUsername = username.trim();
-
-  if (trimmedUsername.length === 0) {
-    return 'U';
+function displayNameFor(profile: { readonly name: string } | null): string | null {
+  if (profile === null) {
+    return null;
   }
 
-  const words = trimmedUsername.split(/\s+/).filter((word) => word.length > 0);
+  const trimmedName = profile.name.trim();
 
-  if (words.length >= 2) {
-    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  return trimmedName.length > 0 ? trimmedName : null;
+}
+
+function initialFor(displayName: string | null): string | null {
+  if (displayName === null) {
+    return null;
   }
 
-  return trimmedUsername.slice(0, 2).toUpperCase();
+  return displayName.charAt(0).toUpperCase();
 }

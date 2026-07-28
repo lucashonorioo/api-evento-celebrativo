@@ -42,38 +42,62 @@ describe('PeopleHubComponent', () => {
     expect(textContent()).toContain('Central de pessoas');
   });
 
-  it('should link to each person category', async () => {
+  it('should link to each of the five ministerial categories only', async () => {
     await setup();
 
     const linkTargets = links().map((link) => link.getAttribute('href'));
+    const cards = fixture.nativeElement.querySelectorAll('.people-hub__card');
 
     expect(linkTargets).toContain('/app/leitores');
     expect(linkTargets).toContain('/app/comentaristas');
     expect(linkTargets).toContain('/app/padres');
     expect(linkTargets).toContain('/app/ministros-palavra');
     expect(linkTargets).toContain('/app/ministros-eucaristia');
+    expect(cards.length).toBe(5);
   });
 
-  it('should render the people and access directory card for administrators', async () => {
+  it('should not render the redundant people and access directory card for administrators', async () => {
     await setup(true);
 
-    const text = textContent();
+    const cards = Array.from(
+      fixture.nativeElement.querySelectorAll('.people-hub__card'),
+    ) as HTMLElement[];
+    const cardTitles = cards.map((card) => card.querySelector('h2')?.textContent?.trim());
     const linkTargets = links().map((link) => link.getAttribute('href'));
 
-    expect(text).toContain('Pessoas e acessos');
-    expect(text).toContain('Gerencie os ministérios e os perfis de acesso das pessoas cadastradas.');
-    expect(linkTargets).toContain('/app/admin/usuarios');
+    expect(cardTitles).not.toContain('Pessoas e acessos');
+    expect(cards.length).toBe(5);
+    expect(linkTargets.filter((href) => href === '/app/admin/usuarios').length).toBe(1);
+  });
+
+  it('should not render the redundant people and access directory card for operators', async () => {
+    await setup(false);
+
+    const cards = Array.from(
+      fixture.nativeElement.querySelectorAll('.people-hub__card'),
+    ) as HTMLElement[];
+    const cardTitles = cards.map((card) => card.querySelector('h2')?.textContent?.trim());
+
+    expect(cardTitles).not.toContain('Pessoas e acessos');
+    expect(cards.length).toBe(5);
+  });
+
+  it('should show "Voltar para Pessoas e acessos" for administrators, pointing to the admin directory', async () => {
+    await setup(true);
+
+    const backLink = (
+      Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLAnchorElement[]
+    ).find((link) => link.textContent?.trim() === 'Voltar para Pessoas e acessos');
+
+    expect(backLink).toBeDefined();
+    expect(backLink?.getAttribute('href')).toBe('/app/admin/usuarios');
     expect(authSessionService.hasAuthority).toHaveBeenCalledOnceWith('ROLE_ADMIN');
   });
 
-  it('should not render the people and access directory card for operators', async () => {
+  it('should not show "Voltar para Pessoas e acessos" for operators', async () => {
     await setup(false);
 
-    const text = textContent();
-    const linkTargets = links().map((link) => link.getAttribute('href'));
-
-    expect(text).not.toContain('Pessoas e acessos');
-    expect(linkTargets).not.toContain('/app/admin/usuarios');
+    expect(textContent()).not.toContain('Voltar para Pessoas e acessos');
   });
 
   it('should not render unsupported administrative actions for operators', async () => {
