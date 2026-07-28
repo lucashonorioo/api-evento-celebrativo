@@ -1,0 +1,143 @@
+<section class="current-user-schedules page-shell" aria-labelledby="current-user-schedules-title">
+  <header class="page-header">
+    <div class="page-header__content">
+      <p class="page-header__eyebrow">Escalas</p>
+      <h1 id="current-user-schedules-title">Minhas escalas</h1>
+      <p>Consulte os eventos em que você está escalado e as funções que exercerá.</p>
+    </div>
+  </header>
+
+  <form class="current-user-schedules__filter surface-card" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="current-user-schedules__field">
+      <label for="schedules-start-date">Data inicial</label>
+      <input
+        id="schedules-start-date"
+        type="date"
+        formControlName="startDate"
+        [attr.aria-invalid]="fieldErrorMessage('startDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('startDate') !== null ? 'schedules-start-date-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('startDate'); as message) {
+        <p id="schedules-start-date-error" class="current-user-schedules__field-error" role="alert">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    <div class="current-user-schedules__field">
+      <label for="schedules-end-date">Data final</label>
+      <input
+        id="schedules-end-date"
+        type="date"
+        formControlName="endDate"
+        [attr.aria-invalid]="fieldErrorMessage('endDate') !== null"
+        [attr.aria-describedby]="
+          fieldErrorMessage('endDate') !== null ? 'schedules-end-date-error' : null
+        "
+      />
+
+      @if (fieldErrorMessage('endDate'); as message) {
+        <p id="schedules-end-date-error" class="current-user-schedules__field-error" role="alert">
+          {{ message }}
+        </p>
+      }
+    </div>
+
+    @if (validationMessage()) {
+      <p class="current-user-schedules__validation" role="alert">{{ validationMessage() }}</p>
+    }
+
+    <div class="current-user-schedules__actions">
+      <button
+        class="current-user-schedules__button primary-button"
+        type="submit"
+        [disabled]="isLoading()"
+      >
+        Consultar
+      </button>
+    </div>
+  </form>
+
+  <div aria-live="polite">
+    @if (isLoading()) {
+      <p class="current-user-schedules__status" role="status">Carregando suas escalas...</p>
+    } @else if (errorMessage()) {
+      <div class="current-user-schedules__feedback current-user-schedules__feedback--error" role="alert">
+        <p>{{ errorMessage() }}</p>
+
+        <button class="current-user-schedules__button primary-button" type="button" (click)="retry()">
+          Tentar novamente
+        </button>
+      </div>
+    } @else if (schedules().length === 0) {
+      <p class="current-user-schedules__feedback">
+        Nenhuma escala foi encontrada para o período informado.
+      </p>
+    } @else {
+      <ul class="current-user-schedules__list" aria-label="Lista das minhas escalas">
+        @for (schedule of schedules(); track schedule.eventId) {
+          <li class="current-user-schedules__card surface-card">
+            <header class="current-user-schedules__card-header">
+              <div>
+                <p class="current-user-schedules__eyebrow">{{ eventKindLabel(schedule.massOrCelebration) }}</p>
+                <h2>{{ schedule.eventName }}</h2>
+              </div>
+            </header>
+
+            <dl class="current-user-schedules__details">
+              <div>
+                <dt>Data</dt>
+                <dd>{{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+              </div>
+              <div>
+                <dt>Horário</dt>
+                <dd>{{ formatTime(schedule.eventTime) }}</dd>
+              </div>
+              <div>
+                <dt>Local</dt>
+                <dd>{{ schedule.locationName ?? 'Local não informado.' }}</dd>
+              </div>
+            </dl>
+
+            <section class="current-user-schedules__assignments" aria-label="Minhas funções">
+              <h3>Funções</h3>
+
+              <ul>
+                @for (assignment of schedule.assignments; track assignment) {
+                  <li>{{ assignmentLabel(assignment) }}</li>
+                }
+              </ul>
+            </section>
+          </li>
+        }
+      </ul>
+
+      @if (totalPages() > 0) {
+        <nav class="current-user-schedules__pagination" aria-label="Paginação das minhas escalas">
+          <button
+            class="current-user-schedules__pagination-button"
+            type="button"
+            (click)="previousPage()"
+            [disabled]="isFirstPage() || isLoading()"
+          >
+            Anterior
+          </button>
+          <span class="current-user-schedules__pagination-status">
+            Página {{ currentPage() + 1 }} de {{ totalPages() }}
+          </span>
+          <button
+            class="current-user-schedules__pagination-button"
+            type="button"
+            (click)="nextPage()"
+            [disabled]="isLastPage() || isLoading()"
+          >
+            Próxima
+          </button>
+        </nav>
+      }
+    }
+  </div>
+</section>

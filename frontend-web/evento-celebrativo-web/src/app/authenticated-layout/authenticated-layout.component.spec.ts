@@ -220,15 +220,53 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTargets).toEqual([
       '/app/inicio',
       '/app/eventos',
+      '/app/minhas-escalas',
       '/app/escalas',
       '/app/pessoas',
       '/app/locais',
     ]);
     expect(sidebarText).toContain('Inicio');
     expect(sidebarText).toContain('Eventos');
+    expect(sidebarText).toContain('Minhas escalas');
     expect(sidebarText).toContain('Escalas');
     expect(sidebarText).toContain('Pessoas');
     expect(sidebarText).toContain('Locais');
+  });
+
+  it('should render "Minhas escalas" before "Escalas" for operators', async () => {
+    await setup(false);
+
+    const targets = sidebarLinks().map((link) => link.getAttribute('href'));
+    const myScheduleIndex = targets.indexOf('/app/minhas-escalas');
+    const scheduleIndex = targets.indexOf('/app/escalas');
+
+    expect(myScheduleIndex).toBeGreaterThan(-1);
+    expect(myScheduleIndex).toBeLessThan(scheduleIndex);
+  });
+
+  it('should render "Minhas escalas" before "Escalas" for administrators', async () => {
+    await setup(true);
+
+    const targets = sidebarLinks().map((link) => link.getAttribute('href'));
+    const myScheduleIndex = targets.indexOf('/app/minhas-escalas');
+    const scheduleIndex = targets.indexOf('/app/escalas');
+
+    expect(myScheduleIndex).toBeGreaterThan(-1);
+    expect(myScheduleIndex).toBeLessThan(scheduleIndex);
+  });
+
+  it('should close the sidebar after clicking "Minhas escalas"', async () => {
+    await setup();
+    fixture.componentInstance.isSidebarOpen.set(true);
+    fixture.detectChanges();
+
+    const myScheduleLink = sidebarLinks().find(
+      (link) => link.getAttribute('href') === '/app/minhas-escalas',
+    ) as HTMLAnchorElement;
+    myScheduleLink.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.isSidebarOpen()).toBeFalse();
   });
 
   it('should link Pessoas to the public people directory for operators', async () => {
@@ -330,6 +368,7 @@ describe('AuthenticatedLayoutComponent', () => {
     expect(linkTargets).toEqual([
       '/app/inicio',
       '/app/eventos',
+      '/app/minhas-escalas',
       '/app/escalas',
       '/app/admin/usuarios',
       '/app/locais',
