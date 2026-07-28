@@ -85,12 +85,27 @@
           [attr.aria-expanded]="isUserMenuOpen()"
           (click)="toggleUserMenu()"
         >
-          <span class="user-menu__avatar" aria-hidden="true">{{ userInitials }}</span>
-          <span class="user-menu__name">{{ username }}</span>
+          <span class="user-menu__avatar" aria-hidden="true">{{ userInitial() ?? '?' }}</span>
+
+          @if (displayName(); as name) {
+            <span class="user-menu__name">{{ name }}</span>
+          } @else if (profileErrorMessage()) {
+            <span class="user-menu__name">Perfil indisponível</span>
+          } @else {
+            <span class="user-menu__name">Carregando perfil...</span>
+          }
         </button>
 
         @if (isUserMenuOpen()) {
           <div class="user-menu__panel" role="menu">
+            <a
+              class="user-menu__item user-menu__item--link"
+              role="menuitem"
+              routerLink="/app/perfil"
+              (click)="closeUserMenu()"
+            >
+              Meu perfil
+            </a>
             <button class="user-menu__item" type="button" role="menuitem" (click)="onLogout()">
               Sair
             </button>

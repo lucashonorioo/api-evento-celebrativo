@@ -1,9 +1,11 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { AuthSessionService } from '../auth-session.service';
+import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
+import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
 import { compareEventsByDateTimeAscending, eventLocalTimestamp } from '../events/event-view.utils';
@@ -31,10 +33,13 @@ interface AdminActionLink {
 })
 export class HomeComponent implements OnInit {
   private readonly authSessionService = inject(AuthSessionService);
+  private readonly currentUserProfileService = inject(CurrentUserProfileService);
   private readonly eventService = inject(EventService);
 
   readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
-  readonly username = greetingNameFor(this.authSessionService.getUsername());
+  readonly profileName = computed(() =>
+    profileNameFor(this.currentUserProfileService.profile()),
+  );
 
   readonly quickAccessLinks: readonly QuickAccessLink[] = [
     {
@@ -106,10 +111,14 @@ export class HomeComponent implements OnInit {
   }
 }
 
-function greetingNameFor(username: string | null): string {
-  const trimmedUsername = username?.trim() ?? '';
+function profileNameFor(profile: CurrentUserProfile | null): string | null {
+  if (profile === null) {
+    return null;
+  }
 
-  return trimmedUsername.length > 0 ? trimmedUsername : 'Usuário';
+  const trimmedName = profile.name.trim();
+
+  return trimmedName.length > 0 ? trimmedName : null;
 }
 
 function selectUpcomingEvents(

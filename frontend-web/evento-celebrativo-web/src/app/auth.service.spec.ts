@@ -7,16 +7,22 @@ import { API_BASE_URL } from './api.config';
 import { AuthSessionService } from './auth-session.service';
 import { LoginRequest, TokenResponse } from './auth.models';
 import { AuthService } from './auth.service';
+import { CurrentUserProfileService } from './current-user-profile/current-user-profile.service';
 
 describe('AuthService', () => {
   let service: AuthService;
   let httpTestingController: HttpTestingController;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
+  let currentUserProfileService: jasmine.SpyObj<CurrentUserProfileService>;
   let router: Router;
   let navigateSpy: jasmine.Spy;
 
   beforeEach(() => {
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', ['clear']);
+    currentUserProfileService = jasmine.createSpyObj<CurrentUserProfileService>(
+      'CurrentUserProfileService',
+      ['clearProfile'],
+    );
 
     TestBed.configureTestingModule({
       providers: [
@@ -24,6 +30,7 @@ describe('AuthService', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: AuthSessionService, useValue: authSessionService },
+        { provide: CurrentUserProfileService, useValue: currentUserProfileService },
       ],
     });
 
@@ -81,5 +88,20 @@ describe('AuthService', () => {
 
     expect(authSessionService.clear).toHaveBeenCalledOnceWith();
     expect(navigateSpy).toHaveBeenCalledOnceWith(['/login']);
+  });
+
+  it('should clear the current user profile state before clearing the session on logout', () => {
+    const callOrder: string[] = [];
+    currentUserProfileService.clearProfile.and.callFake(() => {
+      callOrder.push('clearProfile');
+    });
+    authSessionService.clear.and.callFake(() => {
+      callOrder.push('clear');
+    });
+
+    service.logout();
+
+    expect(currentUserProfileService.clearProfile).toHaveBeenCalledOnceWith();
+    expect(callOrder).toEqual(['clearProfile', 'clear']);
   });
 });

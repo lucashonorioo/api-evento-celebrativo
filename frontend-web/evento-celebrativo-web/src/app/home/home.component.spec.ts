@@ -1,37 +1,61 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../auth-session.service';
+import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
+import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
 import { HomeComponent } from './home.component';
 
 const NOW = new Date(2026, 6, 20, 10, 0, 0);
 
+interface CurrentUserProfileServiceDouble {
+  readonly profile: WritableSignal<CurrentUserProfile | null>;
+  readonly isLoading: WritableSignal<boolean>;
+  readonly errorMessage: WritableSignal<string | null>;
+  readonly loadProfile: jasmine.Spy;
+  readonly updateProfile: jasmine.Spy;
+  readonly clearProfile: jasmine.Spy;
+}
+
 describe('HomeComponent', () => {
   let fixture: ComponentFixture<HomeComponent>;
   let authSessionService: jasmine.SpyObj<AuthSessionService>;
   let eventService: jasmine.SpyObj<EventService>;
+  let currentUserProfileService: CurrentUserProfileServiceDouble;
 
   async function setup(
-    username: string | null = '11999999999',
     isAdmin = false,
     events$: Observable<CelebrationEventResponse[]> = of([createEvent()]),
     now: Date = NOW,
+    profileOptions: {
+      profile?: CurrentUserProfile | null;
+      isLoading?: boolean;
+      errorMessage?: string | null;
+    } = {},
   ): Promise<void> {
     jasmine.clock().mockDate(now);
 
     authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
-      'getUsername',
       'hasAuthority',
     ]);
-    authSessionService.getUsername.and.returnValue(username);
     authSessionService.hasAuthority.and.returnValue(isAdmin);
 
     eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValue(events$);
+
+    currentUserProfileService = {
+      profile: signal(profileOptions.profile === undefined ? createProfile() : profileOptions.profile),
+      isLoading: signal(profileOptions.isLoading ?? false),
+      errorMessage: signal(profileOptions.errorMessage ?? null),
+      loadProfile: jasmine.createSpy('loadProfile'),
+      updateProfile: jasmine.createSpy('updateProfile'),
+      clearProfile: jasmine.createSpy('clearProfile'),
+    };
 
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
@@ -39,6 +63,7 @@ describe('HomeComponent', () => {
         provideRouter([]),
         { provide: AuthSessionService, useValue: authSessionService },
         { provide: EventService, useValue: eventService },
+        { provide: CurrentUserProfileService, useValue: currentUserProfileService },
       ],
     }).compileComponents();
 
@@ -61,8 +86,8 @@ describe('HomeComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should render the greeting with the authenticated username', async () => {
-    await setup('Maria Silva');
+  it('should render the greeting with the profile name', async () => {
+    await setup(false, of([createEvent()]), NOW, { profile: createProfile({ name: 'Maria Silva' }) });
 
     const text = textContent();
 
@@ -73,16 +98,48 @@ describe('HomeComponent', () => {
     );
   });
 
-  it('should fallback to Usuário when the username is null', async () => {
-    await setup(null);
+  it('should never render the phone number as the greeting name', async () => {
+    await setup(false, of([createEvent()]), NOW, {
+      profile: createProfile({ name: 'Maria Silva', phoneNumber: '34999999999' }),
+    });
 
-    expect(textContent()).toContain('Bem-vindo, Usuário.');
+    expect(textContent()).toContain('Bem-vindo, Maria Silva.');
+    expect(textContent()).not.toContain('Bem-vindo, 34999999999');
   });
 
-  it('should fallback to Usuário when the username is blank', async () => {
-    await setup('   ');
+  it('should show a neutral greeting while the profile is loading', async () => {
+    await setup(false, of([createEvent()]), NOW, { profile: null, isLoading: true });
 
-    expect(textContent()).toContain('Bem-vindo, Usuário.');
+    expect(textContent()).toContain('Bem-vindo.');
+    expect(textContent()).not.toContain('Bem-vindo, ');
+  });
+
+  it('should show a neutral greeting when the profile fails to load', async () => {
+    await setup(false, of([createEvent()]), NOW, {
+      profile: null,
+      errorMessage: 'Não foi possível carregar o seu perfil. Tente novamente.',
+    });
+
+    expect(textContent()).toContain('Bem-vindo.');
+    expect(textContent()).not.toContain('Bem-vindo, ');
+  });
+
+  it('should update the greeting immediately when the profile signal changes', async () => {
+    await setup(false, of([createEvent()]), NOW, { profile: createProfile({ name: 'Maria Silva' }) });
+
+    expect(textContent()).toContain('Bem-vindo, Maria Silva.');
+
+    currentUserProfileService.profile.set(createProfile({ name: 'João Atualizado' }));
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Bem-vindo, João Atualizado.');
+    expect(textContent()).not.toContain('Bem-vindo, Maria Silva.');
+  });
+
+  it('should not call the current user profile service to load the profile', async () => {
+    await setup();
+
+    expect(currentUserProfileService.loadProfile).not.toHaveBeenCalled();
   });
 
   it('should call EventService.findAll once on initialization', async () => {
@@ -113,7 +170,7 @@ describe('HomeComponent', () => {
     const pastEvent = createEvent({ id: 1, eventDate: '2026-07-19', eventTime: '23:59:59' });
     const futureEvent = createEvent({ id: 2, eventDate: '2026-07-21', eventTime: '08:00' });
 
-    await setup('11999999999', false, of([pastEvent, futureEvent]));
+    await setup(false, of([pastEvent, futureEvent]));
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([2]);
   });
@@ -121,7 +178,7 @@ describe('HomeComponent', () => {
   it('should include an event happening exactly at the current moment', async () => {
     const nowEvent = createEvent({ id: 9, eventDate: '2026-07-20', eventTime: '10:00' });
 
-    await setup('11999999999', false, of([nowEvent]));
+    await setup(false, of([nowEvent]));
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([9]);
   });
@@ -130,7 +187,7 @@ describe('HomeComponent', () => {
     const now = new Date(2026, 6, 20, 19, 30, 30);
     const soonEvent = createEvent({ id: 11, eventDate: '2026-07-20', eventTime: '19:30:45' });
 
-    await setup('11999999999', false, of([soonEvent]), now);
+    await setup(false, of([soonEvent]), now);
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([11]);
   });
@@ -139,7 +196,7 @@ describe('HomeComponent', () => {
     const now = new Date(2026, 6, 20, 19, 30, 30);
     const pastEvent = createEvent({ id: 12, eventDate: '2026-07-20', eventTime: '19:30:15' });
 
-    await setup('11999999999', false, of([pastEvent]), now);
+    await setup(false, of([pastEvent]), now);
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([]);
   });
@@ -148,7 +205,7 @@ describe('HomeComponent', () => {
     const now = new Date(2026, 6, 20, 19, 30, 0);
     const eventWithoutSeconds = createEvent({ id: 13, eventDate: '2026-07-20', eventTime: '19:30' });
 
-    await setup('11999999999', false, of([eventWithoutSeconds]), now);
+    await setup(false, of([eventWithoutSeconds]), now);
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([13]);
   });
@@ -157,7 +214,7 @@ describe('HomeComponent', () => {
     const now = new Date(2026, 6, 20, 19, 30, 30);
     const sameSecondEvent = createEvent({ id: 14, eventDate: '2026-07-20', eventTime: '19:30:30' });
 
-    await setup('11999999999', false, of([sameSecondEvent]), now);
+    await setup(false, of([sameSecondEvent]), now);
 
     expect(fixture.componentInstance.upcomingEvents().map((event) => event.id)).toEqual([14]);
   });
@@ -173,7 +230,7 @@ describe('HomeComponent', () => {
       createEvent({ id: 3, nameMassOrEvent: 'Evento C', eventDate: '2026-07-25', eventTime: '09:00' }),
     ];
 
-    await setup('11999999999', false, of(events));
+    await setup(false, of(events));
 
     const ids = fixture.componentInstance.upcomingEvents().map((event) => event.id);
 
@@ -189,7 +246,7 @@ describe('HomeComponent', () => {
     ];
     const originalOrder = events.map((event) => event.id);
 
-    await setup('11999999999', false, of(events));
+    await setup(false, of(events));
 
     expect(events.map((event) => event.id)).toEqual(originalOrder);
   });
@@ -208,7 +265,7 @@ describe('HomeComponent', () => {
       massOrCelebration: false,
     });
 
-    await setup('11999999999', false, of([mass, celebration]));
+    await setup(false, of([mass, celebration]));
 
     const text = textContent();
 
@@ -219,7 +276,7 @@ describe('HomeComponent', () => {
   it('should render a details link for each upcoming event pointing to the event route', async () => {
     const event = createEvent({ id: 42, eventDate: '2026-07-21', eventTime: '08:00' });
 
-    await setup('11999999999', false, of([event]));
+    await setup(false, of([event]));
 
     const detailLink = eventLinks().find((link) => link.textContent?.includes('Ver evento'));
 
@@ -228,7 +285,7 @@ describe('HomeComponent', () => {
   });
 
   it('should show the empty state message while keeping quick access available', async () => {
-    await setup('11999999999', false, of([]));
+    await setup(false, of([]));
 
     const text = textContent();
 
@@ -239,7 +296,7 @@ describe('HomeComponent', () => {
   });
 
   it('should show an error message when loading events fails, without hiding quick access', async () => {
-    await setup('11999999999', false, throwError(() => new HttpErrorResponse({ status: 500 })));
+    await setup(false, throwError(() => new HttpErrorResponse({ status: 500 })));
 
     const text = textContent();
 
@@ -251,7 +308,7 @@ describe('HomeComponent', () => {
   });
 
   it('should reload events when the retry button is clicked', async () => {
-    await setup('11999999999', false, throwError(() => new HttpErrorResponse({ status: 500 })));
+    await setup(false, throwError(() => new HttpErrorResponse({ status: 500 })));
     eventService.findAll.and.returnValue(
       of([
         createEvent({
@@ -303,7 +360,7 @@ describe('HomeComponent', () => {
   });
 
   it('should point Pessoas to the admin directory and show the admin description for administrators', async () => {
-    await setup('11999999999', true);
+    await setup(true);
 
     const pessoasCard = quickAccessCardByLabel('Pessoas');
 
@@ -312,7 +369,7 @@ describe('HomeComponent', () => {
   });
 
   it('should point Pessoas to the public directory and show the operator description for operators', async () => {
-    await setup('11999999999', false);
+    await setup(false);
 
     const pessoasCard = quickAccessCardByLabel('Pessoas');
 
@@ -321,7 +378,7 @@ describe('HomeComponent', () => {
   });
 
   it('should render the administrative actions section for ROLE_ADMIN', async () => {
-    await setup('11999999999', true);
+    await setup(true);
 
     const text = textContent();
     const adminTargets = adminAnchors().map((link) => link.getAttribute('href'));
@@ -340,7 +397,7 @@ describe('HomeComponent', () => {
   });
 
   it('should not render any administrative action for ROLE_OPERATOR', async () => {
-    await setup('11999999999', false);
+    await setup(false);
 
     const text = textContent();
     const allTargets = Array.from(
@@ -361,7 +418,7 @@ describe('HomeComponent', () => {
   it('should not render event location or fictitious metrics', async () => {
     const event = createEvent({ id: 1, eventDate: '2026-07-21', eventTime: '08:00' });
 
-    await setup('11999999999', false, of([event]));
+    await setup(false, of([event]));
 
     const text = textContent();
 
@@ -426,6 +483,18 @@ describe('HomeComponent', () => {
       eventDate: '2026-07-25',
       eventTime: '09:00:00',
       massOrCelebration: true,
+      ...overrides,
+    };
+  }
+
+  function createProfile(overrides: Partial<CurrentUserProfile> = {}): CurrentUserProfile {
+    return {
+      id: 10,
+      name: 'Maria Silva',
+      phoneNumber: '34999999999',
+      birthdayDate: '1990-01-01',
+      roles: ['ROLE_OPERATOR'],
+      ministries: ['READER'],
       ...overrides,
     };
   }

@@ -46,6 +46,13 @@ export const routes: Routes = [
           import('./home/home.component').then(({ HomeComponent }) => HomeComponent),
       },
       {
+        path: 'perfil',
+        loadComponent: () =>
+          import('./current-user-profile/current-user-profile.component').then(
+            ({ CurrentUserProfileComponent }) => CurrentUserProfileComponent,
+          ),
+      },
+      {
         path: 'acesso-negado',
         loadComponent: () =>
           import('./access-denied/access-denied.component').then(
