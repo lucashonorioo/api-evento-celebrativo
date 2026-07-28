@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -17,6 +19,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,6 +32,36 @@ public class PersonController {
 
     public PersonController(PersonService personService) {
         this.personService = personService;
+    }
+
+    @Operation(summary = "Consulta o perfil da pessoa autenticada")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Perfil consultado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
+    @GetMapping(value = "/me")
+    public ResponseEntity<CurrentUserProfileResponseDTO> findCurrentUserProfile(Authentication authentication) {
+        CurrentUserProfileResponseDTO responseDTO = personService.getCurrentUserProfile(authentication.getName());
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(summary = "Atualiza nome e data de nascimento da pessoa autenticada. Nao permite alterar telefone, senha, roles ou ministerios.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Perfil atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
+    @PutMapping(value = "/me")
+    public ResponseEntity<CurrentUserProfileResponseDTO> updateCurrentUserProfile(
+            Authentication authentication,
+            @Valid @RequestBody CurrentUserProfileUpdateRequestDTO requestDTO
+    ) {
+        CurrentUserProfileResponseDTO responseDTO = personService.updateCurrentUserProfile(authentication.getName(), requestDTO);
+        return ResponseEntity.ok(responseDTO);
     }
 
     @Operation(summary = "Lista pessoas para administracao de usuarios")

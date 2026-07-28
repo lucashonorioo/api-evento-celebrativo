@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -9,6 +11,7 @@ import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.mapper.CurrentUserProfileMapper;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
 import com.eventoscelebrativos.model.MinistryType;
@@ -55,6 +58,9 @@ class PersonServiceImplTest {
 
     @Mock
     private PersonRoleUpdateMapper personRoleUpdateMapper;
+
+    @Mock
+    private CurrentUserProfileMapper currentUserProfileMapper;
 
     @Mock
     private PersonMinistryReadService personMinistryReadService;
@@ -498,6 +504,198 @@ class PersonServiceImplTest {
         );
 
         assertEquals(List.of(MinistryType.READER), response.getMinistries());
+    }
+
+    @Test
+    void shouldGetCurrentUserProfileByPhoneNumberOfAuthenticatedPerson() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
+                .thenReturn(Map.of(10L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+
+        assertEquals(10L, response.getId());
+        assertEquals("Joao da Silva", response.getName());
+        assertEquals("34999999999", response.getPhoneNumber());
+        assertEquals(person.getBirthdayDate(), response.getBirthdayDate());
+        assertEquals(List.of("ROLE_OPERATOR"), response.getRoles());
+        assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
+    }
+
+    @Test
+    void shouldReturnEmptyMinistriesWhenAuthenticatedPersonHasNoActiveMinistry() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+
+        assertEquals(List.of(), response.getMinistries());
+    }
+
+    @Test
+    void shouldSortCurrentUserProfileMinistriesDeterministically() {
+        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
+                .thenReturn(Map.of(10L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+
+        assertEquals(
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                response.getMinistries()
+        );
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnGet() {
+        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.getCurrentUserProfile("34900000000"));
+        verifyNoInteractions(personMinistryReadService);
+    }
+
+    @Test
+    void shouldUpdateCurrentUserProfileNameAndBirthdayDate() {
+        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        person.addRole(operatorRole());
+        LocalDate newBirthday = LocalDate.of(1992, 3, 15);
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
+                .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "New Name", "34999999999", newBirthday, List.of("ROLE_OPERATOR")
+        ));
+
+        CurrentUserProfileResponseDTO response = service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("New Name", newBirthday)
+        );
+
+        assertEquals("New Name", response.getName());
+        assertEquals(newBirthday, response.getBirthdayDate());
+        assertEquals("New Name", person.getName());
+        assertEquals(newBirthday, person.getBirthdayDate());
+    }
+
+    @Test
+    void shouldTrimNameBeforePersistingOnUpdate() {
+        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "New Name", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("  New Name  ", person.getBirthdayDate())
+        );
+
+        assertEquals("New Name", person.getName());
+    }
+
+    @Test
+    void shouldKeepProtectedFieldsUnchangedWhenUpdatingCurrentUserProfile() {
+        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        person.addRole(operatorRole());
+
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.save(person)).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
+                .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
+        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+                10L, "New Name", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("New Name", person.getBirthdayDate())
+        );
+
+        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
+        verify(personRepository).save(captor.capture());
+        Person saved = captor.getValue();
+        assertEquals(10L, saved.getId());
+        assertEquals("34999999999", saved.getPhoneNumber());
+        assertEquals("encoded-password", saved.getPassword());
+        assertTrue(saved.hasRole("ROLE_OPERATOR"));
+        verifyNoInteractions(roleRepository, personMinistryCommandService);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnUpdate() {
+        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.updateCurrentUserProfile(
+                "34900000000",
+                new CurrentUserProfileUpdateRequestDTO("Name", LocalDate.of(1990, 1, 1))
+        ));
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowBadRequestWhenCurrentUserProfileNameIsBlankOnUpdate() {
+        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+
+        assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("", person.getBirthdayDate())
+        ));
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowBadRequestWhenCurrentUserProfileNameIsOnlySpacesOnUpdate() {
+        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+
+        assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("   ", person.getBirthdayDate())
+        ));
+        verify(personRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldUpdateOnlyAuthenticatedPersonNotAnotherPerson() {
+        Person authenticatedPerson = person(10L, "Old Name", "34999999999", "encoded-password");
+        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(authenticatedPerson));
+        when(personRepository.save(authenticatedPerson)).thenReturn(authenticatedPerson);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
+        when(currentUserProfileMapper.toDto(authenticatedPerson)).thenReturn(currentProfileResponse(
+                10L, "New Name", "34999999999", authenticatedPerson.getBirthdayDate(), List.of("ROLE_OPERATOR")
+        ));
+
+        service.updateCurrentUserProfile(
+                "34999999999",
+                new CurrentUserProfileUpdateRequestDTO("New Name", authenticatedPerson.getBirthdayDate())
+        );
+
+        verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
+        verify(personRepository, times(1)).save(any());
+        verify(personRepository).save(authenticatedPerson);
+    }
+
+    private CurrentUserProfileResponseDTO currentProfileResponse(
+            Long id, String name, String phoneNumber, LocalDate birthdayDate, List<String> roles
+    ) {
+        return new CurrentUserProfileResponseDTO(id, name, phoneNumber, birthdayDate, roles, List.of());
     }
 
     private void authenticateAs(String username) {

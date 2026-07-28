@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -25,4 +27,8 @@ public interface PersonService {
     PersonMinistriesResponseDTO findPersonMinistries(Long id);
 
     PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO);
+
+    CurrentUserProfileResponseDTO getCurrentUserProfile(String phoneNumber);
+
+    CurrentUserProfileResponseDTO updateCurrentUserProfile(String phoneNumber, CurrentUserProfileUpdateRequestDTO requestDTO);
 }
