@@ -14,6 +14,63 @@
     </div>
   </header>
 
+  <section class="home__upcoming surface-card" aria-labelledby="upcoming-user-schedules-title">
+    <h2 id="upcoming-user-schedules-title">Próximas escalas</h2>
+    <p>Veja os próximos eventos em que você está escalado.</p>
+
+    <div aria-live="polite">
+      @if (isLoadingUserSchedules()) {
+        <p class="home__status" role="status">Carregando suas próximas escalas...</p>
+      } @else if (userSchedulesErrorMessage()) {
+        <div class="home__feedback home__feedback--error" role="alert">
+          <p>{{ userSchedulesErrorMessage() }}</p>
+          <button class="home__button" type="button" (click)="loadUserSchedules()">
+            Tentar novamente
+          </button>
+        </div>
+      } @else if (upcomingUserSchedules().length === 0) {
+        <p class="home__feedback">Você não possui escalas nos próximos 90 dias.</p>
+      } @else {
+        <ul class="home__events-list" aria-label="Lista das minhas próximas escalas">
+          @for (schedule of upcomingUserSchedules(); track schedule.eventId) {
+            <li class="home__event-card">
+              <div class="home__event-card-main">
+                <h3>{{ schedule.eventName }}</h3>
+                <span class="home__event-type">{{ eventTypeLabel(schedule) }}</span>
+              </div>
+
+              <dl class="home__event-details">
+                <div>
+                  <dt>Data</dt>
+                  <dd>{{ schedule.eventDate | date: 'dd/MM/yyyy' : 'UTC' }}</dd>
+                </div>
+                <div>
+                  <dt>Horário</dt>
+                  <dd>{{ formatEventTime(schedule.eventTime) }}</dd>
+                </div>
+                <div>
+                  <dt>Local</dt>
+                  <dd>{{ schedule.locationName ?? 'Local não informado.' }}</dd>
+                </div>
+              </dl>
+
+              <div class="home__event-assignments">
+                <h4>Funções</h4>
+                <ul aria-label="Minhas funções neste evento">
+                  @for (assignment of schedule.assignments; track assignment) {
+                    <li>{{ assignmentLabel(assignment) }}</li>
+                  }
+                </ul>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <a class="home__event-link" routerLink="/app/minhas-escalas">Ver todas as minhas escalas</a>
+  </section>
+
   <section class="home__upcoming surface-card" aria-labelledby="upcoming-events-title">
     <h2 id="upcoming-events-title">Próximos eventos</h2>
 

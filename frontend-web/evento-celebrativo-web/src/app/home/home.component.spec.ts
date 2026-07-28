@@ -7,6 +7,10 @@ import { Observable, of, Subject, throwError } from 'rxjs';
 import { AuthSessionService } from '../auth-session.service';
 import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
 import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
+import {
+  CurrentUserSchedule,
+  CurrentUserSchedulePage,
+} from '../current-user-schedules/current-user-schedule.models';
 import { CurrentUserScheduleService } from '../current-user-schedules/current-user-schedule.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
@@ -39,6 +43,7 @@ describe('HomeComponent', () => {
       isLoading?: boolean;
       errorMessage?: string | null;
     } = {},
+    userSchedules$: Observable<CurrentUserSchedulePage> = of(createSchedulePage({ content: [] })),
   ): Promise<void> {
     jasmine.clock().mockDate(now);
 
@@ -63,6 +68,7 @@ describe('HomeComponent', () => {
       'CurrentUserScheduleService',
       ['findSchedules'],
     );
+    currentUserScheduleService.findSchedules.and.returnValue(userSchedules$);
 
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
@@ -387,12 +393,6 @@ describe('HomeComponent', () => {
     expect(adminCard.getAttribute('href')).toBe('/app/minhas-escalas');
   });
 
-  it('should not call CurrentUserScheduleService from the Home component', async () => {
-    await setup();
-
-    expect(currentUserScheduleService.findSchedules).not.toHaveBeenCalled();
-  });
-
   it('should point Pessoas to the admin directory and show the admin description for administrators', async () => {
     await setup(true);
 
@@ -465,6 +465,260 @@ describe('HomeComponent', () => {
     expect(text).not.toContain('total de pessoas');
   });
 
+  describe('Próximas escalas', () => {
+    it('should request user schedules starting from the current local date', async () => {
+      await setup();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ startDate: '2026-07-20' }),
+      );
+    });
+
+    it('should request user schedules ending 90 days after the current local date', async () => {
+      await setup();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ endDate: '2026-10-18' }),
+      );
+    });
+
+    it('should always request page 0', async () => {
+      await setup();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ page: 0 }),
+      );
+    });
+
+    it('should always request size 20', async () => {
+      await setup();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ size: 20 }),
+      );
+    });
+
+    it('should call the user schedules endpoint only once on initialization', async () => {
+      await setup();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show a loading state while user schedules are pending', async () => {
+      await setup();
+      const pending = new Subject<CurrentUserSchedulePage>();
+      currentUserScheduleService.findSchedules.and.returnValue(pending);
+
+      fixture.componentInstance.loadUserSchedules();
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.isLoadingUserSchedules()).toBeTrue();
+      expect(textContent()).toContain('Carregando suas próximas escalas...');
+
+      pending.next(createSchedulePage({ content: [] }));
+      pending.complete();
+    });
+
+    it('should show an error message when loading user schedules fails', async () => {
+      await setup(false, of([createEvent()]), NOW, {}, throwError(() => new HttpErrorResponse({ status: 500 })));
+
+      const text = textContent();
+
+      expect(text).toContain('Não foi possível carregar suas próximas escalas.');
+      expect(text).toContain('Tentar novamente');
+    });
+
+    it('should reload user schedules when the retry button is clicked', async () => {
+      await setup(false, of([createEvent()]), NOW, {}, throwError(() => new HttpErrorResponse({ status: 500 })));
+      currentUserScheduleService.findSchedules.and.returnValue(
+        of(createSchedulePage({ content: [createSchedule({ eventName: 'Missa da Tarde' })] })),
+      );
+
+      const retryButtons = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.home__button'),
+      ) as HTMLButtonElement[];
+      retryButtons[0].click();
+      fixture.detectChanges();
+
+      expect(currentUserScheduleService.findSchedules).toHaveBeenCalledTimes(2);
+      expect(textContent()).toContain('Missa da Tarde');
+      expect(textContent()).not.toContain('Não foi possível carregar suas próximas escalas.');
+    });
+
+    it('should not reload the general upcoming events when retrying user schedules', async () => {
+      await setup(false, of([createEvent()]), NOW, {}, throwError(() => new HttpErrorResponse({ status: 500 })));
+      currentUserScheduleService.findSchedules.and.returnValue(of(createSchedulePage({ content: [] })));
+
+      const retryButtons = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.home__button'),
+      ) as HTMLButtonElement[];
+      retryButtons[0].click();
+      fixture.detectChanges();
+
+      expect(eventService.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show the empty state message when there are no user schedules in the next 90 days', async () => {
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [] })));
+
+      expect(textContent()).toContain('Você não possui escalas nos próximos 90 dias.');
+    });
+
+    it('should limit the user schedules list to a maximum of five cards', async () => {
+      const schedules = Array.from({ length: 7 }, (_, index) =>
+        createSchedule({
+          eventId: index + 1,
+          eventDate: '2026-07-21',
+          eventTime: `0${(index % 9) + 1}:00`,
+        }),
+      );
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: schedules })));
+
+      expect(fixture.componentInstance.upcomingUserSchedules().length).toBe(5);
+    });
+
+    it('should remove a user schedule whose date and time have already passed', async () => {
+      const past = createSchedule({ eventId: 1, eventDate: '2026-07-19', eventTime: '23:59:59' });
+      const future = createSchedule({ eventId: 2, eventDate: '2026-07-21', eventTime: '08:00' });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [past, future] })));
+
+      expect(fixture.componentInstance.upcomingUserSchedules().map((schedule) => schedule.eventId)).toEqual([2]);
+    });
+
+    it('should keep a user schedule happening later on the current day', async () => {
+      const laterToday = createSchedule({ eventId: 3, eventDate: '2026-07-20', eventTime: '18:00' });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [laterToday] })));
+
+      expect(fixture.componentInstance.upcomingUserSchedules().map((schedule) => schedule.eventId)).toEqual([3]);
+    });
+
+    it('should keep a user schedule happening on a future day', async () => {
+      const nextWeek = createSchedule({ eventId: 4, eventDate: '2026-07-27', eventTime: '09:00' });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [nextWeek] })));
+
+      expect(fixture.componentInstance.upcomingUserSchedules().map((schedule) => schedule.eventId)).toEqual([4]);
+    });
+
+    it('should display the date and time of each user schedule', async () => {
+      const schedule = createSchedule({ eventDate: '2026-07-21', eventTime: '19:00:00' });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [schedule] })));
+
+      const text = textContent();
+
+      expect(text).toContain('21/07/2026');
+      expect(text).toContain('19:00');
+    });
+
+    it('should display the location name when present', async () => {
+      const schedule = createSchedule({ eventDate: '2026-07-21', locationName: 'Igreja Matriz' });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [schedule] })));
+
+      expect(textContent()).toContain('Igreja Matriz');
+    });
+
+    it('should show a fallback message when the location is null', async () => {
+      const schedule = createSchedule({
+        eventDate: '2026-07-21',
+        locationId: null,
+        locationName: null,
+      });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [schedule] })));
+
+      expect(textContent()).toContain('Local não informado.');
+    });
+
+    it('should label mass and celebration user schedules correctly', async () => {
+      const mass = createSchedule({ eventId: 1, eventDate: '2026-07-21', massOrCelebration: true });
+      const celebration = createSchedule({ eventId: 2, eventDate: '2026-07-22', massOrCelebration: false });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [mass, celebration] })));
+
+      const text = textContent();
+
+      expect(text).toContain('Missa');
+      expect(text).toContain('Celebração');
+    });
+
+    it('should translate all five assignment types', async () => {
+      const schedule = createSchedule({
+        eventDate: '2026-07-21',
+        assignments: ['PRIEST', 'READER', 'COMMENTATOR', 'MINISTER_OF_THE_WORD', 'EUCHARISTIC_MINISTER'],
+      });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [schedule] })));
+
+      const text = textContent();
+
+      expect(text).toContain('Padre');
+      expect(text).toContain('Leitor');
+      expect(text).toContain('Comentarista');
+      expect(text).toContain('Ministro da Palavra');
+      expect(text).toContain('Ministro da Eucaristia');
+    });
+
+    it('should render two assignments within the same card', async () => {
+      const schedule = createSchedule({ eventDate: '2026-07-21', assignments: ['READER', 'COMMENTATOR'] });
+
+      await setup(false, of([createEvent()]), NOW, {}, of(createSchedulePage({ content: [schedule] })));
+
+      const card = userScheduleCards()[0];
+
+      expect(card.textContent).toContain('Leitor');
+      expect(card.textContent).toContain('Comentarista');
+    });
+
+    it('should render the "Ver todas as minhas escalas" link', async () => {
+      await setup();
+
+      const link = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('a'),
+      ).find((anchor) => anchor.textContent?.trim() === 'Ver todas as minhas escalas') as
+        | HTMLAnchorElement
+        | undefined;
+
+      expect(link).toBeDefined();
+    });
+
+    it('should point the "Ver todas as minhas escalas" link to /app/minhas-escalas', async () => {
+      await setup();
+
+      const link = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('a'),
+      ).find((anchor) => anchor.textContent?.trim() === 'Ver todas as minhas escalas') as HTMLAnchorElement;
+
+      expect(link.getAttribute('href')).toBe('/app/minhas-escalas');
+    });
+
+    it('should preserve the general upcoming events section unchanged', async () => {
+      const event = createEvent({ id: 42, nameMassOrEvent: 'Missa Dominical' });
+
+      await setup(false, of([event]));
+
+      const text = textContent();
+
+      expect(text).toContain('Próximos eventos');
+      expect(text).toContain('Missa Dominical');
+      expect(eventService.findAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve quick access links and administrative actions', async () => {
+      await setup(true);
+
+      const labels = quickAccessAnchors().map((anchor) => anchor.querySelector('span')?.textContent?.trim());
+
+      expect(labels).toEqual(['Eventos', 'Minhas escalas', 'Escalas', 'Pessoas', 'Locais']);
+      expect(textContent()).toContain('Administração');
+      expect(adminAnchors().length).toBe(4);
+    });
+  });
+
   it('should expose a single h1 and accessible loading, error and result states', async () => {
     await setup();
 
@@ -529,6 +783,43 @@ describe('HomeComponent', () => {
       birthdayDate: '1990-01-01',
       roles: ['ROLE_OPERATOR'],
       ministries: ['READER'],
+      ...overrides,
+    };
+  }
+
+  function userScheduleCards(): HTMLElement[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '#upcoming-user-schedules-title ~ div .home__event-card',
+      ),
+    );
+  }
+
+  function createSchedule(overrides: Partial<CurrentUserSchedule> = {}): CurrentUserSchedule {
+    return {
+      eventId: 15,
+      eventName: 'Missa das 19h',
+      eventDate: '2026-07-20',
+      eventTime: '19:00:00',
+      massOrCelebration: true,
+      locationId: 2,
+      locationName: 'Igreja Matriz',
+      assignments: ['READER', 'COMMENTATOR'],
+      ...overrides,
+    };
+  }
+
+  function createSchedulePage(overrides: Partial<CurrentUserSchedulePage> = {}): CurrentUserSchedulePage {
+    return {
+      content: [createSchedule()],
+      totalPages: 1,
+      totalElements: 1,
+      first: true,
+      last: true,
+      size: 20,
+      number: 0,
+      numberOfElements: 1,
+      empty: false,
       ...overrides,
     };
   }
