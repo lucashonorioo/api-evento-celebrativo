@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -25,6 +26,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -498,6 +500,186 @@ class PersonControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(personService);
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenGettingOwnProfileWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldGetOwnProfileWhenUserIsOperator() throws Exception {
+        when(personService.getCurrentUserProfile("34999999999"))
+                .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
+
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.name").value("Joao da Silva"))
+                .andExpect(jsonPath("$.phoneNumber").value("34999999999"))
+                .andExpect(jsonPath("$.birthdayDate").value("1995-05-20"))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.personType").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    void shouldGetOwnProfileWhenUserIsAdmin() throws Exception {
+        when(personService.getCurrentUserProfile("34999999998"))
+                .thenReturn(currentProfileResponse(11L, "Admin User", "34999999998", List.of("ROLE_ADMIN"), List.of()));
+
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(11))
+                .andExpect(jsonPath("$.ministries").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    void shouldReturnNotFoundWhenGettingOwnProfileOfMissingPerson() throws Exception {
+        when(personService.getCurrentUserProfile("34900000000"))
+                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenUpdatingOwnProfileWithoutAuthentication() throws Exception {
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("Joao da Silva", "1995-05-20")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldUpdateOwnProfileWhenUserIsOperator() throws Exception {
+        when(personService.updateCurrentUserProfile(eq("34999999999"), any()))
+                .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
+
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("Joao da Silva", "1995-05-20")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Joao da Silva"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    void shouldUpdateOwnProfileWhenUserIsAdmin() throws Exception {
+        when(personService.updateCurrentUserProfile(eq("34999999998"), any()))
+                .thenReturn(currentProfileResponse(11L, "Admin User", "34999999998", List.of("ROLE_ADMIN"), List.of()));
+
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("Admin User", "1990-01-01")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Admin User"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenUpdatingOwnProfileWithBlankName() throws Exception {
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("", "1995-05-20")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenUpdatingOwnProfileWithNameOnlySpaces() throws Exception {
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("   ", "1995-05-20")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenUpdatingOwnProfileWithFutureBirthdayDate() throws Exception {
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("Joao da Silva", "2999-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(personService);
+    }
+
+    @Test
+    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    void shouldReturnNotFoundWhenUpdatingOwnProfileOfMissingPerson() throws Exception {
+        when(personService.updateCurrentUserProfile(eq("34900000000"), any()))
+                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profileUpdatePayload("Joao da Silva", "1995-05-20")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldIgnoreProtectedFieldsSentInOwnProfileUpdatePayload() throws Exception {
+        when(personService.updateCurrentUserProfile(eq("34999999999"), any()))
+                .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
+
+        mockMvc.perform(put("/pessoas/me")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id": 999,
+                                  "name": "Joao da Silva",
+                                  "birthdayDate": "1995-05-20",
+                                  "phoneNumber": "00000000000",
+                                  "roles": ["ROLE_ADMIN"],
+                                  "ministries": ["PRIEST"],
+                                  "password": "new-password"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.phoneNumber").value("34999999999"))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
+                .andExpect(jsonPath("$.ministries[0]").value("READER"));
+    }
+
+    private CurrentUserProfileResponseDTO currentProfileResponse(
+            Long id, String name, String phoneNumber, List<String> roles, List<MinistryType> ministries
+    ) {
+        return new CurrentUserProfileResponseDTO(id, name, phoneNumber, LocalDate.of(1995, 5, 20), roles, ministries);
+    }
+
+    private String profileUpdatePayload(String name, String birthdayDate) {
+        return """
+                {
+                  "name": "%s",
+                  "birthdayDate": "%s"
+                }
+                """.formatted(name, birthdayDate);
     }
 
     private PersonAdminResponseDTO adminResponse(Long id, String name, List<MinistryType> ministries, List<String> roles) {

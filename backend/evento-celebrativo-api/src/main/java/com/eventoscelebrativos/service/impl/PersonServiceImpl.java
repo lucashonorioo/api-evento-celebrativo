@@ -1,7 +1,9 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -9,6 +11,7 @@ import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.mapper.CurrentUserProfileMapper;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
 import com.eventoscelebrativos.model.MinistryType;
@@ -49,6 +52,7 @@ public class PersonServiceImpl implements PersonService {
     private final RoleRepository roleRepository;
     private final PersonAdminMapper personAdminMapper;
     private final PersonRoleUpdateMapper personRoleUpdateMapper;
+    private final CurrentUserProfileMapper currentUserProfileMapper;
     private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryCommandService personMinistryCommandService;
 
@@ -57,6 +61,7 @@ public class PersonServiceImpl implements PersonService {
             RoleRepository roleRepository,
             PersonAdminMapper personAdminMapper,
             PersonRoleUpdateMapper personRoleUpdateMapper,
+            CurrentUserProfileMapper currentUserProfileMapper,
             PersonMinistryReadService personMinistryReadService,
             PersonMinistryCommandService personMinistryCommandService
     ) {
@@ -64,6 +69,7 @@ public class PersonServiceImpl implements PersonService {
         this.roleRepository = roleRepository;
         this.personAdminMapper = personAdminMapper;
         this.personRoleUpdateMapper = personRoleUpdateMapper;
+        this.currentUserProfileMapper = currentUserProfileMapper;
         this.personMinistryReadService = personMinistryReadService;
         this.personMinistryCommandService = personMinistryCommandService;
     }
@@ -175,6 +181,41 @@ public class PersonServiceImpl implements PersonService {
         Set<MinistryType> desiredMinistries = parseDesiredMinistries(requestDTO.getMinistries());
         PersonMinistrySyncResult result = personMinistryCommandService.syncMinistries(id, desiredMinistries);
         return toMinistriesResponseDTO(result.person().getId(), result.activeMinistries());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CurrentUserProfileResponseDTO getCurrentUserProfile(String phoneNumber) {
+        Person person = findAuthenticatedPerson(phoneNumber);
+        return toCurrentUserProfileDTO(person);
+    }
+
+    @Override
+    @Transactional
+    public CurrentUserProfileResponseDTO updateCurrentUserProfile(String phoneNumber, CurrentUserProfileUpdateRequestDTO requestDTO) {
+        Person person = findAuthenticatedPerson(phoneNumber);
+        person.setName(normalizeRequiredName(requestDTO.getName()));
+        person.setBirthdayDate(requestDTO.getBirthdayDate());
+        Person savedPerson = personRepository.save(person);
+        return toCurrentUserProfileDTO(savedPerson);
+    }
+
+    private Person findAuthenticatedPerson(String phoneNumber) {
+        return personRepository.findByPhoneNumber(phoneNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
+    }
+
+    private CurrentUserProfileResponseDTO toCurrentUserProfileDTO(Person person) {
+        CurrentUserProfileResponseDTO dto = currentUserProfileMapper.toDto(person);
+        dto.setMinistries(sortedMinistries(activeMinistriesForPerson(person.getId())));
+        return dto;
+    }
+
+    private String normalizeRequiredName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new BadRequestException("O campo nome não pode ser vazio");
+        }
+        return name.trim();
     }
 
     private PersonMinistriesResponseDTO toMinistriesResponseDTO(Long id, Set<MinistryType> ministries) {

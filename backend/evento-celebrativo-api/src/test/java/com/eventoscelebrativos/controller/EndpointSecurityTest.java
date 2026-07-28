@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -59,6 +60,14 @@ class EndpointSecurityTest {
     @Test
     void shouldRequireAuthenticationForPeopleAndLocationLists() throws Exception {
         mockMvc.perform(get("/locais"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profilePayload()))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas"))
@@ -156,8 +165,44 @@ class EndpointSecurityTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(username = "34962165544", roles = "OPERATOR")
+    void shouldAllowOperatorOnOwnProfileEndpointsOnly() throws Exception {
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2))
+                .andExpect(jsonPath("$.phoneNumber").value("34962165544"))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+
+        mockMvc.perform(put("/pessoas/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(profilePayload()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phoneNumber").value("34962165544"));
+
+        mockMvc.perform(get("/pessoas"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/roles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rolePayload()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/ministries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ministriesPayload()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "34999887766", roles = "ADMIN")
     void shouldAllowAdminOnAdministrativeEndpoints() throws Exception {
+        mockMvc.perform(get("/pessoas/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(14))
+                .andExpect(jsonPath("$.phoneNumber").value("34999887766"))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_ADMIN"));
+
         mockMvc.perform(post("/locais")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLocationPayload()))
@@ -228,6 +273,15 @@ class EndpointSecurityTest {
         return """
                 {
                   "role": "ROLE_OPERATOR"
+                }
+                """;
+    }
+
+    private String profilePayload() {
+        return """
+                {
+                  "name": "Nome Atualizado",
+                  "birthdayDate": "1990-01-01"
                 }
                 """;
     }
