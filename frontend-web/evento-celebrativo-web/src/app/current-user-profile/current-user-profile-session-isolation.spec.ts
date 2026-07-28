@@ -8,6 +8,8 @@ import { API_BASE_URL } from '../api.config';
 import { AuthSessionService } from '../auth-session.service';
 import { AuthService } from '../auth.service';
 import { AuthenticatedLayoutComponent } from '../authenticated-layout/authenticated-layout.component';
+import { CurrentUserSchedulePage } from '../current-user-schedules/current-user-schedule.models';
+import { CurrentUserScheduleService } from '../current-user-schedules/current-user-schedule.service';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
 import { HomeComponent } from '../home/home.component';
@@ -27,6 +29,12 @@ describe('Current user profile session isolation', () => {
     const eventService = jasmine.createSpyObj<EventService>('EventService', ['findAll']);
     eventService.findAll.and.returnValue(of([] as CelebrationEventResponse[]));
 
+    const currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
+      'CurrentUserScheduleService',
+      ['findSchedules'],
+    );
+    currentUserScheduleService.findSchedules.and.returnValue(of(emptySchedulePage()));
+
     await TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -35,6 +43,7 @@ describe('Current user profile session isolation', () => {
         { provide: AuthSessionService, useValue: authSessionService },
         { provide: AuthService, useValue: authService },
         { provide: EventService, useValue: eventService },
+        { provide: CurrentUserScheduleService, useValue: currentUserScheduleService },
       ],
     }).compileComponents();
 
@@ -120,6 +129,20 @@ describe('Current user profile session isolation', () => {
       roles: ['ROLE_OPERATOR'],
       ministries: ['READER'],
       ...overrides,
+    };
+  }
+
+  function emptySchedulePage(): CurrentUserSchedulePage {
+    return {
+      content: [],
+      totalPages: 0,
+      totalElements: 0,
+      first: true,
+      last: true,
+      size: 20,
+      number: 0,
+      numberOfElements: 0,
+      empty: true,
     };
   }
 });

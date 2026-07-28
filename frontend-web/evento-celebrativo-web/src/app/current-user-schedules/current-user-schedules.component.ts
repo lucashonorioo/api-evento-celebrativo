@@ -13,6 +13,7 @@ import { ActivatedRoute, Params, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { EventScheduleType } from '../event-schedules/event-schedule.models';
+import { formatLocalDate, scheduleAssignmentLabel } from './current-user-schedule-view.utils';
 import {
   CurrentUserSchedule,
   CurrentUserSchedulePage,
@@ -22,14 +23,6 @@ import { CurrentUserScheduleService } from './current-user-schedule.service';
 
 const PAGE_SIZE = 10;
 const QUERY_PARAM_KEYS = ['startDate', 'endDate', 'page'] as const;
-
-const ASSIGNMENT_LABELS: Record<EventScheduleType, string> = {
-  PRIEST: 'Padre',
-  READER: 'Leitor',
-  COMMENTATOR: 'Comentarista',
-  MINISTER_OF_THE_WORD: 'Ministro da Palavra',
-  EUCHARISTIC_MINISTER: 'Ministro da Eucaristia',
-};
 
 @Component({
   selector: 'app-current-user-schedules',
@@ -175,7 +168,7 @@ export class CurrentUserSchedulesComponent implements OnInit {
   }
 
   assignmentLabel(assignment: EventScheduleType): string {
-    return ASSIGNMENT_LABELS[assignment] ?? assignment;
+    return scheduleAssignmentLabel(assignment);
   }
 
   private loadPage(page: number): void {
@@ -341,14 +334,6 @@ function currentMonthPeriod(now: Date = new Date()): {
     startDate: formatLocalDate(firstDay),
     endDate: formatLocalDate(lastDay),
   };
-}
-
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
 }
 
 function isPageBeyondLimit(query: CurrentUserScheduleQuery, page: CurrentUserSchedulePage): boolean {

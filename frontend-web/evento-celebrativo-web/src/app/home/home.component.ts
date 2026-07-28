@@ -6,11 +6,25 @@ import { finalize } from 'rxjs';
 import { AuthSessionService } from '../auth-session.service';
 import { CurrentUserProfile } from '../current-user-profile/current-user-profile.models';
 import { CurrentUserProfileService } from '../current-user-profile/current-user-profile.service';
+import {
+  formatLocalDate,
+  scheduleAssignmentLabel,
+} from '../current-user-schedules/current-user-schedule-view.utils';
+import { CurrentUserSchedule, CurrentUserScheduleQuery } from '../current-user-schedules/current-user-schedule.models';
+import { CurrentUserScheduleService } from '../current-user-schedules/current-user-schedule.service';
+import { EventScheduleType } from '../event-schedules/event-schedule.models';
 import { CelebrationEventResponse } from '../events/event.models';
 import { EventService } from '../events/event.service';
-import { compareEventsByDateTimeAscending, eventLocalTimestamp } from '../events/event-view.utils';
+import {
+  EventDateTime,
+  compareEventsByDateTimeAscending,
+  eventLocalTimestamp,
+} from '../events/event-view.utils';
 
 const MAX_UPCOMING_EVENTS = 5;
+const MAX_UPCOMING_USER_SCHEDULES = 5;
+const USER_SCHEDULES_LOOKAHEAD_DAYS = 90;
+const USER_SCHEDULES_PAGE_SIZE = 20;
 
 interface QuickAccessLink {
   readonly label: string;
@@ -35,6 +49,7 @@ export class HomeComponent implements OnInit {
   private readonly authSessionService = inject(AuthSessionService);
   private readonly currentUserProfileService = inject(CurrentUserProfileService);
   private readonly eventService = inject(EventService);
+  private readonly currentUserScheduleService = inject(CurrentUserScheduleService);
 
   readonly isAdmin = this.authSessionService.hasAuthority('ROLE_ADMIN');
   readonly profileName = computed(() =>
@@ -82,8 +97,13 @@ export class HomeComponent implements OnInit {
   readonly isLoadingEvents = signal(false);
   readonly eventsErrorMessage = signal<string | null>(null);
 
+  readonly upcomingUserSchedules = signal<readonly CurrentUserSchedule[]>([]);
+  readonly isLoadingUserSchedules = signal(false);
+  readonly userSchedulesErrorMessage = signal<string | null>(null);
+
   ngOnInit(): void {
     this.loadEvents();
+    this.loadUserSchedules();
   }
 
   loadEvents(): void {
@@ -107,8 +127,33 @@ export class HomeComponent implements OnInit {
       });
   }
 
-  eventTypeLabel(event: CelebrationEventResponse): string {
-    return event.massOrCelebration ? 'Missa' : 'Celebração';
+  loadUserSchedules(): void {
+    if (this.isLoadingUserSchedules()) {
+      return;
+    }
+
+    this.isLoadingUserSchedules.set(true);
+    this.userSchedulesErrorMessage.set(null);
+
+    this.currentUserScheduleService
+      .findSchedules(userSchedulesQuery())
+      .pipe(finalize(() => this.isLoadingUserSchedules.set(false)))
+      .subscribe({
+        next: (page) => {
+          this.upcomingUserSchedules.set(selectUpcomingUserSchedules(page.content));
+        },
+        error: () => {
+          this.userSchedulesErrorMessage.set('Não foi possível carregar suas próximas escalas.');
+        },
+      });
+  }
+
+  eventTypeLabel(item: { readonly massOrCelebration: boolean }): string {
+    return item.massOrCelebration ? 'Missa' : 'Celebração';
+  }
+
+  assignmentLabel(assignment: EventScheduleType): string {
+    return scheduleAssignmentLabel(assignment);
   }
 
   formatEventTime(eventTime: string): string {
@@ -130,8 +175,34 @@ function selectUpcomingEvents(
   events: readonly CelebrationEventResponse[],
   now: Date = new Date(),
 ): CelebrationEventResponse[] {
-  return [...events]
-    .filter((event) => eventLocalTimestamp(event) >= now.getTime())
+  return selectUpcoming(events, MAX_UPCOMING_EVENTS, now);
+}
+
+function selectUpcomingUserSchedules(
+  schedules: readonly CurrentUserSchedule[],
+  now: Date = new Date(),
+): CurrentUserSchedule[] {
+  return selectUpcoming(schedules, MAX_UPCOMING_USER_SCHEDULES, now);
+}
+
+function selectUpcoming<T extends EventDateTime>(
+  items: readonly T[],
+  maxItems: number,
+  now: Date,
+): T[] {
+  return [...items]
+    .filter((item) => eventLocalTimestamp(item) >= now.getTime())
     .sort(compareEventsByDateTimeAscending)
-    .slice(0, MAX_UPCOMING_EVENTS);
+    .slice(0, maxItems);
+}
+
+function userSchedulesQuery(now: Date = new Date()): CurrentUserScheduleQuery {
+  const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + USER_SCHEDULES_LOOKAHEAD_DAYS);
+
+  return {
+    startDate: formatLocalDate(now),
+    endDate: formatLocalDate(endDate),
+    page: 0,
+    size: USER_SCHEDULES_PAGE_SIZE,
+  };
 }
