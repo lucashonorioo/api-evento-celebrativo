@@ -743,7 +743,7 @@ function extractMessage(value: unknown): string | null {
     return null;
   }
 
-  const message = (value as Record<string, unknown>)['message'];
+  const message = (value as Record<string, unknown>)['error'];
 
   return typeof message === 'string' ? message : null;
 }

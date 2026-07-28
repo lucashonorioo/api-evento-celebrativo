@@ -435,11 +435,12 @@ describe('EventScheduleEditComponent', () => {
     expect(component.form.controls.readerIds.value).toEqual([4, 5]);
   });
 
-  it('should show save messages for 400, 404, 409 and generic errors', async () => {
+  it('should show save messages for 400, 404, 409, 422 and generic errors', async () => {
     const cases = [
       { status: 400, message: 'Revise os dados da escala' },
       { status: 404, message: 'A escala do evento solicitado nao foi encontrada' },
       { status: 409, message: 'conflito com os dados atuais' },
+      { status: 422, message: 'Revise os participantes selecionados' },
       { status: 500, message: 'Nao foi possivel atualizar a escala' },
     ];
 

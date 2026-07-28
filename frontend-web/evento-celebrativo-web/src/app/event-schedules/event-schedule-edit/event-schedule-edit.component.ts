@@ -389,6 +389,10 @@ function saveErrorMessageFor(error: unknown): string {
     return 'Nao foi possivel atualizar a escala devido a um conflito com os dados atuais.';
   }
 
+  if (error instanceof HttpErrorResponse && error.status === 422) {
+    return 'Revise os participantes selecionados antes de salvar.';
+  }
+
   return 'Nao foi possivel atualizar a escala. Tente novamente.';
 }
 
