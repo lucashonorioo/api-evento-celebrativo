@@ -1,4 +1,5 @@
 import { EventScheduleType } from '../event-schedules/event-schedule.models';
+import { ScheduleParticipationStatus } from './current-user-schedule.models';
 
 const ASSIGNMENT_LABELS: Record<EventScheduleType, string> = {
   PRIEST: 'Padre',
@@ -10,6 +11,16 @@ const ASSIGNMENT_LABELS: Record<EventScheduleType, string> = {
 
 export function scheduleAssignmentLabel(assignment: EventScheduleType): string {
   return ASSIGNMENT_LABELS[assignment] ?? assignment;
+}
+
+const PARTICIPATION_STATUS_LABELS: Record<ScheduleParticipationStatus, string> = {
+  PENDING: 'Aguardando resposta',
+  CONFIRMED: 'Participação confirmada',
+  DECLINED: 'Não participará',
+};
+
+export function scheduleParticipationStatusLabel(status: ScheduleParticipationStatus): string {
+  return PARTICIPATION_STATUS_LABELS[status];
 }
 
 export function formatLocalDate(date: Date): string {

@@ -111,6 +111,146 @@
                 }
               </ul>
             </section>
+
+            <section class="current-user-schedules__participation" aria-label="Participação">
+              <p class="current-user-schedules__participation-status">
+                {{ participationStatusLabel(schedule) }}
+              </p>
+
+              @if (schedule.participationStatus === 'DECLINED' && schedule.declineReason) {
+                <p class="current-user-schedules__meta-text">
+                  Motivo: {{ schedule.declineReason }}
+                </p>
+              }
+
+              @if (schedule.respondedAt) {
+                <p class="current-user-schedules__meta-text">
+                  Respondido em: {{ schedule.respondedAt | date: 'dd/MM/yyyy HH:mm' }}
+                </p>
+              }
+
+              @if (isEventStarted(schedule)) {
+                <p class="current-user-schedules__meta-text" role="status">
+                  O evento já começou. A participação não pode mais ser alterada.
+                </p>
+              } @else {
+                <div class="current-user-schedules__participation-actions">
+                  @if (schedule.participationStatus !== 'CONFIRMED') {
+                    <button
+                      class="current-user-schedules__button primary-button"
+                      type="button"
+                      [disabled]="respondingEventId() !== null"
+                      (click)="confirmParticipation(schedule)"
+                    >
+                      Confirmar participação
+                    </button>
+                  }
+
+                  @if (schedule.participationStatus === 'DECLINED') {
+                    <button
+                      class="current-user-schedules__button"
+                      type="button"
+                      [disabled]="respondingEventId() !== null"
+                      (click)="openDeclineForm(schedule)"
+                    >
+                      Alterar recusa
+                    </button>
+                  } @else {
+                    <button
+                      class="current-user-schedules__button"
+                      type="button"
+                      [disabled]="respondingEventId() !== null"
+                      (click)="openDeclineForm(schedule)"
+                    >
+                      Não poderei participar
+                    </button>
+                  }
+                </div>
+
+                @if (activeDeclineEventId() === schedule.eventId) {
+                  <form
+                    class="current-user-schedules__decline-form surface-card"
+                    (submit)="$event.preventDefault(); submitDecline(schedule)"
+                  >
+                    <label [for]="'current-user-schedules-decline-reason-' + schedule.eventId">
+                      Motivo da recusa
+                    </label>
+                    <p
+                      [id]="'current-user-schedules-decline-hint-' + schedule.eventId"
+                      class="current-user-schedules__meta-text"
+                    >
+                      Informar o motivo é opcional.
+                    </p>
+
+                    <textarea
+                      [id]="'current-user-schedules-decline-reason-' + schedule.eventId"
+                      [formControl]="declineReasonControl"
+                      maxlength="500"
+                      rows="3"
+                      [attr.aria-invalid]="declineReasonControl.invalid"
+                      [attr.aria-describedby]="
+                        'current-user-schedules-decline-hint-' +
+                        schedule.eventId +
+                        ' current-user-schedules-decline-count-' +
+                        schedule.eventId +
+                        (declineReasonErrorMessage()
+                          ? ' current-user-schedules-decline-error-' + schedule.eventId
+                          : '')
+                      "
+                    ></textarea>
+
+                    <p
+                      [id]="'current-user-schedules-decline-count-' + schedule.eventId"
+                      class="current-user-schedules__meta-text"
+                    >
+                      {{ declineReasonControl.value.length }}/500
+                    </p>
+
+                    @if (declineReasonErrorMessage(); as declineError) {
+                      <p
+                        [id]="'current-user-schedules-decline-error-' + schedule.eventId"
+                        class="current-user-schedules__field-error"
+                        role="alert"
+                      >
+                        {{ declineError }}
+                      </p>
+                    }
+
+                    <div class="current-user-schedules__decline-actions">
+                      <button
+                        class="current-user-schedules__button primary-button"
+                        type="submit"
+                        [disabled]="respondingEventId() !== null || declineReasonControl.invalid"
+                      >
+                        {{ respondingEventId() === schedule.eventId ? 'Salvando...' : 'Salvar recusa' }}
+                      </button>
+                      <button
+                        class="current-user-schedules__button"
+                        type="button"
+                        [disabled]="respondingEventId() !== null"
+                        (click)="cancelDeclineForm(schedule.eventId)"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                }
+              }
+
+              @if (participationFeedback(); as feedback) {
+                @if (feedback.eventId === schedule.eventId) {
+                  <p
+                    class="current-user-schedules__participation-feedback"
+                    [class.current-user-schedules__participation-feedback--error]="
+                      feedback.type === 'error'
+                    "
+                    [attr.role]="feedback.type === 'error' ? 'alert' : 'status'"
+                  >
+                    {{ feedback.message }}
+                  </p>
+                }
+              }
+            </section>
           </li>
         }
       </ul>

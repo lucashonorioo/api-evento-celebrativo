@@ -15,14 +15,15 @@
   gap: 0.4rem;
 }
 
-.current-user-schedules__field label {
+.current-user-schedules__field label,
+.current-user-schedules__decline-form label {
   color: var(--color-text);
   font-weight: 700;
 }
 
-.current-user-schedules__field input {
+.current-user-schedules__field input,
+.current-user-schedules__decline-form textarea {
   width: 100%;
-  min-height: 2.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -31,9 +32,14 @@
   font: inherit;
 }
 
+.current-user-schedules__field input {
+  min-height: 2.5rem;
+}
+
 .current-user-schedules__field input:focus-visible,
 .current-user-schedules__button:focus-visible,
-.current-user-schedules__pagination-button:focus-visible {
+.current-user-schedules__pagination-button:focus-visible,
+.current-user-schedules__decline-form textarea:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -44,7 +50,8 @@
 
 .current-user-schedules__field-error,
 .current-user-schedules__feedback--error,
-.current-user-schedules__validation {
+.current-user-schedules__validation,
+.current-user-schedules__participation-feedback--error {
   color: var(--color-danger);
   margin: 0;
 }
@@ -149,15 +156,6 @@
   font-size: 1rem;
 }
 
-.current-user-schedules__assignments ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
 .current-user-schedules__assignments li {
   padding: 0.35rem 0.6rem;
   border: 1px solid var(--color-border);
@@ -177,6 +175,43 @@
 
 .current-user-schedules__pagination-status {
   font-weight: 800;
+}
+
+.current-user-schedules__participation {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.current-user-schedules__participation-status {
+  margin: 0;
+  font-weight: 800;
+}
+
+.current-user-schedules__meta-text {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.current-user-schedules__assignments ul,
+.current-user-schedules__participation-actions,
+.current-user-schedules__decline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.current-user-schedules__decline-form {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem;
+}
+
+.current-user-schedules__participation-feedback {
+  margin: 0;
+  color: var(--color-success);
 }
 
 @media (max-width: 48rem) {
