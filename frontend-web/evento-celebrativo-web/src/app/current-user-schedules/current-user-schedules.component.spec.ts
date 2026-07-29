@@ -5,7 +5,11 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
-import { CurrentUserSchedule, CurrentUserSchedulePage } from './current-user-schedule.models';
+import {
+  CurrentUserSchedule,
+  CurrentUserSchedulePage,
+  ScheduleParticipationResponse,
+} from './current-user-schedule.models';
 import { CurrentUserScheduleService } from './current-user-schedule.service';
 import { CurrentUserSchedulesComponent } from './current-user-schedules.component';
 
@@ -27,7 +31,7 @@ describe('CurrentUserSchedulesComponent', () => {
   ): Promise<void> {
     currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
       'CurrentUserScheduleService',
-      ['findSchedules'],
+      ['findSchedules', 'updateParticipation'],
     );
     currentUserScheduleService.findSchedules.and.returnValue(of(response));
 
@@ -533,7 +537,7 @@ describe('CurrentUserSchedulesComponent', () => {
     it('should correct to the last valid page when the requested page is empty beyond the limit', async () => {
       currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
         'CurrentUserScheduleService',
-        ['findSchedules'],
+        ['findSchedules', 'updateParticipation'],
       );
       currentUserScheduleService.findSchedules.and.returnValues(
         of(createPage({ content: [], totalElements: 12, totalPages: 2, number: 5, empty: true })),
@@ -561,7 +565,7 @@ describe('CurrentUserSchedulesComponent', () => {
     it('should execute only the single necessary follow-up request when correcting the page', async () => {
       currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
         'CurrentUserScheduleService',
-        ['findSchedules'],
+        ['findSchedules', 'updateParticipation'],
       );
       currentUserScheduleService.findSchedules.and.returnValues(
         of(createPage({ content: [], totalElements: 12, totalPages: 2, number: 5, empty: true })),
@@ -633,7 +637,7 @@ describe('CurrentUserSchedulesComponent', () => {
     it('should reuse the corrected page on a subsequent retry after an empty page beyond the limit', async () => {
       currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
         'CurrentUserScheduleService',
-        ['findSchedules'],
+        ['findSchedules', 'updateParticipation'],
       );
       currentUserScheduleService.findSchedules.and.returnValues(
         of(createPage({ content: [], totalElements: 12, totalPages: 2, number: 5, empty: true })),
@@ -672,7 +676,7 @@ describe('CurrentUserSchedulesComponent', () => {
       const correctivePending = new Subject<CurrentUserSchedulePage>();
       currentUserScheduleService = jasmine.createSpyObj<CurrentUserScheduleService>(
         'CurrentUserScheduleService',
-        ['findSchedules'],
+        ['findSchedules', 'updateParticipation'],
       );
       currentUserScheduleService.findSchedules.and.returnValues(
         of(createPage({ content: [], totalElements: 12, totalPages: 2, number: 5, empty: true })),
@@ -834,6 +838,773 @@ describe('CurrentUserSchedulesComponent', () => {
     });
   });
 
+  describe('participation', () => {
+    function card(): HTMLElement {
+      return harness.routeNativeElement?.querySelector(
+        '.current-user-schedules__card',
+      ) as HTMLElement;
+    }
+
+    function findButton(text: string): HTMLButtonElement {
+      const button = Array.from(card().querySelectorAll('button')).find(
+        (candidate) => candidate.textContent?.trim() === text,
+      ) as HTMLButtonElement | undefined;
+
+      if (!button) {
+        throw new Error(`Button "${text}" not found`);
+      }
+
+      return button;
+    }
+
+    function findTextarea(): HTMLTextAreaElement {
+      return card().querySelector('textarea') as HTMLTextAreaElement;
+    }
+
+    function setTextareaValue(value: string): void {
+      const textarea = findTextarea();
+      textarea.value = value;
+      textarea.dispatchEvent(new Event('input'));
+    }
+
+    describe('PENDING state', () => {
+      it('should show "Aguardando resposta"', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule()] }));
+
+        expect(card().textContent).toContain('Aguardando resposta');
+      });
+
+      it('should show both action buttons', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule()] }));
+
+        expect(() => findButton('Confirmar participação')).not.toThrow();
+        expect(() => findButton('Não poderei participar')).not.toThrow();
+      });
+    });
+
+    describe('CONFIRMED state', () => {
+      it('should show "Participação confirmada"', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [createSchedule({ participationStatus: 'CONFIRMED', respondedAt: '2026-07-18T10:00:00' })],
+          }),
+        );
+
+        expect(card().textContent).toContain('Participação confirmada');
+      });
+
+      it('should show the formatted respondedAt', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [createSchedule({ participationStatus: 'CONFIRMED', respondedAt: '2026-07-18T10:05:00' })],
+          }),
+        );
+
+        expect(card().textContent).toContain('Respondido em: 18/07/2026 10:05');
+      });
+
+      it('should not show a decline reason', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'CONFIRMED',
+                declineReason: null,
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(card().textContent).not.toContain('Motivo:');
+      });
+    });
+
+    describe('DECLINED state', () => {
+      it('should show "Não participará"', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(card().textContent).toContain('Não participará');
+      });
+
+      it('should show the decline reason when present', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(card().textContent).toContain('Motivo: Estarei fora da cidade.');
+      });
+
+      it('should not show a reason line when declineReason is null', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'DECLINED',
+                declineReason: null,
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(card().textContent).not.toContain('Motivo:');
+      });
+
+      it('should show the respondedAt', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(card().textContent).toContain('Respondido em: 18/07/2026 10:00');
+      });
+
+      it('should offer confirm and change-decline actions', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        expect(() => findButton('Confirmar participação')).not.toThrow();
+        expect(() => findButton('Alterar recusa')).not.toThrow();
+      });
+    });
+
+    describe('confirming participation', () => {
+      it('should call updateParticipation with the correct eventId and body', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED' })),
+        );
+
+        findButton('Confirmar participação').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledOnceWith(15, {
+          status: 'CONFIRMED',
+          declineReason: null,
+        });
+      });
+
+      it('should update only the corresponding card on success', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [createSchedule({ eventId: 15 }), createSchedule({ eventId: 16 })],
+            numberOfElements: 2,
+          }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED', respondedAt: '2026-07-19T09:00:00' })),
+        );
+        harness.detectChanges();
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        const cards = harness.routeNativeElement?.querySelectorAll('.current-user-schedules__card');
+        expect(cards?.[0].textContent).toContain('Participação confirmada');
+        expect(cards?.[1].textContent).toContain('Aguardando resposta');
+      });
+
+      it('should clear a previous decline reason after confirming', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                eventId: 15,
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED', declineReason: null })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).not.toContain('Motivo:');
+      });
+
+      it('should preserve assignments and not duplicate the event after a successful update', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({ content: [createSchedule({ eventId: 15, assignments: ['READER', 'COMMENTATOR'] })] }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED' })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        const cards = harness.routeNativeElement?.querySelectorAll('.current-user-schedules__card');
+        expect(cards?.length).toBe(1);
+        expect(card().textContent).toContain('Leitor');
+        expect(card().textContent).toContain('Comentarista');
+      });
+
+      it('should show a success feedback message', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED' })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Participação confirmada com sucesso.');
+      });
+
+      it('should block a duplicate confirm submit while pending', async () => {
+        const pending = new Subject<ScheduleParticipationResponse>();
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(pending);
+
+        component.confirmParticipation(createSchedule({ eventId: 15 }));
+        component.confirmParticipation(createSchedule({ eventId: 15 }));
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledTimes(1);
+
+        pending.next(createParticipationResponse({ eventId: 15 }));
+        pending.complete();
+      });
+    });
+
+    describe('declining participation', () => {
+      it('should open the inline form', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+
+        expect(findTextarea()).not.toBeNull();
+      });
+
+      it('should prefill the textarea when editing an existing decline', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                eventId: 15,
+                participationStatus: 'DECLINED',
+                declineReason: 'Estarei fora da cidade.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+
+        findButton('Alterar recusa').click();
+        harness.detectChanges();
+
+        expect(findTextarea().value).toBe('Estarei fora da cidade.');
+      });
+
+      it('should not require a reason to submit', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED', declineReason: null })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledOnceWith(15, {
+          status: 'DECLINED',
+          declineReason: null,
+        });
+      });
+
+      it('should trim the reason before sending', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED', declineReason: 'Estarei fora.' })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('  Estarei fora.  ');
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledOnceWith(15, {
+          status: 'DECLINED',
+          declineReason: 'Estarei fora.',
+        });
+      });
+
+      it('should turn a blank reason into null', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED', declineReason: null })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('    ');
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledOnceWith(15, {
+          status: 'DECLINED',
+          declineReason: null,
+        });
+      });
+
+      it('should accept exactly 500 characters', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED' })),
+        );
+        const reason = 'a'.repeat(500);
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue(reason);
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledOnceWith(15, {
+          status: 'DECLINED',
+          declineReason: reason,
+        });
+      });
+
+      it('should block the request beyond 500 characters', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        const reason = 'a'.repeat(501);
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue(reason);
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).not.toHaveBeenCalled();
+      });
+
+      it('should show a character counter', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('abc');
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('3/500');
+      });
+
+      it('should block a duplicate submit while pending', async () => {
+        const pending = new Subject<ScheduleParticipationResponse>();
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(pending);
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        findButton('Salvar recusa').click();
+
+        expect(currentUserScheduleService.updateParticipation).toHaveBeenCalledTimes(1);
+
+        pending.next(createParticipationResponse({ eventId: 15, status: 'DECLINED' }));
+        pending.complete();
+      });
+
+      it('should keep the cards visible while the PUT is pending', async () => {
+        const pending = new Subject<ScheduleParticipationResponse>();
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(pending);
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        harness.detectChanges();
+
+        expect(card()).not.toBeNull();
+        expect(textContent()).not.toContain('Carregando suas escalas...');
+
+        pending.next(createParticipationResponse({ eventId: 15, status: 'DECLINED' }));
+        pending.complete();
+      });
+
+      it('should block filter submit and pagination while a PUT is pending', async () => {
+        const pending = new Subject<ScheduleParticipationResponse>();
+        await setup(
+          '/minhas-escalas',
+          createPage({ content: [createSchedule({ eventId: 15 })], totalPages: 2, last: false }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(pending);
+        currentUserScheduleService.findSchedules.calls.reset();
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+
+        component.submit();
+        component.nextPage();
+        component.previousPage();
+        component.retry();
+
+        expect(currentUserScheduleService.findSchedules).not.toHaveBeenCalled();
+
+        pending.next(createParticipationResponse({ eventId: 15, status: 'DECLINED' }));
+        pending.complete();
+      });
+
+      it('should close the form on success', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED' })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        harness.detectChanges();
+
+        expect(card().querySelector('textarea')).toBeNull();
+      });
+
+      it('should preserve the typed text on error', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 500 })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('Estarei fora da cidade.');
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        harness.detectChanges();
+
+        expect(findTextarea().value).toBe('Estarei fora da cidade.');
+      });
+
+      it('should close without calling the service on cancel', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('Estarei fora da cidade.');
+        harness.detectChanges();
+        findButton('Cancelar').click();
+        harness.detectChanges();
+
+        expect(currentUserScheduleService.updateParticipation).not.toHaveBeenCalled();
+        expect(card().querySelector('textarea')).toBeNull();
+      });
+    });
+
+    describe('status transitions', () => {
+      it('should switch from CONFIRMED to DECLINED', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [createSchedule({ eventId: 15, participationStatus: 'CONFIRMED', respondedAt: '2026-07-18T10:00:00' })],
+          }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED', declineReason: 'Imprevisto.' })),
+        );
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+        setTextareaValue('Imprevisto.');
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Não participará');
+      });
+
+      it('should switch from DECLINED to CONFIRMED', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                eventId: 15,
+                participationStatus: 'DECLINED',
+                declineReason: 'Imprevisto.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED', declineReason: null })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Participação confirmada');
+      });
+
+      it('should keep DECLINED while changing the reason', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({
+            content: [
+              createSchedule({
+                eventId: 15,
+                participationStatus: 'DECLINED',
+                declineReason: 'Motivo antigo.',
+                respondedAt: '2026-07-18T10:00:00',
+              }),
+            ],
+          }),
+        );
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'DECLINED', declineReason: 'Motivo novo.' })),
+        );
+
+        findButton('Alterar recusa').click();
+        harness.detectChanges();
+        setTextareaValue('Motivo novo.');
+        harness.detectChanges();
+        findButton('Salvar recusa').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Não participará');
+        expect(card().textContent).toContain('Motivo: Motivo novo.');
+      });
+    });
+
+    describe('error handling', () => {
+      it('should show a message for HTTP 400', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 400 })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain(
+          'Não foi possível registrar a participação. Revise os dados informados.',
+        );
+      });
+
+      it('should not create a local logout handling for HTTP 401', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        navigateSpy.calls.reset();
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 401 })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(navigateSpy).not.toHaveBeenCalled();
+      });
+
+      it('should show a message for HTTP 403', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 403 })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Você não tem permissão para responder a esta escala.');
+      });
+
+      it('should show a message for HTTP 404', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 404 })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain(
+          'Não foi possível localizar o evento ou a pessoa associada à conta autenticada.',
+        );
+      });
+
+      it('should show a message for HTTP 409 caused by the event having started', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 409,
+                error: { error: 'Nao e possivel responder a participacao apos o inicio do evento' },
+              }),
+          ),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain(
+          'Não é mais possível alterar a participação porque o evento já começou.',
+        );
+      });
+
+      it('should show a message for HTTP 409 caused by no longer being assigned', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 409,
+                error: { error: 'A pessoa autenticada nao possui atribuicao neste evento' },
+              }),
+          ),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(textContent()).toContain('Você não está mais escalado para este evento.');
+      });
+
+      it('should run a single reconciliation GET when the person is no longer assigned', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(
+            () =>
+              new HttpErrorResponse({
+                status: 409,
+                error: { error: 'A pessoa autenticada nao possui atribuicao neste evento' },
+              }),
+          ),
+        );
+        currentUserScheduleService.findSchedules.calls.reset();
+        currentUserScheduleService.findSchedules.and.returnValue(of(createPage({ content: [] })));
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(currentUserScheduleService.findSchedules).toHaveBeenCalledTimes(1);
+      });
+
+      it('should show a generic message for an unexpected error', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 500 })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        expect(card().textContent).toContain('Não foi possível atualizar sua participação. Tente novamente.');
+      });
+    });
+
+    describe('event already started (visual rule)', () => {
+      it('should not allow a new visual action once the event has started', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({ content: [createSchedule({ eventId: 15, eventDate: '2026-07-20', eventTime: '09:00:00' })] }),
+        );
+
+        expect(card().textContent).toContain(
+          'O evento já começou. A participação não pode mais ser alterada.',
+        );
+        expect(() => findButton('Confirmar participação')).toThrow();
+        expect(() => findButton('Não poderei participar')).toThrow();
+      });
+
+      it('should use the local date and time for the rule (not UTC)', async () => {
+        await setup(
+          '/minhas-escalas',
+          createPage({ content: [createSchedule({ eventId: 15, eventDate: '2026-07-20', eventTime: '11:00:00' })] }),
+        );
+
+        expect(card().textContent).not.toContain('O evento já começou.');
+        expect(() => findButton('Confirmar participação')).not.toThrow();
+      });
+    });
+
+    describe('accessibility', () => {
+      it('should not depend solely on a CSS class for the status', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+
+        expect(card().textContent).toContain('Aguardando resposta');
+      });
+
+      it('should associate a label and a description with the textarea', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+
+        findButton('Não poderei participar').click();
+        harness.detectChanges();
+
+        const textarea = findTextarea();
+        const label = card().querySelector(`label[for="${textarea.id}"]`);
+
+        expect(label).not.toBeNull();
+        expect(textarea.getAttribute('aria-describedby')).toBeTruthy();
+      });
+
+      it('should expose feedback and validation messages with appropriate roles', async () => {
+        await setup('/minhas-escalas', createPage({ content: [createSchedule({ eventId: 15 })] }));
+        currentUserScheduleService.updateParticipation.and.returnValue(
+          of(createParticipationResponse({ eventId: 15, status: 'CONFIRMED' })),
+        );
+
+        findButton('Confirmar participação').click();
+        harness.detectChanges();
+
+        const feedback = card().querySelector('.current-user-schedules__participation-feedback');
+        expect(feedback?.getAttribute('role')).toBe('status');
+      });
+    });
+  });
+
   function textContent(): string {
     return harness.routeNativeElement?.textContent ?? '';
   }
@@ -849,6 +1620,9 @@ function createSchedule(overrides: Partial<CurrentUserSchedule> = {}): CurrentUs
     locationId: 2,
     locationName: 'Igreja Matriz',
     assignments: ['READER', 'COMMENTATOR'],
+    participationStatus: 'PENDING',
+    declineReason: null,
+    respondedAt: null,
     ...overrides,
   };
 }
@@ -864,6 +1638,18 @@ function createPage(overrides: Partial<CurrentUserSchedulePage> = {}): CurrentUs
     number: 0,
     numberOfElements: 1,
     empty: false,
+    ...overrides,
+  };
+}
+
+function createParticipationResponse(
+  overrides: Partial<ScheduleParticipationResponse> = {},
+): ScheduleParticipationResponse {
+  return {
+    eventId: 15,
+    status: 'CONFIRMED',
+    declineReason: null,
+    respondedAt: '2026-07-20T10:00:00',
     ...overrides,
   };
 }

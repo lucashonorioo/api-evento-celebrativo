@@ -805,6 +805,9 @@ describe('HomeComponent', () => {
       locationId: 2,
       locationName: 'Igreja Matriz',
       assignments: ['READER', 'COMMENTATOR'],
+      participationStatus: 'PENDING',
+      declineReason: null,
+      respondedAt: null,
       ...overrides,
     };
   }

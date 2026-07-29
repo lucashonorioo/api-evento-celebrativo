@@ -3,7 +3,12 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
-import { CurrentUserSchedulePage, CurrentUserScheduleQuery } from './current-user-schedule.models';
+import {
+  CurrentUserSchedulePage,
+  CurrentUserScheduleQuery,
+  ScheduleParticipationResponse,
+  ScheduleParticipationUpdateRequest,
+} from './current-user-schedule.models';
 
 @Injectable({
   providedIn: 'root',
@@ -21,5 +26,15 @@ export class CurrentUserScheduleService {
       .set('size', String(query.size));
 
     return this.http.get<CurrentUserSchedulePage>(this.schedulesUrl, { params });
+  }
+
+  updateParticipation(
+    eventId: number,
+    request: ScheduleParticipationUpdateRequest,
+  ): Observable<ScheduleParticipationResponse> {
+    return this.http.put<ScheduleParticipationResponse>(
+      `${this.schedulesUrl}/${eventId}/participacao`,
+      request,
+    );
   }
 }
