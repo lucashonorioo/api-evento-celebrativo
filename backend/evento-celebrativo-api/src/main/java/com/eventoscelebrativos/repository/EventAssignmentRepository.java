@@ -17,7 +17,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface EventAssignmentRepository extends JpaRepository<EventAssignment, Long> {
@@ -96,16 +95,12 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             """)
     List<EventAssignment> findAllByEventIdInWithPerson(@Param("eventIds") Collection<Long> eventIds);
 
-    Optional<EventAssignment> findByEventIdAndPersonId(Long eventId, Long personId);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM EventAssignment a WHERE a.event.id = :eventId AND a.person.id = :personId")
     List<EventAssignment> findAllByEventIdAndPersonIdForUpdate(
             @Param("eventId") Long eventId,
             @Param("personId") Long personId
     );
-
-    boolean existsByEventIdAndPersonId(Long eventId, Long personId);
 
     boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
 
