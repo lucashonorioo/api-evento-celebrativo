@@ -76,12 +76,81 @@
       </dl>
     </article>
 
+    @if (isAdmin() && participationSummary(); as summary) {
+      <section
+        class="participation-summary surface-card"
+        aria-labelledby="participation-summary-title"
+      >
+        <header>
+          <h2 id="participation-summary-title">Situação das participações</h2>
+          <p>Acompanhe as respostas das pessoas escaladas e identifique substituições necessárias.</p>
+        </header>
+
+        <dl class="participation-summary__stats">
+          <div>
+            <dt>Total de participantes</dt>
+            <dd>{{ summary.total }}</dd>
+          </div>
+          <div>
+            <dt>Confirmados</dt>
+            <dd>{{ summary.confirmed }}</dd>
+          </div>
+          <div>
+            <dt>Aguardando resposta</dt>
+            <dd>{{ summary.pending }}</dd>
+          </div>
+          <div>
+            <dt>Não participarão</dt>
+            <dd>{{ summary.declined }}</dd>
+          </div>
+        </dl>
+
+        <div class="participation-summary__actions">
+          <button
+            class="event-schedule-detail__button"
+            type="button"
+            [disabled]="isRefreshing()"
+            (click)="refreshParticipation()"
+          >
+            {{ isRefreshing() ? 'Atualizando...' : 'Atualizar participações' }}
+          </button>
+        </div>
+
+        @if (isRefreshing()) {
+          <p class="participation-summary__status" role="status">Atualizando participações...</p>
+        }
+
+        @if (refreshErrorMessage(); as refreshError) {
+          <p class="participation-summary__feedback" role="alert">{{ refreshError }}</p>
+        }
+      </section>
+    }
+
     <section class="schedule-sections" aria-label="Pessoas escaladas por funcao">
       <article class="schedule-section surface-card">
         <h2>Padre</h2>
 
-        @if (schedule.priest) {
-          <p>{{ schedule.priest.name }}</p>
+        @if (schedule.priest; as priest) {
+          <p>{{ priest.name }}</p>
+
+          @if (isAdmin() && priest.participationStatus) {
+            <p class="participant-status">
+              {{ participationStatusLabel(priest.participationStatus) }}
+            </p>
+
+            @if (priest.participationStatus === 'DECLINED' && priest.declineReason) {
+              <p class="participant-reason">Motivo: {{ priest.declineReason }}</p>
+            }
+
+            @if (
+              priest.participationStatus !== 'PENDING' && respondedAtDate(priest.respondedAt);
+              as priestRespondedAt
+            ) {
+              <p class="participant-responded-at">
+                Respondido em {{ priestRespondedAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+              </p>
+            }
+          }
         } @else {
           <p>Nenhum padre informado.</p>
         }
@@ -96,7 +165,28 @@
           } @else {
             <ul>
               @for (person of section.people; track person.id) {
-                <li>{{ person.name }}</li>
+                <li>
+                  {{ person.name }}
+
+                  @if (isAdmin() && person.participationStatus) {
+                    <p class="participant-status">
+                      {{ participationStatusLabel(person.participationStatus) }}
+                    </p>
+
+                    @if (person.participationStatus === 'DECLINED' && person.declineReason) {
+                      <p class="participant-reason">Motivo: {{ person.declineReason }}</p>
+                    }
+
+                    @if (
+                      person.participationStatus !== 'PENDING' && respondedAtDate(person.respondedAt);
+                      as personRespondedAt
+                    ) {
+                      <p class="participant-responded-at">
+                        Respondido em {{ personRespondedAt | date: "dd/MM/yyyy 'às' HH:mm" }}
+                      </p>
+                    }
+                  }
+                </li>
               }
             </ul>
           }

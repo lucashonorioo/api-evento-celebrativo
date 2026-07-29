@@ -8,6 +8,7 @@ import {
   CreateEventWithScheduleResponse,
   EventScheduleDetailResponse,
   EventSchedulePage,
+  EventScheduleParticipationDetailResponse,
   UpdateEventScheduleRequest,
   UpdateEventScheduleResponse,
 } from './event-schedule.models';
@@ -58,6 +59,43 @@ describe('EventScheduleService', () => {
     commentators: [{ id: 1, name: 'Luana Odinson' }],
     ministersOfTheWord: [{ id: 7, name: 'Davi Gomes' }],
     eucharisticMinisters: [{ id: 10, name: 'Mariana Ferraz' }],
+  };
+  const participationDetail: EventScheduleParticipationDetailResponse = {
+    eventId: 1,
+    eventName: 'Missa de Domingo da manha',
+    eventDate: '2025-07-13',
+    eventTime: '10:00:00',
+    massOrCelebration: true,
+    location: {
+      id: 1,
+      churchName: 'Igreja Matriz Nossa Senhora do Rosario',
+    },
+    priest: {
+      id: 13,
+      name: 'Padre Miguel',
+      participationStatus: 'PENDING',
+      declineReason: null,
+      respondedAt: null,
+    },
+    readers: [
+      {
+        id: 4,
+        name: 'Alice Lima',
+        participationStatus: 'CONFIRMED',
+        declineReason: null,
+        respondedAt: '2026-07-30T18:20:00',
+      },
+      {
+        id: 5,
+        name: 'Arthur Costa',
+        participationStatus: 'DECLINED',
+        declineReason: 'Estarei fora da cidade.',
+        respondedAt: '2026-07-30T18:21:00',
+      },
+    ],
+    commentators: [],
+    ministersOfTheWord: [],
+    eucharisticMinisters: [],
   };
   const updateRequest: UpdateEventScheduleRequest = {
     locationId: 2,
@@ -300,6 +338,114 @@ describe('EventScheduleService', () => {
         statusText: 'Forbidden',
       },
     );
+  });
+
+  describe('findParticipationByEventId', () => {
+    it('should use GET', () => {
+      service.findParticipationByEventId(1).subscribe();
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+
+      expect(request.request.method).toBe('GET');
+      request.flush(participationDetail);
+    });
+
+    it('should include the eventId in the path', () => {
+      service.findParticipationByEventId(42).subscribe();
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/42/escala/participacoes`,
+      );
+
+      expect(request.request.url).toBe(`${API_BASE_URL}/eventos/42/escala/participacoes`);
+      request.flush({ ...participationDetail, eventId: 42 });
+    });
+
+    it('should end with /escala/participacoes', () => {
+      service.findParticipationByEventId(1).subscribe();
+
+      const request = httpTestingController.expectOne(
+        (candidate) => candidate.url === `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+
+      expect(request.request.url.endsWith('/escala/participacoes')).toBeTrue();
+      request.flush(participationDetail);
+    });
+
+    it('should not send query params', () => {
+      service.findParticipationByEventId(1).subscribe();
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+
+      expect(request.request.params.keys().length).toBe(0);
+      request.flush(participationDetail);
+    });
+
+    it('should return a typed administrative response', () => {
+      let result: EventScheduleParticipationDetailResponse | undefined;
+      service.findParticipationByEventId(1).subscribe((response) => (result = response));
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+      request.flush(participationDetail);
+
+      expect(result).toEqual(participationDetail);
+    });
+
+    it('should receive a PENDING participation status', () => {
+      let result: EventScheduleParticipationDetailResponse | undefined;
+      service.findParticipationByEventId(1).subscribe((response) => (result = response));
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+      request.flush(participationDetail);
+
+      expect(result?.priest?.participationStatus).toBe('PENDING');
+    });
+
+    it('should receive a CONFIRMED participation status', () => {
+      let result: EventScheduleParticipationDetailResponse | undefined;
+      service.findParticipationByEventId(1).subscribe((response) => (result = response));
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+      request.flush(participationDetail);
+
+      expect(result?.readers[0].participationStatus).toBe('CONFIRMED');
+    });
+
+    it('should receive a DECLINED status with reason and respondedAt', () => {
+      let result: EventScheduleParticipationDetailResponse | undefined;
+      service.findParticipationByEventId(1).subscribe((response) => (result = response));
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+      request.flush(participationDetail);
+
+      expect(result?.readers[1].participationStatus).toBe('DECLINED');
+      expect(result?.readers[1].declineReason).toBe('Estarei fora da cidade.');
+      expect(result?.readers[1].respondedAt).toBe('2026-07-30T18:21:00');
+    });
+
+    it('should propagate an HTTP error to the caller', () => {
+      let error: unknown;
+      service.findParticipationByEventId(1).subscribe({ error: (err: unknown) => (error = err) });
+
+      const request = httpTestingController.expectOne(
+        `${API_BASE_URL}/eventos/1/escala/participacoes`,
+      );
+      request.flush({ error: 'Forbidden' }, { status: 403, statusText: 'Forbidden' });
+
+      expect(error).toBeDefined();
+    });
   });
 
   it('should update an event schedule with the expected body', () => {

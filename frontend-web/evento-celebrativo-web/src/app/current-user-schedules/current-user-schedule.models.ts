@@ -1,8 +1,8 @@
 import { EventScheduleType } from '../event-schedules/event-schedule.models';
-
-export type ScheduleParticipationStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED';
-
-export type ScheduleParticipationResponseStatus = 'CONFIRMED' | 'DECLINED';
+import {
+  ScheduleParticipationResponseStatus,
+  ScheduleParticipationStatus,
+} from '../schedule-participation/schedule-participation.models';
 
 export interface ScheduleParticipationUpdateRequest {
   readonly status: ScheduleParticipationResponseStatus;

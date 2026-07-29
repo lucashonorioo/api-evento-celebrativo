@@ -8,6 +8,7 @@ import {
   CreateEventWithScheduleResponse,
   EventScheduleDetailResponse,
   EventSchedulePage,
+  EventScheduleParticipationDetailResponse,
   EventScheduleQuery,
   UpdateEventScheduleRequest,
   UpdateEventScheduleResponse,
@@ -34,6 +35,14 @@ export class EventScheduleService {
   findByEventId(eventId: number): Observable<EventScheduleDetailResponse> {
     return this.http.get<EventScheduleDetailResponse>(
       `${API_BASE_URL}/eventos/${eventId}/escala`,
+    );
+  }
+
+  findParticipationByEventId(
+    eventId: number,
+  ): Observable<EventScheduleParticipationDetailResponse> {
+    return this.http.get<EventScheduleParticipationDetailResponse>(
+      `${API_BASE_URL}/eventos/${eventId}/escala/participacoes`,
     );
   }
 

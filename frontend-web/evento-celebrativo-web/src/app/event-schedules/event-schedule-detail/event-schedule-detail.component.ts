@@ -1,20 +1,54 @@
+import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Params, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { Observable, finalize, map } from 'rxjs';
 
 import {
   EventScheduleDetailResponse,
+  EventScheduleParticipationDetailResponse,
+  EventScheduleParticipationPersonSummary,
   EventSchedulePersonSummary,
   EventScheduleType,
 } from '../event-schedule.models';
 import { EventScheduleService } from '../event-schedule.service';
 import { AuthSessionService } from '../../auth-session.service';
+import { ScheduleParticipationStatus } from '../../schedule-participation/schedule-participation.models';
+import { scheduleParticipationStatusLabel } from '../../schedule-participation/schedule-participation-view.utils';
+
+interface ScheduleParticipant {
+  readonly id: number;
+  readonly name: string;
+  readonly participationStatus: ScheduleParticipationStatus | null;
+  readonly declineReason: string | null;
+  readonly respondedAt: string | null;
+}
+
+interface ScheduleDetailView {
+  readonly eventId: number;
+  readonly eventName: string;
+  readonly eventDate: string;
+  readonly eventTime: string;
+  readonly massOrCelebration: boolean;
+  readonly location: EventScheduleDetailResponse['location'];
+  readonly priest: ScheduleParticipant | null;
+  readonly readers: ScheduleParticipant[];
+  readonly commentators: ScheduleParticipant[];
+  readonly ministersOfTheWord: ScheduleParticipant[];
+  readonly eucharisticMinisters: ScheduleParticipant[];
+}
 
 interface ParticipantSection {
   readonly title: string;
   readonly emptyMessage: string;
-  readonly people: readonly EventSchedulePersonSummary[];
+  readonly people: readonly ScheduleParticipant[];
+}
+
+interface ParticipationSummary {
+  readonly total: number;
+  readonly confirmed: number;
+  readonly pending: number;
+  readonly declined: number;
 }
 
 const SCHEDULE_LIST_ROUTE_PATH = 'escalas/eventos/:id';
@@ -23,7 +57,7 @@ const EVENT_DETAIL_ROUTE_PATH = 'eventos/:id/escala';
 @Component({
   selector: 'app-event-schedule-detail',
   standalone: true,
-  imports: [RouterLink],
+  imports: [DatePipe, RouterLink],
   templateUrl: './event-schedule-detail.component.html',
   styleUrl: './event-schedule-detail.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,11 +67,24 @@ export class EventScheduleDetailComponent implements OnInit {
   private readonly authSessionService = inject(AuthSessionService);
   private readonly eventScheduleService = inject(EventScheduleService);
 
-  readonly schedule = signal<EventScheduleDetailResponse | null>(null);
+  readonly schedule = signal<ScheduleDetailView | null>(null);
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly eventId = signal<number | null>(null);
   readonly backQueryParams = signal<Params>({});
+
+  readonly isRefreshing = signal(false);
+  readonly refreshErrorMessage = signal<string | null>(null);
+
+  readonly participationSummary = computed<ParticipationSummary | null>(() => {
+    const schedule = this.schedule();
+
+    if (schedule === null || !this.isAdmin()) {
+      return null;
+    }
+
+    return buildParticipationSummary(schedule);
+  });
 
   private readonly routeConfigPath = this.activatedRoute.snapshot.routeConfig?.path;
   private readonly isEventDetailContext = this.routeConfigPath === EVENT_DETAIL_ROUTE_PATH;
@@ -75,6 +122,32 @@ export class EventScheduleDetailComponent implements OnInit {
     this.loadSchedule(eventId);
   }
 
+  refreshParticipation(): void {
+    const eventId = this.eventId();
+
+    if (eventId === null || this.isRefreshing() || !this.isAdmin()) {
+      return;
+    }
+
+    this.isRefreshing.set(true);
+    this.refreshErrorMessage.set(null);
+
+    this.eventScheduleService
+      .findParticipationByEventId(eventId)
+      .pipe(
+        map(toParticipationScheduleDetailView),
+        finalize(() => this.isRefreshing.set(false)),
+      )
+      .subscribe({
+        next: (schedule) => {
+          this.schedule.set(schedule);
+        },
+        error: (error: unknown) => {
+          this.refreshErrorMessage.set(participationErrorMessageFor(error));
+        },
+      });
+  }
+
   formatDate(eventDate: string): string {
     const [year, month, day] = eventDate.split('-');
 
@@ -93,7 +166,21 @@ export class EventScheduleDetailComponent implements OnInit {
     return this.isRecognizedContext && this.authSessionService.hasAuthority('ROLE_ADMIN');
   }
 
-  participantSections(schedule: EventScheduleDetailResponse): readonly ParticipantSection[] {
+  participationStatusLabel(status: ScheduleParticipationStatus): string {
+    return scheduleParticipationStatusLabel(status);
+  }
+
+  respondedAtDate(respondedAt: string | null): Date | null {
+    if (respondedAt === null) {
+      return null;
+    }
+
+    const date = new Date(respondedAt);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  participantSections(schedule: ScheduleDetailView): readonly ParticipantSection[] {
     return [
       {
         title: 'Leitores',
@@ -127,17 +214,21 @@ export class EventScheduleDetailComponent implements OnInit {
     this.errorMessage.set(null);
     this.schedule.set(null);
 
-    this.eventScheduleService
-      .findByEventId(eventId)
-      .pipe(finalize(() => this.isLoading.set(false)))
-      .subscribe({
-        next: (schedule) => {
-          this.schedule.set(schedule);
-        },
-        error: (error: unknown) => {
-          this.errorMessage.set(errorMessageFor(error));
-        },
-      });
+    const isAdmin = this.isAdmin();
+    const request$: Observable<ScheduleDetailView> = isAdmin
+      ? this.eventScheduleService
+          .findParticipationByEventId(eventId)
+          .pipe(map(toParticipationScheduleDetailView))
+      : this.eventScheduleService.findByEventId(eventId).pipe(map(toScheduleDetailView));
+
+    request$.pipe(finalize(() => this.isLoading.set(false))).subscribe({
+      next: (schedule) => {
+        this.schedule.set(schedule);
+      },
+      error: (error: unknown) => {
+        this.errorMessage.set(isAdmin ? participationErrorMessageFor(error) : errorMessageFor(error));
+      },
+    });
   }
 }
 
@@ -159,6 +250,98 @@ function errorMessageFor(error: unknown): string {
   }
 
   return 'Nao foi possivel carregar a escala. Tente novamente.';
+}
+
+function participationErrorMessageFor(error: unknown): string {
+  if (error instanceof HttpErrorResponse && error.status === 404) {
+    return 'A escala do evento solicitado não foi encontrada.';
+  }
+
+  if (error instanceof HttpErrorResponse && error.status === 403) {
+    return 'Você não possui permissão para consultar as participações desta escala.';
+  }
+
+  return 'Não foi possível carregar as participações da escala. Tente novamente.';
+}
+
+function toParticipant(person: EventSchedulePersonSummary): ScheduleParticipant {
+  return {
+    id: person.id,
+    name: person.name,
+    participationStatus: null,
+    declineReason: null,
+    respondedAt: null,
+  };
+}
+
+function toParticipationParticipant(
+  person: EventScheduleParticipationPersonSummary,
+): ScheduleParticipant {
+  return {
+    id: person.id,
+    name: person.name,
+    participationStatus: person.participationStatus,
+    declineReason: person.declineReason,
+    respondedAt: person.respondedAt,
+  };
+}
+
+function toScheduleDetailView(detail: EventScheduleDetailResponse): ScheduleDetailView {
+  return {
+    eventId: detail.eventId,
+    eventName: detail.eventName,
+    eventDate: detail.eventDate,
+    eventTime: detail.eventTime,
+    massOrCelebration: detail.massOrCelebration,
+    location: detail.location,
+    priest: detail.priest ? toParticipant(detail.priest) : null,
+    readers: detail.readers.map(toParticipant),
+    commentators: detail.commentators.map(toParticipant),
+    ministersOfTheWord: detail.ministersOfTheWord.map(toParticipant),
+    eucharisticMinisters: detail.eucharisticMinisters.map(toParticipant),
+  };
+}
+
+function toParticipationScheduleDetailView(
+  detail: EventScheduleParticipationDetailResponse,
+): ScheduleDetailView {
+  return {
+    eventId: detail.eventId,
+    eventName: detail.eventName,
+    eventDate: detail.eventDate,
+    eventTime: detail.eventTime,
+    massOrCelebration: detail.massOrCelebration,
+    location: detail.location,
+    priest: detail.priest ? toParticipationParticipant(detail.priest) : null,
+    readers: detail.readers.map(toParticipationParticipant),
+    commentators: detail.commentators.map(toParticipationParticipant),
+    ministersOfTheWord: detail.ministersOfTheWord.map(toParticipationParticipant),
+    eucharisticMinisters: detail.eucharisticMinisters.map(toParticipationParticipant),
+  };
+}
+
+function buildParticipationSummary(schedule: ScheduleDetailView): ParticipationSummary {
+  const uniquePeople = new Map<number, ScheduleParticipant>();
+  const allPeople = [
+    ...(schedule.priest ? [schedule.priest] : []),
+    ...schedule.readers,
+    ...schedule.commentators,
+    ...schedule.ministersOfTheWord,
+    ...schedule.eucharisticMinisters,
+  ];
+
+  for (const person of allPeople) {
+    uniquePeople.set(person.id, person);
+  }
+
+  const people = Array.from(uniquePeople.values());
+
+  return {
+    total: people.length,
+    confirmed: people.filter((person) => person.participationStatus === 'CONFIRMED').length,
+    pending: people.filter((person) => person.participationStatus === 'PENDING').length,
+    declined: people.filter((person) => person.participationStatus === 'DECLINED').length,
+  };
 }
 
 function validBackQueryParams(queryParamMap: {

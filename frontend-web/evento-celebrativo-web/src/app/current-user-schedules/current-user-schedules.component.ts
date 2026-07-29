@@ -14,11 +14,8 @@ import { finalize } from 'rxjs';
 
 import { eventLocalTimestamp } from '../events/event-view.utils';
 import { EventScheduleType } from '../event-schedules/event-schedule.models';
-import {
-  formatLocalDate,
-  scheduleAssignmentLabel,
-  scheduleParticipationStatusLabel,
-} from './current-user-schedule-view.utils';
+import { scheduleParticipationStatusLabel } from '../schedule-participation/schedule-participation-view.utils';
+import { formatLocalDate, scheduleAssignmentLabel } from './current-user-schedule-view.utils';
 import {
   CurrentUserSchedule,
   CurrentUserSchedulePage,

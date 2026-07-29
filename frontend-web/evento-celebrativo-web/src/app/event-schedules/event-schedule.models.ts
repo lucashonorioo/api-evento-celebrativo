@@ -1,3 +1,5 @@
+import { ScheduleParticipationStatus } from '../schedule-participation/schedule-participation.models';
+
 export type EventScheduleType =
   | 'PRIEST'
   | 'READER'
@@ -104,3 +106,25 @@ export interface CreateEventWithScheduleRequest {
 }
 
 export type CreateEventWithScheduleResponse = UpdateEventScheduleResponse;
+
+export interface EventScheduleParticipationPersonSummary {
+  readonly id: number;
+  readonly name: string;
+  readonly participationStatus: ScheduleParticipationStatus;
+  readonly declineReason: string | null;
+  readonly respondedAt: string | null;
+}
+
+export interface EventScheduleParticipationDetailResponse {
+  readonly eventId: number;
+  readonly eventName: string;
+  readonly eventDate: string;
+  readonly eventTime: string;
+  readonly massOrCelebration: boolean;
+  readonly location: EventScheduleLocationSummary | null;
+  readonly priest: EventScheduleParticipationPersonSummary | null;
+  readonly readers: EventScheduleParticipationPersonSummary[];
+  readonly commentators: EventScheduleParticipationPersonSummary[];
+  readonly ministersOfTheWord: EventScheduleParticipationPersonSummary[];
+  readonly eucharisticMinisters: EventScheduleParticipationPersonSummary[];
+}
