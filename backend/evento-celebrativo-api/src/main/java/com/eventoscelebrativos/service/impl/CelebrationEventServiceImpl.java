@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
@@ -13,6 +14,7 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
+import com.eventoscelebrativos.mapper.CelebrationEventScaleParticipationMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
@@ -30,7 +32,9 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.EventAssignmentCommandService;
 import com.eventoscelebrativos.service.EventAssignmentGroup;
 import com.eventoscelebrativos.service.EventAssignmentReadService;
+import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.EventScaleAssignmentPlan;
+import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
 import com.eventoscelebrativos.service.ScaleParticipantEligibility;
 import jakarta.persistence.EntityNotFoundException;
@@ -64,8 +68,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventMapper celebrationEventMapper;
     private final CelebrationEventScaleMapper celebrationEventScaleMapper;
     private final CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper;
+    private final CelebrationEventScaleParticipationMapper celebrationEventScaleParticipationMapper;
     private final EventAssignmentCommandService eventAssignmentCommandService;
     private final EventAssignmentReadService eventAssignmentReadService;
+    private final EventParticipationResponseService eventParticipationResponseService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
 
     public CelebrationEventServiceImpl(
@@ -74,8 +80,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventMapper celebrationEventMapper,
             CelebrationEventScaleMapper celebrationEventScaleMapper,
             CelebrationEventScaleDetailMapper celebrationEventScaleDetailMapper,
+            CelebrationEventScaleParticipationMapper celebrationEventScaleParticipationMapper,
             EventAssignmentCommandService eventAssignmentCommandService,
             EventAssignmentReadService eventAssignmentReadService,
+            EventParticipationResponseService eventParticipationResponseService,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
@@ -83,8 +91,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.celebrationEventMapper = celebrationEventMapper;
         this.celebrationEventScaleMapper = celebrationEventScaleMapper;
         this.celebrationEventScaleDetailMapper = celebrationEventScaleDetailMapper;
+        this.celebrationEventScaleParticipationMapper = celebrationEventScaleParticipationMapper;
         this.eventAssignmentCommandService = eventAssignmentCommandService;
         this.eventAssignmentReadService = eventAssignmentReadService;
+        this.eventParticipationResponseService = eventParticipationResponseService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
     }
 
@@ -193,6 +203,29 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 celebrationEvent,
                 location,
                 assignments
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CelebrationEventScaleParticipationDetailResponseDTO findScaleParticipationByEventId(Long id) {
+        validateId(id);
+        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdWithLocations(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
+
+        Location location = firstLocation(celebrationEvent);
+        EventAssignmentGroup assignments = EventAssignmentGroup.from(
+                celebrationEvent.getId(),
+                eventAssignmentReadService.findAllByEventId(id)
+        );
+        Map<Long, ParticipationResponseSnapshot> participationByPersonId =
+                eventParticipationResponseService.findByEventId(id);
+
+        return celebrationEventScaleParticipationMapper.toDto(
+                celebrationEvent,
+                location,
+                assignments,
+                participationByPersonId
         );
     }
 

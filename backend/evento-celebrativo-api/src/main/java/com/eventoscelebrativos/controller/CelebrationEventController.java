@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
@@ -123,7 +124,8 @@ public class CelebrationEventController {
         return ResponseEntity.ok(eventSchedules);
     }
 
-    @Operation(summary = "Consulta a escala completa de um evento celebrativo")
+    @Operation(summary = "Consulta a escala completa de um evento celebrativo. Nao inclui o motivo de recusa de participacao; "
+            + "veja GET /eventos/{id}/escala/participacoes, exclusivo para administradores.")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
     @PreAuthorize("hasAnyRole('ROLE_ADMIN','ROLE_OPERATOR')")
     @GetMapping(value = "/{id}/escala")
@@ -131,6 +133,17 @@ public class CelebrationEventController {
         CelebrationEventScaleDetailResponseDTO celebrationEventScaleDetailResponseDTO =
                 celebrationEventService.findScaleByEventId(id);
         return ResponseEntity.ok(celebrationEventScaleDetailResponseDTO);
+    }
+
+    @Operation(summary = "Consulta a escala completa de um evento celebrativo com o estado de participacao de cada pessoa. "
+            + "Exclusivo para administradores, pois inclui o motivo de recusa.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/{id}/escala/participacoes")
+    public ResponseEntity<CelebrationEventScaleParticipationDetailResponseDTO> findEventScaleParticipationById(@PathVariable Long id) {
+        CelebrationEventScaleParticipationDetailResponseDTO celebrationEventScaleParticipationDetailResponseDTO =
+                celebrationEventService.findScaleParticipationByEventId(id);
+        return ResponseEntity.ok(celebrationEventScaleParticipationDetailResponseDTO);
     }
 
     @Operation(summary = "Atualiza um evento celebrativo")

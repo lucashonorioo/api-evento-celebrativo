@@ -17,12 +17,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -33,6 +35,9 @@ class EventAssignmentCommandServiceImplTest {
 
     @Mock
     private EventAssignmentRepository eventAssignmentRepository;
+
+    @Mock
+    private EventParticipationResponseService eventParticipationResponseService;
 
     @InjectMocks
     private EventAssignmentCommandServiceImpl service;
@@ -268,6 +273,56 @@ class EventAssignmentCommandServiceImplTest {
         verify(eventAssignmentRepository, never()).existsByEventIdAndPersonId(1L, 11L);
     }
 
+    @Test
+    void shouldRetainParticipationResponsesOnlyForPeopleStillAssignedAfterSync() {
+        CelebrationEvent event = event(1L);
+        Person kept = person(new Person(), 11L);
+        Person removed = person(new Person(), 12L);
+        Person added = person(new Person(), 13L);
+        EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
+        EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
+        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(keptAssignment, removedAssignment));
+
+        service.synchronizeAssignments(event, List.of(
+                new EventAssignmentTarget(kept, EventAssignmentType.READER),
+                new EventAssignmentTarget(added, EventAssignmentType.READER)
+        ));
+
+        ArgumentCaptor<Collection<Long>> personIdsCaptor = personIdCollectionCaptor();
+        verify(eventParticipationResponseService).retainOnlyForPersonIds(eq(1L), personIdsCaptor.capture());
+        assertEquals(Set.of(11L, 13L), java.util.Set.copyOf(personIdsCaptor.getValue()));
+    }
+
+    @Test
+    void shouldPreservePersonWithTwoFunctionsWhenOnlyOneFunctionRemains() {
+        CelebrationEvent event = event(1L);
+        Person reader = person(new Person(), 11L);
+        EventAssignment readerAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
+        EventAssignment commentatorAssignment = assignment(101L, event, reader, EventAssignmentType.COMMENTATOR);
+        when(eventAssignmentRepository.findAllByEventId(1L))
+                .thenReturn(List.of(readerAssignment, commentatorAssignment));
+
+        service.synchronizeAssignments(event, List.of(
+                new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
+        ));
+
+        ArgumentCaptor<Collection<Long>> personIdsCaptor = personIdCollectionCaptor();
+        verify(eventParticipationResponseService).retainOnlyForPersonIds(eq(1L), personIdsCaptor.capture());
+        assertEquals(Set.of(11L), java.util.Set.copyOf(personIdsCaptor.getValue()));
+    }
+
+    @Test
+    void shouldRetainEmptyPersonSetWhenAllAssignmentsAreRemoved() {
+        CelebrationEvent event = event(1L);
+        Person reader = person(new Person(), 11L);
+        EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
+        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(assignment));
+
+        service.synchronizeAssignments(event, List.of());
+
+        verify(eventParticipationResponseService).retainOnlyForPersonIds(1L, Set.of());
+    }
+
     private CelebrationEvent event(Long id) {
         CelebrationEvent event = new CelebrationEvent();
         event.setId(id);
@@ -289,6 +344,11 @@ class EventAssignmentCommandServiceImplTest {
 
     @SuppressWarnings("unchecked")
     private ArgumentCaptor<Collection<EventAssignment>> collectionCaptor() {
+        return ArgumentCaptor.forClass(Collection.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Collection<Long>> personIdCollectionCaptor() {
         return ArgumentCaptor.forClass(Collection.class);
     }
 }

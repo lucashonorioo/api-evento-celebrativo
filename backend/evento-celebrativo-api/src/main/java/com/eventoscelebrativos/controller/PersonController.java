@@ -1,13 +1,16 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
+import com.eventoscelebrativos.dto.request.ParticipationResponseRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
+import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
+import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,9 +36,11 @@ import java.time.LocalDate;
 public class PersonController {
 
     private final PersonService personService;
+    private final EventParticipationResponseService eventParticipationResponseService;
 
-    public PersonController(PersonService personService) {
+    public PersonController(PersonService personService, EventParticipationResponseService eventParticipationResponseService) {
         this.personService = personService;
+        this.eventParticipationResponseService = eventParticipationResponseService;
     }
 
     @Operation(summary = "Consulta o perfil da pessoa autenticada")
@@ -68,7 +73,9 @@ public class PersonController {
         return ResponseEntity.ok(responseDTO);
     }
 
-    @Operation(summary = "Lista as escalas da pessoa autenticada em um período. A pessoa e determinada pelo token, nao por parametro.")
+    @Operation(summary = "Lista as escalas da pessoa autenticada em um período. A pessoa e determinada pelo token, nao por parametro. "
+            + "Cada evento inclui participationStatus (PENDING quando nao ha resposta registrada, ou CONFIRMED/DECLINED), "
+            + "declineReason e respondedAt.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Escalas listadas com sucesso"),
             @ApiResponse(responseCode = "400", description = "Periodo ou paginacao invalidos"),
@@ -97,6 +104,35 @@ public class PersonController {
                 size
         );
         return ResponseEntity.ok(schedules);
+    }
+
+    @Operation(summary = "Confirma ou recusa a participacao da pessoa autenticada em uma escala. "
+            + "A pessoa e determinada exclusivamente pelo token (Bearer JWT), nao por parametro. Vale para todas as funcoes "
+            + "da pessoa no evento. Aceita apenas os status CONFIRMED e DECLINED; PENDING e o estado derivado da ausencia de "
+            + "resposta e nao pode ser enviado. O motivo da recusa (declineReason) e opcional, limitado a 500 caracteres apos "
+            + "trim, e e descartado quando o status e CONFIRMED. Nao e permitido responder apos o inicio do evento "
+            + "(eventDate + eventTime). A operacao e idempotente: reenviar a mesma resposta normalizada nao altera respondedAt.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Participacao registrada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Status ausente/invalido, PENDING informado ou motivo acima de 500 caracteres"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa ou evento nao encontrado"),
+            @ApiResponse(responseCode = "409", description = "Pessoa sem atribuicao no evento ou evento ja iniciado")
+    })
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
+    @PutMapping(value = "/me/escalas/{eventId}/participacao")
+    public ResponseEntity<ParticipationResponseResponseDTO> respondToEventParticipation(
+            Authentication authentication,
+            @PathVariable Long eventId,
+            @RequestBody ParticipationResponseRequestDTO requestDTO
+    ) {
+        ParticipationResponseResponseDTO responseDTO = eventParticipationResponseService.respond(
+                authentication.getName(),
+                eventId,
+                requestDTO
+        );
+        return ResponseEntity.ok(responseDTO);
     }
 
     @Operation(summary = "Lista pessoas para administracao de usuarios")

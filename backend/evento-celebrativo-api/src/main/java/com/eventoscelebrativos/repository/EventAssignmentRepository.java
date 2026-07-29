@@ -4,9 +4,11 @@ import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -95,6 +97,13 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
     List<EventAssignment> findAllByEventIdInWithPerson(@Param("eventIds") Collection<Long> eventIds);
 
     Optional<EventAssignment> findByEventIdAndPersonId(Long eventId, Long personId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM EventAssignment a WHERE a.event.id = :eventId AND a.person.id = :personId")
+    List<EventAssignment> findAllByEventIdAndPersonIdForUpdate(
+            @Param("eventId") Long eventId,
+            @Param("personId") Long personId
+    );
 
     boolean existsByEventIdAndPersonId(Long eventId, Long personId);
 

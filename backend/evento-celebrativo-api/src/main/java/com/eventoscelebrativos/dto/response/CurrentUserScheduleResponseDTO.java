@@ -1,8 +1,10 @@
 package com.eventoscelebrativos.dto.response;
 
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.ParticipationStatus;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +19,9 @@ public class CurrentUserScheduleResponseDTO {
     private Long locationId;
     private String locationName;
     private List<EventAssignmentType> assignments = new ArrayList<>();
+    private ParticipationStatus participationStatus;
+    private String declineReason;
+    private LocalDateTime respondedAt;
 
     public CurrentUserScheduleResponseDTO() {
     }
@@ -29,7 +34,10 @@ public class CurrentUserScheduleResponseDTO {
             Boolean massOrCelebration,
             Long locationId,
             String locationName,
-            List<EventAssignmentType> assignments
+            List<EventAssignmentType> assignments,
+            ParticipationStatus participationStatus,
+            String declineReason,
+            LocalDateTime respondedAt
     ) {
         this.eventId = eventId;
         this.eventName = eventName;
@@ -39,6 +47,9 @@ public class CurrentUserScheduleResponseDTO {
         this.locationId = locationId;
         this.locationName = locationName;
         this.assignments = assignments;
+        this.participationStatus = participationStatus;
+        this.declineReason = declineReason;
+        this.respondedAt = respondedAt;
     }
 
     public Long getEventId() {
@@ -103,5 +114,29 @@ public class CurrentUserScheduleResponseDTO {
 
     public void setAssignments(List<EventAssignmentType> assignments) {
         this.assignments = assignments;
+    }
+
+    public ParticipationStatus getParticipationStatus() {
+        return participationStatus;
+    }
+
+    public void setParticipationStatus(ParticipationStatus participationStatus) {
+        this.participationStatus = participationStatus;
+    }
+
+    public String getDeclineReason() {
+        return declineReason;
+    }
+
+    public void setDeclineReason(String declineReason) {
+        this.declineReason = declineReason;
+    }
+
+    public LocalDateTime getRespondedAt() {
+        return respondedAt;
+    }
+
+    public void setRespondedAt(LocalDateTime respondedAt) {
+        this.respondedAt = respondedAt;
     }
 }

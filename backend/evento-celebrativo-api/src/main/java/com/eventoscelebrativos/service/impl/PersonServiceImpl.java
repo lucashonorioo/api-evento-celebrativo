@@ -17,6 +17,7 @@ import com.eventoscelebrativos.mapper.PersonAdminMapper;
 import com.eventoscelebrativos.mapper.PersonRoleUpdateMapper;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
@@ -24,6 +25,8 @@ import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
@@ -37,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -63,6 +67,7 @@ public class PersonServiceImpl implements PersonService {
     private final PersonMinistryReadService personMinistryReadService;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final EventAssignmentRepository eventAssignmentRepository;
+    private final EventParticipationResponseService eventParticipationResponseService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -72,7 +77,8 @@ public class PersonServiceImpl implements PersonService {
             CurrentUserProfileMapper currentUserProfileMapper,
             PersonMinistryReadService personMinistryReadService,
             PersonMinistryCommandService personMinistryCommandService,
-            EventAssignmentRepository eventAssignmentRepository
+            EventAssignmentRepository eventAssignmentRepository,
+            EventParticipationResponseService eventParticipationResponseService
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
@@ -82,6 +88,7 @@ public class PersonServiceImpl implements PersonService {
         this.personMinistryReadService = personMinistryReadService;
         this.personMinistryCommandService = personMinistryCommandService;
         this.eventAssignmentRepository = eventAssignmentRepository;
+        this.eventParticipationResponseService = eventParticipationResponseService;
     }
 
     @Override
@@ -248,10 +255,14 @@ public class PersonServiceImpl implements PersonService {
                         )
                 ));
 
+        Map<Long, ParticipationResponseSnapshot> participationByEvent = eventParticipationResponseService
+                .findByPersonIdAndEventIds(person.getId(), eventIds);
+
         List<CurrentUserScheduleResponseDTO> content = eventPage.getContent().stream()
                 .map(event -> toCurrentUserScheduleDTO(
                         event,
-                        assignmentsByEvent.getOrDefault(event.getEventId(), EnumSet.noneOf(EventAssignmentType.class))
+                        assignmentsByEvent.getOrDefault(event.getEventId(), EnumSet.noneOf(EventAssignmentType.class)),
+                        participationByEvent.get(event.getEventId())
                 ))
                 .toList();
 
@@ -270,8 +281,15 @@ public class PersonServiceImpl implements PersonService {
 
     private CurrentUserScheduleResponseDTO toCurrentUserScheduleDTO(
             PersonScheduleEventProjection event,
-            EnumSet<EventAssignmentType> assignmentTypes
+            EnumSet<EventAssignmentType> assignmentTypes,
+            ParticipationResponseSnapshot participation
     ) {
+        ParticipationStatus participationStatus = participation != null
+                ? participation.status()
+                : ParticipationStatus.PENDING;
+        String declineReason = participation != null ? participation.declineReason() : null;
+        LocalDateTime respondedAt = participation != null ? participation.respondedAt() : null;
+
         return new CurrentUserScheduleResponseDTO(
                 event.getEventId(),
                 event.getEventName(),
@@ -280,7 +298,10 @@ public class PersonServiceImpl implements PersonService {
                 event.getMassOrCelebration(),
                 event.getLocationId(),
                 event.getLocationName(),
-                List.copyOf(assignmentTypes)
+                List.copyOf(assignmentTypes),
+                participationStatus,
+                declineReason,
+                respondedAt
         );
     }
 

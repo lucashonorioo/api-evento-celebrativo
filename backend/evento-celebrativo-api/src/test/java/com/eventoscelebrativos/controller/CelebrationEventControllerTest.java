@@ -3,6 +3,8 @@ package com.eventoscelebrativos.controller;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleLocationResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationDetailResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationPersonResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScalePersonResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
@@ -12,6 +14,7 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventScheduleType;
+import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -191,6 +195,56 @@ class CelebrationEventControllerTest {
                 .andExpect(jsonPath("$.commentators").isEmpty())
                 .andExpect(jsonPath("$.ministersOfTheWord").isEmpty())
                 .andExpect(jsonPath("$.eucharisticMinisters").isEmpty());
+    }
+
+    @Test
+    void shouldReturnOkWhenAdminGetsEventScaleParticipation() throws Exception {
+        when(celebrationEventService.findScaleParticipationByEventId(1L)).thenReturn(scaleParticipationResponse());
+
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(1))
+                .andExpect(jsonPath("$.priest.id").value(13))
+                .andExpect(jsonPath("$.priest.participationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.readers[0].id").value(4))
+                .andExpect(jsonPath("$.readers[0].participationStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.readers[1].id").value(5))
+                .andExpect(jsonPath("$.readers[1].participationStatus").value("DECLINED"))
+                .andExpect(jsonPath("$.readers[1].declineReason").value("Viagem"))
+                .andExpect(jsonPath("$.readers[1].respondedAt").exists());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorGetsEventScaleParticipation() throws Exception {
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenGettingMissingEventScaleParticipation() throws Exception {
+        when(celebrationEventService.findScaleParticipationByEventId(99L))
+                .thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
+
+        mockMvc.perform(get("/eventos/99/escala/participacoes"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldShowSameParticipationDataForPersonInTwoFunctions() throws Exception {
+        CelebrationEventScaleParticipationDetailResponseDTO response = scaleParticipationResponse();
+        response.setCommentators(List.of(new CelebrationEventScaleParticipationPersonResponseDTO(
+                4L, "Alice Lima", ParticipationStatus.CONFIRMED, null, null
+        )));
+        when(celebrationEventService.findScaleParticipationByEventId(1L)).thenReturn(response);
+
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.readers[0].participationStatus").value("CONFIRMED"))
+                .andExpect(jsonPath("$.commentators[0].participationStatus").value("CONFIRMED"));
     }
 
     @Test
@@ -502,6 +556,31 @@ class CelebrationEventControllerTest {
                 new CelebrationEventScalePersonResponseDTO(10L, "Mariana Ferraz"),
                 new CelebrationEventScalePersonResponseDTO(11L, "Carlos Silva")
         ));
+        return response;
+    }
+
+    private CelebrationEventScaleParticipationDetailResponseDTO scaleParticipationResponse() {
+        CelebrationEventScaleParticipationDetailResponseDTO response = new CelebrationEventScaleParticipationDetailResponseDTO();
+        response.setEventId(1L);
+        response.setEventName("Missa");
+        response.setEventDate(EVENT_DATE);
+        response.setEventTime(EVENT_TIME);
+        response.setMassOrCelebration(true);
+        response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
+        response.setPriest(new CelebrationEventScaleParticipationPersonResponseDTO(
+                13L, "Padre Miguel", ParticipationStatus.PENDING, null, null
+        ));
+        response.setReaders(List.of(
+                new CelebrationEventScaleParticipationPersonResponseDTO(
+                        4L, "Alice Lima", ParticipationStatus.CONFIRMED, null, LocalDateTime.of(2026, 7, 30, 18, 20)
+                ),
+                new CelebrationEventScaleParticipationPersonResponseDTO(
+                        5L, "Arthur Costa", ParticipationStatus.DECLINED, "Viagem", LocalDateTime.of(2026, 7, 30, 18, 21)
+                )
+        ));
+        response.setCommentators(List.of());
+        response.setMinistersOfTheWord(List.of());
+        response.setEucharisticMinisters(List.of());
         return response;
     }
 

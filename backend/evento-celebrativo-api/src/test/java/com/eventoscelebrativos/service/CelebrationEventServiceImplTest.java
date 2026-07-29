@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.CelebrationEventWithScaleRequestDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
+import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
@@ -15,11 +16,13 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
+import com.eventoscelebrativos.mapper.CelebrationEventScaleParticipationMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
@@ -44,6 +47,7 @@ import org.springframework.data.domain.PageRequest;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -74,10 +78,16 @@ class CelebrationEventServiceImplTest {
     private CelebrationEventScaleDetailMapper scaleDetailMapper;
 
     @Mock
+    private CelebrationEventScaleParticipationMapper scaleParticipationMapper;
+
+    @Mock
     private EventAssignmentCommandService eventAssignmentCommandService;
 
     @Mock
     private EventAssignmentReadService eventAssignmentReadService;
+
+    @Mock
+    private EventParticipationResponseService eventParticipationResponseService;
 
     @InjectMocks
     private CelebrationEventServiceImpl service;
@@ -331,6 +341,72 @@ class CelebrationEventServiceImplTest {
 
         assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
         verifyNoInteractions(scaleDetailMapper);
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenFindingScaleParticipationWithInvalidId() {
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> service.findScaleParticipationByEventId(null)),
+                () -> assertThrows(BusinessException.class, () -> service.findScaleParticipationByEventId(0L)),
+                () -> assertThrows(BusinessException.class, () -> service.findScaleParticipationByEventId(-1L))
+        );
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenFindingScaleParticipationOfMissingEvent() {
+        when(repository.findByIdWithLocations(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findScaleParticipationByEventId(99L));
+        verifyNoInteractions(eventParticipationResponseService, scaleParticipationMapper);
+    }
+
+    @Test
+    void shouldFindScaleParticipationByEventId() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(100L, 1L, 13L, EventAssignmentType.PRIEST, "Padre", "priest"),
+                snapshot(101L, 1L, 4L, EventAssignmentType.READER, "Alice", "reader"),
+                snapshot(102L, 1L, 5L, EventAssignmentType.READER, "Arthur", "reader")
+        );
+        Map<Long, ParticipationResponseSnapshot> participationByPersonId = Map.of(
+                5L, new ParticipationResponseSnapshot(1L, 5L, ParticipationStatus.DECLINED, "Viagem", LocalDate.of(2026, 7, 30).atStartOfDay())
+        );
+        CelebrationEventScaleParticipationDetailResponseDTO response = new CelebrationEventScaleParticipationDetailResponseDTO();
+
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(snapshots);
+        when(eventParticipationResponseService.findByEventId(1L)).thenReturn(participationByPersonId);
+        when(scaleParticipationMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class), eq(participationByPersonId)))
+                .thenReturn(response);
+
+        assertSame(response, service.findScaleParticipationByEventId(1L));
+
+        ArgumentCaptor<EventAssignmentGroup> groupCaptor = ArgumentCaptor.forClass(EventAssignmentGroup.class);
+        verify(scaleParticipationMapper).toDto(eq(event), any(Location.class), groupCaptor.capture(), eq(participationByPersonId));
+        EventAssignmentGroup group = groupCaptor.getValue();
+        assertEquals(13L, group.priest().personId());
+        assertEquals(List.of(4L, 5L), group.readers().stream().map(EventAssignmentSnapshot::personId).toList());
+    }
+
+    @Test
+    void shouldFetchParticipationInBatchByEventIdNotPerParticipantWhenFindingScaleParticipation() {
+        CelebrationEvent event = event(1L);
+        event.getLocations().add(location(1L));
+        List<EventAssignmentSnapshot> snapshots = List.of(
+                snapshot(100L, 1L, 4L, EventAssignmentType.READER, "Alice", "reader"),
+                snapshot(101L, 1L, 5L, EventAssignmentType.COMMENTATOR, "Arthur", "reader")
+        );
+
+        when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentReadService.findAllByEventId(1L)).thenReturn(snapshots);
+        when(eventParticipationResponseService.findByEventId(1L)).thenReturn(Map.of());
+        when(scaleParticipationMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class), anyMap()))
+                .thenReturn(new CelebrationEventScaleParticipationDetailResponseDTO());
+
+        service.findScaleParticipationByEventId(1L);
+
+        verify(eventParticipationResponseService, times(1)).findByEventId(1L);
     }
 
     @Test
