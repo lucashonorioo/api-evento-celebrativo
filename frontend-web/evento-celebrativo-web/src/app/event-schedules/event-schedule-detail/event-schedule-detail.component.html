@@ -150,6 +150,16 @@
                 Respondido em {{ priestRespondedAt | date: "dd/MM/yyyy 'às' HH:mm" }}
               </p>
             }
+
+            @if (canReplace(priest)) {
+              <a
+                class="replace-participant-action"
+                [routerLink]="editLinkFor(schedule.eventId)"
+                [queryParams]="replaceQueryParams(priest.id, 'PRIEST')"
+              >
+                Substituir nesta função
+              </a>
+            }
           }
         } @else {
           <p>Nenhum padre informado.</p>
@@ -184,6 +194,16 @@
                       <p class="participant-responded-at">
                         Respondido em {{ personRespondedAt | date: "dd/MM/yyyy 'às' HH:mm" }}
                       </p>
+                    }
+
+                    @if (canReplace(person)) {
+                      <a
+                        class="replace-participant-action"
+                        [routerLink]="editLinkFor(schedule.eventId)"
+                        [queryParams]="replaceQueryParams(person.id, section.type)"
+                      >
+                        Substituir nesta função
+                      </a>
                     }
                   }
                 </li>

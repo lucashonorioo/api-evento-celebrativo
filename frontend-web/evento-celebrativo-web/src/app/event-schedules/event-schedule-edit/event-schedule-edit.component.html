@@ -50,6 +50,28 @@
       </dl>
     </article>
 
+    @if (replacementWarning()) {
+      <p
+        class="event-schedule-edit__feedback event-schedule-edit__feedback--error"
+        role="alert"
+      >
+        {{ replacementWarning() }}
+      </p>
+    }
+
+    @if (replacementContext(); as context) {
+      <section
+        class="event-schedule-edit__summary event-schedule-edit__feedback--error surface-card"
+        aria-labelledby="replacement-banner-title"
+      >
+        <h2 id="replacement-banner-title">Substituição necessária</h2>
+        <p>
+          {{ context.personName }} não participará como {{ replacementFunctionLabel() }}. Remova
+          essa pessoa da função, escolha um substituto e salve a escala.
+        </p>
+      </section>
+    }
+
     <form class="event-schedule-edit__form" [formGroup]="form" (ngSubmit)="onSubmit()">
       @if (successMessage()) {
         <p class="event-schedule-edit__feedback event-schedule-edit__feedback--success" aria-live="polite">
@@ -60,6 +82,12 @@
       @if (saveErrorMessage()) {
         <p class="event-schedule-edit__feedback event-schedule-edit__feedback--error" role="alert">
           {{ saveErrorMessage() }}
+        </p>
+      }
+
+      @if (contextValidationMessage()) {
+        <p class="event-schedule-edit__feedback event-schedule-edit__feedback--error" role="alert">
+          {{ contextValidationMessage() }}
         </p>
       }
 
@@ -85,12 +113,25 @@
             }
           </div>
 
-          <div class="event-schedule-edit__field">
-            <label for="priestId">Padre</label>
-            <select id="priestId" formControlName="priestId">
+          <div
+            class="event-schedule-edit__field"
+            [class.event-schedule-edit__field--highlighted]="isHighlighted('PRIEST')"
+          >
+            <label for="priestId">
+              Padre
+              @if (isHighlighted('PRIEST')) {
+                <span class="event-schedule-edit__highlight-badge">Função a substituir</span>
+              }
+            </label>
+            <select id="priestId" formControlName="priestId" #priestIdSelect>
               <option [ngValue]="null">Nenhum padre selecionado</option>
               @for (priest of priests(); track priest.id) {
-                <option [ngValue]="priest.id">{{ priest.name }}</option>
+                <option [ngValue]="priest.id">
+                  {{ priest.name }}
+                  @if (isReplacedPerson('PRIEST', priest.id)) {
+                    (Não participará)
+                  }
+                </option>
               }
             </select>
 
@@ -102,11 +143,20 @@
       </section>
 
       <section class="event-schedule-edit__groups" aria-label="Participantes da escala">
-        <fieldset class="event-schedule-edit__group surface-card">
-          <legend>Leitores</legend>
+        <fieldset
+          class="event-schedule-edit__group surface-card"
+          [class.event-schedule-edit__group--highlighted]="isHighlighted('READER')"
+        >
+          <legend>
+            Leitores
+            @if (isHighlighted('READER')) {
+              <span class="event-schedule-edit__highlight-badge">Função a substituir</span>
+            }
+          </legend>
           <label class="event-schedule-edit__search" for="readerSearch">Pesquisar leitores</label>
           <input
             id="readerSearch"
+            #readerSearchInput
             type="search"
             [value]="readerSearch()"
             (input)="setSearch('readers', $event)"
@@ -123,7 +173,12 @@
                     [checked]="isSelected('readerIds', reader.id)"
                     (change)="onSelectionChange('readerIds', reader.id, $event)"
                   />
-                  <span>{{ reader.name }}</span>
+                  <span>
+                    {{ reader.name }}
+                    @if (isReplacedPerson('READER', reader.id)) {
+                      <span class="event-schedule-edit__declined-tag">Não participará</span>
+                    }
+                  </span>
                 </label>
               }
             </div>
@@ -132,13 +187,22 @@
           <p class="event-schedule-edit__count">{{ selectedCount('readerIds') }} selecionado(s)</p>
         </fieldset>
 
-        <fieldset class="event-schedule-edit__group surface-card">
-          <legend>Comentaristas</legend>
+        <fieldset
+          class="event-schedule-edit__group surface-card"
+          [class.event-schedule-edit__group--highlighted]="isHighlighted('COMMENTATOR')"
+        >
+          <legend>
+            Comentaristas
+            @if (isHighlighted('COMMENTATOR')) {
+              <span class="event-schedule-edit__highlight-badge">Função a substituir</span>
+            }
+          </legend>
           <label class="event-schedule-edit__search" for="commentatorSearch">
             Pesquisar comentaristas
           </label>
           <input
             id="commentatorSearch"
+            #commentatorSearchInput
             type="search"
             [value]="commentatorSearch()"
             (input)="setSearch('commentators', $event)"
@@ -155,7 +219,12 @@
                     [checked]="isSelected('commentatorIds', commentator.id)"
                     (change)="onSelectionChange('commentatorIds', commentator.id, $event)"
                   />
-                  <span>{{ commentator.name }}</span>
+                  <span>
+                    {{ commentator.name }}
+                    @if (isReplacedPerson('COMMENTATOR', commentator.id)) {
+                      <span class="event-schedule-edit__declined-tag">Não participará</span>
+                    }
+                  </span>
                 </label>
               }
             </div>
@@ -166,13 +235,22 @@
           </p>
         </fieldset>
 
-        <fieldset class="event-schedule-edit__group surface-card">
-          <legend>Ministros da Palavra</legend>
+        <fieldset
+          class="event-schedule-edit__group surface-card"
+          [class.event-schedule-edit__group--highlighted]="isHighlighted('MINISTER_OF_THE_WORD')"
+        >
+          <legend>
+            Ministros da Palavra
+            @if (isHighlighted('MINISTER_OF_THE_WORD')) {
+              <span class="event-schedule-edit__highlight-badge">Função a substituir</span>
+            }
+          </legend>
           <label class="event-schedule-edit__search" for="ministerOfTheWordSearch">
             Pesquisar ministros da Palavra
           </label>
           <input
             id="ministerOfTheWordSearch"
+            #ministerOfTheWordSearchInput
             type="search"
             [value]="ministerOfTheWordSearch()"
             (input)="setSearch('ministersOfTheWord', $event)"
@@ -189,7 +267,12 @@
                     [checked]="isSelected('ministerOfTheWordIds', minister.id)"
                     (change)="onSelectionChange('ministerOfTheWordIds', minister.id, $event)"
                   />
-                  <span>{{ minister.name }}</span>
+                  <span>
+                    {{ minister.name }}
+                    @if (isReplacedPerson('MINISTER_OF_THE_WORD', minister.id)) {
+                      <span class="event-schedule-edit__declined-tag">Não participará</span>
+                    }
+                  </span>
                 </label>
               }
             </div>
@@ -200,13 +283,22 @@
           </p>
         </fieldset>
 
-        <fieldset class="event-schedule-edit__group surface-card">
-          <legend>Ministros da Eucaristia</legend>
+        <fieldset
+          class="event-schedule-edit__group surface-card"
+          [class.event-schedule-edit__group--highlighted]="isHighlighted('EUCHARISTIC_MINISTER')"
+        >
+          <legend>
+            Ministros da Eucaristia
+            @if (isHighlighted('EUCHARISTIC_MINISTER')) {
+              <span class="event-schedule-edit__highlight-badge">Função a substituir</span>
+            }
+          </legend>
           <label class="event-schedule-edit__search" for="eucharisticMinisterSearch">
             Pesquisar ministros da Eucaristia
           </label>
           <input
             id="eucharisticMinisterSearch"
+            #eucharisticMinisterSearchInput
             type="search"
             [value]="eucharisticMinisterSearch()"
             (input)="setSearch('eucharisticMinisters', $event)"
@@ -223,7 +315,12 @@
                     [checked]="isSelected('eucharisticMinisterIds', minister.id)"
                     (change)="onSelectionChange('eucharisticMinisterIds', minister.id, $event)"
                   />
-                  <span>{{ minister.name }}</span>
+                  <span>
+                    {{ minister.name }}
+                    @if (isReplacedPerson('EUCHARISTIC_MINISTER', minister.id)) {
+                      <span class="event-schedule-edit__declined-tag">Não participará</span>
+                    }
+                  </span>
                 </label>
               }
             </div>

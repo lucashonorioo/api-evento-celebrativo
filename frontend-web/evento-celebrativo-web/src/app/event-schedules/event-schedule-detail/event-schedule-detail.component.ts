@@ -41,6 +41,7 @@ interface ScheduleDetailView {
 interface ParticipantSection {
   readonly title: string;
   readonly emptyMessage: string;
+  readonly type: EventScheduleType;
   readonly people: readonly ScheduleParticipant[];
 }
 
@@ -185,21 +186,25 @@ export class EventScheduleDetailComponent implements OnInit {
       {
         title: 'Leitores',
         emptyMessage: 'Nenhum leitor escalado.',
+        type: 'READER',
         people: schedule.readers,
       },
       {
         title: 'Comentaristas',
         emptyMessage: 'Nenhum comentarista escalado.',
+        type: 'COMMENTATOR',
         people: schedule.commentators,
       },
       {
         title: 'Ministros da Palavra',
         emptyMessage: 'Nenhum ministro da Palavra escalado.',
+        type: 'MINISTER_OF_THE_WORD',
         people: schedule.ministersOfTheWord,
       },
       {
         title: 'Ministros da Eucaristia',
         emptyMessage: 'Nenhum ministro da Eucaristia escalado.',
+        type: 'EUCHARISTIC_MINISTER',
         people: schedule.eucharisticMinisters,
       },
     ];
@@ -207,6 +212,18 @@ export class EventScheduleDetailComponent implements OnInit {
 
   editLinkFor(eventId: number): readonly string[] {
     return ['/app/admin/escalas/eventos', String(eventId), 'editar'];
+  }
+
+  canReplace(person: ScheduleParticipant): boolean {
+    return this.isAdmin() && person.participationStatus === 'DECLINED';
+  }
+
+  replaceQueryParams(personId: number, assignmentType: EventScheduleType): Params {
+    return {
+      ...this.backQueryParams(),
+      replacePersonId: String(personId),
+      replaceAssignmentType: assignmentType,
+    };
   }
 
   private loadSchedule(eventId: number): void {
