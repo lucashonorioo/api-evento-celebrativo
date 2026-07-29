@@ -85,12 +85,23 @@ Não crie novas camadas, interfaces ou pacotes nem mova código em massa sem ben
 - Considere compatibilidade, backfill, valores nulos, índices e rollback operacional em mudanças de dados.
 - Não inclua credenciais ou segredos em `application*.properties`.
 
-## Migração de domínio Person/PersonMinistry
+## Estado atual do domínio Person/PersonMinistry/EventAssignment
 
-- O domínio de pessoas está em transição do modelo legado (entidades por tipo de ministério, ex. `Reader`) para o modelo unificado `Person` + `PersonMinistry`.
-- A fonte de leitura de cada ministério é controlada por `app.person-ministry.read-source.*` (`LEGACY` ou `PARALLEL`, propriedade lida em `PersonMinistryReadSourceProperties`); `app.event-assignment.read-source.*` controla o mesmo padrão para escala/atribuição de evento, via `EventAssignmentReadSourceProperties`. Ambas têm `LEGACY` como padrão quando a variável de ambiente correspondente não é definida.
-- Com `shadow-read` habilitado (`app.person-ministry.shadow-read.*-enabled` / `app.event-assignment.shadow-read.*-enabled`, padrão `false`), o service continua respondendo pela fonte configurada em `read-source`, mas também consulta a outra fonte e compara o resultado sem alterar a resposta (ver `ReaderServiceImpl.findAllReaders()`), servindo para validar a migração sem risco ao contrato.
-- Ao alterar um fluxo de leitura de ministério ou de escala, mantenha os dois caminhos (`LEGACY` e `PARALLEL`) funcionando e consistentes até a migração ser concluída; não assuma que apenas uma das fontes está em uso em produção.
+A migração do modelo legado (entidades por tipo de ministério, ex. `Reader` como entidade JPA, coluna `person_type`, tabela `tb_event_person`) para o modelo unificado está concluída. O runtime atual não possui mais cutover `LEGACY`/`PARALLEL`, shadow-read, `PersonMinistryReadSourceProperties`, `EventAssignmentReadSourceProperties`, write-through legado nem `EventAssignmentCompatibilityService` — nada disso existe mais no código; onde ainda aparecem, é apenas em migrations aplicadas (histórico imutável) ou em nomes de testes que hoje protegem comportamento atual sob um nome antigo.
+
+Fontes oficiais atuais:
+
+- `PersonMinistry` é a única fonte de classificação ministerial de uma `Person`; leia via `PersonMinistryReadService` e escreva via `PersonMinistryCommandService`.
+- `EventAssignment` é a única fonte das funções atribuídas a uma pessoa em um evento; a unicidade é `event_id + person_id + assignment_type` — uma pessoa pode exercer várias funções no mesmo evento.
+- `EventAssignmentCommandService` é o mecanismo oficial de escrita e sincronização de assignments (inclui a limpeza de `EventParticipationResponse` quando a pessoa perde todas as funções no evento).
+- `EventParticipationResponse` registra a confirmação ou recusa de participação da pessoa no evento; é única por `event_id + person_id` (não por função) e é gerenciada por `EventParticipationResponseService`.
+
+Regras para qualquer alteração neste domínio:
+
+- não recrie caminhos `LEGACY`/`PARALLEL` nem qualquer mecanismo de shadow-read;
+- não consulte `tb_event_person` nem dependa da coluna `person_type` — ambos foram removidos por migration e existem apenas para reconstruir bancos antigos;
+- não reintroduza subclasses ministeriais como entidades JPA (`Reader`, `Commentator`, `Priest`, `MinisterOfTheWord`, `EucharisticMinister`); os controllers/services com esses nomes que ainda existem são adaptadores HTTP finos ativos sobre `Person`+`PersonMinistry`, não um modelo de dados paralelo, e continuam necessários enquanto não houver API genérica equivalente para criar pessoa, editar dados de terceiros e definir senha/role inicial;
+- as migrations `V1`–`V9` preservam a evolução histórica do schema e não devem ser alteradas.
 
 ## DTOs, MapStruct e validação
 

@@ -1,5 +1,11 @@
 # Roadmap de Migracao do Dominio de Pessoas
 
+> **Aviso de leitura (adicionado em 2026-07-29):** este documento e um registro cronologico das etapas que evoluiram o dominio de Pessoas, Funcoes Ministeriais e Escalas. A maior parte do conteudo abaixo — incluindo a secao "Estado do Flyway e backfill de PersonMinistry" — descreve etapas intermediarias ja concluidas e superadas, **nao a arquitetura atual**. O estado atual esta descrito na secao final `Auditoria final e limpeza controlada` (fim deste documento) e em `person-domain-legacy-dependency-audit.md`.
+>
+> Confirmado por auditoria em 2026-07-29: o cutover configuravel `LEGACY`/`PARALLEL`, o shadow-read automatico, `PersonMinistryReadSourceProperties` e `EventAssignmentReadSourceProperties` foram removidos por completo do runtime e nao existem mais no codigo. Onde as secoes abaixo descrevem esses mecanismos como "configuravel", "habilitado" ou "em transicao", trata-se de uma fase ja concluida e revertida por etapas posteriores documentadas neste mesmo arquivo — nao recrie nenhum desses mecanismos. Referencias a `person_type` e `tb_event_person` existem apenas para explicar as migrations `V4`-`V8`, que os removeram fisicamente; nenhum dos dois existe no schema atual.
+>
+> Fontes oficiais atuais do dominio: `PersonMinistry` (classificacao ministerial), `EventAssignment` (funcoes atribuidas em eventos, unicidade `event_id + person_id + assignment_type`), `EventAssignmentCommandService` (escrita/sincronizacao oficial) e `EventParticipationResponse` (confirmacao/recusa de participacao, unica por `event_id + person_id`, introduzida pela migration `V9`, posterior ao escopo cronologico deste roadmap).
+
 Este documento resume as fases para evoluir o dominio de Pessoas, Funcoes Ministeriais, Contas de Acesso e Escalas. O ADR principal e `docs/adr/0001-separate-person-ministry-account-and-event-assignment.md`.
 
 ## Objetivo
@@ -21,9 +27,9 @@ Atualizacao posterior (2026-07-26): o paragrafo acima descreve o estado historic
 | 3. Flyway e baseline | Fase 2 | Banco-alvo e baseline definidos | `V1` com schema atual, `V2` com roles obrigatorias e profile MySQL seguro |
 | 4. Tabelas paralelas | Fase 3 | Baseline validado | Concluida: colunas preparatorias em `tb_person` e tabelas `tb_person_ministry`, `tb_user_account`, `tb_user_account_role`, `tb_event_assignment` criadas de forma aditiva |
 | 5. Backfill e auditoria | Fase 4 | Tabelas paralelas disponiveis | Em andamento: `V4` garante funcoes ministeriais derivadas de `person_type` e `V5` garante atribuicoes de eventos derivadas de `tb_event_person` + `person_type`; backfill de contas ainda pendente |
-| 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Em andamento: escrita em compatibilidade, backfill concluido, leitura paralela interna, auditoria, shadow read configuravel, cutovers controlados do detalhe da escala, escala eucaristica e consulta mensal disponiveis |
-| 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Login lendo conta e preservando JWT atual |
-| 8. Reduzir dependencia de subclasses | Fases 6 e 7 | Escalas e contas migradas | Services deixam de depender de subtipo como regra principal |
+| 6. Migrar escalas | Fase 5 | `event_assignment` preenchida | Concluida (ver "Escrita oficial de escala por EventAssignment" e "Remocao fisica de tb_event_person (V7)"): `EventAssignment` e a unica fonte de escrita/leitura de escala; cutover `LEGACY`/`PARALLEL` e shadow read removidos; `tb_event_person` removida fisicamente |
+| 7. Migrar autenticacao | Fase 5 | `user_account` preenchida | Nao iniciada: login continua lendo `Person` diretamente, sem `tb_user_account` separada |
+| 8. Reduzir dependencia de subclasses | Fases 6 e 7 | Escalas e contas migradas | Concluida para o dominio de pessoas (ver "Remocao da heranca JPA legada de Person e do discriminator person_type"): `Person` e entidade concreta, sem subclasses nem `person_type`. Autenticacao (fase 7) continua pendente |
 | 9. API unificada | Fase 8 | Modelo novo estabilizado | Endpoints novos para pessoa, ministerios, conta e escala |
 | 10. Migrar frontend | Fase 9 | API nova disponivel | Telas usando contratos novos |
 | 11. Depreciar contratos antigos | Fase 10 | Frontend migrado | Politica de deprecacao publicada |
