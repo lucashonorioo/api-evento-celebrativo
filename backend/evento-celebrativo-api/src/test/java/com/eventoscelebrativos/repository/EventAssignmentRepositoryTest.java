@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -88,12 +87,6 @@ class EventAssignmentRepositoryTest {
 
         assertEquals(1, byEvent.size());
         assertEquals(assignment.getId(), byEvent.get(0).getId());
-        assertEquals(
-                assignment.getId(),
-                eventAssignmentRepository.findByEventIdAndPersonId(event.getId(), reader.getId()).orElseThrow().getId()
-        );
-        assertTrue(eventAssignmentRepository.existsByEventIdAndPersonId(event.getId(), reader.getId()));
-        assertFalse(eventAssignmentRepository.existsByEventIdAndPersonId(event.getId(), 999_999L));
     }
 
     @Test

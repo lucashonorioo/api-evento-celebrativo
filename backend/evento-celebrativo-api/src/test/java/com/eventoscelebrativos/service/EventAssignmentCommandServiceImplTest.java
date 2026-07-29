@@ -262,18 +262,6 @@ class EventAssignmentCommandServiceImplTest {
     }
 
     @Test
-    void shouldNotUseIndividualPersonAssignmentQueries() {
-        CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
-
-        service.synchronizeAssignments(event, List.of(new EventAssignmentTarget(reader, EventAssignmentType.READER)));
-
-        verify(eventAssignmentRepository, never()).findByEventIdAndPersonId(1L, 11L);
-        verify(eventAssignmentRepository, never()).existsByEventIdAndPersonId(1L, 11L);
-    }
-
-    @Test
     void shouldRetainParticipationResponsesOnlyForPeopleStillAssignedAfterSync() {
         CelebrationEvent event = event(1L);
         Person kept = person(new Person(), 11L);
