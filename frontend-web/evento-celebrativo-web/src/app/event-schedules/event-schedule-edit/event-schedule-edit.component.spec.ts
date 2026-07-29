@@ -39,6 +39,7 @@ describe('EventScheduleEditComponent', () => {
     );
     eventScheduleService = jasmine.createSpyObj<EventScheduleService>('EventScheduleService', [
       'findByEventId',
+      'findParticipationByEventId',
       'updateEventSchedule',
     ]);
     locationService = jasmine.createSpyObj<LocationService>('LocationService', ['findAll']);
@@ -558,6 +559,443 @@ describe('EventScheduleEditComponent', () => {
     expect(text).not.toContain('eventId');
     expect(text).not.toContain('locationId');
     expect(text).not.toContain('personId');
+  });
+
+  describe('participant replacement context', () => {
+    it('should recognize a valid replacement context', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(component.replacementContext()).toEqual({
+        personId: 5,
+        assignmentType: 'READER',
+        personName: 'Arthur Costa',
+      });
+      expect(component.replacementWarning()).toBeNull();
+    });
+
+    it('should ignore malformed replacePersonId values', async () => {
+      for (const invalidPersonId of ['abc', '0', '-1', '1.5', '']) {
+        await setup('1', createDetail(), {
+          replacePersonId: invalidPersonId,
+          replaceAssignmentType: 'READER',
+        });
+
+        fixture.detectChanges();
+
+        expect(component.replacementContext()).withContext(invalidPersonId).toBeNull();
+        expect(component.replacementWarning()).withContext(invalidPersonId).toBeNull();
+        expect(component.form.controls.readerIds.value).withContext(invalidPersonId).toEqual([4, 5]);
+        TestBed.resetTestingModule();
+      }
+    });
+
+    it('should ignore an invalid replaceAssignmentType', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'BISHOP' });
+
+      fixture.detectChanges();
+
+      expect(component.replacementContext()).toBeNull();
+      expect(component.replacementWarning()).toBeNull();
+    });
+
+    it('should disable contextual mode and warn when the person is no longer assigned to the function', async () => {
+      await setup('1', createDetail(), { replacePersonId: '999', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(component.replacementContext()).toBeNull();
+      expect(textContent()).toContain(
+        'O participante indicado não está mais nesta função. A edição normal foi mantida.',
+      );
+      expect(component.form.controls.readerIds.value).toEqual([4, 5]);
+    });
+
+    it('should show the participant name and function in the banner', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      const text = textContent();
+
+      expect(text).toContain('Substituição necessária');
+      expect(text).toContain('Arthur Costa');
+      expect(text).toContain('Leitor');
+    });
+
+    it('should highlight only the corresponding section', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      const badges = fixture.nativeElement.querySelectorAll('.event-schedule-edit__highlight-badge');
+      const highlightedFieldset = fixture.nativeElement.querySelector(
+        'fieldset.event-schedule-edit__group--highlighted',
+      );
+
+      expect(badges.length).toBe(1);
+      expect(highlightedFieldset?.querySelector('legend')?.textContent).toContain('Leitores');
+    });
+
+    it('should not automatically modify the form when entering contextual mode', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(component.form.controls.readerIds.value).toEqual([4, 5]);
+      expect(component.form.controls.priestId.value).toBe(13);
+    });
+
+    it('should keep the form pristine after loading in contextual mode', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(component.form.pristine).toBeTrue();
+    });
+
+    it('should keep the declined person initially selected', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(component.isSelected('readerIds', 5)).toBeTrue();
+    });
+
+    it('should require another priest before saving in PRIEST contextual mode', async () => {
+      await setup('1', createDetail(), { replacePersonId: '13', replaceAssignmentType: 'PRIEST' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(textContent()).toContain('Remova o padre que não participará.');
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+
+      component.form.controls.priestId.setValue(null);
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(textContent()).toContain('Selecione outro padre para concluir a substituição.');
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+
+      component.form.controls.priestId.setValue(14);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+        1,
+        jasmine.objectContaining({ priestId: 14 }),
+      );
+    });
+
+    it('should require removing the declined person for READER', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(textContent()).toContain('Remova a pessoa que não participará desta função.');
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should require a new substitute for READER after removing the declined person', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(textContent()).toContain('Selecione pelo menos um substituto para esta função.');
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should apply the same validation to COMMENTATOR', async () => {
+      await setup('1', createDetail(), { replacePersonId: '1', replaceAssignmentType: 'COMMENTATOR' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Remova a pessoa que não participará desta função.');
+
+      component.toggleSelection('commentatorIds', 1, false);
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Selecione pelo menos um substituto para esta função.');
+
+      component.toggleSelection('commentatorIds', 99, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+        1,
+        jasmine.objectContaining({ commentatorIds: [99] }),
+      );
+    });
+
+    it('should apply the same validation to MINISTER_OF_THE_WORD', async () => {
+      await setup('1', createDetail(), {
+        replacePersonId: '7',
+        replaceAssignmentType: 'MINISTER_OF_THE_WORD',
+      });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Remova a pessoa que não participará desta função.');
+
+      component.toggleSelection('ministerOfTheWordIds', 7, false);
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Selecione pelo menos um substituto para esta função.');
+
+      component.toggleSelection('ministerOfTheWordIds', 98, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+        1,
+        jasmine.objectContaining({ ministerOfTheWordIds: [98] }),
+      );
+    });
+
+    it('should apply the same validation to EUCHARISTIC_MINISTER', async () => {
+      await setup('1', createDetail(), {
+        replacePersonId: '10',
+        replaceAssignmentType: 'EUCHARISTIC_MINISTER',
+      });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Remova a pessoa que não participará desta função.');
+
+      component.toggleSelection('eucharisticMinisterIds', 10, false);
+      component.onSubmit();
+      fixture.detectChanges();
+      expect(textContent()).toContain('Selecione pelo menos um substituto para esta função.');
+
+      component.toggleSelection('eucharisticMinisterIds', 97, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+        1,
+        jasmine.objectContaining({ eucharisticMinisterIds: [97] }),
+      );
+    });
+
+    it('should not call PUT when contextual validation fails', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      fixture.detectChanges();
+
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should call PUT exactly once for a valid replacement', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still send the full schedule in the request', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(1, {
+        locationId: 1,
+        priestId: 13,
+        readerIds: [4, 6],
+        commentatorIds: [1],
+        ministerOfTheWordIds: [7],
+        eucharisticMinisterIds: [10],
+      });
+    });
+
+    it('should preserve the other functions untouched by the replacement', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      const request = eventScheduleService.updateEventSchedule.calls.mostRecent().args[1];
+
+      expect(request.commentatorIds).toEqual([1]);
+      expect(request.ministerOfTheWordIds).toEqual([7]);
+      expect(request.eucharisticMinisterIds).toEqual([10]);
+      expect(request.priestId).toBe(13);
+    });
+
+    it('should not remove a person from another function during a READER replacement', async () => {
+      await setup('1', overlappingSchedule(), { replacePersonId: '10', replaceAssignmentType: 'READER' });
+      readerService.findAll.and.returnValue(of([overlappingPersonOption]));
+      commentatorService.findAll.and.returnValue(of([overlappingPersonOption]));
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 10, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledOnceWith(
+        1,
+        jasmine.objectContaining({ commentatorIds: [10] }),
+      );
+    });
+
+    it('should navigate to the schedule detail after a successful contextual save', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      const router = TestBed.inject(Router);
+      const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      expect(navigateSpy).toHaveBeenCalledOnceWith(['/app/escalas/eventos', 1], { queryParams: {} });
+    });
+
+    it('should discard transient replacement params and preserve listing filters after a successful contextual save', async () => {
+      await setup('1', createDetail(), {
+        replacePersonId: '5',
+        replaceAssignmentType: 'READER',
+        type: 'READER',
+        month: '2026-07',
+        includeUnassigned: 'true',
+        page: '2',
+      });
+      const router = TestBed.inject(Router);
+      const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+
+      const navigatedQueryParams = navigateSpy.calls.mostRecent().args[1]?.queryParams;
+
+      expect(navigateSpy).toHaveBeenCalledOnceWith(['/app/escalas/eventos', 1], {
+        queryParams: { type: 'READER', month: '2026-07', includeUnassigned: 'true', page: '2' },
+      });
+      expect(navigatedQueryParams?.['replacePersonId']).toBeUndefined();
+      expect(navigatedQueryParams?.['replaceAssignmentType']).toBeUndefined();
+    });
+
+    it('should keep the context and form values when the save fails during a replacement', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      eventScheduleService.updateEventSchedule.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409 })),
+      );
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(component.replacementContext()).not.toBeNull();
+      expect(component.form.controls.readerIds.value).toEqual([4, 6]);
+      expect(textContent()).toContain('conflito com os dados atuais');
+    });
+
+    it('should block a duplicated submit while a contextual save is pending', async () => {
+      const pendingSave = new Subject<UpdateEventScheduleResponse>();
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      eventScheduleService.updateEventSchedule.and.returnValue(pendingSave);
+      fixture.detectChanges();
+
+      component.toggleSelection('readerIds', 5, false);
+      component.toggleSelection('readerIds', 6, true);
+      component.onSubmit();
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledTimes(1);
+
+      pendingSave.next(createUpdateResponse());
+      pendingSave.complete();
+    });
+
+    it('should not apply contextual validation during normal editing', async () => {
+      await setup();
+      fixture.detectChanges();
+
+      component.onSubmit();
+
+      expect(eventScheduleService.updateEventSchedule).toHaveBeenCalledTimes(1);
+      expect(component.contextValidationMessage()).toBeNull();
+    });
+
+    it('should preserve current behavior for normal editing after save, without navigating away', async () => {
+      await setup();
+      const router = TestBed.inject(Router);
+      const navigateSpy = spyOn(router, 'navigate');
+      fixture.detectChanges();
+
+      component.onSubmit();
+      fixture.detectChanges();
+
+      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Escala atualizada com sucesso');
+    });
+
+    it('should not call PUT when cancelling in contextual mode', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      const router = TestBed.inject(Router);
+      spyOn(router, 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.cancel();
+
+      expect(eventScheduleService.updateEventSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should return to the detail and discard replacement params when cancelling in contextual mode', async () => {
+      await setup('1', createDetail(), {
+        replacePersonId: '5',
+        replaceAssignmentType: 'READER',
+        type: 'READER',
+        month: '2026-07',
+        includeUnassigned: 'true',
+        page: '2',
+      });
+      const router = TestBed.inject(Router);
+      const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
+      fixture.detectChanges();
+
+      component.cancel();
+
+      expect(navigateSpy).toHaveBeenCalledOnceWith(['/app/escalas/eventos', 1], {
+        queryParams: { type: 'READER', month: '2026-07', includeUnassigned: 'true', page: '2' },
+      });
+    });
+
+    it('should not call the administrative participation endpoint from the edit screen', async () => {
+      await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+
+      fixture.detectChanges();
+
+      expect(eventScheduleService.findParticipationByEventId).not.toHaveBeenCalled();
+    });
   });
 
   function textContent(): string {

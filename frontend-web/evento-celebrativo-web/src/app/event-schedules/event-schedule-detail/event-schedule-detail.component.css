@@ -157,6 +157,23 @@
   font-weight: 800;
 }
 
+.replace-participant-action {
+  display: inline-block;
+  margin-top: 0.15rem;
+  color: var(--color-primary);
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.replace-participant-action:hover {
+  color: var(--color-primary-dark);
+}
+
+.replace-participant-action:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .schedule-sections {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));

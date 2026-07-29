@@ -1329,6 +1329,294 @@ describe('EventScheduleDetailComponent', () => {
     });
   });
 
+  describe('participant replacement action', () => {
+    function declinedParticipationDetail(): EventScheduleParticipationDetailResponse {
+      return createParticipationDetail({
+        priest: {
+          id: 13,
+          name: 'Padre Miguel',
+          participationStatus: 'DECLINED',
+          declineReason: null,
+          respondedAt: '2026-07-30T18:21:00',
+        },
+        readers: [
+          {
+            id: 4,
+            name: 'Alice Lima',
+            participationStatus: 'DECLINED',
+            declineReason: null,
+            respondedAt: '2026-07-30T18:21:00',
+          },
+        ],
+        commentators: [
+          {
+            id: 1,
+            name: 'Luana Odinson',
+            participationStatus: 'DECLINED',
+            declineReason: null,
+            respondedAt: '2026-07-30T18:21:00',
+          },
+        ],
+        ministersOfTheWord: [
+          {
+            id: 7,
+            name: 'Davi Gomes',
+            participationStatus: 'DECLINED',
+            declineReason: null,
+            respondedAt: '2026-07-30T18:21:00',
+          },
+        ],
+        eucharisticMinisters: [
+          {
+            id: 10,
+            name: 'Mariana Ferraz',
+            participationStatus: 'DECLINED',
+            declineReason: null,
+            respondedAt: '2026-07-30T18:21:00',
+          },
+        ],
+      });
+    }
+
+    it('should show the replace action for a declined participant', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        {},
+        true,
+        'escalas/eventos/:id',
+        createParticipationDetail({
+          readers: [
+            {
+              id: 5,
+              name: 'Arthur Costa',
+              participationStatus: 'DECLINED',
+              declineReason: null,
+              respondedAt: '2026-07-30T18:21:00',
+            },
+          ],
+        }),
+      );
+
+      fixture.detectChanges();
+
+      expect(replaceLinksIn(sectionByTitle('Leitores')).length).toBe(1);
+      expect(replaceLinksIn(sectionByTitle('Leitores'))[0].textContent).toContain(
+        'Substituir nesta função',
+      );
+    });
+
+    it('should not show the replace action for a pending participant', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        {},
+        true,
+        'escalas/eventos/:id',
+        createParticipationDetail({
+          readers: [
+            {
+              id: 4,
+              name: 'Alice Lima',
+              participationStatus: 'PENDING',
+              declineReason: null,
+              respondedAt: null,
+            },
+          ],
+        }),
+      );
+
+      fixture.detectChanges();
+
+      expect(replaceLinksIn(sectionByTitle('Leitores')).length).toBe(0);
+    });
+
+    it('should not show the replace action for a confirmed participant', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        {},
+        true,
+        'escalas/eventos/:id',
+        createParticipationDetail({
+          readers: [
+            {
+              id: 4,
+              name: 'Alice Lima',
+              participationStatus: 'CONFIRMED',
+              declineReason: null,
+              respondedAt: '2026-07-30T18:20:00',
+            },
+          ],
+        }),
+      );
+
+      fixture.detectChanges();
+
+      expect(replaceLinksIn(sectionByTitle('Leitores')).length).toBe(0);
+    });
+
+    it('should never show the replace action for ROLE_OPERATOR', async () => {
+      await setup('1', createDetail(), {}, false);
+
+      fixture.detectChanges();
+
+      expect(textContent()).not.toContain('Substituir nesta função');
+    });
+
+    it('should use the correct event id in the replace link', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Leitores'))[0];
+      expect(link.getAttribute('href')).toContain('/app/admin/escalas/eventos/1/editar');
+    });
+
+    it('should use the correct replacePersonId in the replace link', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Leitores'))[0];
+      expect(link.getAttribute('href')).toContain('replacePersonId=4');
+    });
+
+    it('should use READER as the replaceAssignmentType in the readers section', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Leitores'))[0];
+      expect(link.getAttribute('href')).toContain('replaceAssignmentType=READER');
+    });
+
+    it('should use COMMENTATOR as the replaceAssignmentType in the commentators section', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Comentaristas'))[0];
+      expect(link.getAttribute('href')).toContain('replaceAssignmentType=COMMENTATOR');
+    });
+
+    it('should use MINISTER_OF_THE_WORD as the replaceAssignmentType in the ministers of the word section', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Ministros da Palavra'))[0];
+      expect(link.getAttribute('href')).toContain('replaceAssignmentType=MINISTER_OF_THE_WORD');
+    });
+
+    it('should use EUCHARISTIC_MINISTER as the replaceAssignmentType in the eucharistic ministers section', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Ministros da Eucaristia'))[0];
+      expect(link.getAttribute('href')).toContain('replaceAssignmentType=EUCHARISTIC_MINISTER');
+    });
+
+    it('should use PRIEST as the replaceAssignmentType for a declined priest', async () => {
+      await setup('1', createDetail(), {}, true, 'escalas/eventos/:id', declinedParticipationDetail());
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Padre'))[0];
+      expect(link.getAttribute('href')).toContain('replacePersonId=13');
+      expect(link.getAttribute('href')).toContain('replaceAssignmentType=PRIEST');
+    });
+
+    it('should show two replace actions when the same person declined in two functions', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        {},
+        true,
+        'escalas/eventos/:id',
+        createParticipationDetail({
+          readers: [
+            {
+              id: 20,
+              name: 'Marcos Pereira',
+              participationStatus: 'DECLINED',
+              declineReason: null,
+              respondedAt: '2026-07-30T18:21:00',
+            },
+          ],
+          commentators: [
+            {
+              id: 20,
+              name: 'Marcos Pereira',
+              participationStatus: 'DECLINED',
+              declineReason: null,
+              respondedAt: '2026-07-30T18:21:00',
+            },
+          ],
+        }),
+      );
+
+      fixture.detectChanges();
+
+      expect(replaceLinksIn(sectionByTitle('Leitores')).length).toBe(1);
+      expect(replaceLinksIn(sectionByTitle('Comentaristas')).length).toBe(1);
+    });
+
+    it('should preserve listing query params in the replace link', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        { type: 'READER', month: '2026-07', includeUnassigned: 'true', page: '2' },
+        true,
+        'escalas/eventos/:id',
+        declinedParticipationDetail(),
+      );
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Leitores'))[0];
+      const href = link.getAttribute('href') ?? '';
+
+      expect(href).toContain('type=READER');
+      expect(href).toContain('month=2026-07');
+      expect(href).toContain('includeUnassigned=true');
+      expect(href).toContain('page=2');
+    });
+
+    it('should not send decline reason or responded date in the replace link query params', async () => {
+      await setup(
+        '1',
+        createDetail(),
+        {},
+        true,
+        'escalas/eventos/:id',
+        createParticipationDetail({
+          readers: [
+            {
+              id: 4,
+              name: 'Alice Lima',
+              participationStatus: 'DECLINED',
+              declineReason: 'Estarei fora da cidade.',
+              respondedAt: '2026-07-30T18:21:00',
+            },
+          ],
+        }),
+      );
+
+      fixture.detectChanges();
+
+      const link = replaceLinksIn(sectionByTitle('Leitores'))[0];
+      const href = link.getAttribute('href') ?? '';
+
+      expect(href).not.toContain('declineReason');
+      expect(href).not.toContain('respondedAt');
+      expect(href).not.toContain('participationStatus');
+      expect(href).not.toContain('Estarei');
+      expect(href).not.toContain('2026-07-30T18');
+    });
+  });
+
   describe('event detail context', () => {
     it('should use the event context wording and destination when accessed from the event detail route', async () => {
       const harness = await createEventDetailContextHarness('/eventos/1/escala');
@@ -1415,6 +1703,10 @@ describe('EventScheduleDetailComponent', () => {
 
   function namesIn(section: HTMLElement): (string | undefined)[] {
     return Array.from(section.querySelectorAll('li')).map((item) => item.textContent?.trim());
+  }
+
+  function replaceLinksIn(section: HTMLElement): HTMLAnchorElement[] {
+    return Array.from(section.querySelectorAll('.replace-participant-action')) as HTMLAnchorElement[];
   }
 });
 

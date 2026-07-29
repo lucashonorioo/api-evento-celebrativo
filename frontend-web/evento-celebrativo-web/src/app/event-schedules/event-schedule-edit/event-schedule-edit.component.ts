@@ -1,5 +1,15 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  OnInit,
+  ViewChild,
+  afterNextRender,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
@@ -16,7 +26,9 @@ import { PriestResponse } from '../../priests/priest.models';
 import { PriestService } from '../../priests/priest.service';
 import { ReaderResponse } from '../../readers/reader.models';
 import { ReaderService } from '../../readers/reader.service';
+import { eventScheduleTypeSingularLabel } from '../../schedule-participation/schedule-participation-view.utils';
 import {
+  EventSchedulePersonSummary,
   EventScheduleDetailResponse,
   EventScheduleType,
   UpdateEventScheduleRequest,
@@ -30,11 +42,19 @@ type SelectionControlName =
   | 'ministerOfTheWordIds'
   | 'eucharisticMinisterIds';
 
+type MultiSelectAssignmentType = Exclude<EventScheduleType, 'PRIEST'>;
+
 type SearchName = 'readers' | 'commentators' | 'ministersOfTheWord' | 'eucharisticMinisters';
 
 interface PersonOption {
   readonly id: number;
   readonly name: string;
+}
+
+interface ReplacementContext {
+  readonly personId: number;
+  readonly assignmentType: EventScheduleType;
+  readonly personName: string;
 }
 
 @Component({
@@ -50,11 +70,20 @@ export class EventScheduleEditComponent implements OnInit {
   private readonly commentatorService = inject(CommentatorService);
   private readonly eucharisticMinisterService = inject(EucharisticMinisterService);
   private readonly eventScheduleService = inject(EventScheduleService);
+  private readonly injector = inject(Injector);
   private readonly locationService = inject(LocationService);
   private readonly ministerOfTheWordService = inject(MinisterOfTheWordService);
   private readonly priestService = inject(PriestService);
   private readonly readerService = inject(ReaderService);
   private readonly router = inject(Router);
+
+  @ViewChild('priestIdSelect') private priestIdSelectRef?: ElementRef<HTMLSelectElement>;
+  @ViewChild('readerSearchInput') private readerSearchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('commentatorSearchInput') private commentatorSearchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('ministerOfTheWordSearchInput')
+  private ministerOfTheWordSearchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('eucharisticMinisterSearchInput')
+  private eucharisticMinisterSearchInputRef?: ElementRef<HTMLInputElement>;
 
   readonly form = new FormGroup({
     locationId: new FormControl<number | null>(null, { validators: [Validators.required] }),
@@ -84,8 +113,21 @@ export class EventScheduleEditComponent implements OnInit {
   readonly ministerOfTheWordSearch = signal('');
   readonly eucharisticMinisterSearch = signal('');
 
+  readonly replacementContext = signal<ReplacementContext | null>(null);
+  readonly replacementWarning = signal<string | null>(null);
+  readonly contextValidationMessage = signal<string | null>(null);
+
+  private pendingReplacement: { personId: number; assignmentType: EventScheduleType } | null = null;
+  private originalSelectionIds: Record<SelectionControlName, number[]> = {
+    readerIds: [],
+    commentatorIds: [],
+    ministerOfTheWordIds: [],
+    eucharisticMinisterIds: [],
+  };
+
   ngOnInit(): void {
     this.backQueryParams.set(validBackQueryParams(this.activatedRoute.snapshot.queryParamMap));
+    this.pendingReplacement = parseReplacementParams(this.activatedRoute.snapshot.queryParamMap);
 
     const eventId = parseEventId(this.activatedRoute.snapshot.paramMap.get('id'));
 
@@ -115,9 +157,17 @@ export class EventScheduleEditComponent implements OnInit {
 
     this.successMessage.set(null);
     this.saveErrorMessage.set(null);
+    this.contextValidationMessage.set(null);
     this.form.markAllAsTouched();
 
     if (this.form.invalid) {
+      return;
+    }
+
+    const contextualError = this.contextualValidationError();
+
+    if (contextualError !== null) {
+      this.contextValidationMessage.set(contextualError);
       return;
     }
 
@@ -128,6 +178,8 @@ export class EventScheduleEditComponent implements OnInit {
       return;
     }
 
+    const isContextualSave = this.replacementContext() !== null;
+
     this.isSaving.set(true);
 
     this.eventScheduleService
@@ -135,6 +187,13 @@ export class EventScheduleEditComponent implements OnInit {
       .pipe(finalize(() => this.isSaving.set(false)))
       .subscribe({
         next: (response) => {
+          if (isContextualSave) {
+            void this.router.navigate(['/app/escalas/eventos', eventId], {
+              queryParams: this.backQueryParams(),
+            });
+            return;
+          }
+
           this.schedule.set(toDetailResponse(response));
           this.patchFormFromSchedule(this.schedule());
           this.form.markAsPristine();
@@ -144,6 +203,22 @@ export class EventScheduleEditComponent implements OnInit {
           this.saveErrorMessage.set(saveErrorMessageFor(error));
         },
       });
+  }
+
+  isHighlighted(type: EventScheduleType): boolean {
+    return this.replacementContext()?.assignmentType === type;
+  }
+
+  isReplacedPerson(type: EventScheduleType, personId: number): boolean {
+    const context = this.replacementContext();
+
+    return context !== null && context.assignmentType === type && context.personId === personId;
+  }
+
+  replacementFunctionLabel(): string {
+    const context = this.replacementContext();
+
+    return context === null ? '' : eventScheduleTypeSingularLabel(context.assignmentType);
   }
 
   cancel(): void {
@@ -247,6 +322,7 @@ export class EventScheduleEditComponent implements OnInit {
     this.loadErrorMessage.set(null);
     this.saveErrorMessage.set(null);
     this.successMessage.set(null);
+    this.contextValidationMessage.set(null);
     this.schedule.set(null);
 
     forkJoin({
@@ -269,6 +345,7 @@ export class EventScheduleEditComponent implements OnInit {
           this.ministersOfTheWord.set(result.ministersOfTheWord);
           this.eucharisticMinisters.set(result.eucharisticMinisters);
           this.patchFormFromSchedule(result.schedule);
+          this.applyReplacementContext(result.schedule);
         },
         error: (error: unknown) => {
           this.loadErrorMessage.set(loadErrorMessageFor(error));
@@ -290,6 +367,103 @@ export class EventScheduleEditComponent implements OnInit {
       eucharisticMinisterIds: schedule.eucharisticMinisters.map((person) => person.id),
     });
     this.form.markAsPristine();
+
+    this.originalSelectionIds = {
+      readerIds: schedule.readers.map((person) => person.id),
+      commentatorIds: schedule.commentators.map((person) => person.id),
+      ministerOfTheWordIds: schedule.ministersOfTheWord.map((person) => person.id),
+      eucharisticMinisterIds: schedule.eucharisticMinisters.map((person) => person.id),
+    };
+  }
+
+  private applyReplacementContext(schedule: EventScheduleDetailResponse): void {
+    const pending = this.pendingReplacement;
+
+    if (pending === null) {
+      return;
+    }
+
+    const person = peopleListFor(schedule, pending.assignmentType).find(
+      (candidate) => candidate.id === pending.personId,
+    );
+
+    if (person === undefined) {
+      this.replacementContext.set(null);
+      this.replacementWarning.set(
+        'O participante indicado não está mais nesta função. A edição normal foi mantida.',
+      );
+      return;
+    }
+
+    this.replacementWarning.set(null);
+    this.replacementContext.set({
+      personId: pending.personId,
+      assignmentType: pending.assignmentType,
+      personName: person.name,
+    });
+
+    const assignmentType = pending.assignmentType;
+
+    afterNextRender(() => this.focusReplacementTarget(assignmentType), { injector: this.injector });
+  }
+
+  private focusReplacementTarget(type: EventScheduleType): void {
+    const target = this.replacementFocusTarget(type);
+
+    target?.nativeElement.focus();
+  }
+
+  private replacementFocusTarget(type: EventScheduleType): ElementRef<HTMLElement> | undefined {
+    switch (type) {
+      case 'PRIEST':
+        return this.priestIdSelectRef;
+      case 'READER':
+        return this.readerSearchInputRef;
+      case 'COMMENTATOR':
+        return this.commentatorSearchInputRef;
+      case 'MINISTER_OF_THE_WORD':
+        return this.ministerOfTheWordSearchInputRef;
+      case 'EUCHARISTIC_MINISTER':
+        return this.eucharisticMinisterSearchInputRef;
+    }
+  }
+
+  private contextualValidationError(): string | null {
+    const context = this.replacementContext();
+
+    if (context === null) {
+      return null;
+    }
+
+    if (context.assignmentType === 'PRIEST') {
+      const priestId = this.form.controls.priestId.value;
+
+      if (priestId === context.personId) {
+        return 'Remova o padre que não participará.';
+      }
+
+      if (priestId === null) {
+        return 'Selecione outro padre para concluir a substituição.';
+      }
+
+      return null;
+    }
+
+    const controlName = multiSelectControlNameFor(context.assignmentType);
+    const currentIds = this.form.controls[controlName].value;
+
+    if (currentIds.includes(context.personId)) {
+      return 'Remova a pessoa que não participará desta função.';
+    }
+
+    const originalIds = this.originalSelectionIds[controlName];
+    const hasNewSubstitute = currentIds.some((id) => !originalIds.includes(id));
+
+    if (!hasNewSubstitute) {
+      return 'Selecione pelo menos um substituto para esta função.';
+    }
+
+    return null;
   }
 
   private buildRequest(): UpdateEventScheduleRequest | null {
@@ -358,6 +532,54 @@ function isEventScheduleType(value: string | null): value is EventScheduleType {
     value === 'MINISTER_OF_THE_WORD' ||
     value === 'EUCHARISTIC_MINISTER'
   );
+}
+
+function parseReplacementParams(queryParamMap: {
+  get(name: string): string | null;
+}): { personId: number; assignmentType: EventScheduleType } | null {
+  const rawPersonId = queryParamMap.get('replacePersonId');
+  const rawAssignmentType = queryParamMap.get('replaceAssignmentType');
+
+  if (rawPersonId === null || !/^[1-9]\d*$/.test(rawPersonId)) {
+    return null;
+  }
+
+  if (!isEventScheduleType(rawAssignmentType)) {
+    return null;
+  }
+
+  return { personId: Number(rawPersonId), assignmentType: rawAssignmentType };
+}
+
+function peopleListFor(
+  schedule: EventScheduleDetailResponse,
+  type: EventScheduleType,
+): readonly EventSchedulePersonSummary[] {
+  switch (type) {
+    case 'PRIEST':
+      return schedule.priest ? [schedule.priest] : [];
+    case 'READER':
+      return schedule.readers;
+    case 'COMMENTATOR':
+      return schedule.commentators;
+    case 'MINISTER_OF_THE_WORD':
+      return schedule.ministersOfTheWord;
+    case 'EUCHARISTIC_MINISTER':
+      return schedule.eucharisticMinisters;
+  }
+}
+
+function multiSelectControlNameFor(type: MultiSelectAssignmentType): SelectionControlName {
+  switch (type) {
+    case 'READER':
+      return 'readerIds';
+    case 'COMMENTATOR':
+      return 'commentatorIds';
+    case 'MINISTER_OF_THE_WORD':
+      return 'ministerOfTheWordIds';
+    case 'EUCHARISTIC_MINISTER':
+      return 'eucharisticMinisterIds';
+  }
 }
 
 function loadErrorMessageFor(error: unknown): string {

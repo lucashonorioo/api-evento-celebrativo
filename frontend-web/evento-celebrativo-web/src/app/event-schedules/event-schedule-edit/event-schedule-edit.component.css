@@ -33,6 +33,19 @@
   color: var(--color-danger);
 }
 
+.event-schedule-edit__field--highlighted,
+.event-schedule-edit__group--highlighted {
+  border-color: #c9a227;
+}
+
+.event-schedule-edit__highlight-badge,
+.event-schedule-edit__declined-tag {
+  margin-left: 0.4rem;
+  color: var(--color-danger);
+  font-weight: 800;
+  font-size: 0.7rem;
+}
+
 .event-schedule-edit__summary {
   display: grid;
   gap: 1rem;
