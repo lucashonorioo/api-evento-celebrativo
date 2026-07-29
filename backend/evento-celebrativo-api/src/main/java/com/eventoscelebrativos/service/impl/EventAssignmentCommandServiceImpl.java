@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.service.EventAssignmentCommandService;
 import com.eventoscelebrativos.service.EventAssignmentTarget;
+import com.eventoscelebrativos.service.EventParticipationResponseService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +18,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class EventAssignmentCommandServiceImpl implements EventAssignmentCommandService {
 
     private final EventAssignmentRepository eventAssignmentRepository;
+    private final EventParticipationResponseService eventParticipationResponseService;
 
-    public EventAssignmentCommandServiceImpl(EventAssignmentRepository eventAssignmentRepository) {
+    public EventAssignmentCommandServiceImpl(
+            EventAssignmentRepository eventAssignmentRepository,
+            EventParticipationResponseService eventParticipationResponseService
+    ) {
         this.eventAssignmentRepository = eventAssignmentRepository;
+        this.eventParticipationResponseService = eventParticipationResponseService;
     }
 
     @Override
@@ -65,6 +72,11 @@ public class EventAssignmentCommandServiceImpl implements EventAssignmentCommand
         if (!assignmentsToSave.isEmpty()) {
             eventAssignmentRepository.saveAll(assignmentsToSave);
         }
+
+        Set<Long> finalPersonIds = targetPairs.stream()
+                .map(PersonAssignmentTypeKey::personId)
+                .collect(Collectors.toSet());
+        eventParticipationResponseService.retainOnlyForPersonIds(event.getId(), finalPersonIds);
     }
 
     @Override

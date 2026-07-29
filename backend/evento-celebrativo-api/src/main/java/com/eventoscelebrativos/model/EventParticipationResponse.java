@@ -19,13 +19,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "tb_event_assignment",
+        name = "tb_event_participation_response",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_tb_event_assignment_event_person_type",
-                columnNames = {"event_id", "person_id", "assignment_type"}
+                name = "uk_tb_event_participation_response_event_person",
+                columnNames = {"event_id", "person_id"}
         )
 )
-public class EventAssignment {
+public class EventParticipationResponse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,8 +40,14 @@ public class EventAssignment {
     private Person person;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "assignment_type", nullable = false, length = 50)
-    private EventAssignmentType assignmentType;
+    @Column(name = "status", nullable = false, length = 20)
+    private ParticipationStatus status;
+
+    @Column(name = "decline_reason", length = 500)
+    private String declineReason;
+
+    @Column(name = "responded_at", nullable = false)
+    private LocalDateTime respondedAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -49,13 +55,21 @@ public class EventAssignment {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public EventAssignment() {
+    public EventParticipationResponse() {
     }
 
-    public EventAssignment(CelebrationEvent event, Person person, EventAssignmentType assignmentType) {
+    public EventParticipationResponse(
+            CelebrationEvent event,
+            Person person,
+            ParticipationStatus status,
+            String declineReason,
+            LocalDateTime respondedAt
+    ) {
         this.event = event;
         this.person = person;
-        this.assignmentType = assignmentType;
+        this.status = status;
+        this.declineReason = declineReason;
+        this.respondedAt = respondedAt;
     }
 
     @PrePersist
@@ -96,12 +110,28 @@ public class EventAssignment {
         this.person = person;
     }
 
-    public EventAssignmentType getAssignmentType() {
-        return assignmentType;
+    public ParticipationStatus getStatus() {
+        return status;
     }
 
-    public void setAssignmentType(EventAssignmentType assignmentType) {
-        this.assignmentType = assignmentType;
+    public void setStatus(ParticipationStatus status) {
+        this.status = status;
+    }
+
+    public String getDeclineReason() {
+        return declineReason;
+    }
+
+    public void setDeclineReason(String declineReason) {
+        this.declineReason = declineReason;
+    }
+
+    public LocalDateTime getRespondedAt() {
+        return respondedAt;
+    }
+
+    public void setRespondedAt(LocalDateTime respondedAt) {
+        this.respondedAt = respondedAt;
     }
 
     public LocalDateTime getCreatedAt() {

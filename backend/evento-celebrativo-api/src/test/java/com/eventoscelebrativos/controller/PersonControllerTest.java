@@ -2,6 +2,7 @@ package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
+import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
@@ -12,6 +13,8 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.ParticipationStatus;
+import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -29,6 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -49,6 +53,9 @@ class PersonControllerTest {
 
     @MockitoBean
     private PersonService personService;
+
+    @MockitoBean
+    private EventParticipationResponseService eventParticipationResponseService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -860,6 +867,192 @@ class PersonControllerTest {
                 "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10);
     }
 
+    @Test
+    void shouldReturnUnauthorizedWhenRespondingToParticipationWithoutAuthentication() throws Exception {
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldRespondToParticipationWhenUserIsOperator() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenReturn(participationResponse(15L, ParticipationStatus.CONFIRMED, null));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eventId").value(15))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.declineReason").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    void shouldRespondToParticipationWhenUserIsAdmin() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999998"), eq(15L), any()))
+                .thenReturn(participationResponse(15L, ParticipationStatus.DECLINED, "Viagem"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("DECLINED", "Viagem")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DECLINED"))
+                .andExpect(jsonPath("$.declineReason").value("Viagem"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OTHER")
+    void shouldReturnForbiddenWhenRoleIsNotAdminOrOperator() throws Exception {
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(eventParticipationResponseService);
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenParticipationStatusIsInvalid() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenThrow(new BadRequestException("Status de participacao invalido: UNKNOWN"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("UNKNOWN", null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenParticipationStatusIsPending() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenThrow(new BadRequestException("O status PENDING nao pode ser definido diretamente"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("PENDING", null)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenDeclineReasonExceedsLimit() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenThrow(new BadRequestException("O motivo da recusa deve ter no maximo 500 caracteres"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("DECLINED", "a".repeat(501))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    void shouldReturnNotFoundWhenPersonDoesNotExistOnParticipation() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34900000000"), eq(15L), any()))
+                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnNotFoundWhenEventDoesNotExistOnParticipation() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(99L), any()))
+                .thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
+
+        mockMvc.perform(put("/pessoas/me/escalas/99/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnConflictWhenPersonHasNoAssignmentOnParticipation() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenThrow(new ConflictException("A pessoa autenticada nao possui atribuicao neste evento"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("BUSINESS_CONFLICT"));
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldReturnConflictWhenEventAlreadyStarted() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenThrow(new ConflictException("Nao e possivel responder a participacao apos o inicio do evento"));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload("CONFIRMED", null)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    void shouldIgnorePersonIdInParticipationPayload() throws Exception {
+        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+                .thenReturn(participationResponse(15L, ParticipationStatus.CONFIRMED, null));
+
+        mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "CONFIRMED",
+                                  "personId": 999
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(eventParticipationResponseService).respond(eq("34999999999"), eq(15L), any());
+    }
+
+    private String participationPayload(String status, String declineReason) {
+        if (declineReason == null) {
+            return """
+                    {
+                      "status": "%s"
+                    }
+                    """.formatted(status);
+        }
+        return """
+                {
+                  "status": "%s",
+                  "declineReason": "%s"
+                }
+                """.formatted(status, declineReason);
+    }
+
+    private ParticipationResponseResponseDTO participationResponse(Long eventId, ParticipationStatus status, String declineReason) {
+        return new ParticipationResponseResponseDTO(eventId, status, declineReason, LocalDateTime.of(2026, 7, 30, 18, 20));
+    }
+
     private CurrentUserScheduleResponseDTO scheduleResponse(
             Long eventId,
             String eventName,
@@ -871,7 +1064,8 @@ class PersonControllerTest {
             List<EventAssignmentType> assignments
     ) {
         return new CurrentUserScheduleResponseDTO(
-                eventId, eventName, eventDate, eventTime, massOrCelebration, locationId, locationName, assignments
+                eventId, eventName, eventDate, eventTime, massOrCelebration, locationId, locationName, assignments,
+                ParticipationStatus.PENDING, null, null
         );
     }
 

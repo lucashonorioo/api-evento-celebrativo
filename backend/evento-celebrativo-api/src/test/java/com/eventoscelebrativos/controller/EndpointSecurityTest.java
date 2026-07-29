@@ -120,6 +120,14 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/me/escalas/1/participacao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(participationPayload()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -167,6 +175,9 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -260,6 +271,9 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/eventos/1/escala/participacoes"))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -305,6 +319,14 @@ class EndpointSecurityTest {
         return """
                 {
                   "ministries": ["COMMENTATOR"]
+                }
+                """;
+    }
+
+    private String participationPayload() {
+        return """
+                {
+                  "status": "CONFIRMED"
                 }
                 """;
     }
