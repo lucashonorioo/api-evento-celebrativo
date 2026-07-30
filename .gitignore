@@ -3,6 +3,7 @@
 
 # Claude Code — configurações específicas de cada computador
 **/.claude/settings.local.json
+/.claude/settings.json.graphify-bak
 
 # IntelliJ — configurações locais do monorepo
 /.idea/
