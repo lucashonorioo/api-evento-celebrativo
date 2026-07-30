@@ -25,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -224,8 +225,8 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent(name);
-        request.setEventDate(eventDate);
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(eventDate, LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(eventDate, LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setEucharisticMinisterIds(eucharisticMinisterIds);

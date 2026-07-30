@@ -1,14 +1,13 @@
 package com.eventoscelebrativos.projection;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 public interface EucharistScaleEventProjection {
 
     Long getEventId();
     String getNameMassOrEvent();
-    LocalDate getEventDate();
-    LocalTime getEventTime();
+    LocalDateTime getStartAt();
+    LocalDateTime getEndAt();
     String getChurchName();
     String getMinisterNames();
 

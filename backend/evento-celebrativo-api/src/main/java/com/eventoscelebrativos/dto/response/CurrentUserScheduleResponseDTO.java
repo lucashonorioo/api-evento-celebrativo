@@ -13,8 +13,8 @@ public class CurrentUserScheduleResponseDTO {
 
     private Long eventId;
     private String eventName;
-    private LocalDate eventDate;
-    private LocalTime eventTime;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
     private Boolean massOrCelebration;
     private Long locationId;
     private String locationName;
@@ -29,8 +29,8 @@ public class CurrentUserScheduleResponseDTO {
     public CurrentUserScheduleResponseDTO(
             Long eventId,
             String eventName,
-            LocalDate eventDate,
-            LocalTime eventTime,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             Boolean massOrCelebration,
             Long locationId,
             String locationName,
@@ -41,8 +41,8 @@ public class CurrentUserScheduleResponseDTO {
     ) {
         this.eventId = eventId;
         this.eventName = eventName;
-        this.eventDate = eventDate;
-        this.eventTime = eventTime;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.massOrCelebration = massOrCelebration;
         this.locationId = locationId;
         this.locationName = locationName;
@@ -68,20 +68,36 @@ public class CurrentUserScheduleResponseDTO {
         this.eventName = eventName;
     }
 
+    public LocalDateTime getStartAt() {
+        return startAt;
+    }
+
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
+    }
+
+    public LocalDateTime getEndAt() {
+        return endAt;
+    }
+
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
+    }
+
+    /**
+     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
+     */
+    @Deprecated
     public LocalDate getEventDate() {
-        return eventDate;
+        return startAt == null ? null : startAt.toLocalDate();
     }
 
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
-    }
-
+    /**
+     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
+     */
+    @Deprecated
     public LocalTime getEventTime() {
-        return eventTime;
-    }
-
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
+        return startAt == null ? null : startAt.toLocalTime();
     }
 
     public Boolean getMassOrCelebration() {

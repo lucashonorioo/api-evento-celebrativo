@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -182,8 +183,8 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent(name);
-        request.setEventDate(LocalDate.now().plusDays(15));
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(LocalDate.now().plusDays(15), LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(LocalDate.now().plusDays(15), LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setMinisterOfTheWordIds(ministerOfTheWordIds);

@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Usa o profile "test" padrao (spring.profiles.active=test em application.properties de teste),
  * cujo application-test.properties aplica TODAS as migrations Flyway em classpath:db/migration
  * (V1 ate a mais recente, sem flyway.target) e valida o mapeamento JPA contra esse schema real
- * com spring.jpa.hibernate.ddl-auto=validate. Nao ha nenhum cap de versao aqui: se V10 nao
+ * com spring.jpa.hibernate.ddl-auto=validate. Nao ha nenhum cap de versao aqui: se V11 nao
  * existisse ou estivesse incorreta, o contexto desta classe (e de toda a suite) falharia ao subir.
  */
 @DataJpaTest
@@ -48,7 +49,7 @@ class PersonUnavailabilityRepositoryTest {
         Person person = savePerson("Unavailability Persistence Person", "34975000001");
 
         PersonUnavailability saved = personUnavailabilityRepository.saveAndFlush(
-                new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), "Viagem")
+                new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), "Viagem")
         );
 
         assertNotNull(saved.getId());
@@ -62,14 +63,14 @@ class PersonUnavailabilityRepositoryTest {
         Person person = savePerson("Unavailability Null Reason Person", "34975000002");
 
         PersonUnavailability saved = personUnavailabilityRepository.saveAndFlush(
-                new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null)
+                new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null)
         );
 
         assertNull(saved.getReason());
     }
 
     @Test
-    void shouldEnforceCheckConstraintForInvertedDates() {
+    void shouldEnforceCheckConstraintForInvertedRange() {
         // A traducao de excecao do Hibernate para o CHECK varia por dialeto: H2 produz
         // DataIntegrityViolationException, MySQL (via este driver/versao) produz JpaSystemException.
         // Ambas sao DataAccessException; o teste valida o comportamento do banco, nao a subclasse exata.
@@ -77,21 +78,30 @@ class PersonUnavailabilityRepositoryTest {
 
         DataAccessException exception = assertThrows(DataAccessException.class, () ->
                 personUnavailabilityRepository.saveAndFlush(
-                        new PersonUnavailability(person, LocalDate.of(2026, 8, 12), LocalDate.of(2026, 8, 10), null)
+                        new PersonUnavailability(person, at(2026, 8, 12, 0, 0), at(2026, 8, 10, 0, 0), null)
                 ));
-        assertTrue(rootCauseMessage(exception).toLowerCase().contains("chk_tb_person_unavailability_dates"));
+        assertTrue(rootCauseMessage(exception).toLowerCase().contains("chk_tb_person_unavailability_range"));
+    }
+
+    @Test
+    void shouldEnforceCheckConstraintForZeroDuration() {
+        Person person = savePerson("Unavailability Zero Duration Person", "34975000018");
+        LocalDateTime same = at(2026, 8, 10, 9, 0);
+
+        assertThrows(DataAccessException.class, () ->
+                personUnavailabilityRepository.saveAndFlush(new PersonUnavailability(person, same, same, null)));
     }
 
     @Test
     void shouldEnforceUniqueExactDuplicate() {
         Person person = savePerson("Unavailability Duplicate Person", "34975000004");
         personUnavailabilityRepository.saveAndFlush(
-                new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null)
+                new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null)
         );
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 personUnavailabilityRepository.saveAndFlush(
-                        new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), "Outro motivo")
+                        new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), "Outro motivo")
                 ));
     }
 
@@ -99,7 +109,7 @@ class PersonUnavailabilityRepositoryTest {
     void shouldCascadeDeleteWhenPersonIsDeletedButNotTheOpposite() {
         Person person = savePerson("Unavailability Cascade Person", "34975000005");
         PersonUnavailability unavailability = personUnavailabilityRepository.saveAndFlush(
-                new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null)
+                new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null)
         );
         Long unavailabilityId = unavailability.getId();
         Long personId = person.getId();
@@ -116,7 +126,7 @@ class PersonUnavailabilityRepositoryTest {
     void shouldNotDeletePersonWhenDeletingUnavailability() {
         Person person = savePerson("Unavailability Reverse Cascade Person", "34975000006");
         PersonUnavailability unavailability = personUnavailabilityRepository.saveAndFlush(
-                new PersonUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null)
+                new PersonUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null)
         );
         Long personId = person.getId();
 
@@ -128,31 +138,31 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
-    void shouldFindOverlappingPeriodsInclusive() {
+    void shouldFindOverlappingSemiOpenRanges() {
         Person person = savePerson("Unavailability Overlap Person", "34975000007");
-        saveUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        saveUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
 
         List<PersonUnavailability> touching = personUnavailabilityRepository.findOverlapping(
-                person.getId(), LocalDate.of(2026, 8, 12), LocalDate.of(2026, 8, 14));
+                person.getId(), at(2026, 8, 11, 0, 0), at(2026, 8, 14, 0, 0));
         List<PersonUnavailability> adjacentAfter = personUnavailabilityRepository.findOverlapping(
-                person.getId(), LocalDate.of(2026, 8, 13), LocalDate.of(2026, 8, 14));
+                person.getId(), at(2026, 8, 12, 0, 0), at(2026, 8, 14, 0, 0));
         List<PersonUnavailability> containing = personUnavailabilityRepository.findOverlapping(
-                person.getId(), LocalDate.of(2026, 8, 9), LocalDate.of(2026, 8, 20));
+                person.getId(), at(2026, 8, 9, 0, 0), at(2026, 8, 20, 0, 0));
 
         assertEquals(1, touching.size());
-        assertTrue(adjacentAfter.isEmpty());
+        assertTrue(adjacentAfter.isEmpty(), "Intervalos adjacentes (endAt == startAt) nao devem ser conflitantes");
         assertEquals(1, containing.size());
     }
 
     @Test
     void shouldExcludeOwnIdWhenCheckingOverlapForUpdate() {
         Person person = savePerson("Unavailability Exclude Self Person", "34975000008");
-        PersonUnavailability existing = saveUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        PersonUnavailability existing = saveUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
 
         List<PersonUnavailability> withoutExclusion = personUnavailabilityRepository.findOverlapping(
-                person.getId(), LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12));
+                person.getId(), at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0));
         List<PersonUnavailability> withExclusion = personUnavailabilityRepository.findOverlappingExcludingId(
-                person.getId(), LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), existing.getId());
+                person.getId(), at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), existing.getId());
 
         assertEquals(1, withoutExclusion.size());
         assertTrue(withExclusion.isEmpty());
@@ -161,10 +171,10 @@ class PersonUnavailabilityRepositoryTest {
     @Test
     void shouldNotConsiderAdjacentNonOverlappingPeriodsAsConflicting() {
         Person person = savePerson("Unavailability Adjacent Person", "34975000009");
-        saveUnavailability(person, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        saveUnavailability(person, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
 
         List<PersonUnavailability> adjacent = personUnavailabilityRepository.findOverlapping(
-                person.getId(), LocalDate.of(2026, 8, 13), LocalDate.of(2026, 8, 14));
+                person.getId(), at(2026, 8, 12, 0, 0), at(2026, 8, 14, 0, 0));
 
         assertTrue(adjacent.isEmpty());
     }
@@ -172,17 +182,17 @@ class PersonUnavailabilityRepositoryTest {
     @Test
     void shouldFindIntersectingPeriodsPaginatedAndOrdered() {
         Person person = savePerson("Unavailability Intersect Person", "34975000010");
-        saveUnavailability(person, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 8, 22), null);
-        saveUnavailability(person, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), null);
-        saveUnavailability(person, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 2), null);
+        saveUnavailability(person, at(2026, 8, 20, 0, 0), at(2026, 8, 22, 0, 0), null);
+        saveUnavailability(person, at(2026, 8, 1, 0, 0), at(2026, 8, 3, 0, 0), null);
+        saveUnavailability(person, at(2026, 9, 1, 0, 0), at(2026, 9, 2, 0, 0), null);
 
         Page<PersonUnavailability> page = personUnavailabilityRepository.findByPersonIdIntersecting(
-                person.getId(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), PageRequest.of(0, 10));
+                person.getId(), at(2026, 8, 1, 0, 0), at(2026, 9, 1, 0, 0), PageRequest.of(0, 10));
 
         assertEquals(2, page.getTotalElements());
         assertEquals(
-                List.of(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 20)),
-                page.getContent().stream().map(PersonUnavailability::getStartDate).toList()
+                List.of(at(2026, 8, 1, 0, 0), at(2026, 8, 20, 0, 0)),
+                page.getContent().stream().map(PersonUnavailability::getStartAt).toList()
         );
     }
 
@@ -190,23 +200,23 @@ class PersonUnavailabilityRepositoryTest {
     void shouldFindByIdAndPersonIdOnlyForOwner() {
         Person owner = savePerson("Unavailability Owner Person", "34975000011");
         Person other = savePerson("Unavailability Other Person", "34975000012");
-        PersonUnavailability unavailability = saveUnavailability(owner, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        PersonUnavailability unavailability = saveUnavailability(owner, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
 
         assertTrue(personUnavailabilityRepository.findByIdAndPersonId(unavailability.getId(), owner.getId()).isPresent());
         assertTrue(personUnavailabilityRepository.findByIdAndPersonId(unavailability.getId(), other.getId()).isEmpty());
     }
 
     @Test
-    void shouldFindUnavailablePeopleForGivenPersonIdsAndDateInBatch() {
+    void shouldFindUnavailablePeopleForGivenPersonIdsAndRangeInBatch() {
         Person first = savePerson("Unavailability Batch First", "34975000013");
         Person second = savePerson("Unavailability Batch Second", "34975000014");
         Person notIncluded = savePerson("Unavailability Batch NotIncluded", "34975000015");
-        saveUnavailability(first, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
-        saveUnavailability(second, LocalDate.of(2026, 8, 5), LocalDate.of(2026, 8, 20), null);
-        saveUnavailability(notIncluded, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        saveUnavailability(first, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
+        saveUnavailability(second, at(2026, 8, 5, 0, 0), at(2026, 8, 20, 0, 0), null);
+        saveUnavailability(notIncluded, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
 
-        List<PersonUnavailabilityPersonProjection> result = personUnavailabilityRepository.findByPersonIdsAndDate(
-                List.of(first.getId(), second.getId()), LocalDate.of(2026, 8, 11));
+        List<PersonUnavailabilityPersonProjection> result = personUnavailabilityRepository.findByPersonIdsAndRange(
+                List.of(first.getId(), second.getId()), at(2026, 8, 11, 0, 0), at(2026, 8, 11, 12, 0));
 
         assertEquals(2, result.size());
         assertTrue(result.stream().map(PersonUnavailabilityPersonProjection::getPersonId)
@@ -214,14 +224,14 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
-    void shouldFindAllUnavailablePeopleOnDateOrderedByNameThenId() {
+    void shouldFindAllUnavailablePeopleOnRangeOrderedByNameThenId() {
         Person zelia = savePerson("Zelia Almeida", "34975000016");
         Person arthur = savePerson("Arthur Costa", "34975000017");
-        saveUnavailability(zelia, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
-        saveUnavailability(arthur, LocalDate.of(2026, 8, 9), LocalDate.of(2026, 8, 15), null);
+        saveUnavailability(zelia, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
+        saveUnavailability(arthur, at(2026, 8, 9, 0, 0), at(2026, 8, 15, 0, 0), null);
 
         List<PersonUnavailabilityPersonProjection> result =
-                personUnavailabilityRepository.findAllByDate(LocalDate.of(2026, 8, 10));
+                personUnavailabilityRepository.findAllByRange(at(2026, 8, 10, 0, 0), at(2026, 8, 10, 12, 0));
 
         assertEquals(
                 List.of("Arthur Costa", "Zelia Almeida"),
@@ -231,9 +241,9 @@ class PersonUnavailabilityRepositoryTest {
 
     @Test
     void shouldHaveNamedIndexesForPersonAndDateLookups() {
-        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_person_dates");
-        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_dates_person");
-        assertConstraintExists("tb_person_unavailability", "uk_tb_person_unavailability_person_dates");
+        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_person_range");
+        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_range_person");
+        assertConstraintExists("tb_person_unavailability", "uk_tb_person_unavailability_person_range");
     }
 
     @Test
@@ -257,9 +267,9 @@ class PersonUnavailabilityRepositoryTest {
 
     @Test
     void shouldRejectInsertReferencingNonExistentPerson() {
-        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbcTemplate.update(
-                "INSERT INTO tb_person_unavailability (person_id, start_date, end_date) VALUES (?, ?, ?)",
-                999999999L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 2)
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "INSERT INTO tb_person_unavailability (person_id, start_at, end_at) VALUES (?, ?, ?)",
+                999999999L, at(2026, 8, 1, 0, 0), at(2026, 8, 2, 0, 0)
         ));
     }
 
@@ -276,12 +286,12 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
-    void shouldHaveAppliedFlywayMigrationThroughV10() {
+    void shouldHaveAppliedFlywayMigrationThroughV11() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '10' AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '11' AND success = TRUE",
                 Integer.class
         );
-        assertEquals(1, count, "Migration V10 deve estar aplicada com sucesso neste contexto de teste (sem flyway.target)");
+        assertEquals(1, count, "Migration V11 deve estar aplicada com sucesso neste contexto de teste (sem flyway.target)");
     }
 
     private void assertIndexExists(String tableName, String indexName) {
@@ -321,9 +331,9 @@ class PersonUnavailabilityRepositoryTest {
         assertTrue(count != null && count > 0, "Expected constraint " + constraintName + " to exist on " + tableName);
     }
 
-    private PersonUnavailability saveUnavailability(Person person, LocalDate startDate, LocalDate endDate, String reason) {
+    private PersonUnavailability saveUnavailability(Person person, LocalDateTime startAt, LocalDateTime endAt, String reason) {
         PersonUnavailability unavailability = personUnavailabilityRepository.save(
-                new PersonUnavailability(person, startDate, endDate, reason)
+                new PersonUnavailability(person, startAt, endAt, reason)
         );
         entityManager.flush();
         return unavailability;
@@ -338,5 +348,9 @@ class PersonUnavailabilityRepositoryTest {
         entityManager.persist(person);
         entityManager.flush();
         return person;
+    }
+
+    private LocalDateTime at(int year, int month, int day, int hour, int minute) {
+        return LocalDateTime.of(year, month, day, hour, minute);
     }
 }

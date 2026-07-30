@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -204,14 +205,15 @@ class EventAssignmentOfficialWriteIntegrationTest {
 
     private Long insertEvent(String name, Long locationId) {
         String eventName = name + " " + UUID.randomUUID();
+        LocalDateTime startAt = LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(19, 0));
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, ?, TRUE)
                 """,
                 eventName,
-                LocalDate.now().plusDays(30),
-                LocalTime.of(19, 0)
+                startAt,
+                startAt.plusHours(1)
         );
         Long eventId = jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
@@ -264,8 +266,8 @@ class EventAssignmentOfficialWriteIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent(name + " " + UUID.randomUUID());
-        request.setEventDate(LocalDate.now().plusDays(30));
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setPriestId(priestId);

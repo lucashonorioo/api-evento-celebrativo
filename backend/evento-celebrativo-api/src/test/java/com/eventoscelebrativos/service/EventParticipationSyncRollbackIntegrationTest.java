@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -125,8 +126,8 @@ class EventParticipationSyncRollbackIntegrationTest {
     private CelebrationEventWithScaleRequestDTO eventRequest(String name, Long locationId, List<Long> readerIds) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent(name + " " + UUID.randomUUID());
-        request.setEventDate(LocalDate.now().plusDays(30));
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setReaderIds(readerIds);

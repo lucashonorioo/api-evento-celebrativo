@@ -52,6 +52,8 @@ class CelebrationEventControllerTest {
 
     private static final LocalDate EVENT_DATE = LocalDate.of(2026, 8, 15);
     private static final LocalTime EVENT_TIME = LocalTime.of(19, 30);
+    private static final LocalDateTime EVENT_START_AT = LocalDateTime.of(2026, 8, 15, 19, 30);
+    private static final LocalDateTime EVENT_END_AT = LocalDateTime.of(2026, 8, 15, 20, 30);
 
     @Autowired
     private MockMvc mockMvc;
@@ -352,7 +354,7 @@ class CelebrationEventControllerTest {
     @Test
     void shouldReturnOkWhenFindingEucharistScaleByPeriod() throws Exception {
         EucharistScaleEventResponseDTO response = new EucharistScaleEventResponseDTO(
-                "Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz"
+                "Missa", EVENT_START_AT, EVENT_END_AT, "Igreja Matriz"
         );
         response.getNameMinisters().add("Ana");
         response.getNameMinisters().add("Bruno");
@@ -374,7 +376,7 @@ class CelebrationEventControllerTest {
     @Test
     void shouldIgnoreInvalidSortWhenFindingEucharistScaleByPeriod() throws Exception {
         EucharistScaleEventResponseDTO response = new EucharistScaleEventResponseDTO(
-                "Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz"
+                "Missa", EVENT_START_AT, EVENT_END_AT, "Igreja Matriz"
         );
         when(celebrationEventService.findEucharistScale(any(), eq(LocalDate.of(2025, 7, 1)), eq(LocalDate.of(2026, 12, 31))))
                 .thenReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1));
@@ -521,15 +523,15 @@ class CelebrationEventControllerTest {
     }
 
     private CelebrationEventResponseDTO response(String nameMassOrEvent) {
-        return new CelebrationEventResponseDTO(1L, nameMassOrEvent, EVENT_DATE, EVENT_TIME, true);
+        return new CelebrationEventResponseDTO(1L, nameMassOrEvent, EVENT_START_AT, EVENT_END_AT, true);
     }
 
     private CelebrationEventScaleResponseDTO scaleResponse() {
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
         response.setEventId(1L);
         response.setNameMassOrEvent("Missa");
-        response.setEventDate(EVENT_DATE);
-        response.setEventTime(EVENT_TIME);
+        response.setStartAt(EVENT_START_AT);
+        response.setEndAt(EVENT_END_AT);
         response.setMassOrCelebration(true);
         response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
         response.setPriest(new CelebrationEventScalePersonResponseDTO(8L, "Padre"));
@@ -541,8 +543,8 @@ class CelebrationEventControllerTest {
         CelebrationEventScaleDetailResponseDTO response = new CelebrationEventScaleDetailResponseDTO();
         response.setEventId(1L);
         response.setEventName("Missa");
-        response.setEventDate(EVENT_DATE);
-        response.setEventTime(EVENT_TIME);
+        response.setStartAt(EVENT_START_AT);
+        response.setEndAt(EVENT_END_AT);
         response.setMassOrCelebration(true);
         response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
         response.setPriest(new CelebrationEventScalePersonResponseDTO(13L, "Padre Miguel"));
@@ -563,8 +565,8 @@ class CelebrationEventControllerTest {
         CelebrationEventScaleParticipationDetailResponseDTO response = new CelebrationEventScaleParticipationDetailResponseDTO();
         response.setEventId(1L);
         response.setEventName("Missa");
-        response.setEventDate(EVENT_DATE);
-        response.setEventTime(EVENT_TIME);
+        response.setStartAt(EVENT_START_AT);
+        response.setEndAt(EVENT_END_AT);
         response.setMassOrCelebration(true);
         response.setLocation(new CelebrationEventScaleLocationResponseDTO(1L, "Igreja Matriz"));
         response.setPriest(new CelebrationEventScaleParticipationPersonResponseDTO(
@@ -588,8 +590,8 @@ class CelebrationEventControllerTest {
         EventScheduleQueryResponseDTO response = new EventScheduleQueryResponseDTO();
         response.setEventId(1L);
         response.setEventName("Missa");
-        response.setEventDate(EVENT_DATE);
-        response.setEventTime(EVENT_TIME);
+        response.setStartAt(EVENT_START_AT);
+        response.setEndAt(EVENT_END_AT);
         response.setMassOrCelebration(true);
         response.setLocationId(1L);
         response.setChurchName("Igreja Matriz");
@@ -602,8 +604,8 @@ class CelebrationEventControllerTest {
         return """
                 {
                   "nameMassOrEvent": "%s",
-                  "eventDate": "2026-08-15",
-                  "eventTime": "19:30:00",
+                  "startAt": "2026-08-15T19:30:00",
+                  "endAt": "2026-08-15T20:30:00",
                   "massOrCelebration": true
                 }
                 """.formatted(nameMassOrEvent);
@@ -613,8 +615,8 @@ class CelebrationEventControllerTest {
         return """
                 {
                   "nameMassOrEvent": "",
-                  "eventDate": null,
-                  "eventTime": null,
+                  "startAt": null,
+                  "endAt": null,
                   "massOrCelebration": null
                 }
                 """;
@@ -646,8 +648,8 @@ class CelebrationEventControllerTest {
         return """
                 {
                   "nameMassOrEvent": "Missa",
-                  "eventDate": "2026-08-15",
-                  "eventTime": "19:30:00",
+                  "startAt": "2026-08-15T19:30:00",
+                  "endAt": "2026-08-15T20:30:00",
                   "massOrCelebration": true,
                   "locationId": 1,
                   "priestId": 8,
@@ -663,8 +665,8 @@ class CelebrationEventControllerTest {
         return """
                 {
                   "nameMassOrEvent": "",
-                  "eventDate": null,
-                  "eventTime": null,
+                  "startAt": null,
+                  "endAt": null,
                   "massOrCelebration": null,
                   "locationId": null
                 }

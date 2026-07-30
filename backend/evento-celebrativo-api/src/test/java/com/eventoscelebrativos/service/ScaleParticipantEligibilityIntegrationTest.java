@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -266,8 +267,8 @@ class ScaleParticipantEligibilityIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent(name + " " + UUID.randomUUID());
-        request.setEventDate(LocalDate.now().plusDays(30));
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setPriestId(priestId);

@@ -12,7 +12,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,11 +26,11 @@ public class PersonUnavailability {
     @JoinColumn(name = "person_id", nullable = false)
     private Person person;
 
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
+    @Column(name = "start_at", nullable = false)
+    private LocalDateTime startAt;
 
-    @Column(name = "end_date", nullable = false)
-    private LocalDate endDate;
+    @Column(name = "end_at", nullable = false)
+    private LocalDateTime endAt;
 
     @Column(name = "reason", length = 500)
     private String reason;
@@ -45,10 +44,10 @@ public class PersonUnavailability {
     public PersonUnavailability() {
     }
 
-    public PersonUnavailability(Person person, LocalDate startDate, LocalDate endDate, String reason) {
+    public PersonUnavailability(Person person, LocalDateTime startAt, LocalDateTime endAt, String reason) {
         this.person = person;
-        this.startDate = startDate;
-        this.endDate = endDate;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.reason = reason;
     }
 
@@ -82,20 +81,20 @@ public class PersonUnavailability {
         this.person = person;
     }
 
-    public LocalDate getStartDate() {
-        return startDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalDate getEndDate() {
-        return endDate;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public String getReason() {

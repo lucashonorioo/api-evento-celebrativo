@@ -14,7 +14,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -201,11 +200,12 @@ class EventParticipationResponseRepositoryTest {
     }
 
     private CelebrationEvent saveEvent(String name) {
+        LocalDateTime startAt = LocalDateTime.of(2026, 9, 1, 19, 0);
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name,
-                LocalDate.of(2026, 9, 1),
-                LocalTime.of(19, 0),
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         entityManager.persist(event);

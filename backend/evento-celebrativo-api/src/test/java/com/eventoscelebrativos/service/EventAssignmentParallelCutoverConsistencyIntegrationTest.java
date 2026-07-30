@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -305,8 +306,8 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent("Consolidated Parallel Cutover " + UUID.randomUUID());
-        request.setEventDate(eventDate);
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(eventDate, LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(eventDate, LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setPriestId(priestId);
@@ -427,14 +428,15 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
 
     private Long insertEvent(String name, LocalDate eventDate) {
         String eventName = name + " " + UUID.randomUUID();
+        LocalDateTime startAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, ?, TRUE)
                 """,
                 eventName,
-                eventDate,
-                LocalTime.of(19, 0)
+                startAt,
+                startAt.plusHours(1)
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",

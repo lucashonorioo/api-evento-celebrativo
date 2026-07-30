@@ -90,8 +90,8 @@ class EndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
-                        .param("startDate", "2026-08-01")
-                        .param("endDate", "2026-08-31"))
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -100,7 +100,8 @@ class EndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/indisponibilidades")
-                        .param("date", "2026-08-10"))
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/leitores"))
@@ -194,7 +195,8 @@ class EndpointSecurityTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/pessoas/indisponibilidades")
-                        .param("date", "2026-08-10"))
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isForbidden());
     }
 
@@ -220,12 +222,13 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
-                        .param("startDate", "2000-01-01")
-                        .param("endDate", "2030-12-31"))
+                        .param("startAt", "2000-01-01T00:00:00")
+                        .param("endAt", "2030-12-31T00:00:00"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/indisponibilidades")
-                        .param("date", "2026-08-10"))
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/pessoas"))
@@ -276,12 +279,13 @@ class EndpointSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
-                        .param("startDate", "2000-01-01")
-                        .param("endDate", "2030-12-31"))
+                        .param("startAt", "2000-01-01T00:00:00")
+                        .param("endAt", "2030-12-31T00:00:00"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/pessoas/indisponibilidades")
-                        .param("date", "2026-08-10"))
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(put("/pessoas/1/ministries")
@@ -362,8 +366,8 @@ class EndpointSecurityTest {
     private String unavailabilityPayload() {
         return """
                 {
-                  "startDate": "2026-08-10",
-                  "endDate": "2026-08-12"
+                  "startAt": "2026-08-10T00:00:00",
+                  "endAt": "2026-08-12T00:00:00"
                 }
                 """;
     }
@@ -393,8 +397,8 @@ class EndpointSecurityTest {
         return """
                 {
                   "nameMassOrEvent": "Missa Teste Segurança",
-                  "eventDate": "2027-08-15",
-                  "eventTime": "19:30:00",
+                  "startAt": "2027-08-15T19:30:00",
+                  "endAt": "2027-08-15T20:30:00",
                   "massOrCelebration": true,
                   "locationId": 1,
                   "priestId": 13,

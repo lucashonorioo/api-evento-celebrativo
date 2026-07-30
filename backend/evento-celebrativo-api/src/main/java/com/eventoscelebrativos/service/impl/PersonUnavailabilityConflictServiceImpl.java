@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
+import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
 import com.eventoscelebrativos.dto.response.EventAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
@@ -18,7 +19,7 @@ import com.eventoscelebrativos.service.PersonUnavailabilityConflictService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -46,10 +47,10 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
 
     @Override
     @Transactional(readOnly = true)
-    public void validateNoOverlap(Long personId, LocalDate startDate, LocalDate endDate, Long excludeUnavailabilityId) {
+    public void validateNoOverlap(Long personId, LocalDateTime startAt, LocalDateTime endAt, Long excludeUnavailabilityId) {
         List<PersonUnavailability> overlapping = excludeUnavailabilityId == null
-                ? personUnavailabilityRepository.findOverlapping(personId, startDate, endDate)
-                : personUnavailabilityRepository.findOverlappingExcludingId(personId, startDate, endDate, excludeUnavailabilityId);
+                ? personUnavailabilityRepository.findOverlapping(personId, startAt, endAt)
+                : personUnavailabilityRepository.findOverlappingExcludingId(personId, startAt, endAt, excludeUnavailabilityId);
 
         if (!overlapping.isEmpty()) {
             throw new UnavailabilityOverlapException("O período informado se sobrepõe a uma indisponibilidade já cadastrada.");
@@ -58,9 +59,9 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
 
     @Override
     @Transactional(readOnly = true)
-    public void validateNoAssignmentConflict(Long personId, LocalDate startDate, LocalDate endDate) {
+    public void validateNoAssignmentConflict(Long personId, LocalDateTime startAt, LocalDateTime endAt) {
         List<PersonUnavailabilityAssignmentConflictProjection> rows =
-                eventAssignmentRepository.findAssignmentConflictsByPersonIdAndDateRange(personId, startDate, endDate);
+                eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(personId, startAt, endAt);
 
         if (rows.isEmpty()) {
             return;
@@ -74,8 +75,7 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
         List<EventAssignmentConflictDTO> conflicts = rowsByEvent.values().stream()
                 .map(this::toEventAssignmentConflictDTO)
                 .sorted(Comparator
-                        .comparing(EventAssignmentConflictDTO::getEventDate)
-                        .thenComparing(EventAssignmentConflictDTO::getEventTime)
+                        .comparing(EventAssignmentConflictDTO::getStartAt)
                         .thenComparing(EventAssignmentConflictDTO::getEventId))
                 .toList();
 
@@ -97,13 +97,17 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
 
     @Override
     @Transactional(readOnly = true)
-    public void validateAvailabilityForEvent(Map<Long, Set<EventAssignmentType>> assignmentTypesByPersonId, LocalDate eventDate) {
+    public void validateAvailabilityForEvent(
+            Map<Long, Set<EventAssignmentType>> assignmentTypesByPersonId,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
         if (assignmentTypesByPersonId == null || assignmentTypesByPersonId.isEmpty()) {
             return;
         }
 
         List<PersonUnavailabilityPersonProjection> unavailablePeople =
-                personUnavailabilityRepository.findByPersonIdsAndDate(assignmentTypesByPersonId.keySet(), eventDate);
+                personUnavailabilityRepository.findByPersonIdsAndRange(assignmentTypesByPersonId.keySet(), startAt, endAt);
 
         if (unavailablePeople.isEmpty()) {
             return;
@@ -114,10 +118,11 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
                         unavailability.getPersonId(),
                         unavailability.getPersonName(),
                         sortedAssignmentTypeNames(assignmentTypesByPersonId.get(unavailability.getPersonId())),
-                        unavailability.getStartDate(),
-                        unavailability.getEndDate()
+                        unavailability.getStartAt(),
+                        unavailability.getEndAt()
                 ))
-                .sorted(Comparator.comparing(PersonUnavailabilityEventConflictDTO::getPersonId))
+                .sorted(Comparator.comparing(PersonUnavailabilityEventConflictDTO::getPersonId)
+                        .thenComparing(PersonUnavailabilityEventConflictDTO::getStartAt))
                 .toList();
 
         throw new PersonUnavailableForEventException(conflicts);
@@ -125,19 +130,25 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUnavailabilityPersonDTO> findUnavailablePeopleOnDate(LocalDate date) {
-        List<PersonUnavailabilityPersonProjection> rows = personUnavailabilityRepository.findAllByDate(date);
+    public List<AdminUnavailabilityPersonDTO> findUnavailablePeopleOnRange(LocalDateTime startAt, LocalDateTime endAt) {
+        List<PersonUnavailabilityPersonProjection> rows = personUnavailabilityRepository.findAllByRange(startAt, endAt);
 
-        Map<Long, AdminUnavailabilityPersonDTO> byPersonId = new LinkedHashMap<>();
+        Map<Long, String> nameByPersonId = new LinkedHashMap<>();
+        Map<Long, List<AdminUnavailabilityRangeDTO>> rangesByPersonId = new LinkedHashMap<>();
         for (PersonUnavailabilityPersonProjection row : rows) {
-            byPersonId.putIfAbsent(row.getPersonId(), new AdminUnavailabilityPersonDTO(
-                    row.getPersonId(),
-                    row.getPersonName(),
-                    row.getStartDate(),
-                    row.getEndDate()
-            ));
+            nameByPersonId.putIfAbsent(row.getPersonId(), row.getPersonName());
+            rangesByPersonId
+                    .computeIfAbsent(row.getPersonId(), id -> new ArrayList<>())
+                    .add(new AdminUnavailabilityRangeDTO(row.getStartAt(), row.getEndAt()));
         }
-        return List.copyOf(byPersonId.values());
+
+        return nameByPersonId.entrySet().stream()
+                .map(entry -> new AdminUnavailabilityPersonDTO(
+                        entry.getKey(),
+                        entry.getValue(),
+                        rangesByPersonId.getOrDefault(entry.getKey(), List.of())
+                ))
+                .toList();
     }
 
     private EventAssignmentConflictDTO toEventAssignmentConflictDTO(List<PersonUnavailabilityAssignmentConflictProjection> rows) {
@@ -151,8 +162,8 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
         return new EventAssignmentConflictDTO(
                 first.getEventId(),
                 first.getEventName(),
-                first.getEventDate(),
-                first.getEventTime(),
+                first.getStartAt(),
+                first.getEndAt(),
                 assignments
         );
     }

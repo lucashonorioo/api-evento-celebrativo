@@ -150,9 +150,8 @@ public class EventParticipationResponseServiceImpl implements EventParticipation
     }
 
     private void validateEventNotStarted(CelebrationEvent event) {
-        LocalDateTime eventStart = LocalDateTime.of(event.getEventDate(), event.getEventTime());
         LocalDateTime now = LocalDateTime.now(clock);
-        if (!now.isBefore(eventStart)) {
+        if (!now.isBefore(event.getStartAt())) {
             throw new ConflictException("Nao e possivel responder a participacao apos o inicio do evento");
         }
     }

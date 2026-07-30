@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.dto.response;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,8 +10,8 @@ public class CelebrationEventScaleResponseDTO {
 
     private Long eventId;
     private String nameMassOrEvent;
-    private LocalDate eventDate;
-    private LocalTime eventTime;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
     private Boolean massOrCelebration;
     private CelebrationEventScaleLocationResponseDTO location;
     private CelebrationEventScalePersonResponseDTO priest;
@@ -35,20 +36,36 @@ public class CelebrationEventScaleResponseDTO {
         this.nameMassOrEvent = nameMassOrEvent;
     }
 
+    public LocalDateTime getStartAt() {
+        return startAt;
+    }
+
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
+    }
+
+    public LocalDateTime getEndAt() {
+        return endAt;
+    }
+
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
+    }
+
+    /**
+     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
+     */
+    @Deprecated
     public LocalDate getEventDate() {
-        return eventDate;
+        return startAt == null ? null : startAt.toLocalDate();
     }
 
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
-    }
-
+    /**
+     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
+     */
+    @Deprecated
     public LocalTime getEventTime() {
-        return eventTime;
-    }
-
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
+        return startAt == null ? null : startAt.toLocalTime();
     }
 
     public Boolean getMassOrCelebration() {

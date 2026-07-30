@@ -63,9 +63,9 @@ INSERT INTO tb_location(church_name, address) VALUES ('Igreja Matriz Nossa Senho
 INSERT INTO tb_location(church_name, address) VALUES ('Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG');
 INSERT INTO tb_location(church_name, address) VALUES ('Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG');
 
-INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Missa de Domingo da manhã', '2025-07-13', '10:00:00', TRUE);
-INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Celebração da Palavra de Sábado', '2025-07-12', '19:30:00', FALSE);
-INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration) VALUES ('Missa de Ação de Graças', '2025-07-20', '08:00:00', TRUE);
+INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Missa de Domingo da manhã', '2025-07-13 10:00:00', '2025-07-13 11:00:00', TRUE);
+INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Celebração da Palavra de Sábado', '2025-07-12 19:30:00', '2025-07-12 20:30:00', FALSE);
+INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Missa de Ação de Graças', '2025-07-20 08:00:00', '2025-07-20 09:00:00', TRUE);
 
 INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 13, 'PRIEST', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
 INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 10, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));

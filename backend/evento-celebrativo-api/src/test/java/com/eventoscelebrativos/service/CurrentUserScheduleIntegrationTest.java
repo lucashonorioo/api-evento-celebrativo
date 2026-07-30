@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -246,11 +247,12 @@ class CurrentUserScheduleIntegrationTest {
     }
 
     private CelebrationEvent saveEvent(String name, LocalDate eventDate) {
+        LocalDateTime startAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name + " " + UUID.randomUUID(),
-                eventDate,
-                LocalTime.of(19, 0),
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         return celebrationEventRepository.saveAndFlush(event);

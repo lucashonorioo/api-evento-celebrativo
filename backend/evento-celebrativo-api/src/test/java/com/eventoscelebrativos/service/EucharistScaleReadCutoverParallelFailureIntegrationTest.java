@@ -12,8 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,13 +90,13 @@ class EucharistScaleReadCutoverParallelFailureIntegrationTest {
             }
 
             @Override
-            public LocalDate getEventDate() {
-                return LocalDate.of(2025, 7, 13);
+            public LocalDateTime getStartAt() {
+                return LocalDateTime.of(2025, 7, 13, 19, 30);
             }
 
             @Override
-            public LocalTime getEventTime() {
-                return LocalTime.of(19, 30);
+            public LocalDateTime getEndAt() {
+                return LocalDateTime.of(2025, 7, 13, 20, 30);
             }
 
             @Override

@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
+import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.EventAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
@@ -24,8 +25,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -57,18 +57,18 @@ class PersonUnavailabilityControllerTest {
     void shouldListMyUnavailabilitiesWhenOperator() throws Exception {
         when(personUnavailabilityService.findMine(eq("34970000001"), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(
-                        List.of(new PersonUnavailabilityResponseDTO(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), "Viagem")),
+                        List.of(new PersonUnavailabilityResponseDTO(1L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), "Viagem")),
                         PageRequest.of(0, 10),
                         1
                 ));
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
-                        .param("startDate", "2026-08-01")
-                        .param("endDate", "2026-08-31"))
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1))
-                .andExpect(jsonPath("$.content[0].startDate").value("2026-08-10"))
-                .andExpect(jsonPath("$.content[0].endDate").value("2026-08-12"))
+                .andExpect(jsonPath("$.content[0].startAt").value("2026-08-10T00:00:00"))
+                .andExpect(jsonPath("$.content[0].endAt").value("2026-08-12T00:00:00"))
                 .andExpect(jsonPath("$.content[0].reason").value("Viagem"));
     }
 
@@ -76,15 +76,15 @@ class PersonUnavailabilityControllerTest {
     @WithMockUser(username = "34970000002", roles = "ADMIN")
     void shouldCreateUnavailabilityAndReturn201() throws Exception {
         when(personUnavailabilityService.create(eq("34970000002"), any()))
-                .thenReturn(new PersonUnavailabilityResponseDTO(5L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null));
+                .thenReturn(new PersonUnavailabilityResponseDTO(5L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), null));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-12"
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-12T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -95,15 +95,15 @@ class PersonUnavailabilityControllerTest {
     @WithMockUser(username = "34970000003", roles = "ADMIN")
     void shouldIgnoreExtraPersonIdFieldInRequestBody() throws Exception {
         when(personUnavailabilityService.create(eq("34970000003"), any()))
-                .thenReturn(new PersonUnavailabilityResponseDTO(6L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null));
+                .thenReturn(new PersonUnavailabilityResponseDTO(6L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), null));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-12",
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-12T00:00:00",
                                   "personId": 999
                                 }
                                 """))
@@ -136,8 +136,8 @@ class PersonUnavailabilityControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-12"
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-12T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isConflict())
@@ -149,7 +149,7 @@ class PersonUnavailabilityControllerTest {
     void shouldReturn409WithAssignmentConflictStructuredResponse() throws Exception {
         when(personUnavailabilityService.create(eq("34970000005"), any()))
                 .thenThrow(new UnavailabilityAssignmentConflictException(List.of(
-                        new EventAssignmentConflictDTO(15L, "Missa das 19h", LocalDate.of(2026, 8, 15), LocalTime.of(19, 0),
+                        new EventAssignmentConflictDTO(15L, "Missa das 19h", LocalDateTime.of(2026, 8, 15, 19, 0), LocalDateTime.of(2026, 8, 15, 20, 0),
                                 List.of("READER", "COMMENTATOR"))
                 )));
 
@@ -158,8 +158,8 @@ class PersonUnavailabilityControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-15",
-                                  "endDate": "2026-08-15"
+                                  "startAt": "2026-08-15T00:00:00",
+                                  "endAt": "2026-08-16T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isConflict())
@@ -173,20 +173,20 @@ class PersonUnavailabilityControllerTest {
     @WithMockUser(username = "34970000006", roles = "ADMIN")
     void shouldUpdateUnavailability() throws Exception {
         when(personUnavailabilityService.update(eq("34970000006"), eq(1L), any()))
-                .thenReturn(new PersonUnavailabilityResponseDTO(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 15), "Atualizado"));
+                .thenReturn(new PersonUnavailabilityResponseDTO(1L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 15, 0, 0), "Atualizado"));
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-15",
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-15T00:00:00",
                                   "reason": "Atualizado"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.endDate").value("2026-08-15"))
+                .andExpect(jsonPath("$.endAt").value("2026-08-15T00:00:00"))
                 .andExpect(jsonPath("$.reason").value("Atualizado"));
     }
 
@@ -201,8 +201,8 @@ class PersonUnavailabilityControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-12"
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-12T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isNotFound())
@@ -211,17 +211,17 @@ class PersonUnavailabilityControllerTest {
 
     @Test
     @WithMockUser(username = "34970000008", roles = "ADMIN")
-    void shouldReturn400WhenStartDateIsInThePast() throws Exception {
+    void shouldReturn400WhenStartAtIsInThePast() throws Exception {
         when(personUnavailabilityService.update(eq("34970000008"), eq(1L), any()))
-                .thenThrow(new BadRequestException("A data inicial não pode ser anterior à data atual"));
+                .thenThrow(new BadRequestException("startAt não pode ser anterior ao instante atual"));
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2020-01-01",
-                                  "endDate": "2020-01-02"
+                                  "startAt": "2020-01-01T00:00:00",
+                                  "endAt": "2020-01-02T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -249,18 +249,23 @@ class PersonUnavailabilityControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldReturnAdminUnavailabilityByDateWithoutSensitiveFields() throws Exception {
-        when(personUnavailabilityService.findByDate(LocalDate.of(2026, 8, 10)))
+    void shouldReturnAdminUnavailabilityByRangeWithoutSensitiveFields() throws Exception {
+        when(personUnavailabilityService.findByDate(LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0)))
                 .thenReturn(new AdminUnavailabilityResponseDTO(
-                        LocalDate.of(2026, 8, 10),
-                        List.of(new AdminUnavailabilityPersonDTO(4L, "Arthur Costa", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)))
+                        LocalDateTime.of(2026, 8, 10, 0, 0),
+                        LocalDateTime.of(2026, 8, 11, 0, 0),
+                        List.of(new AdminUnavailabilityPersonDTO(4L, "Arthur Costa",
+                                List.of(new AdminUnavailabilityRangeDTO(LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0)))))
                 ));
 
-        mockMvc.perform(get("/pessoas/indisponibilidades").param("date", "2026-08-10"))
+        mockMvc.perform(get("/pessoas/indisponibilidades")
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.date").value("2026-08-10"))
+                .andExpect(jsonPath("$.startAt").value("2026-08-10T00:00:00"))
                 .andExpect(jsonPath("$.people[0].personId").value(4))
                 .andExpect(jsonPath("$.people[0].personName").value("Arthur Costa"))
+                .andExpect(jsonPath("$.people[0].unavailabilities[0].startAt").value("2026-08-10T00:00:00"))
                 .andExpect(jsonPath("$.people[0].reason").doesNotExist())
                 .andExpect(jsonPath("$.people[0].phoneNumber").doesNotExist())
                 .andExpect(jsonPath("$.people[0].password").doesNotExist())
@@ -272,7 +277,9 @@ class PersonUnavailabilityControllerTest {
     @Test
     @WithMockUser(roles = "OPERATOR")
     void shouldReturnForbiddenWhenOperatorUsesAdminEndpoint() throws Exception {
-        mockMvc.perform(get("/pessoas/indisponibilidades").param("date", "2026-08-10"))
+        mockMvc.perform(get("/pessoas/indisponibilidades")
+                        .param("startAt", "2026-08-10T00:00:00")
+                        .param("endAt", "2026-08-11T00:00:00"))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(personUnavailabilityService);
@@ -284,7 +291,7 @@ class PersonUnavailabilityControllerTest {
         when(personUnavailabilityService.create(eq("34970000011"), any()))
                 .thenThrow(new PersonUnavailableForEventException(List.of(
                         new PersonUnavailabilityEventConflictDTO(4L, "Arthur Costa", List.of("READER", "COMMENTATOR"),
-                                LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12))
+                                LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0))
                 )));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -292,8 +299,8 @@ class PersonUnavailabilityControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "startDate": "2026-08-10",
-                                  "endDate": "2026-08-12"
+                                  "startAt": "2026-08-10T00:00:00",
+                                  "endAt": "2026-08-12T00:00:00"
                                 }
                                 """))
                 .andExpect(status().isConflict())

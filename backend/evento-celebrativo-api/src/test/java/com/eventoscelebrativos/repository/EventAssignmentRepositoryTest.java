@@ -23,6 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
@@ -540,8 +541,8 @@ class EventAssignmentRepositoryTest {
     private Page<PersonScheduleEventProjection> findSchedule(Person person, LocalDate startDate, LocalDate endDate, int page, int size) {
         return eventAssignmentRepository.findScheduleEventsByPersonId(
                 person.getId(),
-                startDate,
-                endDate,
+                startDate.atStartOfDay(),
+                endDate.plusDays(1).atStartOfDay(),
                 PageRequest.of(page, size)
         );
     }
@@ -564,11 +565,12 @@ class EventAssignmentRepositoryTest {
     }
 
     private CelebrationEvent saveEvent(String name, LocalDate eventDate, LocalTime eventTime) {
+        LocalDateTime startAt = LocalDateTime.of(eventDate, eventTime);
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name,
-                eventDate,
-                eventTime,
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         entityManager.persist(event);

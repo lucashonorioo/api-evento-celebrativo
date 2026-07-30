@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -105,8 +106,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 1);
-        PersonUnavailabilityRequestDTO first = new PersonUnavailabilityRequestDTO(base, base.plusDays(3), null);
-        PersonUnavailabilityRequestDTO second = new PersonUnavailabilityRequestDTO(base.plusDays(1), base.plusDays(5), null);
+        PersonUnavailabilityRequestDTO first = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(3)), null);
+        PersonUnavailabilityRequestDTO second = new PersonUnavailabilityRequestDTO(dayStart(base.plusDays(1)), dayEndExclusive(base.plusDays(5)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -119,7 +120,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         assertEquals(1, successes.get(), "Apenas uma das duas indisponibilidades sobrepostas deve ser persistida");
         assertEquals(1, conflicts.get());
-        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), base, base.plusDays(5)).size());
+        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(base), dayEndExclusive(base.plusDays(5))).size());
     }
 
     @Test
@@ -129,7 +130,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 10);
-        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -142,7 +143,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         assertEquals(1, successes.get());
         assertEquals(1, conflicts.get());
-        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), base, base.plusDays(2)).size());
+        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(base), dayEndExclusive(base.plusDays(2))).size());
     }
 
     @Test
@@ -155,8 +156,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdB = personB.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 15);
-        PersonUnavailabilityRequestDTO requestA = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
-        PersonUnavailabilityRequestDTO requestB = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
+        PersonUnavailabilityRequestDTO requestA = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
+        PersonUnavailabilityRequestDTO requestB = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -180,13 +181,14 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Test Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 20);
+        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
 
         PersonUnavailabilityRequestDTO unavailabilityRequest =
-                new PersonUnavailabilityRequestDTO(eventDate, eventDate, null);
+                new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
         CelebrationEventWithScaleRequestDTO scaleRequest = new CelebrationEventWithScaleRequestDTO();
         scaleRequest.setNameMassOrEvent("Concurrent Invariant Event " + UUID.randomUUID());
-        scaleRequest.setEventDate(eventDate);
-        scaleRequest.setEventTime(LocalTime.of(19, 0));
+        scaleRequest.setStartAt(eventStartAt);
+        scaleRequest.setEndAt(eventStartAt.plusHours(1));
         scaleRequest.setMassOrCelebration(true);
         scaleRequest.setLocationId(locationId);
         scaleRequest.setReaderIds(List.of(person.getId()));
@@ -230,7 +232,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupEventId = createdEventId.get();
 
         boolean hasUnavailability = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), eventDate, eventDate).isEmpty();
+                .findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate)).isEmpty();
         boolean hasAssignment = cleanupEventId != null
                 && !eventAssignmentRepository.findAllByEventId(cleanupEventId).isEmpty();
 
@@ -248,12 +250,14 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Scale Update Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 25);
+        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Scale Update Event " + UUID.randomUUID(), eventDate, LocalTime.of(19, 0), true));
+                null, "Concurrent Scale Update Event " + UUID.randomUUID(), eventStartAt, eventStartAt.plusHours(1), true));
         cleanupEventId = event.getId();
         Long eventId = event.getId();
 
-        PersonUnavailabilityRequestDTO unavailabilityRequest = new PersonUnavailabilityRequestDTO(eventDate, eventDate, null);
+        PersonUnavailabilityRequestDTO unavailabilityRequest =
+                new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
         CelebrationEventScaleRequestDTO scaleRequest =
                 new CelebrationEventScaleRequestDTO(locationId, null, List.of(person.getId()), null, null, null);
 
@@ -292,7 +296,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         }
 
         boolean hasUnavailability = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), eventDate, eventDate).isEmpty();
+                .findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate)).isEmpty();
         boolean hasAssignment = !eventAssignmentRepository.findAllByEventId(eventId).isEmpty();
 
         assertFalse(hasUnavailability && hasAssignment,
@@ -308,15 +312,18 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         LocalDate originalDate = LocalDate.of(2026, 11, 1);
         LocalDate newDate = LocalDate.of(2026, 11, 5);
+        LocalDateTime originalStartAt = LocalDateTime.of(originalDate, LocalTime.of(19, 0));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Date Change Event " + UUID.randomUUID(), originalDate, LocalTime.of(19, 0), true));
+                null, "Concurrent Date Change Event " + UUID.randomUUID(), originalStartAt, originalStartAt.plusHours(1), true));
         cleanupEventId = event.getId();
         Long eventId = event.getId();
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
 
-        PersonUnavailabilityRequestDTO unavailabilityRequest = new PersonUnavailabilityRequestDTO(newDate, newDate, null);
+        PersonUnavailabilityRequestDTO unavailabilityRequest =
+                new PersonUnavailabilityRequestDTO(dayStart(newDate), dayEndExclusive(newDate), null);
+        LocalDateTime newStartAt = LocalDateTime.of(newDate, event.getStartAt().toLocalTime());
         CelebrationEventRequestDTO dateChangeRequest =
-                new CelebrationEventRequestDTO(event.getNameMassOrEvent(), newDate, event.getEventTime(), true);
+                new CelebrationEventRequestDTO(event.getNameMassOrEvent(), newStartAt, newStartAt.plusHours(1), true);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -354,8 +361,9 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         CelebrationEvent finalEvent = celebrationEventRepository.findById(eventId).orElseThrow();
         boolean hasAssignment = !eventAssignmentRepository.findAllByEventId(eventId).isEmpty();
+        LocalDate finalEventDate = finalEvent.getStartAt().toLocalDate();
         boolean hasUnavailabilityCoveringFinalDate = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), finalEvent.getEventDate(), finalEvent.getEventDate()).isEmpty();
+                .findOverlapping(person.getId(), dayStart(finalEventDate), dayEndExclusive(finalEventDate)).isEmpty();
 
         assertFalse(hasAssignment && hasUnavailabilityCoveringFinalDate,
                 "Invariante violado: pessoa nao pode estar indisponivel e escalada na data final do evento simultaneamente (mudanca de eventDate)");
@@ -426,6 +434,14 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+    }
+
+    private LocalDateTime dayStart(LocalDate date) {
+        return date.atStartOfDay();
+    }
+
+    private LocalDateTime dayEndExclusive(LocalDate date) {
+        return date.plusDays(1).atStartOfDay();
     }
 
     private String uniquePhoneNumber() {

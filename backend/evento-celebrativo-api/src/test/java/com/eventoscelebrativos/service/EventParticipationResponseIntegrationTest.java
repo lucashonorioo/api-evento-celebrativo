@@ -334,11 +334,12 @@ class EventParticipationResponseIntegrationTest {
     }
 
     private CelebrationEvent saveEvent(String name, LocalDate eventDate, LocalTime eventTime) {
+        LocalDateTime startAt = LocalDateTime.of(eventDate, eventTime);
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name + " " + UUID.randomUUID(),
-                eventDate,
-                eventTime,
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         return celebrationEventRepository.saveAndFlush(event);

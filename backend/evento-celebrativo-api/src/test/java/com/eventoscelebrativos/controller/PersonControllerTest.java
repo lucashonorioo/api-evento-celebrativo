@@ -692,7 +692,7 @@ class PersonControllerTest {
                 "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(scheduleResponse(
-                                15L, "Missa das 19h", LocalDate.of(2026, 7, 20), LocalTime.of(19, 0),
+                                15L, "Missa das 19h", LocalDateTime.of(2026, 7, 20, 19, 0), LocalDateTime.of(2026, 7, 20, 20, 0),
                                 true, 2L, "Igreja Matriz",
                                 List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR)
                         )),
@@ -1056,15 +1056,15 @@ class PersonControllerTest {
     private CurrentUserScheduleResponseDTO scheduleResponse(
             Long eventId,
             String eventName,
-            LocalDate eventDate,
-            LocalTime eventTime,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             Boolean massOrCelebration,
             Long locationId,
             String locationName,
             List<EventAssignmentType> assignments
     ) {
         return new CurrentUserScheduleResponseDTO(
-                eventId, eventName, eventDate, eventTime, massOrCelebration, locationId, locationName, assignments,
+                eventId, eventName, startAt, endAt, massOrCelebration, locationId, locationName, assignments,
                 ParticipationStatus.PENDING, null, null
         );
     }

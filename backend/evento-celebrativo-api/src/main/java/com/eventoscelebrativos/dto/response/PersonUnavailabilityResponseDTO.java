@@ -1,21 +1,21 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class PersonUnavailabilityResponseDTO {
 
     private Long id;
-    private LocalDate startDate;
-    private LocalDate endDate;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
     private String reason;
 
     public PersonUnavailabilityResponseDTO() {
     }
 
-    public PersonUnavailabilityResponseDTO(Long id, LocalDate startDate, LocalDate endDate, String reason) {
+    public PersonUnavailabilityResponseDTO(Long id, LocalDateTime startAt, LocalDateTime endAt, String reason) {
         this.id = id;
-        this.startDate = startDate;
-        this.endDate = endDate;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.reason = reason;
     }
 
@@ -27,20 +27,20 @@ public class PersonUnavailabilityResponseDTO {
         this.id = id;
     }
 
-    public LocalDate getStartDate() {
-        return startDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalDate getEndDate() {
-        return endDate;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public String getReason() {

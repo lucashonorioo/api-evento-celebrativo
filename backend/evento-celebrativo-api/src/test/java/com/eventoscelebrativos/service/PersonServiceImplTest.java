@@ -714,7 +714,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
                         pageable,
@@ -735,7 +735,7 @@ class PersonServiceImplTest {
         assertEquals(ParticipationStatus.PENDING, result.getContent().get(0).getParticipationStatus());
         assertNull(result.getContent().get(0).getDeclineReason());
         assertNull(result.getContent().get(0).getRespondedAt());
-        verify(eventAssignmentRepository).findScheduleEventsByPersonId(10L, startDate, endDate, pageable);
+        verify(eventAssignmentRepository).findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable);
     }
 
     @Test
@@ -746,7 +746,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
                         pageable,
@@ -773,7 +773,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
                         pageable,
@@ -800,7 +800,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(
                                 eventProjection(5L, "Evento Um", startDate, LocalTime.of(8, 0), true, null, null),
@@ -890,7 +890,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
                         pageable,
@@ -921,7 +921,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(
                                 eventProjection(5L, "Evento Cedo", LocalDate.of(2026, 8, 5), LocalTime.of(8, 0), true, null, null),
@@ -948,7 +948,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
@@ -966,7 +966,7 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
                         pageable,
@@ -990,12 +990,13 @@ class PersonServiceImplTest {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
         when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(authenticatedPerson));
-        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate, endDate, pageable))
+        when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
 
-        verify(eventAssignmentRepository).findScheduleEventsByPersonId(eq(10L), eq(startDate), eq(endDate), eq(pageable));
+        verify(eventAssignmentRepository).findScheduleEventsByPersonId(
+                eq(10L), eq(startDate.atStartOfDay()), eq(endDate.plusDays(1).atStartOfDay()), eq(pageable));
         verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
     }
 
@@ -1008,6 +1009,8 @@ class PersonServiceImplTest {
             Long locationId,
             String locationName
     ) {
+        LocalDateTime startAt = LocalDateTime.of(eventDate, eventTime);
+        LocalDateTime endAt = startAt.plusHours(1);
         return new PersonScheduleEventProjection() {
             @Override
             public Long getEventId() {
@@ -1020,13 +1023,13 @@ class PersonServiceImplTest {
             }
 
             @Override
-            public LocalDate getEventDate() {
-                return eventDate;
+            public LocalDateTime getStartAt() {
+                return startAt;
             }
 
             @Override
-            public LocalTime getEventTime() {
-                return eventTime;
+            public LocalDateTime getEndAt() {
+                return endAt;
             }
 
             @Override
