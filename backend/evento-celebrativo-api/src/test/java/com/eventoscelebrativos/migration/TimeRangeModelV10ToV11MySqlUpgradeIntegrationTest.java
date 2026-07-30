@@ -19,6 +19,9 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +79,9 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
             DataSource dataSource = dataSourceFor(databaseName);
             migrateUntil(dataSource, "10");
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+            String mysqlVersion = jdbcTemplate.queryForObject("SELECT VERSION()", String.class);
+            assertTrue(mysqlVersion != null && mysqlVersion.startsWith("8.4."),
+                    "A validacao exige MySQL 8.4 real, mas encontrou: " + mysqlVersion);
 
             // --- Dataset representativo em schema V10 ---
             long personId = insertPerson(jdbcTemplate, "Ana Beatriz Ferreira", "34991230001");
@@ -94,18 +100,16 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
                     jdbcTemplate, personId, multiDayStart, multiDayEnd, "Viagem de familia",
                     multiDayCreatedAt, multiDayUpdatedAt);
 
-            // Evento cuja duracao real e conhecida externamente (Missa das 19h, dura 1h ate as 20h) -
-            // esse conhecimento NAO existe em nenhuma coluna do schema V10 e NAO deve ser inferido
-            // pela migration: end_at precisa permanecer NULL apos a V11, mesmo sabendo-se, fora do
-            // banco, qual seria o horario real de termino.
-            LocalDate eventDate = LocalDate.of(2026, 9, 20);
+            // Regra autorizada apenas para os dados legados descartaveis: end_at = start_at + 1 hora.
+            LocalDate eventDate = LocalDate.of(2026, 8, 9);
             LocalTime eventTime = LocalTime.of(19, 0);
             long eventId = insertLegacyEvent(jdbcTemplate, "Missa Legada V10", eventDate, eventTime);
 
             long assignmentId = insertEventAssignment(jdbcTemplate, eventId, personId, "READER");
             Timestamp respondedAt = Timestamp.valueOf(LocalDateTime.of(2026, 1, 8, 10, 0));
+            String declineReason = "Compromisso familiar";
             long participationId = insertEventParticipationResponse(
-                    jdbcTemplate, eventId, personId, "CONFIRMED", null, respondedAt);
+                    jdbcTemplate, eventId, personId, "DECLINED", declineReason, respondedAt);
 
             MigrateResult result = migrateAll(dataSource);
             assertTrue(result.migrationsExecuted >= 1);
@@ -141,19 +145,27 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
             assertEquals(multiDayUpdatedAt, queryTimestamp(
                     jdbcTemplate, "SELECT updated_at FROM tb_person_unavailability WHERE id = ?", multiDayUnavailabilityId));
 
-            // --- Conversao exata do evento: start_at = event_date + event_time; end_at permanece NULL ---
+            // --- Conversao exata do evento: start_at = date+time; end_at = start_at + 1 hora ---
             assertEquals(Timestamp.valueOf(LocalDateTime.of(eventDate, eventTime)), queryTimestamp(
                     jdbcTemplate, "SELECT start_at FROM tb_celebration_event WHERE id = ?", eventId));
-            assertNull(jdbcTemplate.queryForObject(
-                    "SELECT end_at FROM tb_celebration_event WHERE id = ?", Timestamp.class, eventId));
+            assertEquals(Timestamp.valueOf(LocalDateTime.of(eventDate, eventTime).plusHours(1)), queryTimestamp(
+                    jdbcTemplate, "SELECT end_at FROM tb_celebration_event WHERE id = ?", eventId));
 
             // --- EventAssignment e EventParticipationResponse permanecem intactos (nao sao alvo da V11) ---
             assertEquals(1, jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM tb_event_assignment WHERE id = ? AND event_id = ? AND person_id = ? AND assignment_type = 'READER'",
                     Integer.class, assignmentId, eventId, personId));
             assertEquals(1, jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM tb_event_participation_response WHERE id = ? AND event_id = ? AND person_id = ? AND status = 'CONFIRMED'",
+                    "SELECT COUNT(*) FROM tb_event_participation_response WHERE id = ? AND event_id = ? AND person_id = ? AND status = 'DECLINED'",
                     Integer.class, participationId, eventId, personId));
+            assertEquals(declineReason, jdbcTemplate.queryForObject(
+                    "SELECT decline_reason FROM tb_event_participation_response WHERE id = ?",
+                    String.class, participationId));
+            assertEquals(respondedAt, queryTimestamp(
+                    jdbcTemplate,
+                    "SELECT responded_at FROM tb_event_participation_response WHERE id = ?",
+                    participationId
+            ));
 
             // --- Schema final: PersonUnavailability ---
             assertFalse(columnExists(jdbcTemplate, "tb_person_unavailability", "start_date"));
@@ -161,18 +173,58 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
             assertFalse(columnNullable(jdbcTemplate, "tb_person_unavailability", "start_at"));
             assertFalse(columnNullable(jdbcTemplate, "tb_person_unavailability", "end_at"));
             assertTrue(constraintExists(jdbcTemplate, "uk_tb_person_unavailability_person_range", "UNIQUE"));
-            assertTrue(indexExists(jdbcTemplate, "tb_person_unavailability", "idx_tb_person_unavailability_person_range"));
+            assertTrue(constraintExists(jdbcTemplate, "chk_tb_person_unavailability_range", "CHECK"));
+            assertTrue(indexExists(jdbcTemplate, "tb_person_unavailability",
+                    "idx_tb_person_unavailability_person_end_start"));
             assertTrue(indexExists(jdbcTemplate, "tb_person_unavailability", "idx_tb_person_unavailability_range_person"));
+            assertFalse(indexExists(jdbcTemplate, "tb_person_unavailability",
+                    "idx_tb_person_unavailability_person_range"));
             assertTrue(foreignKeyExists(jdbcTemplate, "tb_person_unavailability", "fk_tb_person_unavailability_person"));
             assertEquals("CASCADE", foreignKeyDeleteRule(jdbcTemplate, "fk_tb_person_unavailability_person"));
 
-            // --- Schema final: CelebrationEvent (fase 1 - end_at ainda nullable, colunas antigas preservadas) ---
+            // --- Schema final: CelebrationEvent ---
             assertFalse(columnNullable(jdbcTemplate, "tb_celebration_event", "start_at"));
-            assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "end_at"));
-            assertTrue(columnExists(jdbcTemplate, "tb_celebration_event", "event_date"));
-            assertTrue(columnExists(jdbcTemplate, "tb_celebration_event", "event_time"));
-            assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "event_date"));
-            assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "event_time"));
+            assertFalse(columnNullable(jdbcTemplate, "tb_celebration_event", "end_at"));
+            assertFalse(columnExists(jdbcTemplate, "tb_celebration_event", "event_date"));
+            assertFalse(columnExists(jdbcTemplate, "tb_celebration_event", "event_time"));
+            assertTrue(constraintExists(jdbcTemplate, "chk_tb_celebration_event_range", "CHECK"));
+            assertEquals(
+                    List.of("start_at", "end_at", "id"),
+                    indexColumns(jdbcTemplate, "tb_celebration_event", "idx_tb_celebration_event_start_end")
+            );
+            assertEquals(
+                    List.of("end_at", "start_at", "id"),
+                    indexColumns(jdbcTemplate, "tb_celebration_event", "idx_tb_celebration_event_end_start")
+            );
+            assertEquals(
+                    List.of("person_id", "start_at", "end_at"),
+                    indexColumns(
+                            jdbcTemplate,
+                            "tb_person_unavailability",
+                            "uk_tb_person_unavailability_person_range"
+                    )
+            );
+            assertEquals(
+                    List.of("person_id", "end_at", "start_at"),
+                    indexColumns(
+                            jdbcTemplate,
+                            "tb_person_unavailability",
+                            "idx_tb_person_unavailability_person_end_start"
+                    )
+            );
+            assertEquals(
+                    List.of("start_at", "end_at", "person_id"),
+                    indexColumns(
+                            jdbcTemplate,
+                            "tb_person_unavailability",
+                            "idx_tb_person_unavailability_range_person"
+                    )
+            );
+
+            assertBusinessDateTimeColumn(jdbcTemplate, "tb_celebration_event", "start_at");
+            assertBusinessDateTimeColumn(jdbcTemplate, "tb_celebration_event", "end_at");
+            assertBusinessDateTimeColumn(jdbcTemplate, "tb_person_unavailability", "start_at");
+            assertBusinessDateTimeColumn(jdbcTemplate, "tb_person_unavailability", "end_at");
 
             // --- CHECK constraints funcionais ---
             long thirdPersonId = insertPerson(jdbcTemplate, "Bruno Castro", "34991230002");
@@ -184,12 +236,53 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
                     """,
                     thirdPersonId, Timestamp.valueOf(sameInstant), Timestamp.valueOf(sameInstant)));
 
-            jdbcTemplate.update(
+            assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                     """
                     INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                     VALUES (?, ?, NULL, TRUE)
                     """,
-                    "Evento novo sem end_at ainda definido", Timestamp.valueOf(sameInstant));
+                    "Evento sem end_at", Timestamp.valueOf(sameInstant)));
+
+            assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                    """
+                    INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
+                    VALUES (?, ?, ?, TRUE)
+                    """,
+                    "Evento invertido",
+                    Timestamp.valueOf(sameInstant),
+                    Timestamp.valueOf(sameInstant.minusHours(1))));
+
+            assertExplainConsidersIndex(
+                    jdbcTemplate,
+                    "EXPLAIN SELECT * FROM tb_person_unavailability "
+                            + "WHERE person_id = " + personId
+                            + " AND start_at < '2026-08-13 00:00:00'"
+                            + " AND end_at > '2026-08-10 00:00:00'",
+                    "idx_tb_person_unavailability_person_end_start"
+            );
+            assertExplainConsidersIndex(
+                    jdbcTemplate,
+                    "EXPLAIN SELECT person_id, start_at, end_at FROM tb_person_unavailability "
+                            + "WHERE person_id IN (" + personId + "," + thirdPersonId + ")"
+                            + " AND start_at < '2026-08-13 00:00:00'"
+                            + " AND end_at > '2026-08-10 00:00:00'",
+                    "idx_tb_person_unavailability_person_end_start"
+            );
+            assertExplainConsidersIndex(
+                    jdbcTemplate,
+                    "EXPLAIN SELECT person_id, start_at, end_at FROM tb_person_unavailability "
+                            + "WHERE start_at < '2026-08-13 00:00:00'"
+                            + " AND end_at > '2026-08-10 00:00:00'",
+                    "idx_tb_person_unavailability_range_person"
+            );
+            assertExplainConsidersIndex(
+                    jdbcTemplate,
+                    "EXPLAIN SELECT id, start_at, end_at FROM tb_celebration_event "
+                            + "WHERE start_at < '2026-08-10 00:00:00'"
+                            + " AND end_at > '2026-08-09 00:00:00'"
+                            + " ORDER BY start_at, id",
+                    "idx_tb_celebration_event_start_end"
+            );
         } finally {
             dropIsolatedDatabase(databaseName);
         }
@@ -383,5 +476,58 @@ class TimeRangeModelV10ToV11MySqlUpgradeIntegrationTest {
                 WHERE constraint_schema = DATABASE() AND UPPER(constraint_name) = UPPER(?)
                 """,
                 String.class, constraintName);
+    }
+
+    private List<String> indexColumns(JdbcTemplate jdbcTemplate, String tableName, String indexName) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT LOWER(column_name)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND UPPER(table_name) = UPPER(?)
+                  AND UPPER(index_name) = UPPER(?)
+                ORDER BY seq_in_index
+                """,
+                String.class,
+                tableName,
+                indexName
+        );
+    }
+
+    private void assertBusinessDateTimeColumn(
+            JdbcTemplate jdbcTemplate,
+            String tableName,
+            String columnName
+    ) {
+        Map<String, Object> metadata = jdbcTemplate.queryForMap(
+                """
+                SELECT data_type, datetime_precision
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND UPPER(table_name) = UPPER(?)
+                  AND UPPER(column_name) = UPPER(?)
+                """,
+                tableName,
+                columnName
+        );
+        assertEquals("datetime", String.valueOf(metadata.get("data_type")).toLowerCase(Locale.ROOT));
+        assertEquals(0, ((Number) metadata.get("datetime_precision")).intValue());
+    }
+
+    private void assertExplainConsidersIndex(
+            JdbcTemplate jdbcTemplate,
+            String explainSql,
+            String expectedIndex
+    ) {
+        List<Map<String, Object>> plan = jdbcTemplate.queryForList(explainSql);
+        String possibleKeys = plan.stream()
+                .map(row -> row.get("possible_keys"))
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
+        assertTrue(
+                possibleKeys.toLowerCase(Locale.ROOT).contains(expectedIndex.toLowerCase(Locale.ROOT)),
+                () -> "EXPLAIN nao considerou " + expectedIndex + ": " + plan
+        );
     }
 }

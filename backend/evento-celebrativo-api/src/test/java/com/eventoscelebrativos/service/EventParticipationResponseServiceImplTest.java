@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class EventParticipationResponseServiceImplTest {
 
-    private static final ZoneId ZONE = ZoneId.systemDefault();
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
 
     @Mock
     private EventParticipationResponseRepository eventParticipationResponseRepository;

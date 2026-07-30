@@ -1,8 +1,6 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,6 +8,7 @@ public class EucharistScaleEventResponseDTO {
 
     String nameMassOrEvent;
     LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
     LocalDateTime endAt;
     String churchName;
     List<String> nameMinisters;
@@ -33,22 +32,6 @@ public class EucharistScaleEventResponseDTO {
 
     public LocalDateTime getEndAt() {
         return endAt;
-    }
-
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     */
-    @Deprecated
-    public LocalDate getEventDate() {
-        return startAt == null ? null : startAt.toLocalDate();
-    }
-
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     */
-    @Deprecated
-    public LocalTime getEventTime() {
-        return startAt == null ? null : startAt.toLocalTime();
     }
 
     public String getChurchName() {

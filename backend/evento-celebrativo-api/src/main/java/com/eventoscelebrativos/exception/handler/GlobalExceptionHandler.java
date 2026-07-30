@@ -19,7 +19,7 @@ import java.time.Instant;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final String UNAVAILABILITY_UNIQUE_CONSTRAINT = "uk_tb_person_unavailability_person_dates";
+    private static final String UNAVAILABILITY_UNIQUE_CONSTRAINT = "uk_tb_person_unavailability_person_range";
 
     @ExceptionHandler(UnavailabilityAssignmentConflictException.class)
     public ResponseEntity<UnavailabilityAssignmentConflictErrorResponse> handleUnavailabilityAssignmentConflict(

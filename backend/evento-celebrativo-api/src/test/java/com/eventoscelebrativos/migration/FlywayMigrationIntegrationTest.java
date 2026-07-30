@@ -53,9 +53,18 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("6");
         assertSuccessfulMigration("7");
         assertSuccessfulMigration("8");
+        assertSuccessfulMigration("9");
+        assertSuccessfulMigration("10");
+        assertSuccessfulMigration("11");
         assertTableExists("flyway_schema_history");
+        assertTableExists("tb_event_participation_response");
+        assertTableExists("tb_person_unavailability");
         assertTableDoesNotExist("tb_event_person");
         assertColumnDoesNotExist("tb_person", "person_type");
+        assertColumnDoesNotExist("tb_celebration_event", "event_date");
+        assertColumnDoesNotExist("tb_celebration_event", "event_time");
+        assertColumnExists("tb_celebration_event", "start_at");
+        assertColumnExists("tb_celebration_event", "end_at");
 
         for (String table : CURRENT_TABLES) {
             assertTableExists(table);
@@ -93,10 +102,12 @@ class FlywayMigrationIntegrationTest {
         assertEquals(0, countRows("tb_celebration_event"));
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4', '5', '6', '7', '8') AND success = TRUE",
+                "SELECT COUNT(*) FROM flyway_schema_history "
+                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11') "
+                        + "AND success = TRUE",
                 Integer.class
         );
-        assertEquals(8, successfulVersions);
+        assertEquals(11, successfulVersions);
     }
 
     @Test
@@ -115,6 +126,9 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("6");
         assertSuccessfulMigration("7");
         assertSuccessfulMigration("8");
+        assertSuccessfulMigration("9");
+        assertSuccessfulMigration("10");
+        assertSuccessfulMigration("11");
         assertTableDoesNotExist("tb_event_person");
         assertColumnDoesNotExist("tb_person", "person_type");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));

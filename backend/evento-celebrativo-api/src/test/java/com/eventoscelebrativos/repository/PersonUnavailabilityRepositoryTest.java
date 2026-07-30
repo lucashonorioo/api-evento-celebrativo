@@ -240,8 +240,8 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
-    void shouldHaveNamedIndexesForPersonAndDateLookups() {
-        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_person_range");
+    void shouldHaveNamedIndexesForTemporalRangeLookups() {
+        assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_person_end_start");
         assertIndexExists("tb_person_unavailability", "idx_tb_person_unavailability_range_person");
         assertConstraintExists("tb_person_unavailability", "uk_tb_person_unavailability_person_range");
     }

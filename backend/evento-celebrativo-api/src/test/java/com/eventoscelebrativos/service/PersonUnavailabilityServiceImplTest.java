@@ -6,6 +6,7 @@ import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PersonUnavailabilityServiceImplTest {
 
-    private static final ZoneId ZONE = ZoneId.systemDefault();
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     private static final LocalDateTime TODAY = LocalDateTime.of(2026, 8, 1, 0, 0);
 
     @Mock
@@ -152,6 +153,54 @@ class PersonUnavailabilityServiceImplTest {
     void shouldRejectZeroDurationRangeOnCreate() {
         assertThrows(BadRequestException.class, () -> service.create(
                 "34970000005", new PersonUnavailabilityRequestDTO(TODAY, TODAY, null)));
+    }
+
+    @Test
+    void shouldRejectFractionalStartAtOnCreate() {
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(
+                TODAY.plusDays(1).withNano(100_000_000),
+                TODAY.plusDays(2),
+                null
+        );
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(TemporalPrecisionNotSupportedException.class,
+                        () -> service.create("34970000001", request));
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verify(personRepository, never()).findByPhoneNumberForUpdate(any());
+    }
+
+    @Test
+    void shouldRejectFractionalEndAtOnUpdateBeforeIdempotencyComparison() {
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(
+                TODAY.plusDays(1),
+                TODAY.plusDays(2).withNano(123_000_000),
+                null
+        );
+
+        assertThrows(
+                TemporalPrecisionNotSupportedException.class,
+                () -> service.update("34970000001", 1L, request)
+        );
+
+        verify(personRepository, never()).findByPhoneNumberForUpdate(any());
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnQueryRange() {
+        assertThrows(
+                TemporalPrecisionNotSupportedException.class,
+                () -> service.findMine(
+                        "34970000001",
+                        TODAY.withNano(123_456_000),
+                        TODAY.plusDays(1),
+                        0,
+                        10
+                )
+        );
+
+        verify(personRepository, never()).findByPhoneNumber(any());
     }
 
     @Test

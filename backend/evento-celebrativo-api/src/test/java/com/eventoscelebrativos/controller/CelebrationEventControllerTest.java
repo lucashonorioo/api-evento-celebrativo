@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.config.TemporalJsonConfig;
 import com.eventoscelebrativos.dto.response.CelebrationEventResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleDetailResponseDTO;
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleLocationResponseDTO;
@@ -13,6 +14,7 @@ import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.service.CelebrationEventService;
@@ -47,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CelebrationEventController.class)
 @WithMockUser(roles = "ADMIN")
-@Import(CelebrationEventControllerTest.MethodSecurityConfig.class)
+@Import({CelebrationEventControllerTest.MethodSecurityConfig.class, TemporalJsonConfig.class})
 class CelebrationEventControllerTest {
 
     private static final LocalDate EVENT_DATE = LocalDate.of(2026, 8, 15);
@@ -73,7 +75,11 @@ class CelebrationEventControllerTest {
         mockMvc.perform(post("/eventos").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(validPayload("Missa")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", containsString("/eventos/1")))
-                .andExpect(jsonPath("$.id").value(1));
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.startAt").value("2026-08-15T19:30:00"))
+                .andExpect(jsonPath("$.endAt").value("2026-08-15T20:30:00"))
+                .andExpect(jsonPath("$.eventDate").doesNotExist())
+                .andExpect(jsonPath("$.eventTime").doesNotExist());
     }
 
     @Test
@@ -81,6 +87,71 @@ class CelebrationEventControllerTest {
         mockMvc.perform(post("/eventos").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(invalidPayload()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldReturnStructuredBadRequestForUnsupportedTemporalFractions() throws Exception {
+        when(celebrationEventService.createEvent(any()))
+                .thenThrow(new TemporalPrecisionNotSupportedException());
+
+        for (String fraction : List.of(".1", ".123", ".123456")) {
+            mockMvc.perform(post("/eventos")
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(fractionalPayload(fraction)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value("TEMPORAL_PRECISION_NOT_SUPPORTED"));
+        }
+    }
+
+    @Test
+    void shouldRejectLegacyEventDateAndEventTimeWriteContract() throws Exception {
+        String legacyPayload = """
+                {
+                  "nameMassOrEvent": "Missa legada",
+                  "startAt": "2026-08-15T19:30:00",
+                  "endAt": "2026-08-15T20:30:00",
+                  "eventDate": "2026-08-15",
+                  "eventTime": "19:30:00",
+                  "massOrCelebration": true
+                }
+                """;
+
+        mockMvc.perform(post("/eventos")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(legacyPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldRejectOffsetAndUtcEventDateTimes() throws Exception {
+        for (String invalidDateTime : List.of(
+                "2026-08-15T19:30:00-03:00",
+                "2026-08-15T22:30:00Z"
+        )) {
+            String payload = """
+                    {
+                      "nameMassOrEvent": "Missa",
+                      "startAt": "%s",
+                      "endAt": "2026-08-15T23:30:00",
+                      "massOrCelebration": true
+                    }
+                    """.formatted(invalidDateTime);
+
+            mockMvc.perform(post("/eventos")
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(payload))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+        }
 
         verifyNoInteractions(celebrationEventService);
     }
@@ -122,6 +193,30 @@ class CelebrationEventControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorPostsCommonEvent() throws Exception {
+        mockMvc.perform(post("/eventos")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPayload("Missa")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorUpdatesCommonEvent() throws Exception {
+        mockMvc.perform(put("/eventos/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validPayload("Missa")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
     void shouldReturnOkWhenPuttingValidEventScale() throws Exception {
         when(celebrationEventService.updateEventScale(eq(1L), any())).thenReturn(scaleResponse());
 
@@ -140,8 +235,10 @@ class CelebrationEventControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventId").value(1))
                 .andExpect(jsonPath("$.eventName").value("Missa"))
-                .andExpect(jsonPath("$.eventDate").value("2026-08-15"))
-                .andExpect(jsonPath("$.eventTime").value("19:30:00"))
+                .andExpect(jsonPath("$.startAt").value("2026-08-15T19:30:00"))
+                .andExpect(jsonPath("$.endAt").value("2026-08-15T20:30:00"))
+                .andExpect(jsonPath("$.eventDate").doesNotExist())
+                .andExpect(jsonPath("$.eventTime").doesNotExist())
                 .andExpect(jsonPath("$.massOrCelebration").value(true))
                 .andExpect(jsonPath("$.location.id").value(1))
                 .andExpect(jsonPath("$.location.churchName").value("Igreja Matriz"))
@@ -620,6 +717,17 @@ class CelebrationEventControllerTest {
                   "massOrCelebration": null
                 }
                 """;
+    }
+
+    private String fractionalPayload(String fraction) {
+        return """
+                {
+                  "nameMassOrEvent": "Missa",
+                  "startAt": "2026-08-15T19:30:00%s",
+                  "endAt": "2026-08-15T20:30:00",
+                  "massOrCelebration": true
+                }
+                """.formatted(fraction);
     }
 
     private String validScalePayload() {

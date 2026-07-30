@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
@@ -137,6 +138,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         if (startAt == null || endAt == null) {
             throw new BadRequestException("startAt e endAt são obrigatórios");
         }
+        validateSecondPrecision(startAt, endAt);
         if (!startAt.isBefore(endAt)) {
             throw new BadRequestException("startAt deve ser anterior a endAt");
         }
@@ -161,10 +163,11 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         if (startAt == null || endAt == null) {
             throw new BadRequestException("startAt e endAt são obrigatórios");
         }
+        validateSecondPrecision(startAt, endAt);
         if (!startAt.isBefore(endAt)) {
             throw new BadRequestException("startAt deve ser anterior a endAt");
         }
-        if (startAt.isBefore(LocalDateTime.now(clock))) {
+        if (startAt.isBefore(LocalDateTime.now(clock).withNano(0))) {
             throw new BadRequestException("startAt não pode ser anterior ao instante atual");
         }
     }
@@ -173,6 +176,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         if (startAt == null || endAt == null) {
             throw new BadRequestException("startAt e endAt são obrigatórios");
         }
+        validateSecondPrecision(startAt, endAt);
         if (!startAt.isBefore(endAt)) {
             throw new BadRequestException("startAt deve ser anterior a endAt");
         }
@@ -181,6 +185,12 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         }
         if (size <= 0 || size > MAX_PAGE_SIZE) {
             throw new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100");
+        }
+    }
+
+    private void validateSecondPrecision(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt.getNano() != 0 || endAt.getNano() != 0) {
+            throw new TemporalPrecisionNotSupportedException();
         }
     }
 

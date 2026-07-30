@@ -2,9 +2,7 @@ package com.eventoscelebrativos.dto.response;
 
 import com.eventoscelebrativos.model.EventScheduleType;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,6 +11,7 @@ public class EventScheduleQueryResponseDTO {
     private Long eventId;
     private String eventName;
     private LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
     private LocalDateTime endAt;
     private Boolean massOrCelebration;
     private Long locationId;
@@ -50,22 +49,6 @@ public class EventScheduleQueryResponseDTO {
 
     public void setEndAt(LocalDateTime endAt) {
         this.endAt = endAt;
-    }
-
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     */
-    @Deprecated
-    public LocalDate getEventDate() {
-        return startAt == null ? null : startAt.toLocalDate();
-    }
-
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     */
-    @Deprecated
-    public LocalTime getEventTime() {
-        return startAt == null ? null : startAt.toLocalTime();
     }
 
     public Boolean getMassOrCelebration() {

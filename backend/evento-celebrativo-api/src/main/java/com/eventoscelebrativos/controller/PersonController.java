@@ -111,7 +111,7 @@ public class PersonController {
             + "da pessoa no evento. Aceita apenas os status CONFIRMED e DECLINED; PENDING e o estado derivado da ausencia de "
             + "resposta e nao pode ser enviado. O motivo da recusa (declineReason) e opcional, limitado a 500 caracteres apos "
             + "trim, e e descartado quando o status e CONFIRMED. Nao e permitido responder apos o inicio do evento "
-            + "(eventDate + eventTime). A operacao e idempotente: reenviar a mesma resposta normalizada nao altera respondedAt.")
+            + "(startAt/endAt). A operacao e idempotente: reenviar a mesma resposta normalizada nao altera respondedAt.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Participacao registrada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Status ausente/invalido, PENDING informado ou motivo acima de 500 caracteres"),

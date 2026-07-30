@@ -88,7 +88,11 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
                 "/eventos/escalas?startDate=2025-07-13&endDate=2025-07-13&type=READER&page=0&size=10"
         ));
         assertEquals(1, oneDay.path("totalElements").asInt());
-        assertEquals("2025-07-13", oneDay.path("content").get(0).path("eventDate").asText());
+        JsonNode event = oneDay.path("content").get(0);
+        assertEquals("2025-07-13T10:00:00", event.path("startAt").asText());
+        assertEquals("2025-07-13T11:00:00", event.path("endAt").asText());
+        assertFalse(event.has("eventDate"));
+        assertFalse(event.has("eventTime"));
 
         JsonNode firstPage = objectMapper.readTree(getJson(fixtureUrl(EventScheduleType.EUCHARISTIC_MINISTER, 0, 2, false)));
         JsonNode lastPage = objectMapper.readTree(getJson(fixtureUrl(EventScheduleType.EUCHARISTIC_MINISTER, 1, 2, false)));

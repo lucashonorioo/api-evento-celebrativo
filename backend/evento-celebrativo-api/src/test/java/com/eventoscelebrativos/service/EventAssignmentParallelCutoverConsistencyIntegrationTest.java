@@ -321,8 +321,10 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     private void assertScaleDetailContract(JsonNode root) {
         assertTrue(root.path("eventId").isNumber());
         assertTrue(root.path("eventName").isTextual());
-        assertTrue(root.path("eventDate").isTextual());
-        assertTrue(root.path("eventTime").isTextual());
+        assertTrue(root.path("startAt").isTextual());
+        assertTrue(root.path("endAt").isTextual());
+        assertFalse(root.has("eventDate"));
+        assertFalse(root.has("eventTime"));
         assertTrue(root.path("massOrCelebration").isBoolean());
         assertTrue(root.path("location").path("id").isNumber());
         assertTrue(root.path("readers").isArray());

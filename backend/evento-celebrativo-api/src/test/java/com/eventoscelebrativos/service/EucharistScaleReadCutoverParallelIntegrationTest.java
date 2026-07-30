@@ -94,7 +94,11 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
         );
         JsonNode oneDayRoot = objectMapper.readTree(oneDay);
         assertEquals(1, oneDayRoot.path("totalElements").asInt());
-        assertEquals("2025-07-13", oneDayRoot.path("content").get(0).path("eventDate").asText());
+        JsonNode event = oneDayRoot.path("content").get(0);
+        assertEquals("2025-07-13T10:00:00", event.path("startAt").asText());
+        assertEquals("2025-07-13T11:00:00", event.path("endAt").asText());
+        assertFalse(event.has("eventDate"));
+        assertFalse(event.has("eventTime"));
 
         String lastPage = getPublicJson(
                 "/eventos/escala/eucaristia?startDate=2025-07-01&endDate=2025-07-31&page=1&size=2"

@@ -9,6 +9,7 @@ import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityAssignmentConflictException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
@@ -70,6 +71,44 @@ class PersonUnavailabilityControllerTest {
                 .andExpect(jsonPath("$.content[0].startAt").value("2026-08-10T00:00:00"))
                 .andExpect(jsonPath("$.content[0].endAt").value("2026-08-12T00:00:00"))
                 .andExpect(jsonPath("$.content[0].reason").value("Viagem"));
+    }
+
+    @Test
+    @WithMockUser(username = "34970000001", roles = "OPERATOR")
+    void shouldRejectNonCanonicalQueryDateTimes() throws Exception {
+        for (String invalidStartAt : List.of(
+                "2026-08-01T00:00:00.1",
+                "2026-08-01T00:00:00-03:00",
+                "2026-08-01T03:00:00Z"
+        )) {
+            mockMvc.perform(get("/pessoas/me/indisponibilidades")
+                            .param("startAt", invalidStartAt)
+                            .param("endAt", "2026-08-31T00:00:00"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verifyNoInteractions(personUnavailabilityService);
+    }
+
+    @Test
+    @WithMockUser(username = "34970000001", roles = "OPERATOR")
+    void shouldReturnStructuredBadRequestForFractionalUnavailabilityBody() throws Exception {
+        when(personUnavailabilityService.create(eq("34970000001"), any()))
+                .thenThrow(new TemporalPrecisionNotSupportedException());
+
+        mockMvc.perform(post("/pessoas/me/indisponibilidades")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "2026-08-10T08:00:00.123",
+                                  "endAt": "2026-08-10T12:00:00",
+                                  "reason": "Consulta médica"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("TEMPORAL_PRECISION_NOT_SUPPORTED"));
     }
 
     @Test

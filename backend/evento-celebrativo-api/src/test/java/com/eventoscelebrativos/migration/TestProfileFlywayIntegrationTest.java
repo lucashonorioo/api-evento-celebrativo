@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest(properties = {
@@ -35,6 +37,9 @@ class TestProfileFlywayIntegrationTest {
         assertSuccessfulVersionedMigration("6");
         assertSuccessfulVersionedMigration("7");
         assertSuccessfulVersionedMigration("8");
+        assertSuccessfulVersionedMigration("9");
+        assertSuccessfulVersionedMigration("10");
+        assertSuccessfulVersionedMigration("11");
         assertSuccessfulScript("R__load_test_fixtures.sql");
         assertTableDoesNotExist("tb_event_person");
         assertColumnDoesNotExist("tb_person", "person_type");
@@ -54,6 +59,9 @@ class TestProfileFlywayIntegrationTest {
         assertEquals("Missa de Domingo da manhã", queryString("SELECT name_mass_or_event FROM tb_celebration_event WHERE id = 1"));
         assertEquals("Celebração da Palavra de Sábado", queryString("SELECT name_mass_or_event FROM tb_celebration_event WHERE id = 2"));
         assertEquals("Missa de Ação de Graças", queryString("SELECT name_mass_or_event FROM tb_celebration_event WHERE id = 3"));
+        assertEventRange(1L, LocalDateTime.of(2025, 7, 13, 10, 0), LocalDateTime.of(2025, 7, 13, 11, 0));
+        assertEventRange(2L, LocalDateTime.of(2025, 7, 12, 19, 30), LocalDateTime.of(2025, 7, 12, 20, 30));
+        assertEventRange(3L, LocalDateTime.of(2025, 7, 20, 8, 0), LocalDateTime.of(2025, 7, 20, 9, 0));
 
         assertEquals(20, countRows("tb_person_role"));
         assertEquals(3, countRows("tb_event_location"));
@@ -214,5 +222,18 @@ class TestProfileFlywayIntegrationTest {
 
     private String queryString(String sql) {
         return jdbcTemplate.queryForObject(sql, String.class);
+    }
+
+    private void assertEventRange(Long eventId, LocalDateTime expectedStartAt, LocalDateTime expectedEndAt) {
+        assertEquals(expectedStartAt, jdbcTemplate.queryForObject(
+                "SELECT start_at FROM tb_celebration_event WHERE id = ?",
+                LocalDateTime.class,
+                eventId
+        ));
+        assertEquals(expectedEndAt, jdbcTemplate.queryForObject(
+                "SELECT end_at FROM tb_celebration_event WHERE id = ?",
+                LocalDateTime.class,
+                eventId
+        ));
     }
 }

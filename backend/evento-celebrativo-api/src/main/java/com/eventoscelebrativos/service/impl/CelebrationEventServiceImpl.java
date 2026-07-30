@@ -11,6 +11,7 @@ import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
@@ -49,6 +50,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -83,6 +85,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventParticipationResponseService eventParticipationResponseService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final PersonUnavailabilityConflictService personUnavailabilityConflictService;
+    private final Clock clock;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -96,7 +99,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
-            PersonUnavailabilityConflictService personUnavailabilityConflictService
+            PersonUnavailabilityConflictService personUnavailabilityConflictService,
+            Clock clock
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
@@ -110,12 +114,13 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.personUnavailabilityConflictService = personUnavailabilityConflictService;
+        this.clock = clock;
     }
 
     @Override
     @Transactional
     public CelebrationEventResponseDTO createEvent(CelebrationEventRequestDTO celebrationEventRequestDTO) {
-        validateRange(celebrationEventRequestDTO.getStartAt(), celebrationEventRequestDTO.getEndAt());
+        validateCreationRange(celebrationEventRequestDTO.getStartAt(), celebrationEventRequestDTO.getEndAt());
         CelebrationEvent celebrationEvent = celebrationEventMapper.toEntity(celebrationEventRequestDTO);
         celebrationEvent = celebrationEventRepository.save(celebrationEvent);
 
@@ -333,7 +338,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         celebrationEvent.setStartAt(celebrationEventWithScaleRequestDTO.getStartAt());
         celebrationEvent.setEndAt(celebrationEventWithScaleRequestDTO.getEndAt());
         celebrationEvent.setMassOrCelebration(celebrationEventWithScaleRequestDTO.getMassOrCelebration());
-        validateRange(celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
+        validateCreationRange(celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         CelebrationEventScaleRequestDTO scaleRequest = toScaleRequest(celebrationEventWithScaleRequestDTO);
 
@@ -390,8 +395,23 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if (startAt == null || endAt == null) {
             throw new BusinessException("startAt e endAt são obrigatórios");
         }
+        validateSecondPrecision(startAt, endAt);
         if (!startAt.isBefore(endAt)) {
             throw new BusinessException("startAt deve ser anterior a endAt");
+        }
+    }
+
+    private void validateCreationRange(LocalDateTime startAt, LocalDateTime endAt) {
+        validateRange(startAt, endAt);
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        if (startAt.isBefore(currentSecond)) {
+            throw new BusinessException("startAt só pode ser no presente ou futuro");
+        }
+    }
+
+    private void validateSecondPrecision(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt.getNano() != 0 || endAt.getNano() != 0) {
+            throw new TemporalPrecisionNotSupportedException();
         }
     }
 

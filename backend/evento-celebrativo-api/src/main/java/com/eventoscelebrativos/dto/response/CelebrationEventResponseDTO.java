@@ -1,14 +1,13 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 public class CelebrationEventResponseDTO {
 
     private Long id;
     private String nameMassOrEvent;
     private LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
     private LocalDateTime endAt;
     private Boolean massOrCelebration;
 
@@ -41,23 +40,4 @@ public class CelebrationEventResponseDTO {
         return massOrCelebration;
     }
 
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     * Mantido apenas como compatibilidade de leitura temporária para consumidores ainda nao
-     * migrados; sera removido quando esses consumidores adotarem o contrato canonico.
-     */
-    @Deprecated
-    public LocalDate getEventDate() {
-        return startAt == null ? null : startAt.toLocalDate();
-    }
-
-    /**
-     * @deprecated derivado exclusivamente de {@link #getStartAt()}; use startAt/endAt.
-     * Mantido apenas como compatibilidade de leitura temporária para consumidores ainda nao
-     * migrados; sera removido quando esses consumidores adotarem o contrato canonico.
-     */
-    @Deprecated
-    public LocalTime getEventTime() {
-        return startAt == null ? null : startAt.toLocalTime();
-    }
 }

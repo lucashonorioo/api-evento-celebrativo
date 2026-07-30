@@ -1,6 +1,6 @@
 package com.eventoscelebrativos.dto.request;
 
-import jakarta.validation.constraints.FutureOrPresent;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -12,9 +12,12 @@ public class CelebrationEventRequestDTO {
     private String nameMassOrEvent;
 
     @NotNull(message = "O campo startAt não pode ser vazio")
-    @FutureOrPresent(message = "O startAt só pode ser no presente ou futuro")
     private LocalDateTime startAt;
 
+    /**
+     * Termino previsto do compromisso para planejamento de disponibilidade e escala.
+     * Nao representa o termino real da celebracao.
+     */
     @NotNull(message = "O campo endAt não pode ser vazio")
     private LocalDateTime endAt;
 
@@ -62,5 +65,10 @@ public class CelebrationEventRequestDTO {
 
     public void setMassOrCelebration(Boolean massOrCelebration) {
         this.massOrCelebration = massOrCelebration;
+    }
+
+    @JsonAnySetter
+    private void rejectUnknownProperty(String property, Object value) {
+        throw new IllegalArgumentException("Campo desconhecido no contrato de evento: " + property);
     }
 }

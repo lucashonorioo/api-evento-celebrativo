@@ -4,6 +4,7 @@ import com.eventoscelebrativos.config.OpenApiConfig;
 import com.eventoscelebrativos.dto.request.PersonUnavailabilityRequestDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,7 +14,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -30,12 +30,19 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 
 @RestController
 @RequestMapping(value = "/pessoas")
 @Tag(name = "Indisponibilidades", description = "Gerenciamento de indisponibilidades prévias de pessoas para escalas")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class PersonUnavailabilityController {
+
+    private static final DateTimeFormatter CANONICAL_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss")
+                    .withResolverStyle(ResolverStyle.STRICT);
 
     private final PersonUnavailabilityService personUnavailabilityService;
 
@@ -58,16 +65,21 @@ public class PersonUnavailabilityController {
     public ResponseEntity<Page<PersonUnavailabilityResponseDTO>> findMyUnavailabilities(
             Authentication authentication,
             @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
-            @RequestParam("startAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
+            @RequestParam("startAt") String startAt,
             @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
-            @RequestParam("endAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt,
+            @RequestParam("endAt") String endAt,
             @Parameter(description = "Numero da pagina, iniciando em 0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Quantidade de registros por pagina. Maximo: 100")
             @RequestParam(defaultValue = "10") int size
     ) {
         Page<PersonUnavailabilityResponseDTO> result = personUnavailabilityService.findMine(
-                authentication.getName(), startAt, endAt, page, size);
+                authentication.getName(),
+                parseCanonicalDateTime(startAt),
+                parseCanonicalDateTime(endAt),
+                page,
+                size
+        );
         return ResponseEntity.ok(result);
     }
 
@@ -147,11 +159,24 @@ public class PersonUnavailabilityController {
     @GetMapping(value = "/indisponibilidades")
     public ResponseEntity<AdminUnavailabilityResponseDTO> findUnavailablePeopleByRange(
             @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
-            @RequestParam("startAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startAt,
+            @RequestParam("startAt") String startAt,
             @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
-            @RequestParam("endAt") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt
+            @RequestParam("endAt") String endAt
     ) {
-        AdminUnavailabilityResponseDTO responseDTO = personUnavailabilityService.findByDate(startAt, endAt);
+        AdminUnavailabilityResponseDTO responseDTO = personUnavailabilityService.findByDate(
+                parseCanonicalDateTime(startAt),
+                parseCanonicalDateTime(endAt)
+        );
         return ResponseEntity.ok(responseDTO);
+    }
+
+    private LocalDateTime parseCanonicalDateTime(String value) {
+        try {
+            return LocalDateTime.parse(value, CANONICAL_DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            throw new BadRequestException(
+                    "Data e hora inválidas. Use o formato yyyy-MM-dd'T'HH:mm:ss sem offset ou frações."
+            );
+        }
     }
 }

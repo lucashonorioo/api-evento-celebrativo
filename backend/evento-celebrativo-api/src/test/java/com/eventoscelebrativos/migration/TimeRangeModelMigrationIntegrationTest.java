@@ -12,20 +12,17 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Prova o backfill exato da V11 (migracao para o modelo de intervalo [start_at, end_at)):
- * fase unica para PersonUnavailability (colunas antigas removidas, NOT NULL/CHECK/UNIQUE
- * definitivos) e fase 1 aditiva para CelebrationEvent (start_at exato e NOT NULL, end_at
- * propositalmente NULL para eventos ja existentes, colunas antigas preservadas e relaxadas
- * para nullable).
+ * Prova em H2 a atualizacao V10 -> V11 para o modelo definitivo de intervalos
+ * semiabertos [start_at, end_at), com precisao de segundos e sem colunas temporais legadas.
  */
 class TimeRangeModelMigrationIntegrationTest {
 
@@ -83,13 +80,13 @@ class TimeRangeModelMigrationIntegrationTest {
     }
 
     @Test
-    void shouldBackfillCelebrationEventStartAtExactlyAndLeaveEndAtNullForExistingRows() {
+    void shouldBackfillCelebrationEventRangeExactlyAndDropLegacyColumns() {
         DataSource dataSource = createDataSource("v11_event_backfill");
         migrateUntil(dataSource, "10");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        LocalDate eventDate = LocalDate.of(2026, 9, 20);
-        LocalTime eventTime = LocalTime.of(19, 30);
+        LocalDate eventDate = LocalDate.of(2026, 8, 9);
+        LocalTime eventTime = LocalTime.of(19, 0);
         long eventId = insertLegacyEvent(jdbcTemplate, "Missa Legada", eventDate, eventTime);
 
         MigrateResult result = migrateAll(dataSource);
@@ -98,46 +95,33 @@ class TimeRangeModelMigrationIntegrationTest {
         assertSuccessfulMigration(jdbcTemplate, "11");
 
         LocalDateTime expectedStartAt = LocalDateTime.of(eventDate, eventTime);
+        LocalDateTime expectedEndAt = expectedStartAt.plusHours(1);
         assertEquals(Timestamp.valueOf(expectedStartAt), queryTimestamp(jdbcTemplate,
                 "SELECT start_at FROM tb_celebration_event WHERE id = ?", eventId));
-        assertNull(jdbcTemplate.queryForObject(
-                "SELECT end_at FROM tb_celebration_event WHERE id = ?", Timestamp.class, eventId));
+        assertEquals(Timestamp.valueOf(expectedEndAt), queryTimestamp(jdbcTemplate,
+                "SELECT end_at FROM tb_celebration_event WHERE id = ?", eventId));
 
-        assertTrue(columnExists(jdbcTemplate, "tb_celebration_event", "event_date"));
-        assertTrue(columnExists(jdbcTemplate, "tb_celebration_event", "event_time"));
-        assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "event_date"));
-        assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "event_time"));
+        assertFalse(columnExists(jdbcTemplate, "tb_celebration_event", "event_date"));
+        assertFalse(columnExists(jdbcTemplate, "tb_celebration_event", "event_time"));
         assertFalse(columnNullable(jdbcTemplate, "tb_celebration_event", "start_at"));
-        assertTrue(columnNullable(jdbcTemplate, "tb_celebration_event", "end_at"));
-
-        assertEquals(java.sql.Date.valueOf(eventDate), jdbcTemplate.queryForObject(
-                "SELECT event_date FROM tb_celebration_event WHERE id = ?", java.sql.Date.class, eventId));
-        assertEquals(java.sql.Time.valueOf(eventTime), jdbcTemplate.queryForObject(
-                "SELECT event_time FROM tb_celebration_event WHERE id = ?", java.sql.Time.class, eventId));
+        assertFalse(columnNullable(jdbcTemplate, "tb_celebration_event", "end_at"));
     }
 
     @Test
-    void shouldAllowNullEndAtOnCelebrationEventAfterMigrationWithoutViolatingPermissiveCheck() {
-        DataSource dataSource = createDataSource("v11_event_permissive_check");
+    void shouldRejectNullEndAtOnCelebrationEventAfterMigration() {
+        DataSource dataSource = createDataSource("v11_event_not_null");
         migrateAll(dataSource);
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
         LocalDateTime startAt = LocalDateTime.of(2026, 10, 1, 8, 0);
-        jdbcTemplate.update(
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
                 """
                 INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, NULL, TRUE)
                 """,
                 "Evento sem end_at",
                 Timestamp.valueOf(startAt)
-        );
-
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tb_celebration_event WHERE name_mass_or_event = ?",
-                Integer.class,
-                "Evento sem end_at"
-        );
-        assertEquals(1, count);
+        ));
     }
 
     @Test
@@ -158,6 +142,53 @@ class TimeRangeModelMigrationIntegrationTest {
                 Timestamp.valueOf(startAt),
                 Timestamp.valueOf(invertedEndAt)
         ));
+    }
+
+    @Test
+    void shouldExposeFinalSecondPrecisionConstraintsAndTemporalIndexes() {
+        DataSource dataSource = createDataSource("v11_final_schema");
+        migrateAll(dataSource);
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+        assertEquals(0, columnDateTimePrecision(jdbcTemplate, "tb_celebration_event", "start_at"));
+        assertEquals(0, columnDateTimePrecision(jdbcTemplate, "tb_celebration_event", "end_at"));
+        assertEquals(0, columnDateTimePrecision(jdbcTemplate, "tb_person_unavailability", "start_at"));
+        assertEquals(0, columnDateTimePrecision(jdbcTemplate, "tb_person_unavailability", "end_at"));
+
+        assertTrue(constraintExists(
+                jdbcTemplate, "tb_celebration_event", "chk_tb_celebration_event_range", "CHECK"));
+        assertTrue(constraintExists(
+                jdbcTemplate, "tb_person_unavailability", "chk_tb_person_unavailability_range", "CHECK"));
+        assertTrue(constraintExists(
+                jdbcTemplate, "tb_person_unavailability",
+                "uk_tb_person_unavailability_person_range", "UNIQUE"));
+
+        assertEquals(
+                List.of("start_at", "end_at", "id"),
+                indexColumns(jdbcTemplate, "tb_celebration_event", "idx_tb_celebration_event_start_end")
+        );
+        assertEquals(
+                List.of("end_at", "start_at", "id"),
+                indexColumns(jdbcTemplate, "tb_celebration_event", "idx_tb_celebration_event_end_start")
+        );
+        assertEquals(
+                List.of("person_id", "end_at", "start_at"),
+                indexColumns(
+                        jdbcTemplate,
+                        "tb_person_unavailability",
+                        "idx_tb_person_unavailability_person_end_start"
+                )
+        );
+        assertEquals(
+                List.of("start_at", "end_at", "person_id"),
+                indexColumns(
+                        jdbcTemplate,
+                        "tb_person_unavailability",
+                        "idx_tb_person_unavailability_range_person"
+                )
+        );
+        assertFalse(indexExists(
+                jdbcTemplate, "tb_person_unavailability", "idx_tb_person_unavailability_person_range"));
     }
 
     private DataSource createDataSource(String namePrefix) {
@@ -280,5 +311,65 @@ class TimeRangeModelMigrationIntegrationTest {
                 columnName
         );
         return "YES".equalsIgnoreCase(isNullable);
+    }
+
+    private int columnDateTimePrecision(JdbcTemplate jdbcTemplate, String tableName, String columnName) {
+        Integer precision = jdbcTemplate.queryForObject(
+                """
+                SELECT datetime_precision FROM information_schema.columns
+                WHERE UPPER(table_name) = UPPER(?) AND UPPER(column_name) = UPPER(?)
+                """,
+                Integer.class,
+                tableName,
+                columnName
+        );
+        return precision == null ? -1 : precision;
+    }
+
+    private boolean constraintExists(
+            JdbcTemplate jdbcTemplate,
+            String tableName,
+            String constraintName,
+            String constraintType
+    ) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.table_constraints
+                WHERE UPPER(table_name) = UPPER(?)
+                  AND UPPER(constraint_name) = UPPER(?)
+                  AND UPPER(constraint_type) = UPPER(?)
+                """,
+                Integer.class,
+                tableName,
+                constraintName,
+                constraintType
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean indexExists(JdbcTemplate jdbcTemplate, String tableName, String indexName) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.indexes
+                WHERE UPPER(table_name) = UPPER(?) AND UPPER(index_name) = UPPER(?)
+                """,
+                Integer.class,
+                tableName,
+                indexName
+        );
+        return count != null && count > 0;
+    }
+
+    private List<String> indexColumns(JdbcTemplate jdbcTemplate, String tableName, String indexName) {
+        return jdbcTemplate.queryForList(
+                        """
+                        SELECT LOWER(column_name) FROM information_schema.index_columns
+                        WHERE UPPER(table_name) = UPPER(?) AND UPPER(index_name) = UPPER(?)
+                        ORDER BY ordinal_position
+                        """,
+                        String.class,
+                        tableName,
+                        indexName
+                );
     }
 }

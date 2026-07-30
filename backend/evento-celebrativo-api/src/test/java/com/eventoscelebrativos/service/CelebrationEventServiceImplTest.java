@@ -14,6 +14,7 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
@@ -46,8 +47,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +65,7 @@ class CelebrationEventServiceImplTest {
     private static final LocalDate EVENT_DATE = LocalDate.of(2026, 8, 15);
     private static final LocalDateTime EVENT_START_AT = LocalDateTime.of(2026, 8, 15, 19, 30);
     private static final LocalDateTime EVENT_END_AT = LocalDateTime.of(2026, 8, 15, 20, 30);
+    private static final ZoneId APPLICATION_ZONE = ZoneId.of("America/Sao_Paulo");
 
     @Mock
     private CelebrationEventRepository repository;
@@ -98,6 +103,9 @@ class CelebrationEventServiceImplTest {
     @Mock
     private PersonUnavailabilityConflictService personUnavailabilityConflictService;
 
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-08-15T21:00:00Z"), APPLICATION_ZONE);
+
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -114,6 +122,73 @@ class CelebrationEventServiceImplTest {
 
         assertSame(response, service.createEvent(request));
         verifyNoInteractions(eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldAcceptEventCreationAtCurrentSecondUsingApplicationClock() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 15, 18, 0);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", now, now.plusHours(1), true);
+        CelebrationEvent entity = new CelebrationEvent(null, "Missa", now, now.plusHours(1), true);
+        CelebrationEvent saved = new CelebrationEvent(1L, "Missa", now, now.plusHours(1), true);
+        CelebrationEventResponseDTO response =
+                new CelebrationEventResponseDTO(1L, "Missa", now, now.plusHours(1), true);
+
+        when(mapper.toEntity(request)).thenReturn(entity);
+        when(repository.save(entity)).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(response);
+
+        assertSame(response, service.createEvent(request));
+    }
+
+    @Test
+    void shouldRejectPastEventCreationUsingApplicationClock() {
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 15, 17, 59, 59);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", pastStart, pastStart.plusHours(1), true);
+
+        assertThrows(BusinessException.class, () -> service.createEvent(request));
+
+        verifyNoInteractions(mapper, repository);
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnCommonEventCreation() {
+        CelebrationEventRequestDTO request = request();
+        request.setStartAt(EVENT_START_AT.withNano(100_000_000));
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(TemporalPrecisionNotSupportedException.class, () -> service.createEvent(request));
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verifyNoInteractions(mapper, repository);
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnEventWithScaleCreation() {
+        CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
+        request.setEndAt(EVENT_END_AT.withNano(123_456_000));
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(
+                        TemporalPrecisionNotSupportedException.class,
+                        () -> service.createEventWithScale(request)
+                );
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verifyNoInteractions(repository, eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldRejectPastEventWithScaleCreationUsingApplicationClock() {
+        CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 15, 17, 0);
+        request.setStartAt(pastStart);
+        request.setEndAt(pastStart.plusHours(1));
+
+        assertThrows(BusinessException.class, () -> service.createEventWithScale(request));
+
+        verifyNoInteractions(repository, eventAssignmentCommandService);
     }
 
     @Test
@@ -736,6 +811,27 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
+    void shouldAllowAdministrativeCorrectionOfPastEvent() {
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 10, 19, 0);
+        LocalDateTime pastEnd = pastStart.plusHours(1);
+        CelebrationEvent existing =
+                new CelebrationEvent(1L, "Missa antiga", pastStart, pastEnd, true);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa antiga corrigida", pastStart, pastEnd, true);
+        CelebrationEventResponseDTO response =
+                new CelebrationEventResponseDTO(1L, "Missa antiga corrigida", pastStart, pastEnd, true);
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existing));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of());
+        when(repository.save(existing)).thenReturn(existing);
+        when(mapper.toDto(existing)).thenReturn(response);
+
+        assertSame(response, service.updateEvent(1L, request));
+
+        verify(repository).save(existing);
+    }
+
+    @Test
     void shouldThrowResourceNotFoundWhenUpdatingMissingEvent() {
         when(repository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
@@ -1134,11 +1230,11 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldNotValidateAvailabilityWhenEventDateIsUnchanged() {
+    void shouldNotValidateAvailabilityWhenEventRangeIsUnchanged() {
         CelebrationEvent existingEvent = event(1L);
         CelebrationEvent saved = event(1L);
         CelebrationEventResponseDTO responseDto = response(1L);
-        CelebrationEventRequestDTO sameDate = new CelebrationEventRequestDTO("Missa", EVENT_START_AT, EVENT_END_AT, true);
+        CelebrationEventRequestDTO sameRange = new CelebrationEventRequestDTO("Missa", EVENT_START_AT, EVENT_END_AT, true);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
@@ -1147,13 +1243,55 @@ class CelebrationEventServiceImplTest {
         when(repository.save(existingEvent)).thenReturn(saved);
         when(mapper.toDto(saved)).thenReturn(responseDto);
 
-        assertSame(responseDto, service.updateEvent(1L, sameDate));
+        assertSame(responseDto, service.updateEvent(1L, sameRange));
 
         verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
     }
 
     @Test
-    void shouldRejectEventDateChangeWhenAssignedPersonIsUnavailablePreservingOriginalDate() {
+    void shouldRevalidateAvailabilityWhenOnlyStartAtChanges() {
+        CelebrationEvent existingEvent = event(1L);
+        LocalDateTime newStartAt = EVENT_START_AT.plusMinutes(15);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", newStartAt, EVENT_END_AT, true);
+        Person assignedPerson = person(new Person(), 3L, "Leitor");
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(existingEvent, assignedPerson, EventAssignmentType.READER)
+        ));
+        when(repository.save(existingEvent)).thenReturn(existingEvent);
+        when(mapper.toDto(existingEvent)).thenReturn(response(1L));
+
+        service.updateEvent(1L, request);
+
+        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                any(), eq(newStartAt), eq(EVENT_END_AT));
+    }
+
+    @Test
+    void shouldRevalidateAvailabilityWhenOnlyEndAtChanges() {
+        CelebrationEvent existingEvent = event(1L);
+        LocalDateTime newEndAt = EVENT_END_AT.plusMinutes(30);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", EVENT_START_AT, newEndAt, true);
+        Person assignedPerson = person(new Person(), 3L, "Leitor");
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(existingEvent, assignedPerson, EventAssignmentType.READER)
+        ));
+        when(repository.save(existingEvent)).thenReturn(existingEvent);
+        when(mapper.toDto(existingEvent)).thenReturn(response(1L));
+
+        service.updateEvent(1L, request);
+
+        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                any(), eq(EVENT_START_AT), eq(newEndAt));
+    }
+
+    @Test
+    void shouldRejectEventRangeChangeWhenAssignedPersonIsUnavailablePreservingOriginalRange() {
         CelebrationEvent existingEvent = event(1L);
         LocalDateTime newStartAt = EVENT_START_AT.plusDays(5);
         LocalDateTime newEndAt = EVENT_END_AT.plusDays(5);
@@ -1169,6 +1307,7 @@ class CelebrationEventServiceImplTest {
         assertThrows(PersonUnavailableForEventException.class, () -> service.updateEvent(1L, changedDateRequest));
 
         assertEquals(EVENT_START_AT, existingEvent.getStartAt());
+        assertEquals(EVENT_END_AT, existingEvent.getEndAt());
         verify(repository, never()).save(any());
     }
 

@@ -10,7 +10,9 @@ public class PersonUnavailableForEventException extends ErrorResponseException {
     private final List<PersonUnavailabilityEventConflictDTO> conflicts;
 
     public PersonUnavailableForEventException(List<PersonUnavailabilityEventConflictDTO> conflicts) {
-        super("Uma ou mais pessoas estão indisponíveis na data do evento.", HttpStatus.CONFLICT, "PERSON_UNAVAILABLE_FOR_EVENT");
+        super("Uma ou mais pessoas estão indisponíveis no intervalo previsto do evento.",
+                HttpStatus.CONFLICT,
+                "PERSON_UNAVAILABLE_FOR_EVENT");
         this.conflicts = conflicts;
     }
 

@@ -25,7 +25,11 @@ public class CelebrationEvent implements Serializable {
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;
 
-    @Column(name = "end_at")
+    /**
+     * Termino previsto do compromisso para planejamento de disponibilidade e escala.
+     * Nao representa o termino real da celebracao.
+     */
+    @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
 
     private Boolean massOrCelebration;
