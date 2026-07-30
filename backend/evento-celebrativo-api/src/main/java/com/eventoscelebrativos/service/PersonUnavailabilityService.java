@@ -5,14 +5,14 @@ import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import org.springframework.data.domain.Page;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public interface PersonUnavailabilityService {
 
     Page<PersonUnavailabilityResponseDTO> findMine(
             String phoneNumber,
-            LocalDate startDate,
-            LocalDate endDate,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             int page,
             int size
     );
@@ -23,5 +23,5 @@ public interface PersonUnavailabilityService {
 
     void delete(String phoneNumber, Long id);
 
-    AdminUnavailabilityResponseDTO findByDate(LocalDate date);
+    AdminUnavailabilityResponseDTO findByDate(LocalDateTime startAt, LocalDateTime endAt);
 }

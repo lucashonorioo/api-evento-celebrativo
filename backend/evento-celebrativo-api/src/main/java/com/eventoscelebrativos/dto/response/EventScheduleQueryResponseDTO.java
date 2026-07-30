@@ -2,8 +2,7 @@ package com.eventoscelebrativos.dto.response;
 
 import com.eventoscelebrativos.model.EventScheduleType;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,8 +10,9 @@ public class EventScheduleQueryResponseDTO {
 
     private Long eventId;
     private String eventName;
-    private LocalDate eventDate;
-    private LocalTime eventTime;
+    private LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
+    private LocalDateTime endAt;
     private Boolean massOrCelebration;
     private Long locationId;
     private String churchName;
@@ -35,20 +35,20 @@ public class EventScheduleQueryResponseDTO {
         this.eventName = eventName;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalTime getEventTime() {
-        return eventTime;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public Boolean getMassOrCelebration() {

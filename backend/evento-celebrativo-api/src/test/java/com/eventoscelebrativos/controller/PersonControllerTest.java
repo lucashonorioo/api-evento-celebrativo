@@ -692,7 +692,7 @@ class PersonControllerTest {
                 "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(scheduleResponse(
-                                15L, "Missa das 19h", LocalDate.of(2026, 7, 20), LocalTime.of(19, 0),
+                                15L, "Missa das 19h", LocalDateTime.of(2026, 7, 20, 19, 0), LocalDateTime.of(2026, 7, 20, 20, 0),
                                 true, 2L, "Igreja Matriz",
                                 List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR)
                         )),
@@ -706,7 +706,10 @@ class PersonControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].eventId").value(15))
                 .andExpect(jsonPath("$.content[0].eventName").value("Missa das 19h"))
-                .andExpect(jsonPath("$.content[0].eventDate").value("2026-07-20"))
+                .andExpect(jsonPath("$.content[0].startAt").value("2026-07-20T19:00:00"))
+                .andExpect(jsonPath("$.content[0].endAt").value("2026-07-20T20:00:00"))
+                .andExpect(jsonPath("$.content[0].eventDate").doesNotExist())
+                .andExpect(jsonPath("$.content[0].eventTime").doesNotExist())
                 .andExpect(jsonPath("$.content[0].massOrCelebration").value(true))
                 .andExpect(jsonPath("$.content[0].locationId").value(2))
                 .andExpect(jsonPath("$.content[0].locationName").value("Igreja Matriz"))
@@ -1056,15 +1059,15 @@ class PersonControllerTest {
     private CurrentUserScheduleResponseDTO scheduleResponse(
             Long eventId,
             String eventName,
-            LocalDate eventDate,
-            LocalTime eventTime,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             Boolean massOrCelebration,
             Long locationId,
             String locationName,
             List<EventAssignmentType> assignments
     ) {
         return new CurrentUserScheduleResponseDTO(
-                eventId, eventName, eventDate, eventTime, massOrCelebration, locationId, locationName, assignments,
+                eventId, eventName, startAt, endAt, massOrCelebration, locationId, locationName, assignments,
                 ParticipationStatus.PENDING, null, null
         );
     }

@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class EventParticipationResponseServiceImplTest {
 
-    private static final ZoneId ZONE = ZoneId.systemDefault();
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
 
     @Mock
     private EventParticipationResponseRepository eventParticipationResponseRepository;
@@ -436,8 +436,8 @@ class EventParticipationResponseServiceImplTest {
     }
 
     private CelebrationEvent eventAt(Long id, LocalDate date, LocalTime time) {
-        CelebrationEvent event = new CelebrationEvent(id, "Evento " + id, date, time, true);
-        return event;
+        LocalDateTime startAt = LocalDateTime.of(date, time);
+        return new CelebrationEvent(id, "Evento " + id, startAt, startAt.plusHours(1), true);
     }
 
     private ParticipationResponseRequestDTO request(String status, String declineReason) {

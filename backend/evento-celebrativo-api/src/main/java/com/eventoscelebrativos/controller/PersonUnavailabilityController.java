@@ -4,6 +4,7 @@ import com.eventoscelebrativos.config.OpenApiConfig;
 import com.eventoscelebrativos.dto.request.PersonUnavailabilityRequestDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,7 +14,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -29,7 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 
 @RestController
 @RequestMapping(value = "/pessoas")
@@ -37,17 +40,22 @@ import java.time.LocalDate;
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class PersonUnavailabilityController {
 
+    private static final DateTimeFormatter CANONICAL_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss")
+                    .withResolverStyle(ResolverStyle.STRICT);
+
     private final PersonUnavailabilityService personUnavailabilityService;
 
     public PersonUnavailabilityController(PersonUnavailabilityService personUnavailabilityService) {
         this.personUnavailabilityService = personUnavailabilityService;
     }
 
-    @Operation(summary = "Lista as indisponibilidades da pessoa autenticada que interceptam um período. "
-            + "A pessoa e determinada exclusivamente pelo token (Bearer JWT). Periodo em dias inteiros e inclusivo.")
+    @Operation(summary = "Lista as indisponibilidades da pessoa autenticada que interceptam um intervalo [startAt, endAt). "
+            + "A pessoa e determinada exclusivamente pelo token (Bearer JWT). Dia inteiro e enviado como "
+            + "00:00 do dia ate 00:00 do dia seguinte.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Indisponibilidades listadas com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Periodo ou paginacao invalidos"),
+            @ApiResponse(responseCode = "400", description = "Intervalo ou paginacao invalidos"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
@@ -56,25 +64,31 @@ public class PersonUnavailabilityController {
     @GetMapping(value = "/me/indisponibilidades")
     public ResponseEntity<Page<PersonUnavailabilityResponseDTO>> findMyUnavailabilities(
             Authentication authentication,
-            @Parameter(description = "Data inicial do periodo, inclusive. Formato ISO yyyy-MM-dd")
-            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "Data final do periodo, inclusive. Formato ISO yyyy-MM-dd")
-            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("startAt") String startAt,
+            @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("endAt") String endAt,
             @Parameter(description = "Numero da pagina, iniciando em 0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Quantidade de registros por pagina. Maximo: 100")
             @RequestParam(defaultValue = "10") int size
     ) {
         Page<PersonUnavailabilityResponseDTO> result = personUnavailabilityService.findMine(
-                authentication.getName(), startDate, endDate, page, size);
+                authentication.getName(),
+                parseCanonicalDateTime(startAt),
+                parseCanonicalDateTime(endAt),
+                page,
+                size
+        );
         return ResponseEntity.ok(result);
     }
 
-    @Operation(summary = "Cria uma indisponibilidade da pessoa autenticada. startDate deve ser hoje ou futuro; "
-            + "o periodo nao pode se sobrepor a outra indisponibilidade da mesma pessoa nem conflitar com escalas ja existentes.")
+    @Operation(summary = "Cria uma indisponibilidade da pessoa autenticada. startAt deve ser agora ou futuro; "
+            + "o intervalo [startAt, endAt) nao pode se sobrepor a outra indisponibilidade da mesma pessoa nem "
+            + "conflitar com escalas ja existentes. Dia inteiro: startAt=00:00 do dia, endAt=00:00 do dia seguinte.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Indisponibilidade criada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos, datas invertidas ou data inicial no passado"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos, intervalo invertido/zero ou startAt no passado"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
@@ -96,11 +110,11 @@ public class PersonUnavailabilityController {
     }
 
     @Operation(summary = "Atualiza uma indisponibilidade propria da pessoa autenticada. Idempotente: reenviar o mesmo "
-            + "periodo e motivo normalizados nao altera o registro. Um periodo cujo startDate ja passou nao pode ser "
+            + "intervalo e motivo normalizados nao altera o registro. Um periodo cujo startAt ja passou nao pode ser "
             + "atualizado por PUT, mesmo sem mudanca real.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Indisponibilidade atualizada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados invalidos, datas invertidas ou data inicial no passado"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos, intervalo invertido/zero ou startAt no passado"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Registro inexistente ou pertencente a outra pessoa"),
@@ -134,8 +148,8 @@ public class PersonUnavailabilityController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Consulta administrativa das pessoas indisponiveis em uma data. Nao retorna reason, "
-            + "telefone, senha, roles, ministries ou assignments.")
+    @Operation(summary = "Consulta administrativa das pessoas indisponiveis em um intervalo [startAt, endAt). "
+            + "Nao retorna reason, telefone, senha, roles, ministries ou assignments.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Consulta realizada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
@@ -143,11 +157,26 @@ public class PersonUnavailabilityController {
     })
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping(value = "/indisponibilidades")
-    public ResponseEntity<AdminUnavailabilityResponseDTO> findUnavailablePeopleByDate(
-            @Parameter(description = "Data de referencia. Formato ISO yyyy-MM-dd")
-            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    public ResponseEntity<AdminUnavailabilityResponseDTO> findUnavailablePeopleByRange(
+            @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("startAt") String startAt,
+            @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("endAt") String endAt
     ) {
-        AdminUnavailabilityResponseDTO responseDTO = personUnavailabilityService.findByDate(date);
+        AdminUnavailabilityResponseDTO responseDTO = personUnavailabilityService.findByDate(
+                parseCanonicalDateTime(startAt),
+                parseCanonicalDateTime(endAt)
+        );
         return ResponseEntity.ok(responseDTO);
+    }
+
+    private LocalDateTime parseCanonicalDateTime(String value) {
+        try {
+            return LocalDateTime.parse(value, CANONICAL_DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            throw new BadRequestException(
+                    "Data e hora inválidas. Use o formato yyyy-MM-dd'T'HH:mm:ss sem offset ou frações."
+            );
+        }
     }
 }

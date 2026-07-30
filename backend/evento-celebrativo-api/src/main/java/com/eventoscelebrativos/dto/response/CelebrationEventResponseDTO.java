@@ -1,22 +1,22 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 public class CelebrationEventResponseDTO {
 
     private Long id;
     private String nameMassOrEvent;
-    private LocalDate eventDate;
-    private LocalTime eventTime;
+    private LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
+    private LocalDateTime endAt;
     private Boolean massOrCelebration;
 
 
-    public CelebrationEventResponseDTO(Long id, String nameMassOrEvent, LocalDate eventDate, LocalTime eventTime, Boolean massOrCelebration) {
+    public CelebrationEventResponseDTO(Long id, String nameMassOrEvent, LocalDateTime startAt, LocalDateTime endAt, Boolean massOrCelebration) {
         this.id = id;
         this.nameMassOrEvent = nameMassOrEvent;
-        this.eventDate = eventDate;
-        this.eventTime = eventTime;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.massOrCelebration = massOrCelebration;
     }
 
@@ -28,15 +28,16 @@ public class CelebrationEventResponseDTO {
         return nameMassOrEvent;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public LocalTime getEventTime() {
-        return eventTime;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
     public Boolean getMassOrCelebration() {
         return massOrCelebration;
     }
+
 }

@@ -6,8 +6,7 @@ import jakarta.persistence.*;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,8 +21,17 @@ public class CelebrationEvent implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nameMassOrEvent;
-    private LocalDate eventDate;
-    private LocalTime eventTime;
+
+    @Column(name = "start_at", nullable = false)
+    private LocalDateTime startAt;
+
+    /**
+     * Termino previsto do compromisso para planejamento de disponibilidade e escala.
+     * Nao representa o termino real da celebracao.
+     */
+    @Column(name = "end_at", nullable = false)
+    private LocalDateTime endAt;
+
     private Boolean massOrCelebration;
 
     @ManyToMany
@@ -38,11 +46,11 @@ public class CelebrationEvent implements Serializable {
 
     }
 
-    public CelebrationEvent(Long id, String nameMassOrEvent, LocalDate eventDate, LocalTime eventTime, Boolean massOrCelebration) {
+    public CelebrationEvent(Long id, String nameMassOrEvent, LocalDateTime startAt, LocalDateTime endAt, Boolean massOrCelebration) {
         this.id = id;
         this.nameMassOrEvent = nameMassOrEvent;
-        this.eventDate = eventDate;
-        this.eventTime = eventTime;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.massOrCelebration = massOrCelebration;
     }
 
@@ -74,20 +82,20 @@ public class CelebrationEvent implements Serializable {
         this.nameMassOrEvent = nameMassOrEvent;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalTime getEventTime() {
-        return eventTime;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public Boolean getMassOrCelebration() {

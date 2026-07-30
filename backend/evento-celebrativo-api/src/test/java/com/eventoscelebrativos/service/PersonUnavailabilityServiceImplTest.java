@@ -6,6 +6,7 @@ import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
@@ -19,10 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.time.Clock;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -41,8 +41,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PersonUnavailabilityServiceImplTest {
 
-    private static final ZoneId ZONE = ZoneId.systemDefault();
-    private static final LocalDate TODAY = LocalDate.of(2026, 8, 1);
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+    private static final LocalDateTime TODAY = LocalDateTime.of(2026, 8, 1, 0, 0);
 
     @Mock
     private PersonUnavailabilityRepository personUnavailabilityRepository;
@@ -59,7 +59,7 @@ class PersonUnavailabilityServiceImplTest {
             if (entity == null) {
                 return null;
             }
-            return new PersonUnavailabilityResponseDTO(entity.getId(), entity.getStartDate(), entity.getEndDate(), entity.getReason());
+            return new PersonUnavailabilityResponseDTO(entity.getId(), entity.getStartAt(), entity.getEndAt(), entity.getReason());
         }
     };
 
@@ -67,7 +67,7 @@ class PersonUnavailabilityServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        Clock fixedClock = Clock.fixed(TODAY.atStartOfDay(ZONE).toInstant(), ZONE);
+        Clock fixedClock = Clock.fixed(TODAY.atZone(ZONE).toInstant(), ZONE);
         service = new PersonUnavailabilityServiceImpl(
                 personUnavailabilityRepository, personRepository, personUnavailabilityConflictService, mapper, fixedClock);
     }
@@ -100,9 +100,9 @@ class PersonUnavailabilityServiceImplTest {
 
     @Test
     void shouldRejectListingWithInvalidPagination() {
-        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY, -1, 10));
-        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY, 0, 0));
-        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY, 0, 101));
+        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY.plusDays(1), -1, 10));
+        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY.plusDays(1), 0, 0));
+        assertThrows(BadRequestException.class, () -> service.findMine("34970000001", TODAY, TODAY.plusDays(1), 0, 101));
     }
 
     @Test
@@ -130,7 +130,7 @@ class PersonUnavailabilityServiceImplTest {
         when(personUnavailabilityRepository.save(any(PersonUnavailability.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PersonUnavailabilityResponseDTO result = service.create(
-                "34970000003", new PersonUnavailabilityRequestDTO(TODAY, TODAY, "   "));
+                "34970000003", new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusHours(1), "   "));
 
         assertNull(result.getReason());
     }
@@ -140,13 +140,67 @@ class PersonUnavailabilityServiceImplTest {
         String tooLong = "a".repeat(501);
 
         assertThrows(BadRequestException.class,
-                () -> service.create("34970000004", new PersonUnavailabilityRequestDTO(TODAY, TODAY, tooLong)));
+                () -> service.create("34970000004", new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusHours(1), tooLong)));
     }
 
     @Test
     void shouldRejectInvertedDateRangeOnCreate() {
         assertThrows(BadRequestException.class, () -> service.create(
                 "34970000005", new PersonUnavailabilityRequestDTO(TODAY.plusDays(2), TODAY, null)));
+    }
+
+    @Test
+    void shouldRejectZeroDurationRangeOnCreate() {
+        assertThrows(BadRequestException.class, () -> service.create(
+                "34970000005", new PersonUnavailabilityRequestDTO(TODAY, TODAY, null)));
+    }
+
+    @Test
+    void shouldRejectFractionalStartAtOnCreate() {
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(
+                TODAY.plusDays(1).withNano(100_000_000),
+                TODAY.plusDays(2),
+                null
+        );
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(TemporalPrecisionNotSupportedException.class,
+                        () -> service.create("34970000001", request));
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verify(personRepository, never()).findByPhoneNumberForUpdate(any());
+    }
+
+    @Test
+    void shouldRejectFractionalEndAtOnUpdateBeforeIdempotencyComparison() {
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(
+                TODAY.plusDays(1),
+                TODAY.plusDays(2).withNano(123_000_000),
+                null
+        );
+
+        assertThrows(
+                TemporalPrecisionNotSupportedException.class,
+                () -> service.update("34970000001", 1L, request)
+        );
+
+        verify(personRepository, never()).findByPhoneNumberForUpdate(any());
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnQueryRange() {
+        assertThrows(
+                TemporalPrecisionNotSupportedException.class,
+                () -> service.findMine(
+                        "34970000001",
+                        TODAY.withNano(123_456_000),
+                        TODAY.plusDays(1),
+                        0,
+                        10
+                )
+        );
+
+        verify(personRepository, never()).findByPhoneNumber(any());
     }
 
     @Test
@@ -161,7 +215,7 @@ class PersonUnavailabilityServiceImplTest {
         when(personRepository.findByPhoneNumberForUpdate("34970000007")).thenReturn(Optional.of(person));
         when(personUnavailabilityRepository.save(any(PersonUnavailability.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.create("34970000007", new PersonUnavailabilityRequestDTO(TODAY, TODAY, null));
+        service.create("34970000007", new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusHours(1), null));
     }
 
     @Test
@@ -175,7 +229,7 @@ class PersonUnavailabilityServiceImplTest {
         PersonUnavailabilityResponseDTO result = service.update(
                 "34970000008", 1L, new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusDays(3), "Novo"));
 
-        assertEquals(TODAY.plusDays(3), result.getEndDate());
+        assertEquals(TODAY.plusDays(3), result.getEndAt());
         assertEquals("Novo", result.getReason());
         verify(personUnavailabilityConflictService).validateNoOverlap(10L, TODAY, TODAY.plusDays(3), 1L);
     }
@@ -202,7 +256,7 @@ class PersonUnavailabilityServiceImplTest {
         when(personUnavailabilityRepository.findByIdAndPersonId(99L, 10L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.update(
-                "34970000010", 99L, new PersonUnavailabilityRequestDTO(TODAY, TODAY, null)));
+                "34970000010", 99L, new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusHours(1), null)));
     }
 
     @Test
@@ -236,14 +290,15 @@ class PersonUnavailabilityServiceImplTest {
     }
 
     @Test
-    void shouldReturnAdminUnavailabilityGroupedByDate() {
+    void shouldReturnAdminUnavailabilityGroupedByRange() {
         List<AdminUnavailabilityPersonDTO> people = List.of(
-                new AdminUnavailabilityPersonDTO(4L, "Arthur Costa", TODAY, TODAY.plusDays(2)));
-        when(personUnavailabilityConflictService.findUnavailablePeopleOnDate(TODAY)).thenReturn(people);
+                new AdminUnavailabilityPersonDTO(4L, "Arthur Costa", List.of()));
+        when(personUnavailabilityConflictService.findUnavailablePeopleOnRange(TODAY, TODAY.plusDays(2))).thenReturn(people);
 
-        AdminUnavailabilityResponseDTO result = service.findByDate(TODAY);
+        AdminUnavailabilityResponseDTO result = service.findByDate(TODAY, TODAY.plusDays(2));
 
-        assertEquals(TODAY, result.getDate());
+        assertEquals(TODAY, result.getStartAt());
+        assertEquals(TODAY.plusDays(2), result.getEndAt());
         assertSame(people, result.getPeople());
     }
 
@@ -255,8 +310,8 @@ class PersonUnavailabilityServiceImplTest {
         return person;
     }
 
-    private PersonUnavailability existing(Long id, Person person, LocalDate startDate, LocalDate endDate, String reason) {
-        PersonUnavailability unavailability = new PersonUnavailability(person, startDate, endDate, reason);
+    private PersonUnavailability existing(Long id, Person person, LocalDateTime startAt, LocalDateTime endAt, String reason) {
+        PersonUnavailability unavailability = new PersonUnavailability(person, startAt, endAt, reason);
         unavailability.setId(id);
         return unavailability;
     }

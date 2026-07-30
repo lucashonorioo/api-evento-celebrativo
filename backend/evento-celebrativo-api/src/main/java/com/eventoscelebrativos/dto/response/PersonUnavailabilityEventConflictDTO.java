@@ -1,6 +1,6 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class PersonUnavailabilityEventConflictDTO {
@@ -8,8 +8,8 @@ public class PersonUnavailabilityEventConflictDTO {
     private Long personId;
     private String personName;
     private List<String> assignmentTypes;
-    private LocalDate startDate;
-    private LocalDate endDate;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
 
     public PersonUnavailabilityEventConflictDTO() {
     }
@@ -18,14 +18,14 @@ public class PersonUnavailabilityEventConflictDTO {
             Long personId,
             String personName,
             List<String> assignmentTypes,
-            LocalDate startDate,
-            LocalDate endDate
+            LocalDateTime startAt,
+            LocalDateTime endAt
     ) {
         this.personId = personId;
         this.personName = personName;
         this.assignmentTypes = assignmentTypes;
-        this.startDate = startDate;
-        this.endDate = endDate;
+        this.startAt = startAt;
+        this.endAt = endAt;
     }
 
     public Long getPersonId() {
@@ -52,19 +52,19 @@ public class PersonUnavailabilityEventConflictDTO {
         this.assignmentTypes = assignmentTypes;
     }
 
-    public LocalDate getStartDate() {
-        return startDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalDate getEndDate() {
-        return endDate;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 }

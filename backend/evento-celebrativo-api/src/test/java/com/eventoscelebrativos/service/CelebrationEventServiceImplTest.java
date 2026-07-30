@@ -14,6 +14,7 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
@@ -46,8 +47,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,7 +63,9 @@ import static org.mockito.Mockito.*;
 class CelebrationEventServiceImplTest {
 
     private static final LocalDate EVENT_DATE = LocalDate.of(2026, 8, 15);
-    private static final LocalTime EVENT_TIME = LocalTime.of(19, 30);
+    private static final LocalDateTime EVENT_START_AT = LocalDateTime.of(2026, 8, 15, 19, 30);
+    private static final LocalDateTime EVENT_END_AT = LocalDateTime.of(2026, 8, 15, 20, 30);
+    private static final ZoneId APPLICATION_ZONE = ZoneId.of("America/Sao_Paulo");
 
     @Mock
     private CelebrationEventRepository repository;
@@ -97,6 +103,9 @@ class CelebrationEventServiceImplTest {
     @Mock
     private PersonUnavailabilityConflictService personUnavailabilityConflictService;
 
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-08-15T21:00:00Z"), APPLICATION_ZONE);
+
     @InjectMocks
     private CelebrationEventServiceImpl service;
 
@@ -113,6 +122,73 @@ class CelebrationEventServiceImplTest {
 
         assertSame(response, service.createEvent(request));
         verifyNoInteractions(eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldAcceptEventCreationAtCurrentSecondUsingApplicationClock() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 15, 18, 0);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", now, now.plusHours(1), true);
+        CelebrationEvent entity = new CelebrationEvent(null, "Missa", now, now.plusHours(1), true);
+        CelebrationEvent saved = new CelebrationEvent(1L, "Missa", now, now.plusHours(1), true);
+        CelebrationEventResponseDTO response =
+                new CelebrationEventResponseDTO(1L, "Missa", now, now.plusHours(1), true);
+
+        when(mapper.toEntity(request)).thenReturn(entity);
+        when(repository.save(entity)).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(response);
+
+        assertSame(response, service.createEvent(request));
+    }
+
+    @Test
+    void shouldRejectPastEventCreationUsingApplicationClock() {
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 15, 17, 59, 59);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", pastStart, pastStart.plusHours(1), true);
+
+        assertThrows(BusinessException.class, () -> service.createEvent(request));
+
+        verifyNoInteractions(mapper, repository);
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnCommonEventCreation() {
+        CelebrationEventRequestDTO request = request();
+        request.setStartAt(EVENT_START_AT.withNano(100_000_000));
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(TemporalPrecisionNotSupportedException.class, () -> service.createEvent(request));
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verifyNoInteractions(mapper, repository);
+    }
+
+    @Test
+    void shouldRejectFractionalSecondsOnEventWithScaleCreation() {
+        CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
+        request.setEndAt(EVENT_END_AT.withNano(123_456_000));
+
+        TemporalPrecisionNotSupportedException exception =
+                assertThrows(
+                        TemporalPrecisionNotSupportedException.class,
+                        () -> service.createEventWithScale(request)
+                );
+
+        assertEquals("TEMPORAL_PRECISION_NOT_SUPPORTED", exception.getErrorCode());
+        verifyNoInteractions(repository, eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldRejectPastEventWithScaleCreationUsingApplicationClock() {
+        CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 15, 17, 0);
+        request.setStartAt(pastStart);
+        request.setEndAt(pastStart.plusHours(1));
+
+        assertThrows(BusinessException.class, () -> service.createEventWithScale(request));
+
+        verifyNoInteractions(repository, eventAssignmentCommandService);
     }
 
     @Test
@@ -432,9 +508,9 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(1, 2);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
-        EucharistScaleEventProjection first = projection(1L, "Missa A", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
-        EucharistScaleEventProjection second = projection(2L, "Missa B", EVENT_DATE.plusDays(1), EVENT_TIME, "Capela", null);
-        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+        EucharistScaleEventProjection first = projection(1L, "Missa A", EVENT_START_AT, EVENT_END_AT, "Igreja Matriz", null);
+        EucharistScaleEventProjection second = projection(2L, "Missa B", EVENT_START_AT.plusDays(1), EVENT_END_AT.plusDays(1), "Capela", null);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay()))
                 .thenReturn(new PageImpl<>(List.of(first, second), pageable, 5));
         when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L)))
                 .thenReturn(List.of(
@@ -449,7 +525,7 @@ class CelebrationEventServiceImplTest {
         assertEquals(1, result.getNumber());
         assertEquals(List.of("Mariana", "Carlos"), result.getContent().get(0).getNameMinisters());
         assertEquals(List.of("Pessoa de outro subtipo"), result.getContent().get(1).getNameMinisters());
-        verify(repository).findEucharistScaleByAssignments(pageable, startDate, endDate);
+        verify(repository).findEucharistScaleByAssignments(pageable, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
         verify(repository).findEucharistScaleAssignmentsByEventIds(List.of(1L, 2L));
         verifyNoInteractions(eventAssignmentReadService);
     }
@@ -459,7 +535,7 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2030, 1, 1);
         LocalDate endDate = LocalDate.of(2030, 1, 31);
-        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+        when(repository.findEucharistScaleByAssignments(pageable, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay()))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         Page<EucharistScaleEventResponseDTO> result = service.findEucharistScale(pageable, startDate, endDate);
@@ -474,7 +550,7 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
-        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+        when(repository.findEucharistScaleByAssignments(pageable, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay()))
                 .thenThrow(new IllegalStateException("controlled parallel failure"));
 
         IllegalStateException exception = assertThrows(
@@ -492,8 +568,8 @@ class CelebrationEventServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
-        EucharistScaleEventProjection projection = projection("Missa", EVENT_DATE, EVENT_TIME, "Igreja Matriz", null);
-        when(repository.findEucharistScaleByAssignments(pageable, startDate, endDate))
+        EucharistScaleEventProjection projection = projection("Missa", EVENT_START_AT, EVENT_END_AT, "Igreja Matriz", null);
+        when(repository.findEucharistScaleByAssignments(pageable, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay()))
                 .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
         when(repository.findEucharistScaleAssignmentsByEventIds(List.of(1L)))
                 .thenThrow(new IllegalStateException("controlled batch failure"));
@@ -547,7 +623,7 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldMapEventScheduleToResponse() {
-        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventAssignmentType.READER.name()), eq(false)))
+        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE.atStartOfDay()), eq(EVENT_DATE.plusDays(1).atStartOfDay()), eq(EventAssignmentType.READER.name()), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
         when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.READER.name()))
                 .thenReturn(List.of(scheduleAssignment(1L, 10L, "Maria")));
@@ -558,8 +634,8 @@ class CelebrationEventServiceImplTest {
         EventScheduleQueryResponseDTO dto = result.getContent().get(0);
         assertEquals(1L, dto.getEventId());
         assertEquals("Missa", dto.getEventName());
-        assertEquals(EVENT_DATE, dto.getEventDate());
-        assertEquals(EVENT_TIME, dto.getEventTime());
+        assertEquals(EVENT_START_AT, dto.getStartAt());
+        assertEquals(EVENT_END_AT, dto.getEndAt());
         assertEquals(1L, dto.getLocationId());
         assertEquals("Igreja Matriz", dto.getChurchName());
         assertEquals(EventScheduleType.READER, dto.getAssignmentType());
@@ -569,7 +645,7 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldMapEventScheduleWithSeveralAssignments() {
-        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE), eq(EVENT_DATE), eq(EventAssignmentType.EUCHARISTIC_MINISTER.name()), eq(false)))
+        when(repository.findEventScheduleEventsByAssignments(any(), eq(EVENT_DATE.atStartOfDay()), eq(EVENT_DATE.plusDays(1).atStartOfDay()), eq(EventAssignmentType.EUCHARISTIC_MINISTER.name()), eq(false)))
                 .thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
         when(repository.findEventScheduleAssignmentsByAssignmentType(List.of(1L), EventAssignmentType.EUCHARISTIC_MINISTER.name()))
                 .thenReturn(List.of(
@@ -587,8 +663,8 @@ class CelebrationEventServiceImplTest {
     void shouldFindEventSchedulesFromParallelAssignmentsWithoutLegacyRead() {
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.READER.name()),
                 eq(false)
         )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L), scheduleEvent(2L)), PageRequest.of(1, 2), 5));
@@ -612,8 +688,8 @@ class CelebrationEventServiceImplTest {
                 .toList());
         verify(repository).findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.READER.name()),
                 eq(false)
         );
@@ -625,8 +701,8 @@ class CelebrationEventServiceImplTest {
     void shouldPassIncludeUnassignedToParallelMonthlyScheduleQuery() {
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.PRIEST.name()),
                 eq(true)
         )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
@@ -639,8 +715,8 @@ class CelebrationEventServiceImplTest {
         assertTrue(result.getContent().get(0).getAssignments().isEmpty());
         verify(repository).findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.PRIEST.name()),
                 eq(true)
         );
@@ -650,8 +726,8 @@ class CelebrationEventServiceImplTest {
     void shouldReturnEmptyEventSchedulePageFromParallelSourceWithoutAssignmentBatch() {
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.READER.name()),
                 eq(false)
         )).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
@@ -667,8 +743,8 @@ class CelebrationEventServiceImplTest {
     void shouldPropagateParallelFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.READER.name()),
                 eq(false)
         )).thenThrow(new IllegalStateException("controlled parallel failure"));
@@ -687,8 +763,8 @@ class CelebrationEventServiceImplTest {
     void shouldPropagateParallelAssignmentBatchFailureWithoutLegacyFallbackWhenFindingEventSchedules() {
         when(repository.findEventScheduleEventsByAssignments(
                 any(),
-                eq(EVENT_DATE),
-                eq(EVENT_DATE),
+                eq(EVENT_DATE.atStartOfDay()),
+                eq(EVENT_DATE.plusDays(1).atStartOfDay()),
                 eq(EventAssignmentType.READER.name()),
                 eq(false)
         )).thenReturn(new PageImpl<>(List.of(scheduleEvent(1L)), PageRequest.of(0, 10), 1));
@@ -732,6 +808,27 @@ class CelebrationEventServiceImplTest {
         assertSame(response, service.updateEvent(1L, request));
         verify(mapper).updateCelebrationEventMapperFromDto(request, entity);
         verifyNoInteractions(eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldAllowAdministrativeCorrectionOfPastEvent() {
+        LocalDateTime pastStart = LocalDateTime.of(2026, 8, 10, 19, 0);
+        LocalDateTime pastEnd = pastStart.plusHours(1);
+        CelebrationEvent existing =
+                new CelebrationEvent(1L, "Missa antiga", pastStart, pastEnd, true);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa antiga corrigida", pastStart, pastEnd, true);
+        CelebrationEventResponseDTO response =
+                new CelebrationEventResponseDTO(1L, "Missa antiga corrigida", pastStart, pastEnd, true);
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existing));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of());
+        when(repository.save(existing)).thenReturn(existing);
+        when(mapper.toDto(existing)).thenReturn(response);
+
+        assertSame(response, service.updateEvent(1L, request));
+
+        verify(repository).save(existing);
     }
 
     @Test
@@ -823,8 +920,8 @@ class CelebrationEventServiceImplTest {
         assertSame(response, service.createEventWithScale(eventWithScaleRequest()));
         verify(repository).save(argThat(event ->
                 "Missa".equals(event.getNameMassOrEvent())
-                        && EVENT_DATE.equals(event.getEventDate())
-                        && EVENT_TIME.equals(event.getEventTime())
+                        && EVENT_START_AT.equals(event.getStartAt())
+                        && EVENT_END_AT.equals(event.getEndAt())
                         && event.getLocations().contains(location)
         ));
 
@@ -1053,7 +1150,7 @@ class CelebrationEventServiceImplTest {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_DATE));
+        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_START_AT), eq(EVENT_END_AT));
 
         assertThrows(PersonUnavailableForEventException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
 
@@ -1103,7 +1200,7 @@ class CelebrationEventServiceImplTest {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_DATE));
+        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_START_AT), eq(EVENT_END_AT));
 
         assertThrows(PersonUnavailableForEventException.class,
                 () -> service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
@@ -1133,11 +1230,11 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldNotValidateAvailabilityWhenEventDateIsUnchanged() {
+    void shouldNotValidateAvailabilityWhenEventRangeIsUnchanged() {
         CelebrationEvent existingEvent = event(1L);
         CelebrationEvent saved = event(1L);
         CelebrationEventResponseDTO responseDto = response(1L);
-        CelebrationEventRequestDTO sameDate = new CelebrationEventRequestDTO("Missa", EVENT_DATE, EVENT_TIME, true);
+        CelebrationEventRequestDTO sameRange = new CelebrationEventRequestDTO("Missa", EVENT_START_AT, EVENT_END_AT, true);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
@@ -1146,32 +1243,76 @@ class CelebrationEventServiceImplTest {
         when(repository.save(existingEvent)).thenReturn(saved);
         when(mapper.toDto(saved)).thenReturn(responseDto);
 
-        assertSame(responseDto, service.updateEvent(1L, sameDate));
+        assertSame(responseDto, service.updateEvent(1L, sameRange));
 
-        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any());
+        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
     }
 
     @Test
-    void shouldRejectEventDateChangeWhenAssignedPersonIsUnavailablePreservingOriginalDate() {
+    void shouldRevalidateAvailabilityWhenOnlyStartAtChanges() {
         CelebrationEvent existingEvent = event(1L);
-        LocalDate newDate = EVENT_DATE.plusDays(5);
-        CelebrationEventRequestDTO changedDateRequest = new CelebrationEventRequestDTO("Missa", newDate, EVENT_TIME, true);
+        LocalDateTime newStartAt = EVENT_START_AT.plusMinutes(15);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", newStartAt, EVENT_END_AT, true);
+        Person assignedPerson = person(new Person(), 3L, "Leitor");
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(existingEvent, assignedPerson, EventAssignmentType.READER)
+        ));
+        when(repository.save(existingEvent)).thenReturn(existingEvent);
+        when(mapper.toDto(existingEvent)).thenReturn(response(1L));
+
+        service.updateEvent(1L, request);
+
+        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                any(), eq(newStartAt), eq(EVENT_END_AT));
+    }
+
+    @Test
+    void shouldRevalidateAvailabilityWhenOnlyEndAtChanges() {
+        CelebrationEvent existingEvent = event(1L);
+        LocalDateTime newEndAt = EVENT_END_AT.plusMinutes(30);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", EVENT_START_AT, newEndAt, true);
+        Person assignedPerson = person(new Person(), 3L, "Leitor");
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(existingEvent, assignedPerson, EventAssignmentType.READER)
+        ));
+        when(repository.save(existingEvent)).thenReturn(existingEvent);
+        when(mapper.toDto(existingEvent)).thenReturn(response(1L));
+
+        service.updateEvent(1L, request);
+
+        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                any(), eq(EVENT_START_AT), eq(newEndAt));
+    }
+
+    @Test
+    void shouldRejectEventRangeChangeWhenAssignedPersonIsUnavailablePreservingOriginalRange() {
+        CelebrationEvent existingEvent = event(1L);
+        LocalDateTime newStartAt = EVENT_START_AT.plusDays(5);
+        LocalDateTime newEndAt = EVENT_END_AT.plusDays(5);
+        CelebrationEventRequestDTO changedDateRequest = new CelebrationEventRequestDTO("Missa", newStartAt, newEndAt, true);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
                 eventAssignment(existingEvent, person(new Person(), 3L, "Leitor"), EventAssignmentType.READER)
         ));
         PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(newDate));
+        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(newStartAt), eq(newEndAt));
 
         assertThrows(PersonUnavailableForEventException.class, () -> service.updateEvent(1L, changedDateRequest));
 
-        assertEquals(EVENT_DATE, existingEvent.getEventDate());
+        assertEquals(EVENT_START_AT, existingEvent.getStartAt());
+        assertEquals(EVENT_END_AT, existingEvent.getEndAt());
         verify(repository, never()).save(any());
     }
 
     private CelebrationEventRequestDTO request() {
-        return new CelebrationEventRequestDTO("Missa", EVENT_DATE, EVENT_TIME, true);
+        return new CelebrationEventRequestDTO("Missa", EVENT_START_AT, EVENT_END_AT, true);
     }
 
     private CelebrationEventScaleRequestDTO scaleRequest() {
@@ -1188,8 +1329,8 @@ class CelebrationEventServiceImplTest {
     private CelebrationEventWithScaleRequestDTO eventWithScaleRequest() {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent("Missa");
-        request.setEventDate(EVENT_DATE);
-        request.setEventTime(EVENT_TIME);
+        request.setStartAt(EVENT_START_AT);
+        request.setEndAt(EVENT_END_AT);
         request.setMassOrCelebration(true);
         request.setLocationId(1L);
         request.setPriestId(8L);
@@ -1200,22 +1341,22 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent event = new CelebrationEvent();
         event.setId(id);
         event.setNameMassOrEvent("Missa");
-        event.setEventDate(EVENT_DATE);
-        event.setEventTime(EVENT_TIME);
+        event.setStartAt(EVENT_START_AT);
+        event.setEndAt(EVENT_END_AT);
         event.setMassOrCelebration(true);
         return event;
     }
 
     private CelebrationEventResponseDTO response(Long id) {
-        return new CelebrationEventResponseDTO(id, "Missa", EVENT_DATE, EVENT_TIME, true);
+        return new CelebrationEventResponseDTO(id, "Missa", EVENT_START_AT, EVENT_END_AT, true);
     }
 
     private CelebrationEventScaleDetailResponseDTO detailResponse() {
         CelebrationEventScaleDetailResponseDTO response = new CelebrationEventScaleDetailResponseDTO();
         response.setEventId(1L);
         response.setEventName("Missa");
-        response.setEventDate(EVENT_DATE);
-        response.setEventTime(EVENT_TIME);
+        response.setStartAt(EVENT_START_AT);
+        response.setEndAt(EVENT_END_AT);
         response.setMassOrCelebration(true);
         return response;
     }
@@ -1278,13 +1419,13 @@ class CelebrationEventServiceImplTest {
             }
 
             @Override
-            public LocalDate getEventDate() {
-                return EVENT_DATE;
+            public LocalDateTime getStartAt() {
+                return EVENT_START_AT;
             }
 
             @Override
-            public LocalTime getEventTime() {
-                return EVENT_TIME;
+            public LocalDateTime getEndAt() {
+                return EVENT_END_AT;
             }
 
             @Override
@@ -1325,19 +1466,19 @@ class CelebrationEventServiceImplTest {
 
     private EucharistScaleEventProjection projection(
             String nameMassOrEvent,
-            LocalDate eventDate,
-            LocalTime eventTime,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             String churchName,
             String ministerNames
     ) {
-        return projection(1L, nameMassOrEvent, eventDate, eventTime, churchName, ministerNames);
+        return projection(1L, nameMassOrEvent, startAt, endAt, churchName, ministerNames);
     }
 
     private EucharistScaleEventProjection projection(
             Long eventId,
             String nameMassOrEvent,
-            LocalDate eventDate,
-            LocalTime eventTime,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             String churchName,
             String ministerNames
     ) {
@@ -1353,13 +1494,13 @@ class CelebrationEventServiceImplTest {
             }
 
             @Override
-            public LocalDate getEventDate() {
-                return eventDate;
+            public LocalDateTime getStartAt() {
+                return startAt;
             }
 
             @Override
-            public LocalTime getEventTime() {
-                return eventTime;
+            public LocalDateTime getEndAt() {
+                return endAt;
             }
 
             @Override

@@ -1,21 +1,18 @@
 package com.eventoscelebrativos.dto.response;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-public class AdminUnavailabilityResponseDTO {
+public class AdminUnavailabilityRangeDTO {
 
     private LocalDateTime startAt;
     private LocalDateTime endAt;
-    private List<AdminUnavailabilityPersonDTO> people;
 
-    public AdminUnavailabilityResponseDTO() {
+    public AdminUnavailabilityRangeDTO() {
     }
 
-    public AdminUnavailabilityResponseDTO(LocalDateTime startAt, LocalDateTime endAt, List<AdminUnavailabilityPersonDTO> people) {
+    public AdminUnavailabilityRangeDTO(LocalDateTime startAt, LocalDateTime endAt) {
         this.startAt = startAt;
         this.endAt = endAt;
-        this.people = people;
     }
 
     public LocalDateTime getStartAt() {
@@ -32,13 +29,5 @@ public class AdminUnavailabilityResponseDTO {
 
     public void setEndAt(LocalDateTime endAt) {
         this.endAt = endAt;
-    }
-
-    public List<AdminUnavailabilityPersonDTO> getPeople() {
-        return people;
-    }
-
-    public void setPeople(List<AdminUnavailabilityPersonDTO> people) {
-        this.people = people;
     }
 }

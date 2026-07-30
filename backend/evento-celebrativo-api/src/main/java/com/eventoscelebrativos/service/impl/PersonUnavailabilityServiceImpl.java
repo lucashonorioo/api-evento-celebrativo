@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Service
@@ -51,18 +52,18 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Transactional(readOnly = true)
     public Page<PersonUnavailabilityResponseDTO> findMine(
             String phoneNumber,
-            LocalDate startDate,
-            LocalDate endDate,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
             int page,
             int size
     ) {
-        validateQueryRange(startDate, endDate, page, size);
+        validateQueryRange(startAt, endAt, page, size);
         Person person = findAuthenticatedPerson(phoneNumber);
 
         Page<PersonUnavailability> result = personUnavailabilityRepository.findByPersonIdIntersecting(
                 person.getId(),
-                startDate,
-                endDate,
+                startAt,
+                endAt,
                 PageRequest.of(page, size)
         );
 
@@ -72,17 +73,17 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Override
     @Transactional
     public PersonUnavailabilityResponseDTO create(String phoneNumber, PersonUnavailabilityRequestDTO requestDTO) {
-        LocalDate startDate = requestDTO.getStartDate();
-        LocalDate endDate = requestDTO.getEndDate();
-        validateTemporalRule(startDate, endDate);
+        LocalDateTime startAt = requestDTO.getStartAt();
+        LocalDateTime endAt = requestDTO.getEndAt();
+        validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
         Person person = lockAuthenticatedPerson(phoneNumber);
 
-        personUnavailabilityConflictService.validateNoOverlap(person.getId(), startDate, endDate, null);
-        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startDate, endDate);
+        personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, null);
+        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startAt, endAt);
 
-        PersonUnavailability entity = new PersonUnavailability(person, startDate, endDate, reason);
+        PersonUnavailability entity = new PersonUnavailability(person, startAt, endAt, reason);
         PersonUnavailability saved = personUnavailabilityRepository.save(entity);
 
         return personUnavailabilityMapper.toDto(saved);
@@ -91,9 +92,9 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Override
     @Transactional
     public PersonUnavailabilityResponseDTO update(String phoneNumber, Long id, PersonUnavailabilityRequestDTO requestDTO) {
-        LocalDate startDate = requestDTO.getStartDate();
-        LocalDate endDate = requestDTO.getEndDate();
-        validateTemporalRule(startDate, endDate);
+        LocalDateTime startAt = requestDTO.getStartAt();
+        LocalDateTime endAt = requestDTO.getEndAt();
+        validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
         Person person = lockAuthenticatedPerson(phoneNumber);
@@ -101,19 +102,19 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Indisponibilidade", id));
 
-        boolean unchanged = existing.getStartDate().equals(startDate)
-                && existing.getEndDate().equals(endDate)
+        boolean unchanged = existing.getStartAt().equals(startAt)
+                && existing.getEndAt().equals(endAt)
                 && Objects.equals(existing.getReason(), reason);
 
         if (unchanged) {
             return personUnavailabilityMapper.toDto(existing);
         }
 
-        personUnavailabilityConflictService.validateNoOverlap(person.getId(), startDate, endDate, id);
-        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startDate, endDate);
+        personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, id);
+        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startAt, endAt);
 
-        existing.setStartDate(startDate);
-        existing.setEndDate(endDate);
+        existing.setStartAt(startAt);
+        existing.setEndAt(endAt);
         existing.setReason(reason);
         PersonUnavailability saved = personUnavailabilityRepository.save(existing);
 
@@ -133,13 +134,18 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
     @Override
     @Transactional(readOnly = true)
-    public AdminUnavailabilityResponseDTO findByDate(LocalDate date) {
-        if (date == null) {
-            throw new BadRequestException("A data é obrigatória");
+    public AdminUnavailabilityResponseDTO findByDate(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt == null || endAt == null) {
+            throw new BadRequestException("startAt e endAt são obrigatórios");
+        }
+        validateSecondPrecision(startAt, endAt);
+        if (!startAt.isBefore(endAt)) {
+            throw new BadRequestException("startAt deve ser anterior a endAt");
         }
         return new AdminUnavailabilityResponseDTO(
-                date,
-                personUnavailabilityConflictService.findUnavailablePeopleOnDate(date)
+                startAt,
+                endAt,
+                personUnavailabilityConflictService.findUnavailablePeopleOnRange(startAt, endAt)
         );
     }
 
@@ -153,30 +159,38 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
     }
 
-    private void validateTemporalRule(LocalDate startDate, LocalDate endDate) {
-        if (startDate == null || endDate == null) {
-            throw new BadRequestException("As datas inicial e final são obrigatórias");
+    private void validateTemporalRule(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt == null || endAt == null) {
+            throw new BadRequestException("startAt e endAt são obrigatórios");
         }
-        if (startDate.isAfter(endDate)) {
-            throw new BadRequestException("A data inicial não pode ser posterior à data final");
+        validateSecondPrecision(startAt, endAt);
+        if (!startAt.isBefore(endAt)) {
+            throw new BadRequestException("startAt deve ser anterior a endAt");
         }
-        if (startDate.isBefore(LocalDate.now(clock))) {
-            throw new BadRequestException("A data inicial não pode ser anterior à data atual");
+        if (startAt.isBefore(LocalDateTime.now(clock).withNano(0))) {
+            throw new BadRequestException("startAt não pode ser anterior ao instante atual");
         }
     }
 
-    private void validateQueryRange(LocalDate startDate, LocalDate endDate, int page, int size) {
-        if (startDate == null || endDate == null) {
-            throw new BadRequestException("As datas inicial e final são obrigatórias");
+    private void validateQueryRange(LocalDateTime startAt, LocalDateTime endAt, int page, int size) {
+        if (startAt == null || endAt == null) {
+            throw new BadRequestException("startAt e endAt são obrigatórios");
         }
-        if (startDate.isAfter(endDate)) {
-            throw new BadRequestException("A data inicial não pode ser posterior à data final");
+        validateSecondPrecision(startAt, endAt);
+        if (!startAt.isBefore(endAt)) {
+            throw new BadRequestException("startAt deve ser anterior a endAt");
         }
         if (page < 0) {
             throw new BadRequestException("O número da página deve ser maior ou igual a zero");
         }
         if (size <= 0 || size > MAX_PAGE_SIZE) {
             throw new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100");
+        }
+    }
+
+    private void validateSecondPrecision(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt.getNano() != 0 || endAt.getNano() != 0) {
+            throw new TemporalPrecisionNotSupportedException();
         }
     }
 

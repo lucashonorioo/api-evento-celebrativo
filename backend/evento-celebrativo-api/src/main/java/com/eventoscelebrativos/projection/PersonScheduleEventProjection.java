@@ -1,14 +1,13 @@
 package com.eventoscelebrativos.projection;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 public interface PersonScheduleEventProjection {
 
     Long getEventId();
     String getEventName();
-    LocalDate getEventDate();
-    LocalTime getEventTime();
+    LocalDateTime getStartAt();
+    LocalDateTime getEndAt();
     Boolean getMassOrCelebration();
     Long getLocationId();
     String getLocationName();

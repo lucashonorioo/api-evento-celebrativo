@@ -23,8 +23,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -63,51 +62,51 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     @Test
     void shouldNotThrowWhenNoOverlapExists() {
-        when(personUnavailabilityRepository.findOverlapping(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)))
+        when(personUnavailabilityRepository.findOverlapping(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of());
 
-        service.validateNoOverlap(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null);
+        service.validateNoOverlap(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
     }
 
     @Test
     void shouldThrowOverlapExceptionWhenPeriodsIntersect() {
-        when(personUnavailabilityRepository.findOverlapping(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)))
+        when(personUnavailabilityRepository.findOverlapping(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of(new PersonUnavailability()));
 
         assertThrows(UnavailabilityOverlapException.class,
-                () -> service.validateNoOverlap(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), null));
+                () -> service.validateNoOverlap(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null));
     }
 
     @Test
     void shouldExcludeOwnIdWhenValidatingOverlapForUpdate() {
-        when(personUnavailabilityRepository.findOverlappingExcludingId(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), 5L))
+        when(personUnavailabilityRepository.findOverlappingExcludingId(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), 5L))
                 .thenReturn(List.of());
 
-        service.validateNoOverlap(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), 5L);
+        service.validateNoOverlap(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), 5L);
 
-        verify(personUnavailabilityRepository).findOverlappingExcludingId(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12), 5L);
+        verify(personUnavailabilityRepository).findOverlappingExcludingId(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), 5L);
         verify(personUnavailabilityRepository, never()).findOverlapping(anyLong(), any(), any());
     }
 
     @Test
     void shouldNotThrowWhenNoAssignmentConflictExists() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndDateRange(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)))
+        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of());
 
-        service.validateNoAssignmentConflict(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12));
+        service.validateNoAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0));
     }
 
     @Test
     void shouldGroupAssignmentConflictsByEventAndOrderAssignmentsByEnumOrder() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndDateRange(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)))
+        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of(
-                        conflictRow(15L, "Missa das 19h", LocalDate.of(2026, 8, 15), LocalTime.of(19, 0), "COMMENTATOR"),
-                        conflictRow(15L, "Missa das 19h", LocalDate.of(2026, 8, 15), LocalTime.of(19, 0), "READER")
+                        conflictRow(15L, "Missa das 19h", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "COMMENTATOR"),
+                        conflictRow(15L, "Missa das 19h", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER")
                 ));
 
         UnavailabilityAssignmentConflictException exception = assertThrows(
                 UnavailabilityAssignmentConflictException.class,
-                () -> service.validateNoAssignmentConflict(1L, LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)));
+                () -> service.validateNoAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)));
 
         assertEquals(1, exception.getConflicts().size());
         EventAssignmentConflictDTO conflict = exception.getConflicts().get(0);
@@ -117,15 +116,15 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     @Test
     void shouldOrderMultipleEventConflictsByDateTimeThenId() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndDateRange(1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)))
+        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0)))
                 .thenReturn(List.of(
-                        conflictRow(20L, "Missa Tarde", LocalDate.of(2026, 8, 15), LocalTime.of(19, 0), "READER"),
-                        conflictRow(10L, "Missa Manha", LocalDate.of(2026, 8, 15), LocalTime.of(8, 0), "READER")
+                        conflictRow(20L, "Missa Tarde", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER"),
+                        conflictRow(10L, "Missa Manha", at(2026, 8, 15, 8, 0), at(2026, 8, 15, 9, 0), "READER")
                 ));
 
         UnavailabilityAssignmentConflictException exception = assertThrows(
                 UnavailabilityAssignmentConflictException.class,
-                () -> service.validateNoAssignmentConflict(1L, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)));
+                () -> service.validateNoAssignmentConflict(1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0)));
 
         assertEquals(List.of(10L, 20L), exception.getConflicts().stream().map(EventAssignmentConflictDTO::getEventId).toList());
     }
@@ -159,12 +158,12 @@ class PersonUnavailabilityConflictServiceImplTest {
     }
 
     @Test
-    void shouldNotThrowWhenNoPersonIsUnavailableOnEventDate() {
+    void shouldNotThrowWhenNoPersonIsUnavailableOnEventRange() {
         Map<Long, Set<EventAssignmentType>> plan = Map.of(4L, EnumSet.of(EventAssignmentType.READER));
-        when(personUnavailabilityRepository.findByPersonIdsAndDate(plan.keySet(), LocalDate.of(2026, 8, 15)))
+        when(personUnavailabilityRepository.findByPersonIdsAndRange(plan.keySet(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)))
                 .thenReturn(List.of());
 
-        service.validateAvailabilityForEvent(plan, LocalDate.of(2026, 8, 15));
+        service.validateAvailabilityForEvent(plan, at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0));
     }
 
     @Test
@@ -172,12 +171,12 @@ class PersonUnavailabilityConflictServiceImplTest {
         Map<Long, Set<EventAssignmentType>> plan = Map.of(
                 4L, EnumSet.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR)
         );
-        when(personUnavailabilityRepository.findByPersonIdsAndDate(plan.keySet(), LocalDate.of(2026, 8, 15)))
-                .thenReturn(List.of(personProjection(4L, "Arthur Costa", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 20))));
+        when(personUnavailabilityRepository.findByPersonIdsAndRange(plan.keySet(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)))
+                .thenReturn(List.of(personProjection(4L, "Arthur Costa", at(2026, 8, 10, 0, 0), at(2026, 8, 20, 0, 0))));
 
         PersonUnavailableForEventException exception = assertThrows(
                 PersonUnavailableForEventException.class,
-                () -> service.validateAvailabilityForEvent(plan, LocalDate.of(2026, 8, 15)));
+                () -> service.validateAvailabilityForEvent(plan, at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)));
 
         assertEquals(1, exception.getConflicts().size());
         PersonUnavailabilityEventConflictDTO conflict = exception.getConflicts().get(0);
@@ -188,27 +187,41 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     @Test
     void shouldDoNothingWhenValidatingAvailabilityForEmptyPlan() {
-        service.validateAvailabilityForEvent(Map.of(), LocalDate.of(2026, 8, 15));
+        service.validateAvailabilityForEvent(Map.of(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0));
 
-        verify(personUnavailabilityRepository, never()).findByPersonIdsAndDate(any(), any());
+        verify(personUnavailabilityRepository, never()).findByPersonIdsAndRange(any(), any(), any());
     }
 
     @Test
-    void shouldDeduplicatePeopleWhenListingAdminUnavailabilityOnDate() {
-        when(personUnavailabilityRepository.findAllByDate(LocalDate.of(2026, 8, 10)))
+    void shouldDeduplicatePeopleWhenListingAdminUnavailabilityOnRange() {
+        when(personUnavailabilityRepository.findAllByRange(at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of(
-                        personProjection(4L, "Arthur Costa", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12)),
-                        personProjection(4L, "Arthur Costa", LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 12))
+                        personProjection(4L, "Arthur Costa", at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)),
+                        personProjection(4L, "Arthur Costa", at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0))
                 ));
 
-        List<AdminUnavailabilityPersonDTO> result = service.findUnavailablePeopleOnDate(LocalDate.of(2026, 8, 10));
+        List<AdminUnavailabilityPersonDTO> result = service.findUnavailablePeopleOnRange(at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0));
 
         assertEquals(1, result.size());
         assertTrue(result.stream().allMatch(dto -> dto.getPersonId().equals(4L)));
     }
 
+    @Test
+    void shouldGroupMultipleDistinctPeriodsForTheSamePersonWhenListingAdminUnavailabilityOnRange() {
+        when(personUnavailabilityRepository.findAllByRange(at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0)))
+                .thenReturn(List.of(
+                        personProjection(4L, "Arthur Costa", at(2026, 8, 5, 0, 0), at(2026, 8, 7, 0, 0)),
+                        personProjection(4L, "Arthur Costa", at(2026, 8, 20, 0, 0), at(2026, 8, 22, 0, 0))
+                ));
+
+        List<AdminUnavailabilityPersonDTO> result = service.findUnavailablePeopleOnRange(at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0));
+
+        assertEquals(1, result.size());
+        assertEquals(2, result.get(0).getUnavailabilities().size());
+    }
+
     private PersonUnavailabilityAssignmentConflictProjection conflictRow(
-            Long eventId, String eventName, LocalDate eventDate, LocalTime eventTime, String assignmentType
+            Long eventId, String eventName, LocalDateTime startAt, LocalDateTime endAt, String assignmentType
     ) {
         return new PersonUnavailabilityAssignmentConflictProjection() {
             @Override
@@ -222,13 +235,13 @@ class PersonUnavailabilityConflictServiceImplTest {
             }
 
             @Override
-            public LocalDate getEventDate() {
-                return eventDate;
+            public LocalDateTime getStartAt() {
+                return startAt;
             }
 
             @Override
-            public LocalTime getEventTime() {
-                return eventTime;
+            public LocalDateTime getEndAt() {
+                return endAt;
             }
 
             @Override
@@ -238,7 +251,7 @@ class PersonUnavailabilityConflictServiceImplTest {
         };
     }
 
-    private PersonUnavailabilityPersonProjection personProjection(Long personId, String personName, LocalDate startDate, LocalDate endDate) {
+    private PersonUnavailabilityPersonProjection personProjection(Long personId, String personName, LocalDateTime startAt, LocalDateTime endAt) {
         return new PersonUnavailabilityPersonProjection() {
             @Override
             public Long getPersonId() {
@@ -251,14 +264,18 @@ class PersonUnavailabilityConflictServiceImplTest {
             }
 
             @Override
-            public LocalDate getStartDate() {
-                return startDate;
+            public LocalDateTime getStartAt() {
+                return startAt;
             }
 
             @Override
-            public LocalDate getEndDate() {
-                return endDate;
+            public LocalDateTime getEndAt() {
+                return endAt;
             }
         };
+    }
+
+    private static LocalDateTime at(int year, int month, int day, int hour, int minute) {
+        return LocalDateTime.of(year, month, day, hour, minute);
     }
 }

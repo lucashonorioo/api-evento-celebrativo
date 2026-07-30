@@ -23,6 +23,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -375,11 +376,12 @@ class PersonMinistryManagementIntegrationTest {
     }
 
     private CelebrationEvent saveEvent(String name) {
+        LocalDateTime startAt = LocalDateTime.of(LocalDate.now().plusDays(30), LocalTime.of(19, 0));
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name + " " + UUID.randomUUID(),
-                LocalDate.now().plusDays(30),
-                LocalTime.of(19, 0),
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         return celebrationEventRepository.saveAndFlush(event);

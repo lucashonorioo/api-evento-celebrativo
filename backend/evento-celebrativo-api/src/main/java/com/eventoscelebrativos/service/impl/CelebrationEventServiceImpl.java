@@ -11,6 +11,7 @@ import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
@@ -49,7 +50,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -82,6 +85,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventParticipationResponseService eventParticipationResponseService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final PersonUnavailabilityConflictService personUnavailabilityConflictService;
+    private final Clock clock;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -95,7 +99,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
-            PersonUnavailabilityConflictService personUnavailabilityConflictService
+            PersonUnavailabilityConflictService personUnavailabilityConflictService,
+            Clock clock
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
@@ -109,11 +114,13 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.personUnavailabilityConflictService = personUnavailabilityConflictService;
+        this.clock = clock;
     }
 
     @Override
     @Transactional
     public CelebrationEventResponseDTO createEvent(CelebrationEventRequestDTO celebrationEventRequestDTO) {
+        validateCreationRange(celebrationEventRequestDTO.getStartAt(), celebrationEventRequestDTO.getEndAt());
         CelebrationEvent celebrationEvent = celebrationEventMapper.toEntity(celebrationEventRequestDTO);
         celebrationEvent = celebrationEventRepository.save(celebrationEvent);
 
@@ -135,7 +142,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
 
         Page<EucharistScaleEventProjection> eventPage =
-                celebrationEventRepository.findEucharistScaleByAssignments(pageable, startDate, endDate);
+                celebrationEventRepository.findEucharistScaleByAssignments(pageable, rangeStart(startDate), rangeEnd(endDate));
         List<Long> eventIds = eventPage.getContent().stream()
                 .map(EucharistScaleEventProjection::getEventId)
                 .distinct()
@@ -168,8 +175,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventAssignmentType assignmentType = toAssignmentType(type);
         Page<EventScheduleEventProjection> eventPage = celebrationEventRepository.findEventScheduleEventsByAssignments(
                 pageable,
-                startDate,
-                endDate,
+                rangeStart(startDate),
+                rangeEnd(endDate),
                 assignmentType.name(),
                 includeUnassigned
         );
@@ -248,6 +255,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        validateRange(celebrationEventRequestDTO.getStartAt(), celebrationEventRequestDTO.getEndAt());
 
         // Protocolo de concorrencia: nenhuma leitura simples (nao bloqueante) pode ocorrer antes de
         // todos os locks necessarios. Sob MySQL/InnoDB com REPEATABLE READ, a primeira leitura nao
@@ -257,8 +265,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        LocalDate newEventDate = celebrationEventRequestDTO.getEventDate();
-        boolean eventDateChanged = newEventDate != null && !newEventDate.equals(celebrationEvent.getEventDate());
+        LocalDateTime newStartAt = celebrationEventRequestDTO.getStartAt();
+        LocalDateTime newEndAt = celebrationEventRequestDTO.getEndAt();
+        boolean rangeChanged = (newStartAt != null && !newStartAt.equals(celebrationEvent.getStartAt()))
+                || (newEndAt != null && !newEndAt.equals(celebrationEvent.getEndAt()));
 
         List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
         List<Long> assignedPersonIds = currentAssignments.stream()
@@ -271,7 +281,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
         }
 
-        if (eventDateChanged && !assignedPersonIds.isEmpty()) {
+        if (rangeChanged && !assignedPersonIds.isEmpty()) {
             Map<Long, Set<EventAssignmentType>> assignmentTypesByPerson = currentAssignments.stream()
                     .collect(Collectors.groupingBy(
                             assignment -> assignment.getPerson().getId(),
@@ -280,7 +290,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                                     Collectors.toCollection(() -> EnumSet.noneOf(EventAssignmentType.class))
                             )
                     ));
-            personUnavailabilityConflictService.validateAvailabilityForEvent(assignmentTypesByPerson, newEventDate);
+            personUnavailabilityConflictService.validateAvailabilityForEvent(assignmentTypesByPerson, newStartAt, newEndAt);
         }
 
         celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
@@ -312,7 +322,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
-        validateAvailabilityForTargets(targets, celebrationEvent.getEventDate());
+        validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
         eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, targets);
@@ -325,9 +335,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     public CelebrationEventScaleResponseDTO createEventWithScale(CelebrationEventWithScaleRequestDTO celebrationEventWithScaleRequestDTO) {
         CelebrationEvent celebrationEvent = new CelebrationEvent();
         celebrationEvent.setNameMassOrEvent(celebrationEventWithScaleRequestDTO.getNameMassOrEvent());
-        celebrationEvent.setEventDate(celebrationEventWithScaleRequestDTO.getEventDate());
-        celebrationEvent.setEventTime(celebrationEventWithScaleRequestDTO.getEventTime());
+        celebrationEvent.setStartAt(celebrationEventWithScaleRequestDTO.getStartAt());
+        celebrationEvent.setEndAt(celebrationEventWithScaleRequestDTO.getEndAt());
         celebrationEvent.setMassOrCelebration(celebrationEventWithScaleRequestDTO.getMassOrCelebration());
+        validateCreationRange(celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         CelebrationEventScaleRequestDTO scaleRequest = toScaleRequest(celebrationEventWithScaleRequestDTO);
 
@@ -339,7 +350,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
-        validateAvailabilityForTargets(targets, celebrationEvent.getEventDate());
+        validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
@@ -367,7 +378,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
     }
 
-    private void validateAvailabilityForTargets(Collection<EventAssignmentTarget> targets, LocalDate eventDate) {
+    private void validateAvailabilityForTargets(Collection<EventAssignmentTarget> targets, LocalDateTime startAt, LocalDateTime endAt) {
         if (targets.isEmpty()) {
             return;
         }
@@ -377,7 +388,39 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                     .computeIfAbsent(target.person().getId(), personId -> EnumSet.noneOf(EventAssignmentType.class))
                     .add(target.assignmentType());
         }
-        personUnavailabilityConflictService.validateAvailabilityForEvent(typesByPerson, eventDate);
+        personUnavailabilityConflictService.validateAvailabilityForEvent(typesByPerson, startAt, endAt);
+    }
+
+    private void validateRange(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt == null || endAt == null) {
+            throw new BusinessException("startAt e endAt são obrigatórios");
+        }
+        validateSecondPrecision(startAt, endAt);
+        if (!startAt.isBefore(endAt)) {
+            throw new BusinessException("startAt deve ser anterior a endAt");
+        }
+    }
+
+    private void validateCreationRange(LocalDateTime startAt, LocalDateTime endAt) {
+        validateRange(startAt, endAt);
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        if (startAt.isBefore(currentSecond)) {
+            throw new BusinessException("startAt só pode ser no presente ou futuro");
+        }
+    }
+
+    private void validateSecondPrecision(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt.getNano() != 0 || endAt.getNano() != 0) {
+            throw new TemporalPrecisionNotSupportedException();
+        }
+    }
+
+    private LocalDateTime rangeStart(LocalDate startDate) {
+        return startDate.atStartOfDay();
+    }
+
+    private LocalDateTime rangeEnd(LocalDate endDate) {
+        return endDate.plusDays(1).atStartOfDay();
     }
 
     @Override
@@ -606,8 +649,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     ) {
         EucharistScaleEventResponseDTO dto = new EucharistScaleEventResponseDTO(
                 projection.getNameMassOrEvent(),
-                projection.getEventDate(),
-                projection.getEventTime(),
+                projection.getStartAt(),
+                projection.getEndAt(),
                 projection.getChurchName()
         );
         dto.getNameMinisters().addAll(ministerNames);
@@ -642,8 +685,8 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScheduleQueryResponseDTO dto = new EventScheduleQueryResponseDTO();
         dto.setEventId(event.getEventId());
         dto.setEventName(event.getEventName());
-        dto.setEventDate(event.getEventDate());
-        dto.setEventTime(event.getEventTime());
+        dto.setStartAt(event.getStartAt());
+        dto.setEndAt(event.getEndAt());
         dto.setMassOrCelebration(event.getMassOrCelebration());
         dto.setLocationId(event.getLocationId());
         dto.setChurchName(event.getChurchName());

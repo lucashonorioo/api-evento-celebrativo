@@ -1,13 +1,12 @@
 package com.eventoscelebrativos.projection;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 public interface PersonUnavailabilityAssignmentConflictProjection {
 
     Long getEventId();
     String getEventName();
-    LocalDate getEventDate();
-    LocalTime getEventTime();
+    LocalDateTime getStartAt();
+    LocalDateTime getEndAt();
     String getAssignmentType();
 }

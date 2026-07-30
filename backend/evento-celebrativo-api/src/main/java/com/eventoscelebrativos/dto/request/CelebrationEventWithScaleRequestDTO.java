@@ -1,12 +1,11 @@
 package com.eventoscelebrativos.dto.request;
 
-import jakarta.validation.constraints.FutureOrPresent;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class CelebrationEventWithScaleRequestDTO {
@@ -14,12 +13,15 @@ public class CelebrationEventWithScaleRequestDTO {
     @NotBlank(message = "O campo nome não pode ser vazio")
     private String nameMassOrEvent;
 
-    @NotNull(message = "O campo da data não pode ser vazio")
-    @FutureOrPresent(message = "A data só pode ser no presente ou futuro")
-    private LocalDate eventDate;
+    @NotNull(message = "O campo startAt não pode ser vazio")
+    private LocalDateTime startAt;
 
-    @NotNull(message = "O campo da hora não pode ser vazio")
-    private LocalTime eventTime;
+    /**
+     * Termino previsto do compromisso para planejamento de disponibilidade e escala.
+     * Nao representa o termino real da celebracao.
+     */
+    @NotNull(message = "O campo endAt não pode ser vazio")
+    private LocalDateTime endAt;
 
     @NotNull(message = "É obrigatório informar se é uma missa ou celebração.")
     private Boolean massOrCelebration;
@@ -47,20 +49,20 @@ public class CelebrationEventWithScaleRequestDTO {
         this.nameMassOrEvent = nameMassOrEvent;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setEventDate(LocalDate eventDate) {
-        this.eventDate = eventDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalTime getEventTime() {
-        return eventTime;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEventTime(LocalTime eventTime) {
-        this.eventTime = eventTime;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public Boolean getMassOrCelebration() {
@@ -117,5 +119,10 @@ public class CelebrationEventWithScaleRequestDTO {
 
     public void setEucharisticMinisterIds(List<Long> eucharisticMinisterIds) {
         this.eucharisticMinisterIds = eucharisticMinisterIds;
+    }
+
+    @JsonAnySetter
+    private void rejectUnknownProperty(String property, Object value) {
+        throw new IllegalArgumentException("Campo desconhecido no contrato de evento com escala: " + property);
     }
 }

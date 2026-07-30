@@ -2,41 +2,41 @@ package com.eventoscelebrativos.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class PersonUnavailabilityRequestDTO {
 
-    @NotNull(message = "A data inicial é obrigatória")
-    private LocalDate startDate;
+    @NotNull(message = "O campo startAt é obrigatório")
+    private LocalDateTime startAt;
 
-    @NotNull(message = "A data final é obrigatória")
-    private LocalDate endDate;
+    @NotNull(message = "O campo endAt é obrigatório")
+    private LocalDateTime endAt;
 
     private String reason;
 
     public PersonUnavailabilityRequestDTO() {
     }
 
-    public PersonUnavailabilityRequestDTO(LocalDate startDate, LocalDate endDate, String reason) {
-        this.startDate = startDate;
-        this.endDate = endDate;
+    public PersonUnavailabilityRequestDTO(LocalDateTime startAt, LocalDateTime endAt, String reason) {
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.reason = reason;
     }
 
-    public LocalDate getStartDate() {
-        return startDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
+    public void setStartAt(LocalDateTime startAt) {
+        this.startAt = startAt;
     }
 
-    public LocalDate getEndDate() {
-        return endDate;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
+    public void setEndAt(LocalDateTime endAt) {
+        this.endAt = endAt;
     }
 
     public String getReason() {

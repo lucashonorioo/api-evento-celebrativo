@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -36,8 +37,8 @@ class CelebrationEventRepositoryTest {
     void shouldFindEucharistScaleByParallelAssignmentsWhenEventsExistInPeriod() {
         Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 12, 31)
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 12, 31))
         );
 
         Assertions.assertEquals(3, result.getTotalElements());
@@ -52,27 +53,27 @@ class CelebrationEventRepositoryTest {
     void shouldFilterEucharistScaleByParallelAssignmentsByPeriod() {
         Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2025, 7, 12),
-                LocalDate.of(2025, 7, 13)
+                rs(LocalDate.of(2025, 7, 12)),
+                re(LocalDate.of(2025, 7, 13))
         );
 
         Assertions.assertEquals(2, result.getTotalElements());
         Assertions.assertTrue(result.getContent().stream()
-                .allMatch(event -> !event.getEventDate().isBefore(LocalDate.of(2025, 7, 12))
-                        && !event.getEventDate().isAfter(LocalDate.of(2025, 7, 13))));
+                .allMatch(event -> !event.getStartAt().toLocalDate().isBefore(LocalDate.of(2025, 7, 12))
+                        && !event.getStartAt().toLocalDate().isAfter(LocalDate.of(2025, 7, 13))));
     }
 
     @Test
     void shouldPaginateEucharistScaleByParallelAssignments() {
         Page<EucharistScaleEventProjection> firstPage = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(0, 2),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 7, 31)
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 7, 31))
         );
         Page<EucharistScaleEventProjection> secondPage = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(1, 2),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 7, 31)
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 7, 31))
         );
 
         Assertions.assertEquals(3, firstPage.getTotalElements());
@@ -84,8 +85,8 @@ class CelebrationEventRepositoryTest {
     void shouldFindEucharistScaleAssignmentsInBatchForPageEvents() {
         Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2025, 7, 13),
-                LocalDate.of(2025, 7, 13)
+                rs(LocalDate.of(2025, 7, 13)),
+                re(LocalDate.of(2025, 7, 13))
         );
         List<Long> eventIds = result.getContent().stream()
                 .map(EucharistScaleEventProjection::getEventId)
@@ -120,8 +121,8 @@ class CelebrationEventRepositoryTest {
 
         Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2026, 3, 8),
-                LocalDate.of(2026, 3, 8)
+                rs(LocalDate.of(2026, 3, 8)),
+                re(LocalDate.of(2026, 3, 8))
         );
         List<EventScheduleAssignmentProjection> assignments =
                 eventRepository.findEucharistScaleAssignmentsByEventIds(List.of(eventId));
@@ -148,31 +149,31 @@ class CelebrationEventRepositoryTest {
     void shouldFilterParallelScheduleEventsByPeriod() {
         Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2025, 7, 12),
-                LocalDate.of(2025, 7, 13),
+                rs(LocalDate.of(2025, 7, 12)),
+                re(LocalDate.of(2025, 7, 13)),
                 EventAssignmentType.READER.name(),
                 false
         );
 
         Assertions.assertEquals(2, result.getTotalElements());
         Assertions.assertTrue(result.getContent().stream()
-                .allMatch(event -> !event.getEventDate().isBefore(LocalDate.of(2025, 7, 12))
-                        && !event.getEventDate().isAfter(LocalDate.of(2025, 7, 13))));
+                .allMatch(event -> !event.getStartAt().toLocalDate().isBefore(LocalDate.of(2025, 7, 12))
+                        && !event.getStartAt().toLocalDate().isAfter(LocalDate.of(2025, 7, 13))));
     }
 
     @Test
     void shouldPaginateParallelScheduleByEvent() {
         Page<EventScheduleEventProjection> firstPage = eventRepository.findEventScheduleEventsByAssignments(
                 PageRequest.of(0, 2),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 7, 31),
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 7, 31)),
                 EventAssignmentType.EUCHARISTIC_MINISTER.name(),
                 false
         );
         Page<EventScheduleEventProjection> secondPage = eventRepository.findEventScheduleEventsByAssignments(
                 PageRequest.of(1, 2),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 7, 31),
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 7, 31)),
                 EventAssignmentType.EUCHARISTIC_MINISTER.name(),
                 false
         );
@@ -214,8 +215,8 @@ class CelebrationEventRepositoryTest {
 
         Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2026, 3, 10),
-                LocalDate.of(2026, 3, 10),
+                rs(LocalDate.of(2026, 3, 10)),
+                re(LocalDate.of(2026, 3, 10)),
                 EventAssignmentType.COMMENTATOR.name(),
                 false
         );
@@ -252,7 +253,8 @@ class CelebrationEventRepositoryTest {
 
     @Test
     void shouldFindEventWithoutLocation() {
-        CelebrationEvent event = new CelebrationEvent(null, "Evento sem local", LocalDate.of(2026, 2, 1), LocalTime.of(9, 0), true);
+        CelebrationEvent event = new CelebrationEvent(
+                null, "Evento sem local", LocalDateTime.of(2026, 2, 1, 9, 0), LocalDateTime.of(2026, 2, 1, 10, 0), true);
         entityManager.persist(event);
         entityManager.flush();
         entityManager.clear();
@@ -265,8 +267,8 @@ class CelebrationEventRepositoryTest {
     private Page<EventScheduleEventProjection> findParallelSchedule(EventScheduleType type, boolean includeUnassigned) {
         return eventRepository.findEventScheduleEventsByAssignments(
                 PageRequest.of(0, 10),
-                LocalDate.of(2025, 7, 1),
-                LocalDate.of(2025, 7, 31),
+                rs(LocalDate.of(2025, 7, 1)),
+                re(LocalDate.of(2025, 7, 31)),
                 toAssignmentType(type).name(),
                 includeUnassigned
         );
@@ -306,14 +308,15 @@ class CelebrationEventRepositoryTest {
 
     private Long insertEvent(String name, LocalDate eventDate) {
         String eventName = name + " " + UUID.randomUUID();
+        LocalDateTime startAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, ?, TRUE)
                 """,
                 eventName,
-                eventDate,
-                LocalTime.of(19, 0)
+                startAt,
+                startAt.plusHours(1)
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
@@ -329,5 +332,13 @@ class CelebrationEventRepositoryTest {
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3498" + String.format("%07d", suffix);
+    }
+
+    private static LocalDateTime rs(LocalDate date) {
+        return date.atStartOfDay();
+    }
+
+    private static LocalDateTime re(LocalDate date) {
+        return date.plusDays(1).atStartOfDay();
     }
 }

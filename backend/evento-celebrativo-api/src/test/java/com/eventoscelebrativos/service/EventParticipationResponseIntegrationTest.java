@@ -58,6 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EventParticipationResponseIntegrationTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1990, 1, 10);
+    private static final ZoneId APPLICATION_ZONE = ZoneId.of("America/Sao_Paulo");
 
     @Autowired
     private MockMvc mockMvc;
@@ -304,7 +305,7 @@ class EventParticipationResponseIntegrationTest {
     }
 
     private void setNow(LocalDateTime dateTime) {
-        ((MutableClock) clock).setInstant(dateTime.atZone(ZoneId.systemDefault()).toInstant());
+        ((MutableClock) clock).setInstant(dateTime.atZone(APPLICATION_ZONE).toInstant());
     }
 
     private void resetClock() {
@@ -334,11 +335,12 @@ class EventParticipationResponseIntegrationTest {
     }
 
     private CelebrationEvent saveEvent(String name, LocalDate eventDate, LocalTime eventTime) {
+        LocalDateTime startAt = LocalDateTime.of(eventDate, eventTime);
         CelebrationEvent event = new CelebrationEvent(
                 null,
                 name + " " + UUID.randomUUID(),
-                eventDate,
-                eventTime,
+                startAt,
+                startAt.plusHours(1),
                 true
         );
         return celebrationEventRepository.saveAndFlush(event);
@@ -385,7 +387,7 @@ class EventParticipationResponseIntegrationTest {
         @Bean
         @Primary
         Clock mutableClock() {
-            return new MutableClock(Instant.now(), ZoneId.systemDefault());
+            return new MutableClock(Instant.now(), APPLICATION_ZONE);
         }
     }
 

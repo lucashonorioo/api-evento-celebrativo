@@ -232,8 +232,8 @@ public class PersonServiceImpl implements PersonService {
         PageRequest pageable = PageRequest.of(page, size);
         Page<PersonScheduleEventProjection> eventPage = eventAssignmentRepository.findScheduleEventsByPersonId(
                 person.getId(),
-                startDate,
-                endDate,
+                startDate.atStartOfDay(),
+                endDate.plusDays(1).atStartOfDay(),
                 pageable
         );
 
@@ -293,8 +293,8 @@ public class PersonServiceImpl implements PersonService {
         return new CurrentUserScheduleResponseDTO(
                 event.getEventId(),
                 event.getEventName(),
-                event.getEventDate(),
-                event.getEventTime(),
+                event.getStartAt(),
+                event.getEndAt(),
                 event.getMassOrCelebration(),
                 event.getLocationId(),
                 event.getLocationName(),

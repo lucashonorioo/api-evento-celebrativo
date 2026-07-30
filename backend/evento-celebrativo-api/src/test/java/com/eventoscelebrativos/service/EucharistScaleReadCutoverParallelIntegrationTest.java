@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +94,11 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
         );
         JsonNode oneDayRoot = objectMapper.readTree(oneDay);
         assertEquals(1, oneDayRoot.path("totalElements").asInt());
-        assertEquals("2025-07-13", oneDayRoot.path("content").get(0).path("eventDate").asText());
+        JsonNode event = oneDayRoot.path("content").get(0);
+        assertEquals("2025-07-13T10:00:00", event.path("startAt").asText());
+        assertEquals("2025-07-13T11:00:00", event.path("endAt").asText());
+        assertFalse(event.has("eventDate"));
+        assertFalse(event.has("eventTime"));
 
         String lastPage = getPublicJson(
                 "/eventos/escala/eucaristia?startDate=2025-07-01&endDate=2025-07-31&page=1&size=2"
@@ -216,8 +221,8 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent("Parallel Eucharist Scale " + UUID.randomUUID());
-        request.setEventDate(eventDate);
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(eventDate, LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(eventDate, LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setEucharisticMinisterIds(eucharisticMinisterIds);
@@ -269,14 +274,15 @@ class EucharistScaleReadCutoverParallelIntegrationTest {
 
     private Long insertEvent(String name, LocalDate eventDate) {
         String eventName = name + " " + UUID.randomUUID();
+        LocalDateTime startAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, ?, TRUE)
                 """,
                 eventName,
-                eventDate,
-                LocalTime.of(19, 0)
+                startAt,
+                startAt.plusHours(1)
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",

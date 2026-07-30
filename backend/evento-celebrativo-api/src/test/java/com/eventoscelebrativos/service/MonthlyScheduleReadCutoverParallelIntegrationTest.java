@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +88,11 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
                 "/eventos/escalas?startDate=2025-07-13&endDate=2025-07-13&type=READER&page=0&size=10"
         ));
         assertEquals(1, oneDay.path("totalElements").asInt());
-        assertEquals("2025-07-13", oneDay.path("content").get(0).path("eventDate").asText());
+        JsonNode event = oneDay.path("content").get(0);
+        assertEquals("2025-07-13T10:00:00", event.path("startAt").asText());
+        assertEquals("2025-07-13T11:00:00", event.path("endAt").asText());
+        assertFalse(event.has("eventDate"));
+        assertFalse(event.has("eventTime"));
 
         JsonNode firstPage = objectMapper.readTree(getJson(fixtureUrl(EventScheduleType.EUCHARISTIC_MINISTER, 0, 2, false)));
         JsonNode lastPage = objectMapper.readTree(getJson(fixtureUrl(EventScheduleType.EUCHARISTIC_MINISTER, 1, 2, false)));
@@ -216,8 +221,8 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
     ) {
         CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
         request.setNameMassOrEvent("Parallel Monthly Schedule " + UUID.randomUUID());
-        request.setEventDate(eventDate);
-        request.setEventTime(LocalTime.of(19, 0));
+        request.setStartAt(LocalDateTime.of(eventDate, LocalTime.of(19, 0)));
+        request.setEndAt(LocalDateTime.of(eventDate, LocalTime.of(20, 0)));
         request.setMassOrCelebration(true);
         request.setLocationId(locationId);
         request.setReaderIds(readerIds);
@@ -263,14 +268,15 @@ class MonthlyScheduleReadCutoverParallelIntegrationTest {
 
     private Long insertEvent(String name, LocalDate eventDate) {
         String eventName = name + " " + UUID.randomUUID();
+        LocalDateTime startAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_celebration_event(name_mass_or_event, event_date, event_time, mass_or_celebration)
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
                 VALUES (?, ?, ?, TRUE)
                 """,
                 eventName,
-                eventDate,
-                LocalTime.of(19, 0)
+                startAt,
+                startAt.plusHours(1)
         );
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",

@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,14 +25,15 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     SELECT
                         ce.id AS eventId,
                         ce.name_mass_or_event AS nameMassOrEvent,
-                        ce.event_date AS eventDate,
-                        ce.event_time AS eventTime,
+                        ce.start_at AS startAt,
+                        ce.end_at AS endAt,
                         l.church_name AS churchName,
                         NULL AS ministerNames
                     FROM tb_celebration_event ce
                     INNER JOIN tb_event_location el ON ce.id = el.event_id
                     INNER JOIN tb_location l ON l.id = el.location_id
-                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    WHERE ce.start_at < :rangeEnd
+                    AND ce.end_at > :rangeStart
                     AND EXISTS (
                         SELECT 1
                         FROM tb_event_assignment ea
@@ -42,11 +43,11 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     GROUP BY
                         ce.id,
                         ce.name_mass_or_event,
-                        ce.event_date,
-                        ce.event_time,
+                        ce.start_at,
+                        ce.end_at,
                         l.id,
                         l.church_name
-                    ORDER BY ce.event_date, ce.event_time, ce.name_mass_or_event
+                    ORDER BY ce.start_at, ce.name_mass_or_event
                     """,
             countQuery = """
                     SELECT COUNT(*)
@@ -57,7 +58,8 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                         FROM tb_celebration_event ce
                         INNER JOIN tb_event_location el ON ce.id = el.event_id
                         INNER JOIN tb_location l ON l.id = el.location_id
-                        WHERE ce.event_date BETWEEN :startDate AND :endDate
+                        WHERE ce.start_at < :rangeEnd
+                        AND ce.end_at > :rangeStart
                         AND EXISTS (
                             SELECT 1
                             FROM tb_event_assignment ea
@@ -70,8 +72,8 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
             nativeQuery = true)
     Page<EucharistScaleEventProjection> findEucharistScaleByAssignments(
             Pageable pageable,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEnd") LocalDateTime rangeEnd
     );
 
     @Query(
@@ -96,15 +98,16 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     SELECT
                         ce.id AS eventId,
                         ce.name_mass_or_event AS eventName,
-                        ce.event_date AS eventDate,
-                        ce.event_time AS eventTime,
+                        ce.start_at AS startAt,
+                        ce.end_at AS endAt,
                         ce.mass_or_celebration AS massOrCelebration,
                         MIN(l.id) AS locationId,
                         MIN(l.church_name) AS churchName
                     FROM tb_celebration_event ce
                     LEFT JOIN tb_event_location el ON ce.id = el.event_id
                     LEFT JOIN tb_location l ON l.id = el.location_id
-                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    WHERE ce.start_at < :rangeEnd
+                    AND ce.end_at > :rangeStart
                     AND (
                         :includeUnassigned = TRUE
                         OR EXISTS (
@@ -117,15 +120,16 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     GROUP BY
                         ce.id,
                         ce.name_mass_or_event,
-                        ce.event_date,
-                        ce.event_time,
+                        ce.start_at,
+                        ce.end_at,
                         ce.mass_or_celebration
-                    ORDER BY ce.event_date, ce.event_time, ce.id
+                    ORDER BY ce.start_at, ce.id
                     """,
             countQuery = """
                     SELECT COUNT(*)
                     FROM tb_celebration_event ce
-                    WHERE ce.event_date BETWEEN :startDate AND :endDate
+                    WHERE ce.start_at < :rangeEnd
+                    AND ce.end_at > :rangeStart
                     AND (
                         :includeUnassigned = TRUE
                         OR EXISTS (
@@ -139,8 +143,8 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
             nativeQuery = true)
     Page<EventScheduleEventProjection> findEventScheduleEventsByAssignments(
             Pageable pageable,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEnd") LocalDateTime rangeEnd,
             @Param("assignmentType") String assignmentType,
             @Param("includeUnassigned") boolean includeUnassigned
     );

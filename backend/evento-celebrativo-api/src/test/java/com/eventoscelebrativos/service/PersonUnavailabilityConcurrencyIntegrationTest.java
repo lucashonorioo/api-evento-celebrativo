@@ -20,13 +20,31 @@ import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -43,12 +61,84 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Prova, com transacoes reais e threads concorrentes, que o invariante "nao pode existir
  * EventAssignment para uma pessoa em uma data coberta por PersonUnavailability dessa pessoa"
- * se mantem sob concorrencia real, independentemente de qual operacao vence a corrida.
+ * se mantem sob concorrencia MySQL 8.4 real, independentemente de qual operacao vence a corrida.
+ * Cada execucao usa uma database isolada. Sem MySQL 8.4 acessivel, os seis testes sao ignorados.
  */
 @SpringBootTest
+@Import(PersonUnavailabilityConcurrencyIntegrationTest.FixedClockConfig.class)
 class PersonUnavailabilityConcurrencyIntegrationTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1990, 1, 10);
+    private static final ZoneId APPLICATION_ZONE = ZoneId.of("America/Sao_Paulo");
+    private static String host;
+    private static String port;
+    private static String username;
+    private static String password;
+    private static String databaseName;
+    private static boolean mysqlAvailable;
+
+    @BeforeAll
+    static void provisionIsolatedMySqlDatabase() throws SQLException {
+        host = System.getProperty("mysql.validation.host", "localhost");
+        port = System.getProperty("mysql.validation.port", "3307");
+        username = System.getProperty("mysql.validation.username", "root");
+        password = System.getProperty(
+                "mysql.validation.password",
+                System.getenv("MYSQL_VALIDATION_PASSWORD")
+        );
+
+        if (password == null || password.isBlank()) {
+            mysqlAvailable = false;
+            return;
+        }
+
+        try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
+             Statement statement = connection.createStatement()) {
+            String version = queryVersion(statement);
+            mysqlAvailable = connection.isValid(3) && version.startsWith("8.4.");
+            if (!mysqlAvailable) {
+                return;
+            }
+            databaseName = "v11_concurrency_" + UUID.randomUUID().toString().replace("-", "");
+            statement.execute("CREATE DATABASE `" + databaseName + "`");
+        } catch (SQLException exception) {
+            mysqlAvailable = false;
+        }
+    }
+
+    @DynamicPropertySource
+    static void registerMySqlProperties(DynamicPropertyRegistry registry) {
+        if (!mysqlAvailable) {
+            return;
+        }
+        registry.add(
+                "spring.datasource.url",
+                () -> "jdbc:mysql://" + host + ":" + port + "/" + databaseName
+                        + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo"
+        );
+        registry.add("spring.datasource.username", () -> username);
+        registry.add("spring.datasource.password", () -> password);
+        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+        registry.add("app.time-zone", () -> "America/Sao_Paulo");
+    }
+
+    @AfterAll
+    static void dropIsolatedMySqlDatabase() {
+        if (!mysqlAvailable || databaseName == null) {
+            return;
+        }
+        try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
+             Statement statement = connection.createStatement()) {
+            statement.execute("DROP DATABASE IF EXISTS `" + databaseName + "`");
+        } catch (SQLException ignored) {
+            // best-effort cleanup
+        }
+    }
+
+    @BeforeEach
+    void requireMySql84() {
+        Assumptions.assumeTrue(mysqlAvailable, "MySQL 8.4 real nao acessivel; teste ignorado.");
+    }
 
     @Autowired
     private PersonUnavailabilityService personUnavailabilityService;
@@ -105,8 +195,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 1);
-        PersonUnavailabilityRequestDTO first = new PersonUnavailabilityRequestDTO(base, base.plusDays(3), null);
-        PersonUnavailabilityRequestDTO second = new PersonUnavailabilityRequestDTO(base.plusDays(1), base.plusDays(5), null);
+        PersonUnavailabilityRequestDTO first = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(3)), null);
+        PersonUnavailabilityRequestDTO second = new PersonUnavailabilityRequestDTO(dayStart(base.plusDays(1)), dayEndExclusive(base.plusDays(5)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -119,7 +209,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         assertEquals(1, successes.get(), "Apenas uma das duas indisponibilidades sobrepostas deve ser persistida");
         assertEquals(1, conflicts.get());
-        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), base, base.plusDays(5)).size());
+        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(base), dayEndExclusive(base.plusDays(5))).size());
     }
 
     @Test
@@ -129,7 +219,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 10);
-        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
+        PersonUnavailabilityRequestDTO request = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -142,7 +232,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         assertEquals(1, successes.get());
         assertEquals(1, conflicts.get());
-        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), base, base.plusDays(2)).size());
+        assertEquals(1, personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(base), dayEndExclusive(base.plusDays(2))).size());
     }
 
     @Test
@@ -155,8 +245,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupPersonIdB = personB.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 15);
-        PersonUnavailabilityRequestDTO requestA = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
-        PersonUnavailabilityRequestDTO requestB = new PersonUnavailabilityRequestDTO(base, base.plusDays(2), null);
+        PersonUnavailabilityRequestDTO requestA = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
+        PersonUnavailabilityRequestDTO requestB = new PersonUnavailabilityRequestDTO(dayStart(base), dayEndExclusive(base.plusDays(2)), null);
 
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
@@ -180,13 +270,14 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Test Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 20);
+        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
 
         PersonUnavailabilityRequestDTO unavailabilityRequest =
-                new PersonUnavailabilityRequestDTO(eventDate, eventDate, null);
+                new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
         CelebrationEventWithScaleRequestDTO scaleRequest = new CelebrationEventWithScaleRequestDTO();
         scaleRequest.setNameMassOrEvent("Concurrent Invariant Event " + UUID.randomUUID());
-        scaleRequest.setEventDate(eventDate);
-        scaleRequest.setEventTime(LocalTime.of(19, 0));
+        scaleRequest.setStartAt(eventStartAt);
+        scaleRequest.setEndAt(eventStartAt.plusHours(1));
         scaleRequest.setMassOrCelebration(true);
         scaleRequest.setLocationId(locationId);
         scaleRequest.setReaderIds(List.of(person.getId()));
@@ -230,7 +321,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         cleanupEventId = createdEventId.get();
 
         boolean hasUnavailability = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), eventDate, eventDate).isEmpty();
+                .findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate)).isEmpty();
         boolean hasAssignment = cleanupEventId != null
                 && !eventAssignmentRepository.findAllByEventId(cleanupEventId).isEmpty();
 
@@ -248,12 +339,14 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Scale Update Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 25);
+        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Scale Update Event " + UUID.randomUUID(), eventDate, LocalTime.of(19, 0), true));
+                null, "Concurrent Scale Update Event " + UUID.randomUUID(), eventStartAt, eventStartAt.plusHours(1), true));
         cleanupEventId = event.getId();
         Long eventId = event.getId();
 
-        PersonUnavailabilityRequestDTO unavailabilityRequest = new PersonUnavailabilityRequestDTO(eventDate, eventDate, null);
+        PersonUnavailabilityRequestDTO unavailabilityRequest =
+                new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
         CelebrationEventScaleRequestDTO scaleRequest =
                 new CelebrationEventScaleRequestDTO(locationId, null, List.of(person.getId()), null, null, null);
 
@@ -292,7 +385,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         }
 
         boolean hasUnavailability = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), eventDate, eventDate).isEmpty();
+                .findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate)).isEmpty();
         boolean hasAssignment = !eventAssignmentRepository.findAllByEventId(eventId).isEmpty();
 
         assertFalse(hasUnavailability && hasAssignment,
@@ -308,15 +401,18 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         LocalDate originalDate = LocalDate.of(2026, 11, 1);
         LocalDate newDate = LocalDate.of(2026, 11, 5);
+        LocalDateTime originalStartAt = LocalDateTime.of(originalDate, LocalTime.of(19, 0));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Date Change Event " + UUID.randomUUID(), originalDate, LocalTime.of(19, 0), true));
+                null, "Concurrent Date Change Event " + UUID.randomUUID(), originalStartAt, originalStartAt.plusHours(1), true));
         cleanupEventId = event.getId();
         Long eventId = event.getId();
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
 
-        PersonUnavailabilityRequestDTO unavailabilityRequest = new PersonUnavailabilityRequestDTO(newDate, newDate, null);
+        PersonUnavailabilityRequestDTO unavailabilityRequest =
+                new PersonUnavailabilityRequestDTO(dayStart(newDate), dayEndExclusive(newDate), null);
+        LocalDateTime newStartAt = LocalDateTime.of(newDate, event.getStartAt().toLocalTime());
         CelebrationEventRequestDTO dateChangeRequest =
-                new CelebrationEventRequestDTO(event.getNameMassOrEvent(), newDate, event.getEventTime(), true);
+                new CelebrationEventRequestDTO(event.getNameMassOrEvent(), newStartAt, newStartAt.plusHours(1), true);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -354,8 +450,9 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
         CelebrationEvent finalEvent = celebrationEventRepository.findById(eventId).orElseThrow();
         boolean hasAssignment = !eventAssignmentRepository.findAllByEventId(eventId).isEmpty();
+        LocalDate finalEventDate = finalEvent.getStartAt().toLocalDate();
         boolean hasUnavailabilityCoveringFinalDate = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), finalEvent.getEventDate(), finalEvent.getEventDate()).isEmpty();
+                .findOverlapping(person.getId(), dayStart(finalEventDate), dayEndExclusive(finalEventDate)).isEmpty();
 
         assertFalse(hasAssignment && hasUnavailabilityCoveringFinalDate,
                 "Invariante violado: pessoa nao pode estar indisponivel e escalada na data final do evento simultaneamente (mudanca de eventDate)");
@@ -428,8 +525,38 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 
+    private LocalDateTime dayStart(LocalDate date) {
+        return date.atStartOfDay();
+    }
+
+    private LocalDateTime dayEndExclusive(LocalDate date) {
+        return date.plusDays(1).atStartOfDay();
+    }
+
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3497" + String.format("%07d", suffix);
+    }
+
+    private static String bootstrapUrl() {
+        return "jdbc:mysql://" + host + ":" + port
+                + "/?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo";
+    }
+
+    private static String queryVersion(Statement statement) throws SQLException {
+        try (java.sql.ResultSet resultSet = statement.executeQuery("SELECT VERSION()")) {
+            resultSet.next();
+            return resultSet.getString(1);
+        }
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2026-07-01T15:00:00Z"), APPLICATION_ZONE);
+        }
     }
 }

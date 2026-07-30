@@ -1,23 +1,23 @@
 package com.eventoscelebrativos.dto.response;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class EucharistScaleEventResponseDTO {
 
     String nameMassOrEvent;
-    LocalDate eventDate;
-    LocalTime eventTime;
+    LocalDateTime startAt;
+    /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
+    LocalDateTime endAt;
     String churchName;
     List<String> nameMinisters;
 
 
-    public EucharistScaleEventResponseDTO(String nameMassOrEvent, LocalDate eventDate, LocalTime eventTime, String churchName) {
+    public EucharistScaleEventResponseDTO(String nameMassOrEvent, LocalDateTime startAt, LocalDateTime endAt, String churchName) {
         this.nameMassOrEvent = nameMassOrEvent;
-        this.eventDate = eventDate;
-        this.eventTime = eventTime;
+        this.startAt = startAt;
+        this.endAt = endAt;
         this.churchName = churchName;
         this.nameMinisters = new ArrayList<>();
     }
@@ -26,12 +26,12 @@ public class EucharistScaleEventResponseDTO {
         return nameMassOrEvent;
     }
 
-    public LocalDate getEventDate() {
-        return eventDate;
+    public LocalDateTime getStartAt() {
+        return startAt;
     }
 
-    public LocalTime getEventTime() {
-        return eventTime;
+    public LocalDateTime getEndAt() {
+        return endAt;
     }
 
     public String getChurchName() {

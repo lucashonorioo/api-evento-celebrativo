@@ -26,8 +26,8 @@ public interface CelebrationEventScaleParticipationMapper {
         CelebrationEventScaleParticipationDetailResponseDTO dto = new CelebrationEventScaleParticipationDetailResponseDTO();
         dto.setEventId(event.getId());
         dto.setEventName(event.getNameMassOrEvent());
-        dto.setEventDate(event.getEventDate());
-        dto.setEventTime(event.getEventTime());
+        dto.setStartAt(event.getStartAt());
+        dto.setEndAt(event.getEndAt());
         dto.setMassOrCelebration(event.getMassOrCelebration());
         dto.setLocation(toLocationDto(location));
         dto.setPriest(toPersonDto(assignments.priest(), participationByPersonId));
