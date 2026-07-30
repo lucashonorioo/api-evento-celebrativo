@@ -1,6 +1,8 @@
 package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.exception.error.ErrorResponse;
+import com.eventoscelebrativos.exception.error.PersonUnavailableForEventErrorResponse;
+import com.eventoscelebrativos.exception.error.UnavailabilityAssignmentConflictErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,38 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final String UNAVAILABILITY_UNIQUE_CONSTRAINT = "uk_tb_person_unavailability_person_dates";
+
+    @ExceptionHandler(UnavailabilityAssignmentConflictException.class)
+    public ResponseEntity<UnavailabilityAssignmentConflictErrorResponse> handleUnavailabilityAssignmentConflict(
+            UnavailabilityAssignmentConflictException ex, WebRequest webRequest
+    ) {
+        UnavailabilityAssignmentConflictErrorResponse errorResponse = new UnavailabilityAssignmentConflictErrorResponse(
+                Instant.now(),
+                ex.getStatus().value(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                webRequest.getDescription(false),
+                ex.getConflicts()
+        );
+        return new ResponseEntity<>(errorResponse, ex.getStatus());
+    }
+
+    @ExceptionHandler(PersonUnavailableForEventException.class)
+    public ResponseEntity<PersonUnavailableForEventErrorResponse> handlePersonUnavailableForEvent(
+            PersonUnavailableForEventException ex, WebRequest webRequest
+    ) {
+        PersonUnavailableForEventErrorResponse errorResponse = new PersonUnavailableForEventErrorResponse(
+                Instant.now(),
+                ex.getStatus().value(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                webRequest.getDescription(false),
+                ex.getConflicts()
+        );
+        return new ResponseEntity<>(errorResponse, ex.getStatus());
+    }
 
     @ExceptionHandler(ErrorResponseException.class)
     public ResponseEntity<ErrorResponse> handleCustomExceptions(ErrorResponseException ex, WebRequest webRequest){
@@ -74,6 +108,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(DataIntegrityViolationException e, WebRequest webRequest){
         HttpStatus status = HttpStatus.CONFLICT;
+        String rootCauseMessage = rootCauseMessage(e);
+        if (rootCauseMessage != null && rootCauseMessage.toLowerCase().contains(UNAVAILABILITY_UNIQUE_CONSTRAINT)) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                    Instant.now(),
+                    status.value(),
+                    "O período informado se sobrepõe a uma indisponibilidade já cadastrada.",
+                    "UNAVAILABILITY_OVERLAP",
+                    webRequest.getDescription(false)
+            );
+            return ResponseEntity.status(status).body(errorResponse);
+        }
         ErrorResponse errorResponse = new ErrorResponse(
                 Instant.now(),
                 status.value(),
@@ -82,6 +127,14 @@ public class GlobalExceptionHandler {
                 webRequest.getDescription(false)
         );
         return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current.getMessage();
     }
 
 }

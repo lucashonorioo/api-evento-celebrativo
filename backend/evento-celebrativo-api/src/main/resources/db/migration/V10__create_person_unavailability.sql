@@ -1,0 +1,21 @@
+CREATE TABLE tb_person_unavailability (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    person_id BIGINT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason VARCHAR(500),
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_tb_person_unavailability PRIMARY KEY (id),
+    CONSTRAINT uk_tb_person_unavailability_person_dates UNIQUE (person_id, start_date, end_date),
+    CONSTRAINT chk_tb_person_unavailability_dates CHECK (start_date <= end_date)
+);
+
+CREATE INDEX idx_tb_person_unavailability_person_dates ON tb_person_unavailability (person_id, start_date, end_date);
+CREATE INDEX idx_tb_person_unavailability_dates_person ON tb_person_unavailability (start_date, end_date, person_id);
+
+ALTER TABLE tb_person_unavailability
+    ADD CONSTRAINT fk_tb_person_unavailability_person
+    FOREIGN KEY (person_id)
+    REFERENCES tb_person (id)
+    ON DELETE CASCADE;

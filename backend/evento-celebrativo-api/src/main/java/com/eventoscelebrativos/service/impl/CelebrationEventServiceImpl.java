@@ -24,7 +24,9 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
+import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
@@ -32,12 +34,13 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.EventAssignmentCommandService;
 import com.eventoscelebrativos.service.EventAssignmentGroup;
 import com.eventoscelebrativos.service.EventAssignmentReadService;
+import com.eventoscelebrativos.service.EventAssignmentTarget;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.EventScaleAssignmentPlan;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
+import com.eventoscelebrativos.service.PersonUnavailabilityConflictService;
 import com.eventoscelebrativos.service.ScaleParticipantEligibility;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -47,13 +50,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -71,8 +78,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final CelebrationEventScaleParticipationMapper celebrationEventScaleParticipationMapper;
     private final EventAssignmentCommandService eventAssignmentCommandService;
     private final EventAssignmentReadService eventAssignmentReadService;
+    private final EventAssignmentRepository eventAssignmentRepository;
     private final EventParticipationResponseService eventParticipationResponseService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
+    private final PersonUnavailabilityConflictService personUnavailabilityConflictService;
 
     public CelebrationEventServiceImpl(
             CelebrationEventRepository celebrationEventRepository,
@@ -83,8 +92,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             CelebrationEventScaleParticipationMapper celebrationEventScaleParticipationMapper,
             EventAssignmentCommandService eventAssignmentCommandService,
             EventAssignmentReadService eventAssignmentReadService,
+            EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
-            PersonMinistryEligibilityResolver personMinistryEligibilityResolver
+            PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
+            PersonUnavailabilityConflictService personUnavailabilityConflictService
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
         this.locationRepository = locationRepository;
@@ -94,8 +105,10 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.celebrationEventScaleParticipationMapper = celebrationEventScaleParticipationMapper;
         this.eventAssignmentCommandService = eventAssignmentCommandService;
         this.eventAssignmentReadService = eventAssignmentReadService;
+        this.eventAssignmentRepository = eventAssignmentRepository;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
+        this.personUnavailabilityConflictService = personUnavailabilityConflictService;
     }
 
     @Override
@@ -235,28 +248,74 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        try{
-            CelebrationEvent celebrationEvent = celebrationEventRepository.getReferenceById(id);
 
-            celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
-            celebrationEvent = celebrationEventRepository.save(celebrationEvent);
+        // Protocolo de concorrencia: nenhuma leitura simples (nao bloqueante) pode ocorrer antes de
+        // todos os locks necessarios. Sob MySQL/InnoDB com REPEATABLE READ, a primeira leitura nao
+        // bloqueante da transacao fixa o snapshot para TODAS as leituras simples seguintes, mesmo as
+        // que rodam depois de esperar um lock. Por isso currentAssignments usa uma consulta com
+        // PESSIMISTIC_WRITE (nao fixa snapshot) em vez de uma leitura simples.
+        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-            return celebrationEventMapper.toDto(celebrationEvent);
-        }catch (EntityNotFoundException e){
-            throw new ResourceNotFoundException("Evento celebrativo", id);
+        LocalDate newEventDate = celebrationEventRequestDTO.getEventDate();
+        boolean eventDateChanged = newEventDate != null && !newEventDate.equals(celebrationEvent.getEventDate());
+
+        List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
+        List<Long> assignedPersonIds = currentAssignments.stream()
+                .map(assignment -> assignment.getPerson().getId())
+                .distinct()
+                .sorted()
+                .toList();
+
+        if (!assignedPersonIds.isEmpty()) {
+            personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
         }
+
+        if (eventDateChanged && !assignedPersonIds.isEmpty()) {
+            Map<Long, Set<EventAssignmentType>> assignmentTypesByPerson = currentAssignments.stream()
+                    .collect(Collectors.groupingBy(
+                            assignment -> assignment.getPerson().getId(),
+                            Collectors.mapping(
+                                    EventAssignment::getAssignmentType,
+                                    Collectors.toCollection(() -> EnumSet.noneOf(EventAssignmentType.class))
+                            )
+                    ));
+            personUnavailabilityConflictService.validateAvailabilityForEvent(assignmentTypesByPerson, newEventDate);
+        }
+
+        celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
+        celebrationEvent = celebrationEventRepository.save(celebrationEvent);
+
+        return celebrationEventMapper.toDto(celebrationEvent);
     }
 
     @Override
     @Transactional
     public CelebrationEventScaleResponseDTO updateEventScale(Long id, CelebrationEventScaleRequestDTO celebrationEventScaleRequestDTO) {
         validateId(id);
-        CelebrationEvent celebrationEvent = celebrationEventRepository.findById(id)
+        // Mesmo cuidado de updateEvent: os IDs desejados vem direto do DTO (sem leitura ao banco) para
+        // que o lock das Persons ocorra antes de qualquer leitura simples (localizacao, elegibilidade
+        // de ministerio, indisponibilidade), preservando a validade do snapshot da transacao sob
+        // MySQL/InnoDB REPEATABLE READ.
+        CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, celebrationEventScaleRequestDTO);
+        List<Long> currentPersonIds = eventAssignmentRepository.findAllByEventIdForUpdate(id).stream()
+                .map(assignment -> assignment.getPerson().getId())
+                .toList();
 
-        eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, plan.toTargets());
+        Set<Long> unionPersonIds = new TreeSet<>(currentPersonIds);
+        unionPersonIds.addAll(extractRequestedPersonIds(celebrationEventScaleRequestDTO));
+        personUnavailabilityConflictService.lockPersonsInOrder(unionPersonIds);
+
+        ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, celebrationEventScaleRequestDTO);
+        EventScaleAssignmentPlan plan = planResult.plan();
+        List<EventAssignmentTarget> targets = plan.toTargets();
+
+        validateAvailabilityForTargets(targets, celebrationEvent.getEventDate());
+
+        applyLocation(celebrationEvent, planResult.location());
+        eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, targets);
 
         return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
     }
@@ -270,13 +329,55 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         celebrationEvent.setEventTime(celebrationEventWithScaleRequestDTO.getEventTime());
         celebrationEvent.setMassOrCelebration(celebrationEventWithScaleRequestDTO.getMassOrCelebration());
 
-        EventScaleAssignmentPlan plan = buildScalePlan(celebrationEvent, toScaleRequest(celebrationEventWithScaleRequestDTO));
+        CelebrationEventScaleRequestDTO scaleRequest = toScaleRequest(celebrationEventWithScaleRequestDTO);
 
+        // IDs extraidos diretamente do DTO (sem leitura ao banco) para bloquear as Persons antes de
+        // qualquer leitura simples, pelo mesmo motivo de updateEventScale.
+        personUnavailabilityConflictService.lockPersonsInOrder(extractRequestedPersonIds(scaleRequest));
+
+        ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, scaleRequest);
+        EventScaleAssignmentPlan plan = planResult.plan();
+        List<EventAssignmentTarget> targets = plan.toTargets();
+
+        validateAvailabilityForTargets(targets, celebrationEvent.getEventDate());
+
+        applyLocation(celebrationEvent, planResult.location());
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
 
-        eventAssignmentCommandService.synchronizeAssignments(savedEvent, plan.toTargets());
+        eventAssignmentCommandService.synchronizeAssignments(savedEvent, targets);
 
         return celebrationEventScaleMapper.toDto(savedEvent, plan);
+    }
+
+    private Set<Long> extractRequestedPersonIds(CelebrationEventScaleRequestDTO dto) {
+        Set<Long> ids = new TreeSet<>();
+        if (dto.getPriestId() != null) {
+            ids.add(dto.getPriestId());
+        }
+        addAllNonNull(ids, dto.getReaderIds());
+        addAllNonNull(ids, dto.getCommentatorIds());
+        addAllNonNull(ids, dto.getMinisterOfTheWordIds());
+        addAllNonNull(ids, dto.getEucharisticMinisterIds());
+        return ids;
+    }
+
+    private void addAllNonNull(Set<Long> target, List<Long> source) {
+        if (source != null) {
+            target.addAll(source);
+        }
+    }
+
+    private void validateAvailabilityForTargets(Collection<EventAssignmentTarget> targets, LocalDate eventDate) {
+        if (targets.isEmpty()) {
+            return;
+        }
+        Map<Long, Set<EventAssignmentType>> typesByPerson = new TreeMap<>();
+        for (EventAssignmentTarget target : targets) {
+            typesByPerson
+                    .computeIfAbsent(target.person().getId(), personId -> EnumSet.noneOf(EventAssignmentType.class))
+                    .add(target.assignmentType());
+        }
+        personUnavailabilityConflictService.validateAvailabilityForEvent(typesByPerson, eventDate);
     }
 
     @Override
@@ -298,7 +399,15 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         }
     }
 
-    private EventScaleAssignmentPlan buildScalePlan(CelebrationEvent celebrationEvent, CelebrationEventScaleRequestDTO dto) {
+    private record ScalePlanResult(EventScaleAssignmentPlan plan, Location location) {
+    }
+
+    private void applyLocation(CelebrationEvent celebrationEvent, Location location) {
+        celebrationEvent.getLocations().clear();
+        celebrationEvent.getLocations().add(location);
+    }
+
+    private ScalePlanResult buildScalePlanResult(CelebrationEvent celebrationEvent, CelebrationEventScaleRequestDTO dto) {
         validateId(dto.getLocationId());
 
         Location location = locationRepository.findById(dto.getLocationId())
@@ -332,10 +441,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         addPeople(planBuilder, ministerOfTheWordIds, MinistryType.MINISTER_OF_THE_WORD, "ministro da Palavra", eligibilityByMinistry);
         addPeople(planBuilder, eucharisticMinisterIds, MinistryType.EUCHARISTIC_MINISTER, "ministro da Eucaristia", eligibilityByMinistry);
 
-        celebrationEvent.getLocations().clear();
-        celebrationEvent.getLocations().add(location);
-
-        return planBuilder.build();
+        return new ScalePlanResult(planBuilder.build(), location);
     }
 
     private List<Long> optionalId(Long id) {
