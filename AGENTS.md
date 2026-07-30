@@ -108,3 +108,15 @@ Uma tarefa só está concluída quando:
 - `git diff --check` não aponta problemas;
 - o diff foi revisado quanto a arquivos inesperados e segredos;
 - a resposta final informa exatamente o que foi validado.
+
+## graphify
+
+Este projeto possui um grafo de conhecimento em `graphify-out/`, com nós de maior conectividade, comunidades e relacionamentos entre arquivos.
+
+Regras:
+
+- Antes de ler arquivos-fonte, executar buscas amplas ou responder perguntas sobre arquitetura e estrutura do projeto, consulte `graphify-out/GRAPH_REPORT.md` como mapa inicial da base de código, quando o arquivo existir.
+- Se `graphify-out/wiki/index.md` existir, navegue pela wiki antes de fazer leitura ampla dos arquivos brutos.
+- Para perguntas entre módulos, como “como X se relaciona com Y”, prefira `graphify query "<pergunta>"`, `graphify path "<A>" "<B>"` ou `graphify explain "<conceito>"` antes de recorrer a buscas amplas.
+- Depois de modificar arquivos de código, execute `graphify update .` para manter o grafo atualizado, quando o Graphify estiver disponível.
+- Quando o usuário digitar `$graphify`, invoque a Skill instalada `graphify` antes de qualquer outra ação.
