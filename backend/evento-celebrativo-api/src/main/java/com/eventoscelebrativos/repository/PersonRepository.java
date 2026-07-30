@@ -87,4 +87,12 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
             WHERE r.authority = :authority
             """)
     List<Person> findPeopleByRoleForUpdate(@Param("authority") String authority);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Person p WHERE p.phoneNumber = :phoneNumber")
+    Optional<Person> findByPhoneNumberForUpdate(@Param("phoneNumber") String phoneNumber);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Person p WHERE p.id = :id")
+    Optional<Person> findByIdForUpdate(@Param("id") Long id);
 }

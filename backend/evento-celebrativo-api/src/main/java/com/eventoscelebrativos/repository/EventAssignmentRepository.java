@@ -4,6 +4,7 @@ import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
+import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -100,6 +101,23 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
     List<EventAssignment> findAllByEventIdAndPersonIdForUpdate(
             @Param("eventId") Long eventId,
             @Param("personId") Long personId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM EventAssignment a WHERE a.event.id = :eventId")
+    List<EventAssignment> findAllByEventIdForUpdate(@Param("eventId") Long eventId);
+
+    @Query("""
+            SELECT a.event.id AS eventId, a.event.nameMassOrEvent AS eventName, a.event.eventDate AS eventDate,
+                   a.event.eventTime AS eventTime, a.assignmentType AS assignmentType
+            FROM EventAssignment a
+            WHERE a.person.id = :personId
+              AND a.event.eventDate BETWEEN :startDate AND :endDate
+            """)
+    List<PersonUnavailabilityAssignmentConflictProjection> findAssignmentConflictsByPersonIdAndDateRange(
+            @Param("personId") Long personId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 
     boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
