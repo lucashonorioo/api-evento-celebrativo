@@ -178,6 +178,11 @@ class PersonUnavailabilityIntervalMatrixMySqlIntegrationTest {
     }
 
     @Test
+    void shouldConflictWithMinimalOneSecondIntersectionAtEventEnd() {
+        assertConflict(at(2026, 9, 10, 19, 59, 59), at(2026, 9, 10, 20, 0, 1));
+    }
+
+    @Test
     void shouldConflictWhenEventCrossesMidnightAndUnavailabilityOverlapsIt() throws SQLException {
         LocalDateTime crossMidnightStart = LocalDateTime.of(2026, 9, 15, 23, 0);
         LocalDateTime crossMidnightEnd = LocalDateTime.of(2026, 9, 16, 1, 0);
@@ -241,6 +246,10 @@ class PersonUnavailabilityIntervalMatrixMySqlIntegrationTest {
 
     private LocalDateTime at(int year, int month, int day, int hour, int minute) {
         return LocalDateTime.of(year, month, day, hour, minute);
+    }
+
+    private LocalDateTime at(int year, int month, int day, int hour, int minute, int second) {
+        return LocalDateTime.of(year, month, day, hour, minute, second);
     }
 
     private String uniquePhoneNumber() {
