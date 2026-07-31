@@ -244,6 +244,110 @@ class CelebrationEventRepositoryTest {
     }
 
     @Test
+    void shouldFindEucharistScaleEventCrossingMidnightAcrossAllRangeScenarios() {
+        Long personId = insertPerson("Eucharist Midnight Minister");
+        Long eventId = insertEventWithRange(
+                "Eucharist Midnight Event",
+                LocalDateTime.of(2026, 8, 9, 23, 0),
+                LocalDateTime.of(2026, 8, 10, 1, 0));
+        attachEucharistAssignment(eventId, personId);
+
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 10, 0, 0));
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 23, 30), LocalDateTime.of(2026, 8, 10, 0, 30));
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 22, 0), LocalDateTime.of(2026, 8, 10, 2, 0));
+    }
+
+    @Test
+    void shouldNotReturnEucharistScaleEventEndingExactlyAtRangeStart() {
+        Long personId = insertPerson("Eucharist Boundary Minister End");
+        Long eventId = insertEventWithRange(
+                "Eucharist Boundary Event Ends At Range Start",
+                LocalDateTime.of(2026, 8, 20, 8, 0),
+                LocalDateTime.of(2026, 8, 20, 10, 0));
+        attachEucharistAssignment(eventId, personId);
+
+        assertEucharistScaleExcludesEvent(eventId, LocalDateTime.of(2026, 8, 20, 10, 0), LocalDateTime.of(2026, 8, 20, 12, 0));
+    }
+
+    @Test
+    void shouldNotReturnEucharistScaleEventStartingExactlyAtRangeEnd() {
+        Long personId = insertPerson("Eucharist Boundary Minister Start");
+        Long eventId = insertEventWithRange(
+                "Eucharist Boundary Event Starts At Range End",
+                LocalDateTime.of(2026, 8, 20, 12, 0),
+                LocalDateTime.of(2026, 8, 20, 14, 0));
+        attachEucharistAssignment(eventId, personId);
+
+        assertEucharistScaleExcludesEvent(eventId, LocalDateTime.of(2026, 8, 20, 10, 0), LocalDateTime.of(2026, 8, 20, 12, 0));
+    }
+
+    @Test
+    void shouldReturnEucharistScaleEventWithMinimalIntersection() {
+        Long personId = insertPerson("Eucharist Boundary Minister Minimal");
+        Long eventId = insertEventWithRange(
+                "Eucharist Boundary Event Minimal Intersection",
+                LocalDateTime.of(2026, 8, 20, 9, 59, 59),
+                LocalDateTime.of(2026, 8, 20, 10, 0, 1));
+        attachEucharistAssignment(eventId, personId);
+
+        assertEucharistScaleContainsEvent(eventId, LocalDateTime.of(2026, 8, 20, 10, 0, 0), LocalDateTime.of(2026, 8, 20, 12, 0, 0));
+    }
+
+    @Test
+    void shouldFindParallelScheduleEventCrossingMidnightAcrossAllRangeScenarios() {
+        Long personId = insertPerson("Parallel Schedule Midnight Reader");
+        Long eventId = insertEventWithRange(
+                "Parallel Schedule Midnight Event",
+                LocalDateTime.of(2026, 8, 9, 23, 0),
+                LocalDateTime.of(2026, 8, 10, 1, 0));
+        attachAssignment(eventId, personId, EventAssignmentType.READER);
+
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 10, 0, 0));
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 23, 30), LocalDateTime.of(2026, 8, 10, 0, 30));
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 9, 22, 0), LocalDateTime.of(2026, 8, 10, 2, 0));
+    }
+
+    @Test
+    void shouldNotReturnParallelScheduleEventEndingExactlyAtRangeStart() {
+        Long personId = insertPerson("Parallel Boundary Reader End");
+        Long eventId = insertEventWithRange(
+                "Parallel Boundary Event Ends At Range Start",
+                LocalDateTime.of(2026, 8, 21, 8, 0),
+                LocalDateTime.of(2026, 8, 21, 10, 0));
+        attachAssignment(eventId, personId, EventAssignmentType.READER);
+
+        assertParallelScheduleExcludesEvent(eventId, LocalDateTime.of(2026, 8, 21, 10, 0), LocalDateTime.of(2026, 8, 21, 12, 0));
+    }
+
+    @Test
+    void shouldNotReturnParallelScheduleEventStartingExactlyAtRangeEnd() {
+        Long personId = insertPerson("Parallel Boundary Reader Start");
+        Long eventId = insertEventWithRange(
+                "Parallel Boundary Event Starts At Range End",
+                LocalDateTime.of(2026, 8, 21, 12, 0),
+                LocalDateTime.of(2026, 8, 21, 14, 0));
+        attachAssignment(eventId, personId, EventAssignmentType.READER);
+
+        assertParallelScheduleExcludesEvent(eventId, LocalDateTime.of(2026, 8, 21, 10, 0), LocalDateTime.of(2026, 8, 21, 12, 0));
+    }
+
+    @Test
+    void shouldReturnParallelScheduleEventWithMinimalIntersection() {
+        Long personId = insertPerson("Parallel Boundary Reader Minimal");
+        Long eventId = insertEventWithRange(
+                "Parallel Boundary Event Minimal Intersection",
+                LocalDateTime.of(2026, 8, 21, 9, 59, 59),
+                LocalDateTime.of(2026, 8, 21, 10, 0, 1));
+        attachAssignment(eventId, personId, EventAssignmentType.READER);
+
+        assertParallelScheduleContainsEvent(eventId, LocalDateTime.of(2026, 8, 21, 10, 0, 0), LocalDateTime.of(2026, 8, 21, 12, 0, 0));
+    }
+
+    @Test
     void shouldFindEventWithLocations() {
         CelebrationEvent event = eventRepository.findByIdWithLocations(1L).orElseThrow();
 
@@ -327,6 +431,78 @@ class CelebrationEventRepositoryTest {
 
     private Long firstLocationId() {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_location ORDER BY id LIMIT 1", Long.class);
+    }
+
+    private Long insertEventWithRange(String name, LocalDateTime startAt, LocalDateTime endAt) {
+        String eventName = name + " " + UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration)
+                VALUES (?, ?, ?, TRUE)
+                """,
+                eventName,
+                startAt,
+                endAt
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_celebration_event WHERE name_mass_or_event = ?",
+                Long.class,
+                eventName
+        );
+    }
+
+    private void attachAssignment(Long eventId, Long personId, EventAssignmentType assignmentType) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                eventId,
+                personId,
+                assignmentType.name()
+        );
+    }
+
+    private void attachEucharistAssignment(Long eventId, Long personId) {
+        Long locationId = firstLocationId();
+        jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
+        attachAssignment(eventId, personId, EventAssignmentType.EUCHARISTIC_MINISTER);
+    }
+
+    private void assertEucharistScaleContainsEvent(Long eventId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
+                PageRequest.of(0, 10), rangeStart, rangeEnd);
+
+        Assertions.assertTrue(
+                result.getContent().stream().anyMatch(event -> event.getEventId().equals(eventId)),
+                "Esperava encontrar o evento " + eventId + " no intervalo [" + rangeStart + ", " + rangeEnd + ")");
+    }
+
+    private void assertEucharistScaleExcludesEvent(Long eventId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
+                PageRequest.of(0, 10), rangeStart, rangeEnd);
+
+        Assertions.assertTrue(
+                result.getContent().stream().noneMatch(event -> event.getEventId().equals(eventId)),
+                "Nao esperava encontrar o evento " + eventId + " no intervalo [" + rangeStart + ", " + rangeEnd + ")");
+    }
+
+    private void assertParallelScheduleContainsEvent(Long eventId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
+                PageRequest.of(0, 10), rangeStart, rangeEnd, EventAssignmentType.READER.name(), false);
+
+        Assertions.assertTrue(
+                result.getContent().stream().anyMatch(event -> event.getEventId().equals(eventId)),
+                "Esperava encontrar o evento " + eventId + " no intervalo [" + rangeStart + ", " + rangeEnd + ")");
+    }
+
+    private void assertParallelScheduleExcludesEvent(Long eventId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
+                PageRequest.of(0, 10), rangeStart, rangeEnd, EventAssignmentType.READER.name(), false);
+
+        Assertions.assertTrue(
+                result.getContent().stream().noneMatch(event -> event.getEventId().equals(eventId)),
+                "Nao esperava encontrar o evento " + eventId + " no intervalo [" + rangeStart + ", " + rangeEnd + ")");
     }
 
     private String uniquePhoneNumber() {

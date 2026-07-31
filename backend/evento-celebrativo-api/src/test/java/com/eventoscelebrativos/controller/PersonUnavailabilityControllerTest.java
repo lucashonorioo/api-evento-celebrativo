@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.config.TemporalJsonConfig;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
@@ -32,6 +33,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -44,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PersonUnavailabilityController.class)
-@Import(PersonUnavailabilityControllerTest.MethodSecurityTestConfig.class)
+@Import({PersonUnavailabilityControllerTest.MethodSecurityTestConfig.class, TemporalJsonConfig.class})
 class PersonUnavailabilityControllerTest {
 
     @Autowired
@@ -104,6 +106,80 @@ class PersonUnavailabilityControllerTest {
                                   "startAt": "2026-08-10T08:00:00.123",
                                   "endAt": "2026-08-10T12:00:00",
                                   "reason": "Consulta médica"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value("TEMPORAL_PRECISION_NOT_SUPPORTED"));
+    }
+
+    @Test
+    @WithMockUser(username = "34970000012", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenCreateBodyStartAtIsMissingSeconds() throws Exception {
+        mockMvc.perform(post("/pessoas/me/indisponibilidades")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "2026-08-10T08:00",
+                                  "endAt": "2026-08-10T12:00:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(personUnavailabilityService);
+    }
+
+    @Test
+    @WithMockUser(username = "34970000013", roles = "OPERATOR")
+    void shouldReturnBadRequestWhenCreateBodyStartAtIsInvalidText() throws Exception {
+        mockMvc.perform(post("/pessoas/me/indisponibilidades")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "horario-invalido",
+                                  "endAt": "2026-08-10T12:00:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(personUnavailabilityService);
+    }
+
+    @Test
+    @WithMockUser(username = "34970000014", roles = "ADMIN")
+    void shouldReturnBadRequestWhenUpdateBodyStartAtIsMissingSeconds() throws Exception {
+        mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "2026-08-10T08:00",
+                                  "endAt": "2026-08-10T12:00:00"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verify(personUnavailabilityService, never()).update(any(), any(), any());
+    }
+
+    @Test
+    @WithMockUser(username = "34970000015", roles = "ADMIN")
+    void shouldReturnStructuredBadRequestForFractionalUpdateBody() throws Exception {
+        when(personUnavailabilityService.update(eq("34970000015"), eq(1L), any()))
+                .thenThrow(new TemporalPrecisionNotSupportedException());
+
+        mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "startAt": "2026-08-10T08:00:00.123",
+                                  "endAt": "2026-08-10T12:00:00"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())

@@ -363,6 +363,33 @@ class EventParticipationResponseServiceImplTest {
     }
 
     @Test
+    void shouldAllowResponseWhenClockNanosArePastEventStartSecondButBeforeItsNextSecond() {
+        Person person = person(10L, "34970000025");
+        CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0, 1));
+        mockAssignedPerson(person, event);
+        when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
+        service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 0, 100_000_000));
+
+        service.respond("34970000025", 15L, request("CONFIRMED", null));
+
+        verify(eventParticipationResponseRepository).save(any());
+    }
+
+    @Test
+    void shouldBlockResponseWhenClockNanosReachEventStartInstant() {
+        Person person = person(10L, "34970000026");
+        CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0, 0));
+        when(personRepository.findByPhoneNumber("34970000026")).thenReturn(Optional.of(person));
+        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
+                .thenReturn(List.of(assignment(event, person)));
+        service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 0, 100_000_000));
+
+        assertThrows(ConflictException.class, () -> service.respond("34970000026", 15L, request("CONFIRMED", null)));
+        verify(eventParticipationResponseRepository, never()).save(any());
+    }
+
+    @Test
     void shouldAcquirePessimisticLockOnAssignmentsBeforeRespondingToPreventDuplicates() {
         Person person = person(10L, "34970000023");
         CelebrationEvent event = futureEvent(15L);

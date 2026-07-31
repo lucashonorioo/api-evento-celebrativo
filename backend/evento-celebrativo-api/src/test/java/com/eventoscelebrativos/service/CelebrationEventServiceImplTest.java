@@ -153,6 +153,81 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
+    void shouldAcceptEventCreationOneSecondAfterCurrentInstantUsingApplicationClock() {
+        LocalDateTime startAt = LocalDateTime.of(2026, 8, 15, 18, 0, 1);
+        CelebrationEventRequestDTO request =
+                new CelebrationEventRequestDTO("Missa", startAt, startAt.plusHours(1), true);
+        CelebrationEvent entity = new CelebrationEvent(null, "Missa", startAt, startAt.plusHours(1), true);
+        CelebrationEvent saved = new CelebrationEvent(1L, "Missa", startAt, startAt.plusHours(1), true);
+        CelebrationEventResponseDTO response =
+                new CelebrationEventResponseDTO(1L, "Missa", startAt, startAt.plusHours(1), true);
+
+        when(mapper.toEntity(request)).thenReturn(entity);
+        when(repository.save(entity)).thenReturn(saved);
+        when(mapper.toDto(saved)).thenReturn(response);
+
+        assertSame(response, service.createEvent(request));
+    }
+
+    @Test
+    void shouldNormalizeClockNanosToSecondPrecisionOnCommonEventCreation() {
+        when(clock.instant()).thenReturn(Instant.parse("2026-08-15T21:00:00.900Z"));
+        LocalDateTime boundary = LocalDateTime.of(2026, 8, 15, 18, 0, 0);
+
+        CelebrationEventRequestDTO pastRequest =
+                new CelebrationEventRequestDTO("Missa", boundary.minusSeconds(1), boundary, true);
+        assertThrows(BusinessException.class, () -> service.createEvent(pastRequest));
+        verifyNoInteractions(mapper, repository);
+
+        CelebrationEventRequestDTO onBoundaryRequest =
+                new CelebrationEventRequestDTO("Missa", boundary, boundary.plusHours(1), true);
+        CelebrationEvent onBoundaryEntity = new CelebrationEvent(null, "Missa", boundary, boundary.plusHours(1), true);
+        CelebrationEvent onBoundarySaved = new CelebrationEvent(1L, "Missa", boundary, boundary.plusHours(1), true);
+        CelebrationEventResponseDTO onBoundaryResponse =
+                new CelebrationEventResponseDTO(1L, "Missa", boundary, boundary.plusHours(1), true);
+        when(mapper.toEntity(onBoundaryRequest)).thenReturn(onBoundaryEntity);
+        when(repository.save(onBoundaryEntity)).thenReturn(onBoundarySaved);
+        when(mapper.toDto(onBoundarySaved)).thenReturn(onBoundaryResponse);
+
+        assertSame(onBoundaryResponse, service.createEvent(onBoundaryRequest));
+
+        LocalDateTime afterBoundary = boundary.plusSeconds(1);
+        CelebrationEventRequestDTO afterBoundaryRequest =
+                new CelebrationEventRequestDTO("Missa", afterBoundary, afterBoundary.plusHours(1), true);
+        CelebrationEvent afterBoundaryEntity = new CelebrationEvent(null, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
+        CelebrationEvent afterBoundarySaved = new CelebrationEvent(2L, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
+        CelebrationEventResponseDTO afterBoundaryResponse =
+                new CelebrationEventResponseDTO(2L, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
+        when(mapper.toEntity(afterBoundaryRequest)).thenReturn(afterBoundaryEntity);
+        when(repository.save(afterBoundaryEntity)).thenReturn(afterBoundarySaved);
+        when(mapper.toDto(afterBoundarySaved)).thenReturn(afterBoundaryResponse);
+
+        assertSame(afterBoundaryResponse, service.createEvent(afterBoundaryRequest));
+    }
+
+    @Test
+    void shouldAcceptEventWithScaleCreationAtCurrentSecondUsingApplicationClock() {
+        Location location = location(1L);
+        Person priest = person(new Person(), 8L, "Padre");
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+        CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
+        LocalDateTime now = LocalDateTime.of(2026, 8, 15, 18, 0);
+        request.setStartAt(now);
+        request.setEndAt(now.plusHours(1));
+
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
+        when(repository.save(any(CelebrationEvent.class))).thenAnswer(invocation -> {
+            CelebrationEvent event = invocation.getArgument(0);
+            event.setId(1L);
+            return event;
+        });
+        when(scaleMapper.toDto(any(CelebrationEvent.class), any(EventScaleAssignmentPlan.class))).thenReturn(response);
+
+        assertSame(response, service.createEventWithScale(request));
+    }
+
+    @Test
     void shouldRejectFractionalSecondsOnCommonEventCreation() {
         CelebrationEventRequestDTO request = request();
         request.setStartAt(EVENT_START_AT.withNano(100_000_000));

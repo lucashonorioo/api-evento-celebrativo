@@ -219,6 +219,45 @@ class PersonUnavailabilityServiceImplTest {
     }
 
     @Test
+    void shouldRejectStartAtOneSecondBeforeCurrentInstantOnCreate() {
+        LocalDateTime pastStart = TODAY.minusSeconds(1);
+
+        assertThrows(BadRequestException.class, () -> service.create(
+                "34970000009", new PersonUnavailabilityRequestDTO(pastStart, pastStart.plusHours(1), null)));
+
+        verify(personRepository, never()).findByPhoneNumberForUpdate(any());
+    }
+
+    @Test
+    void shouldAllowStartAtOneSecondAfterCurrentInstantOnCreate() {
+        Person person = person(10L, "34970000010");
+        when(personRepository.findByPhoneNumberForUpdate("34970000010")).thenReturn(Optional.of(person));
+        when(personUnavailabilityRepository.save(any(PersonUnavailability.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LocalDateTime futureStart = TODAY.plusSeconds(1);
+
+        service.create("34970000010", new PersonUnavailabilityRequestDTO(futureStart, futureStart.plusHours(1), null));
+    }
+
+    @Test
+    void shouldNormalizeClockNanosToSecondPrecisionOnCreate() {
+        Clock nanosClock = Clock.fixed(TODAY.atZone(ZONE).toInstant().plusNanos(900_000_000), ZONE);
+        PersonUnavailabilityServiceImpl nanosService = new PersonUnavailabilityServiceImpl(
+                personUnavailabilityRepository, personRepository, personUnavailabilityConflictService, mapper, nanosClock);
+
+        LocalDateTime pastStart = TODAY.minusSeconds(1);
+        assertThrows(BadRequestException.class, () -> nanosService.create(
+                "34970000011", new PersonUnavailabilityRequestDTO(pastStart, pastStart.plusHours(1), null)));
+
+        Person person = person(10L, "34970000011");
+        when(personRepository.findByPhoneNumberForUpdate("34970000011")).thenReturn(Optional.of(person));
+        when(personUnavailabilityRepository.save(any(PersonUnavailability.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        nanosService.create("34970000011", new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusHours(1), null));
+        nanosService.create("34970000011", new PersonUnavailabilityRequestDTO(TODAY.plusSeconds(1), TODAY.plusHours(2), null));
+    }
+
+    @Test
     void shouldUpdateOwnRecordWhenChanged() {
         Person person = person(10L, "34970000008");
         PersonUnavailability existing = existing(1L, person, TODAY, TODAY.plusDays(1), "Antigo");

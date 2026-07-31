@@ -458,6 +458,52 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
                 "Invariante violado: pessoa nao pode estar indisponivel e escalada na data final do evento simultaneamente (mudanca de eventDate)");
     }
 
+    @Test
+    void shouldPreserveInvariantWhenUnavailabilityRacesAgainstIsolatedEndAtChangeForAssignedPerson() throws Exception {
+        String phone = uniquePhoneNumber();
+        Person person = savePersonWithRole("Concurrent EndAt Change Person", phone, "ROLE_OPERATOR");
+        cleanupPersonIdA = person.getId();
+
+        LocalDate eventDate = LocalDate.of(2026, 10, 20);
+        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
+        LocalDateTime eventEndAt = LocalDateTime.of(eventDate, LocalTime.of(20, 0));
+        CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
+                null, "Concurrent EndAt Change Event " + UUID.randomUUID(), eventStartAt, eventEndAt, true));
+        cleanupEventId = event.getId();
+        Long eventId = event.getId();
+        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
+
+        // Estado inicial: assignment 19:00-20:00 e indisponibilidade concorrente 20:00-21:00 sao
+        // adjacentes (nao conflitam). A corrida decide entre persistir a indisponibilidade como esta
+        // ou estender isoladamente o endAt do evento (mantendo nome/startAt/massOrCelebration) para
+        // 20:30, o que passaria a se sobrepor a indisponibilidade.
+        PersonUnavailabilityRequestDTO unavailabilityRequest =
+                new PersonUnavailabilityRequestDTO(eventEndAt, eventEndAt.plusHours(1), null);
+        CelebrationEventRequestDTO endAtChangeRequest =
+                new CelebrationEventRequestDTO(event.getNameMassOrEvent(), eventStartAt, eventEndAt.plusMinutes(30), true);
+
+        AtomicInteger successes = new AtomicInteger();
+        AtomicInteger conflicts = new AtomicInteger();
+        runConcurrently(
+                () -> personUnavailabilityService.create(phone, unavailabilityRequest),
+                () -> celebrationEventService.updateEvent(eventId, endAtChangeRequest),
+                successes,
+                conflicts
+        );
+
+        assertEquals(1, successes.get(), "Exatamente uma das duas operacoes concorrentes deve ser bem-sucedida");
+        assertEquals(1, conflicts.get());
+
+        CelebrationEvent finalEvent = celebrationEventRepository.findById(eventId).orElseThrow();
+        boolean hasAssignment = !eventAssignmentRepository.findAllByEventId(eventId).isEmpty();
+        boolean hasConflictingUnavailability = !personUnavailabilityRepository
+                .findOverlapping(person.getId(), finalEvent.getStartAt(), finalEvent.getEndAt()).isEmpty();
+
+        assertFalse(hasAssignment && hasConflictingUnavailability,
+                "Invariante violado: assignment ativo, evento final " + finalEvent.getStartAt() + "-" + finalEvent.getEndAt()
+                        + " e indisponibilidade sobrepondo o intervalo final simultaneamente (alteracao isolada de endAt)");
+    }
+
     private void runConcurrently(
             Runnable first, Runnable second, AtomicInteger successes, AtomicInteger conflicts
     ) throws Exception {

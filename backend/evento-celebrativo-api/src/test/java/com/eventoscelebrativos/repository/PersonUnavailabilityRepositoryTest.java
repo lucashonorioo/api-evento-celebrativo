@@ -197,6 +197,67 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
+    void shouldReturnOverlappingWithMinimalIntersection() {
+        Person person = savePerson("Unavailability Minimal Overlap Person", "34975000019");
+        saveUnavailability(person, at(2026, 8, 10, 9, 59, 59), at(2026, 8, 10, 10, 0, 1), null);
+
+        List<PersonUnavailability> result = personUnavailabilityRepository.findOverlapping(
+                person.getId(), at(2026, 8, 10, 10, 0, 0), at(2026, 8, 10, 12, 0, 0));
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void shouldExcludeIntersectingUnavailabilityAdjacentToQueryRange() {
+        Person person = savePerson("Unavailability Intersect Boundary Person", "34975000020");
+        saveUnavailability(person, at(2026, 8, 10, 8, 0), at(2026, 8, 10, 10, 0), null);
+
+        Page<PersonUnavailability> after = personUnavailabilityRepository.findByPersonIdIntersecting(
+                person.getId(), at(2026, 8, 10, 10, 0), at(2026, 8, 10, 12, 0), PageRequest.of(0, 10));
+        Page<PersonUnavailability> before = personUnavailabilityRepository.findByPersonIdIntersecting(
+                person.getId(), at(2026, 8, 10, 4, 0), at(2026, 8, 10, 8, 0), PageRequest.of(0, 10));
+
+        assertTrue(after.getContent().isEmpty());
+        assertTrue(before.getContent().isEmpty());
+    }
+
+    @Test
+    void shouldIncludeIntersectingUnavailabilityWithMinimalIntersection() {
+        Person person = savePerson("Unavailability Intersect Minimal Person", "34975000021");
+        saveUnavailability(person, at(2026, 8, 10, 9, 59, 59), at(2026, 8, 10, 10, 0, 1), null);
+
+        Page<PersonUnavailability> result = personUnavailabilityRepository.findByPersonIdIntersecting(
+                person.getId(), at(2026, 8, 10, 10, 0, 0), at(2026, 8, 10, 12, 0, 0), PageRequest.of(0, 10));
+
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void shouldExcludeFromAdministrativeRangeQueryWhenAdjacentToRange() {
+        Person person = savePerson("Unavailability Admin Boundary Person", "34975000022");
+        saveUnavailability(person, at(2026, 8, 10, 8, 0), at(2026, 8, 10, 10, 0), null);
+
+        List<PersonUnavailabilityPersonProjection> after = personUnavailabilityRepository.findAllByRange(
+                at(2026, 8, 10, 10, 0), at(2026, 8, 10, 12, 0));
+        List<PersonUnavailabilityPersonProjection> before = personUnavailabilityRepository.findAllByRange(
+                at(2026, 8, 10, 4, 0), at(2026, 8, 10, 8, 0));
+
+        assertTrue(after.isEmpty());
+        assertTrue(before.isEmpty());
+    }
+
+    @Test
+    void shouldIncludeInAdministrativeRangeQueryWithMinimalIntersection() {
+        Person person = savePerson("Unavailability Admin Minimal Person", "34975000023");
+        saveUnavailability(person, at(2026, 8, 10, 9, 59, 59), at(2026, 8, 10, 10, 0, 1), null);
+
+        List<PersonUnavailabilityPersonProjection> result = personUnavailabilityRepository.findAllByRange(
+                at(2026, 8, 10, 10, 0, 0), at(2026, 8, 10, 12, 0, 0));
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
     void shouldFindByIdAndPersonIdOnlyForOwner() {
         Person owner = savePerson("Unavailability Owner Person", "34975000011");
         Person other = savePerson("Unavailability Other Person", "34975000012");
@@ -352,5 +413,9 @@ class PersonUnavailabilityRepositoryTest {
 
     private LocalDateTime at(int year, int month, int day, int hour, int minute) {
         return LocalDateTime.of(year, month, day, hour, minute);
+    }
+
+    private LocalDateTime at(int year, int month, int day, int hour, int minute, int second) {
+        return LocalDateTime.of(year, month, day, hour, minute, second);
     }
 }

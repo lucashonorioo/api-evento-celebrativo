@@ -157,6 +157,83 @@ class CelebrationEventControllerTest {
     }
 
     @Test
+    void shouldReturnBadRequestWhenCommonEventStartAtIsMissingSeconds() throws Exception {
+        String payload = """
+                {
+                  "nameMassOrEvent": "Missa",
+                  "startAt": "2026-08-15T19:30",
+                  "endAt": "2026-08-15T20:30:00",
+                  "massOrCelebration": true
+                }
+                """;
+
+        mockMvc.perform(post("/eventos").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenCommonEventStartAtIsInvalidText() throws Exception {
+        String payload = """
+                {
+                  "nameMassOrEvent": "Missa",
+                  "startAt": "horario-invalido",
+                  "endAt": "2026-08-15T20:30:00",
+                  "massOrCelebration": true
+                }
+                """;
+
+        mockMvc.perform(post("/eventos").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEventWithScaleStartAtIsMissingSeconds() throws Exception {
+        String payload = """
+                {
+                  "nameMassOrEvent": "Missa",
+                  "startAt": "2026-08-15T19:30",
+                  "endAt": "2026-08-15T20:30:00",
+                  "massOrCelebration": true,
+                  "locationId": 1,
+                  "priestId": 8
+                }
+                """;
+
+        mockMvc.perform(post("/eventos/com-escala").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verify(celebrationEventService, never()).createEventWithScale(any());
+    }
+
+    @Test
+    void shouldReturnStructuredBadRequestForUnsupportedTemporalFractionsOnEventWithScale() throws Exception {
+        when(celebrationEventService.createEventWithScale(any()))
+                .thenThrow(new TemporalPrecisionNotSupportedException());
+
+        String payload = """
+                {
+                  "nameMassOrEvent": "Missa",
+                  "startAt": "2026-08-15T19:30:00.123",
+                  "endAt": "2026-08-15T20:30:00",
+                  "massOrCelebration": true,
+                  "locationId": 1,
+                  "priestId": 8
+                }
+                """;
+
+        mockMvc.perform(post("/eventos/com-escala").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("TEMPORAL_PRECISION_NOT_SUPPORTED"));
+    }
+
+    @Test
     void shouldReturnOkWhenGettingEventByExistingId() throws Exception {
         when(celebrationEventService.findEventById(1L)).thenReturn(response("Missa"));
 

@@ -428,6 +428,100 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
+    void shouldFindScheduleEventCrossingMidnightAcrossAllRangeScenarios() {
+        Person reader = savePerson("Schedule Midnight Precision Reader", "34974000023");
+        CelebrationEvent event = saveEventWithRange(
+                "Schedule Midnight Precision Event",
+                LocalDateTime.of(2026, 8, 9, 23, 0),
+                LocalDateTime.of(2026, 8, 10, 1, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 10, 0, 0));
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 9, 0, 0), LocalDateTime.of(2026, 8, 11, 0, 0));
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 9, 23, 30), LocalDateTime.of(2026, 8, 10, 0, 30));
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 9, 22, 0), LocalDateTime.of(2026, 8, 10, 2, 0));
+    }
+
+    @Test
+    void shouldNotReturnScheduleEventEndingExactlyAtRangeStart() {
+        Person reader = savePerson("Schedule Boundary Reader End", "34974000024");
+        CelebrationEvent event = saveEventWithRange(
+                "Schedule Boundary Event Ends At Range Start",
+                LocalDateTime.of(2026, 8, 22, 8, 0),
+                LocalDateTime.of(2026, 8, 22, 10, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findScheduleExact(
+                reader, LocalDateTime.of(2026, 8, 22, 10, 0), LocalDateTime.of(2026, 8, 22, 12, 0));
+
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
+    void shouldNotReturnScheduleEventStartingExactlyAtRangeEnd() {
+        Person reader = savePerson("Schedule Boundary Reader Start", "34974000025");
+        CelebrationEvent event = saveEventWithRange(
+                "Schedule Boundary Event Starts At Range End",
+                LocalDateTime.of(2026, 8, 22, 12, 0),
+                LocalDateTime.of(2026, 8, 22, 14, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findScheduleExact(
+                reader, LocalDateTime.of(2026, 8, 22, 10, 0), LocalDateTime.of(2026, 8, 22, 12, 0));
+
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
+    void shouldReturnScheduleEventWithMinimalIntersection() {
+        Person reader = savePerson("Schedule Boundary Reader Minimal", "34974000026");
+        CelebrationEvent event = saveEventWithRange(
+                "Schedule Boundary Event Minimal Intersection",
+                LocalDateTime.of(2026, 8, 22, 9, 59, 59),
+                LocalDateTime.of(2026, 8, 22, 10, 0, 1));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertScheduleContainsEvent(reader, event.getId(), LocalDateTime.of(2026, 8, 22, 10, 0, 0), LocalDateTime.of(2026, 8, 22, 12, 0, 0));
+    }
+
+    @Test
+    void shouldPaginateDistinctEventsWhenEventCrossesMidnightWithMultipleAssignmentsAndOtherParticipants() {
+        Person reader = savePerson("Schedule Midnight Combined Reader", "34974000027");
+        Person otherParticipant = savePerson("Schedule Midnight Combined Other", "34974000028");
+        CelebrationEvent midnightEvent = saveEvent("Schedule Midnight Combined Event", LocalDate.of(2026, 8, 9), LocalTime.of(23, 30));
+        CelebrationEvent secondEvent = saveEvent("Schedule Midnight Combined Second Event", LocalDate.of(2026, 8, 10), LocalTime.of(10, 0));
+        Location location = saveLocation("Schedule Midnight Combined Church");
+        attachLocation(midnightEvent, location);
+        saveAssignment(midnightEvent, reader, EventAssignmentType.READER);
+        saveAssignment(midnightEvent, reader, EventAssignmentType.COMMENTATOR);
+        saveAssignment(midnightEvent, otherParticipant, EventAssignmentType.PRIEST);
+        saveAssignment(secondEvent, reader, EventAssignmentType.READER);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> firstPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 0, 1);
+
+        assertEquals(2, firstPage.getTotalElements());
+        assertEquals(1, firstPage.getNumberOfElements());
+        assertEquals(midnightEvent.getId(), firstPage.getContent().get(0).getEventId());
+        assertEquals(location.getId(), firstPage.getContent().get(0).getLocationId());
+
+        Page<PersonScheduleEventProjection> secondPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 1, 1);
+
+        assertEquals(1, secondPage.getNumberOfElements());
+        assertEquals(secondEvent.getId(), secondPage.getContent().get(0).getEventId());
+    }
+
+    @Test
     void shouldReturnLocationOfEvent() {
         Person reader = savePerson("Schedule Location Reader", "34974000014");
         CelebrationEvent event = saveEvent("Schedule Location Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
@@ -576,6 +670,25 @@ class EventAssignmentRepositoryTest {
         entityManager.persist(event);
         entityManager.flush();
         return event;
+    }
+
+    private CelebrationEvent saveEventWithRange(String name, LocalDateTime startAt, LocalDateTime endAt) {
+        CelebrationEvent event = new CelebrationEvent(null, name, startAt, endAt, true);
+        entityManager.persist(event);
+        entityManager.flush();
+        return event;
+    }
+
+    private Page<PersonScheduleEventProjection> findScheduleExact(Person person, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        return eventAssignmentRepository.findScheduleEventsByPersonId(person.getId(), rangeStart, rangeEnd, PageRequest.of(0, 10));
+    }
+
+    private void assertScheduleContainsEvent(Person person, Long eventId, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
+        Page<PersonScheduleEventProjection> result = findScheduleExact(person, rangeStart, rangeEnd);
+
+        assertTrue(
+                result.getContent().stream().anyMatch(event -> event.getEventId().equals(eventId)),
+                "Esperava encontrar o evento " + eventId + " no intervalo [" + rangeStart + ", " + rangeEnd + ")");
     }
 
     private Person savePerson(String name, String phoneNumber) {
