@@ -266,11 +266,12 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        LocalDateTime newStartAt = celebrationEventRequestDTO.getStartAt();
-        LocalDateTime newEndAt = celebrationEventRequestDTO.getEndAt();
-        boolean rangeChanged = (newStartAt != null && !newStartAt.equals(celebrationEvent.getStartAt()))
-                || (newEndAt != null && !newEndAt.equals(celebrationEvent.getEndAt()));
-
+        // Todos os participantes deste fluxo sao pessoas atuais (nenhuma pessoa nova e adicionada
+        // por aqui). Uma alteracao de startAt/endAt pode tornar assignments existentes
+        // incompatíveis com indisponibilidades ja cadastradas; isso e permitido e o conflito passa
+        // a ser derivado nas consultas administrativas, em vez de bloquear esta operacao. O lock das
+        // pessoas e mantido apenas como ponto de serializacao comum com o fluxo pessoal de
+        // indisponibilidade (secao 25/30), nao para validacao bloqueante.
         List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
         List<Long> assignedPersonIds = currentAssignments.stream()
                 .map(assignment -> assignment.getPerson().getId())
@@ -280,18 +281,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         if (!assignedPersonIds.isEmpty()) {
             personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
-        }
-
-        if (rangeChanged && !assignedPersonIds.isEmpty()) {
-            Map<Long, Set<EventAssignmentType>> assignmentTypesByPerson = currentAssignments.stream()
-                    .collect(Collectors.groupingBy(
-                            assignment -> assignment.getPerson().getId(),
-                            Collectors.mapping(
-                                    EventAssignment::getAssignmentType,
-                                    Collectors.toCollection(() -> EnumSet.noneOf(EventAssignmentType.class))
-                            )
-                    ));
-            personUnavailabilityConflictService.validateAvailabilityForEvent(assignmentTypesByPerson, newStartAt, newEndAt);
         }
 
         celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
@@ -311,19 +300,29 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
         List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
+        Set<Long> currentPersonIds = currentAssignments.stream()
+                .map(assignment -> assignment.getPerson().getId())
+                .collect(Collectors.toSet());
 
         Map<Long, EventAssignmentType> desiredAssignmentsByPersonId =
                 buildDesiredAssignments(id, celebrationEventScaleRequestDTO);
 
         Set<Long> unionPersonIds = new TreeSet<>(desiredAssignmentsByPersonId.keySet());
-        currentAssignments.forEach(assignment -> unionPersonIds.add(assignment.getPerson().getId()));
+        unionPersonIds.addAll(currentPersonIds);
         personUnavailabilityConflictService.lockPersonsInOrder(unionPersonIds);
 
         ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, celebrationEventScaleRequestDTO);
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
-        validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
+        // Pessoa retida (personId ja atribuido ao evento antes desta chamada, mesmo que a funcao
+        // tenha mudado) pode permanecer mesmo em conflito com indisponibilidade existente; somente
+        // pessoa nova (personId ainda nao atribuido) e validada contra a indisponibilidade
+        // bloqueante, evitando barrar quem ja estava na escala por um conflito derivado.
+        List<EventAssignmentTarget> newPersonTargets = targets.stream()
+                .filter(target -> !currentPersonIds.contains(target.person().getId()))
+                .toList();
+        validateAvailabilityForTargets(newPersonTargets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
         eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, currentAssignments, targets);

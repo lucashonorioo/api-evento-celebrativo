@@ -143,6 +143,14 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(participationPayload()))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/eventos/1/escala/conflitos-indisponibilidade"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

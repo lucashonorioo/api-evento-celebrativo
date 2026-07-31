@@ -79,9 +79,10 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         String reason = normalizeReason(requestDTO.getReason());
 
         Person person = lockAuthenticatedPerson(phoneNumber);
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
         personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, null);
-        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startAt, endAt);
+        personUnavailabilityConflictService.validateNoStartedAssignmentConflict(person.getId(), startAt, endAt, currentSecond);
 
         PersonUnavailability entity = new PersonUnavailability(person, startAt, endAt, reason);
         PersonUnavailability saved = personUnavailabilityRepository.save(entity);
@@ -110,8 +111,9 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
             return personUnavailabilityMapper.toDto(existing);
         }
 
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
         personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, id);
-        personUnavailabilityConflictService.validateNoAssignmentConflict(person.getId(), startAt, endAt);
+        personUnavailabilityConflictService.validateNoStartedAssignmentConflict(person.getId(), startAt, endAt, currentSecond);
 
         existing.setStartAt(startAt);
         existing.setEndAt(endAt);

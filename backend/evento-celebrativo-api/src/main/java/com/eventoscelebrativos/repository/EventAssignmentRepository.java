@@ -123,6 +123,23 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             @Param("endAt") LocalDateTime endAt
     );
 
+    @Query("""
+            SELECT a.event.id AS eventId, a.event.nameMassOrEvent AS eventName, a.event.startAt AS startAt,
+                   a.event.endAt AS endAt, a.assignmentType AS assignmentType
+            FROM EventAssignment a
+            WHERE a.person.id = :personId
+              AND a.event.startAt < :endAt
+              AND a.event.endAt > :startAt
+              AND a.event.startAt <= :currentSecond
+              AND a.event.endAt > :currentSecond
+            """)
+    List<PersonUnavailabilityAssignmentConflictProjection> findStartedAssignmentConflictsByPersonIdAndRange(
+            @Param("personId") Long personId,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt,
+            @Param("currentSecond") LocalDateTime currentSecond
+    );
+
     boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
 
     @Modifying

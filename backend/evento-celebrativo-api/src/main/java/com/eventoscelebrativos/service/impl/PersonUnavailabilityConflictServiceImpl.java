@@ -2,11 +2,11 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
-import com.eventoscelebrativos.dto.response.EventAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
+import com.eventoscelebrativos.dto.response.StartedAssignmentConflictDTO;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.exception.exceptions.UnavailabilityAssignmentConflictException;
+import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.PersonUnavailability;
@@ -59,27 +59,30 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
 
     @Override
     @Transactional(readOnly = true)
-    public void validateNoAssignmentConflict(Long personId, LocalDateTime startAt, LocalDateTime endAt) {
+    public void validateNoStartedAssignmentConflict(
+            Long personId,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            LocalDateTime currentSecond
+    ) {
         List<PersonUnavailabilityAssignmentConflictProjection> rows =
-                eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(personId, startAt, endAt);
+                eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(personId, startAt, endAt, currentSecond);
 
         if (rows.isEmpty()) {
             return;
         }
 
-        Map<Long, List<PersonUnavailabilityAssignmentConflictProjection>> rowsByEvent = new LinkedHashMap<>();
-        for (PersonUnavailabilityAssignmentConflictProjection row : rows) {
-            rowsByEvent.computeIfAbsent(row.getEventId(), id -> new ArrayList<>()).add(row);
-        }
-
-        List<EventAssignmentConflictDTO> conflicts = rowsByEvent.values().stream()
-                .map(this::toEventAssignmentConflictDTO)
+        // A partir da V12, uma pessoa possui no maximo uma funcao por evento: no maximo uma linha
+        // por eventId ja e garantido pelo banco, sem necessidade de agrupamento.
+        List<StartedAssignmentConflictDTO> conflicts = rows.stream()
+                .map(row -> new StartedAssignmentConflictDTO(
+                        row.getEventId(), row.getEventName(), row.getStartAt(), row.getEndAt(), row.getAssignmentType()))
                 .sorted(Comparator
-                        .comparing(EventAssignmentConflictDTO::getStartAt)
-                        .thenComparing(EventAssignmentConflictDTO::getEventId))
+                        .comparing(StartedAssignmentConflictDTO::getEventStartAt)
+                        .thenComparing(StartedAssignmentConflictDTO::getEventId))
                 .toList();
 
-        throw new UnavailabilityAssignmentConflictException(conflicts);
+        throw new UnavailabilityConflictWithStartedAssignmentException(conflicts);
     }
 
     @Override
@@ -149,23 +152,6 @@ public class PersonUnavailabilityConflictServiceImpl implements PersonUnavailabi
                         rangesByPersonId.getOrDefault(entry.getKey(), List.of())
                 ))
                 .toList();
-    }
-
-    private EventAssignmentConflictDTO toEventAssignmentConflictDTO(List<PersonUnavailabilityAssignmentConflictProjection> rows) {
-        PersonUnavailabilityAssignmentConflictProjection first = rows.get(0);
-        List<String> assignments = rows.stream()
-                .map(row -> EventAssignmentType.valueOf(row.getAssignmentType()))
-                .sorted()
-                .map(Enum::name)
-                .toList();
-
-        return new EventAssignmentConflictDTO(
-                first.getEventId(),
-                first.getEventName(),
-                first.getStartAt(),
-                first.getEndAt(),
-                assignments
-        );
     }
 
     private List<String> sortedAssignmentTypeNames(Set<EventAssignmentType> assignmentTypes) {

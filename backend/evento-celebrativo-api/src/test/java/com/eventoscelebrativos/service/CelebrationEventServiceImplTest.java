@@ -1311,7 +1311,84 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldNotValidateAvailabilityWhenEventRangeIsUnchanged() {
+    void shouldNeverValidateAvailabilityForRetainedPersonWhenFunctionChangesOnScaleUpdate() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(event, retainedPerson, EventAssignmentType.READER)
+        ));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any()))
+                .thenReturn(List.of(eligible(retainedPerson, MinistryType.COMMENTATOR)));
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
+
+        // Mesma pessoa (3L), agora como comentarista em vez de leitor: a funcao mudou, mas a pessoa
+        // continua retida (ja estava atribuida ao evento) e nunca deve ser validada contra indisponibilidade.
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, List.of(3L), null, null));
+
+        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
+        verify(eventAssignmentCommandService).synchronizeAssignments(eq(event), anyList(), anyList());
+    }
+
+    @Test
+    void shouldOnlyValidateNewPersonWhenRetainedPersonCoexistsWithNewPersonOnScaleUpdate() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
+        Person newPerson = person(new Person(), 8L, "Padre Novo");
+        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(event, retainedPerson, EventAssignmentType.READER)
+        ));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
+                eligible(retainedPerson, MinistryType.READER),
+                eligible(newPerson, MinistryType.PRIEST)
+        ));
+        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
+
+        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, List.of(3L), null, null, null));
+
+        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                eq(Map.of(8L, Set.of(EventAssignmentType.PRIEST))), eq(EVENT_START_AT), eq(EVENT_END_AT));
+    }
+
+    @Test
+    void shouldRollBackEntireScaleUpdateWhenNewPersonIsUnavailableEvenIfRetainedPersonAlsoConflicts() {
+        CelebrationEvent event = event(1L);
+        Location location = location(1L);
+        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
+        Person newUnavailablePerson = person(new Person(), 8L, "Padre Indisponivel");
+
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
+                eventAssignment(event, retainedPerson, EventAssignmentType.READER)
+        ));
+        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
+        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
+                eligible(retainedPerson, MinistryType.READER),
+                eligible(newUnavailablePerson, MinistryType.PRIEST)
+        ));
+        PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
+        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(
+                eq(Map.of(8L, Set.of(EventAssignmentType.PRIEST))), eq(EVENT_START_AT), eq(EVENT_END_AT));
+
+        assertThrows(PersonUnavailableForEventException.class, () -> service.updateEventScale(
+                1L, new CelebrationEventScaleRequestDTO(1L, 8L, List.of(3L), null, null, null)));
+
+        // Mesmo com a pessoa retida (3L) tambem em conflito, a rejeicao da pessoa nova (8L) deve
+        // impedir totalmente a sincronizacao da escala: nao ha persistencia parcial.
+        verifyNoInteractions(eventAssignmentCommandService);
+    }
+
+    @Test
+    void shouldNeverValidateAvailabilityForCurrentPeopleWhenEventRangeIsUnchanged() {
         CelebrationEvent existingEvent = event(1L);
         CelebrationEvent saved = event(1L);
         CelebrationEventResponseDTO responseDto = response(1L);
@@ -1327,10 +1404,11 @@ class CelebrationEventServiceImplTest {
         assertSame(responseDto, service.updateEvent(1L, sameRange));
 
         verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
-    void shouldRevalidateAvailabilityWhenOnlyStartAtChanges() {
+    void shouldPersistNewRangeWithoutValidatingAvailabilityWhenOnlyStartAtChanges() {
         CelebrationEvent existingEvent = event(1L);
         LocalDateTime newStartAt = EVENT_START_AT.plusMinutes(15);
         CelebrationEventRequestDTO request =
@@ -1346,50 +1424,37 @@ class CelebrationEventServiceImplTest {
 
         service.updateEvent(1L, request);
 
-        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
-                any(), eq(newStartAt), eq(EVENT_END_AT));
+        verify(mapper).updateCelebrationEventMapperFromDto(request, existingEvent);
+        verify(repository).save(existingEvent);
+        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
     }
 
     @Test
-    void shouldRevalidateAvailabilityWhenOnlyEndAtChanges() {
+    void shouldAllowRangeChangeEvenWhenAssignedPersonBecomesUnavailablePreservingAssignmentAndParticipation() {
+        // Regra desta branch: alterar startAt/endAt nunca bloqueia por indisponibilidade de pessoa ja
+        // atribuida (secao 12). O conflito passa a ser derivado nas consultas administrativas, nao
+        // bloqueante aqui. O assignment e a participacao permanecem intocados por updateEvent.
         CelebrationEvent existingEvent = event(1L);
-        LocalDateTime newEndAt = EVENT_END_AT.plusMinutes(30);
-        CelebrationEventRequestDTO request =
-                new CelebrationEventRequestDTO("Missa", EVENT_START_AT, newEndAt, true);
+        LocalDateTime newStartAt = EVENT_START_AT.plusDays(5);
+        LocalDateTime newEndAt = EVENT_END_AT.plusDays(5);
+        CelebrationEventRequestDTO changedDateRequest = new CelebrationEventRequestDTO("Missa", newStartAt, newEndAt, true);
         Person assignedPerson = person(new Person(), 3L, "Leitor");
+        CelebrationEventResponseDTO responseDto = response(1L);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
                 eventAssignment(existingEvent, assignedPerson, EventAssignmentType.READER)
         ));
         when(repository.save(existingEvent)).thenReturn(existingEvent);
-        when(mapper.toDto(existingEvent)).thenReturn(response(1L));
+        when(mapper.toDto(existingEvent)).thenReturn(responseDto);
 
-        service.updateEvent(1L, request);
+        assertSame(responseDto, service.updateEvent(1L, changedDateRequest));
 
-        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
-                any(), eq(EVENT_START_AT), eq(newEndAt));
-    }
-
-    @Test
-    void shouldRejectEventRangeChangeWhenAssignedPersonIsUnavailablePreservingOriginalRange() {
-        CelebrationEvent existingEvent = event(1L);
-        LocalDateTime newStartAt = EVENT_START_AT.plusDays(5);
-        LocalDateTime newEndAt = EVENT_END_AT.plusDays(5);
-        CelebrationEventRequestDTO changedDateRequest = new CelebrationEventRequestDTO("Missa", newStartAt, newEndAt, true);
-
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
-        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
-                eventAssignment(existingEvent, person(new Person(), 3L, "Leitor"), EventAssignmentType.READER)
-        ));
-        PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(newStartAt), eq(newEndAt));
-
-        assertThrows(PersonUnavailableForEventException.class, () -> service.updateEvent(1L, changedDateRequest));
-
-        assertEquals(EVENT_START_AT, existingEvent.getStartAt());
-        assertEquals(EVENT_END_AT, existingEvent.getEndAt());
-        verify(repository, never()).save(any());
+        verify(mapper).updateCelebrationEventMapperFromDto(changedDateRequest, existingEvent);
+        verify(repository).save(existingEvent);
+        verify(personUnavailabilityConflictService).lockPersonsInOrder(List.of(3L));
+        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
+        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     private CelebrationEventRequestDTO request() {

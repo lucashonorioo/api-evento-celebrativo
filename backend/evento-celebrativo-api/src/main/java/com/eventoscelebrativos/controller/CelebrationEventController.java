@@ -9,8 +9,11 @@ import com.eventoscelebrativos.dto.response.CelebrationEventScaleParticipationDe
 import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.dto.response.ScheduleUnavailabilityConflictResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.service.CelebrationEventService;
+import com.eventoscelebrativos.service.ScheduleUnavailabilityConflictService;
 import com.eventoscelebrativos.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,6 +30,10 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.List;
 
 @RestController
@@ -34,10 +41,19 @@ import java.util.List;
 @Tag(name = "Eventos", description = "Gerenciamento de eventos celebrativos e escalas")
 public class CelebrationEventController {
 
-    private final CelebrationEventService celebrationEventService;
+    private static final DateTimeFormatter CANONICAL_DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss")
+                    .withResolverStyle(ResolverStyle.STRICT);
 
-    public CelebrationEventController(CelebrationEventService celebrationEventService) {
+    private final CelebrationEventService celebrationEventService;
+    private final ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
+
+    public CelebrationEventController(
+            CelebrationEventService celebrationEventService,
+            ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService
+    ) {
         this.celebrationEventService = celebrationEventService;
+        this.scheduleUnavailabilityConflictService = scheduleUnavailabilityConflictService;
     }
 
     @Operation(summary = "Cria um evento celebrativo")
@@ -175,6 +191,54 @@ public class CelebrationEventController {
     public ResponseEntity<Void> deleteEventById(@PathVariable Long id){
         celebrationEventService.deleteEventById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Consulta os conflitos derivados entre a escala de um evento e indisponibilidades pessoais. "
+            + "Um conflito nao bloqueia nem altera o assignment; e apenas exibido ate deixar de existir naturalmente. "
+            + "Evento encerrado retorna lista vazia.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/{eventId}/escala/conflitos-indisponibilidade")
+    public ResponseEntity<List<ScheduleUnavailabilityConflictResponseDTO>> findScheduleUnavailabilityConflictsByEvent(
+            @PathVariable Long eventId
+    ) {
+        List<ScheduleUnavailabilityConflictResponseDTO> conflicts =
+                scheduleUnavailabilityConflictService.findByEventId(eventId);
+        return ResponseEntity.ok(conflicts);
+    }
+
+    @Operation(summary = "Consulta paginada dos conflitos derivados entre escalas e indisponibilidades pessoais em um "
+            + "intervalo [startAt, endAt). Considera somente eventos ainda ativos (endAt no presente ou futuro).")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/escala/conflitos-indisponibilidade")
+    public ResponseEntity<Page<ScheduleUnavailabilityConflictResponseDTO>> findScheduleUnavailabilityConflictsByRange(
+            @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("startAt") String startAt,
+            @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
+            @RequestParam("endAt") String endAt,
+            @Parameter(description = "Número da página, iniciando em 0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Quantidade de registros por página. Máximo: 100")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<ScheduleUnavailabilityConflictResponseDTO> conflicts = scheduleUnavailabilityConflictService.findByRange(
+                parseCanonicalDateTime(startAt),
+                parseCanonicalDateTime(endAt),
+                page,
+                size
+        );
+        return ResponseEntity.ok(conflicts);
+    }
+
+    private LocalDateTime parseCanonicalDateTime(String value) {
+        try {
+            return LocalDateTime.parse(value, CANONICAL_DATE_TIME_FORMATTER);
+        } catch (DateTimeParseException exception) {
+            throw new BadRequestException(
+                    "Data e hora inválidas. Use o formato yyyy-MM-dd'T'HH:mm:ss sem offset ou frações."
+            );
+        }
     }
 
 }
