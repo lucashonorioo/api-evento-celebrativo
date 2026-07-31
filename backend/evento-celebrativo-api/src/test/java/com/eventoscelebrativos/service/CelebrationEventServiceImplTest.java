@@ -12,6 +12,7 @@ import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
@@ -55,6 +56,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -432,7 +434,7 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldAllowParallelEventScaleWithSamePersonInDifferentAssignmentTypes() {
+    void shouldRejectParallelEventScaleWithSamePersonInDifferentAssignmentTypes() {
         CelebrationEvent event = event(1L);
         event.getLocations().add(location(1L));
         when(repository.findByIdWithLocations(1L)).thenReturn(Optional.of(event));
@@ -440,16 +442,9 @@ class CelebrationEventServiceImplTest {
                 snapshot(100L, 1L, 10L, EventAssignmentType.READER, "Pessoa", "reader"),
                 snapshot(101L, 1L, 10L, EventAssignmentType.COMMENTATOR, "Pessoa", "reader")
         ));
-        when(scaleDetailMapper.toDto(eq(event), any(Location.class), any(EventAssignmentGroup.class)))
-                .thenReturn(detailResponse());
 
-        service.findScaleByEventId(1L);
-
-        ArgumentCaptor<EventAssignmentGroup> groupCaptor = ArgumentCaptor.forClass(EventAssignmentGroup.class);
-        verify(scaleDetailMapper).toDto(eq(event), any(Location.class), groupCaptor.capture());
-        EventAssignmentGroup group = groupCaptor.getValue();
-        assertEquals(List.of(10L), group.readers().stream().map(EventAssignmentSnapshot::personId).toList());
-        assertEquals(List.of(10L), group.commentators().stream().map(EventAssignmentSnapshot::personId).toList());
+        assertThrows(BusinessException.class, () -> service.findScaleByEventId(1L));
+        verifyNoInteractions(scaleDetailMapper);
     }
 
     @Test
@@ -974,7 +969,7 @@ class CelebrationEventServiceImplTest {
                 new EventAssignmentTarget(ministerOfTheWord, EventAssignmentType.MINISTER_OF_THE_WORD),
                 new EventAssignmentTarget(eucharisticMinister, EventAssignmentType.EUCHARISTIC_MINISTER)
         );
-        verify(eventAssignmentCommandService).synchronizeAssignments(event, expectedTargets);
+        verify(eventAssignmentCommandService).synchronizeAssignments(event, List.of(), expectedTargets);
     }
 
     @Test
@@ -1001,11 +996,11 @@ class CelebrationEventServiceImplTest {
         ));
 
         List<EventAssignmentTarget> expectedTargets = List.of(new EventAssignmentTarget(priest, EventAssignmentType.PRIEST));
-        verify(eventAssignmentCommandService).synchronizeAssignments(any(CelebrationEvent.class), eq(expectedTargets));
+        verify(eventAssignmentCommandService).synchronizeAssignments(any(CelebrationEvent.class), eq(List.of()), eq(expectedTargets));
 
         InOrder inOrder = inOrder(repository, eventAssignmentCommandService);
         inOrder.verify(repository).save(any(CelebrationEvent.class));
-        inOrder.verify(eventAssignmentCommandService).synchronizeAssignments(any(), any());
+        inOrder.verify(eventAssignmentCommandService).synchronizeAssignments(any(), any(), any());
     }
 
     @Test
@@ -1023,7 +1018,7 @@ class CelebrationEventServiceImplTest {
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, null, null, null));
 
         assertEquals(List.of(newLocation), event.getLocations());
-        verify(eventAssignmentCommandService).synchronizeAssignments(event, List.of());
+        verify(eventAssignmentCommandService).synchronizeAssignments(event, List.of(), List.of());
     }
 
     @Test
@@ -1036,7 +1031,7 @@ class CelebrationEventServiceImplTest {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
-        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
+        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any(), any());
 
         RuntimeException result = assertThrows(RuntimeException.class, () ->
                 service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
@@ -1057,7 +1052,7 @@ class CelebrationEventServiceImplTest {
             return event;
         });
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
-        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
+        doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any(), any());
 
         RuntimeException result = assertThrows(RuntimeException.class, () ->
                 service.createEventWithScale(eventWithScaleRequest()));
@@ -1104,6 +1099,7 @@ class CelebrationEventServiceImplTest {
 
         verify(eventAssignmentCommandService).synchronizeAssignments(
                 event,
+                List.of(),
                 List.of(new EventAssignmentTarget(personWithPriestMinistry, EventAssignmentType.PRIEST))
         );
     }
@@ -1149,15 +1145,52 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldThrowBusinessExceptionWhenScaleListHasDuplicatedIds() {
+    void shouldThrowMultipleAssignmentsExceptionWhenScaleListHasDuplicatedIds() {
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event(1L)));
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
 
         CelebrationEventScaleRequestDTO request =
                 new CelebrationEventScaleRequestDTO(1L, null, List.of(2L, 2L), null, null, null);
 
-        assertThrows(BusinessException.class, () -> service.updateEventScale(1L, request));
-        verifyNoInteractions(personMinistryEligibilityResolver);
+        MultipleAssignmentsForPersonInEventException exception = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> service.updateEventScale(1L, request));
+        assertEquals(1L, exception.getEventId());
+        assertEquals(2L, exception.getPersonId());
+        verifyNoInteractions(locationRepository, personMinistryEligibilityResolver);
+    }
+
+    @Test
+    void shouldThrowMultipleAssignmentsExceptionWhenPriestIdAlsoAppearsInAnotherList() {
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event(1L)));
+
+        CelebrationEventScaleRequestDTO request =
+                new CelebrationEventScaleRequestDTO(1L, 8L, List.of(8L), null, null, null);
+
+        MultipleAssignmentsForPersonInEventException exception = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> service.updateEventScale(1L, request));
+        assertEquals(1L, exception.getEventId());
+        assertEquals(8L, exception.getPersonId());
+        assertEquals(Set.of(EventAssignmentType.PRIEST, EventAssignmentType.READER), exception.getConflictingAssignmentTypes());
+        verifyNoInteractions(locationRepository, personMinistryEligibilityResolver);
+    }
+
+    @Test
+    void shouldThrowMultipleAssignmentsExceptionWhenSamePersonAppearsInTwoDifferentLists() {
+        CelebrationEventWithScaleRequestDTO request = new CelebrationEventWithScaleRequestDTO();
+        request.setNameMassOrEvent("Missa");
+        request.setStartAt(EVENT_START_AT);
+        request.setEndAt(EVENT_END_AT);
+        request.setMassOrCelebration(true);
+        request.setLocationId(1L);
+        request.setReaderIds(List.of(8L));
+        request.setCommentatorIds(List.of(8L));
+
+        MultipleAssignmentsForPersonInEventException exception = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> service.createEventWithScale(request));
+        assertNull(exception.getEventId());
+        assertEquals(8L, exception.getPersonId());
+        assertEquals(Set.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR), exception.getConflictingAssignmentTypes());
+        verify(repository, never()).save(any());
+        verifyNoInteractions(locationRepository, personMinistryEligibilityResolver, eventAssignmentCommandService);
     }
 
     @Test
@@ -1188,33 +1221,6 @@ class CelebrationEventServiceImplTest {
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
         verifyNoInteractions(eventAssignmentCommandService);
-    }
-
-    @Test
-    void shouldAllowSamePersonInMultipleAssignmentTypesWhenEligibleForBoth() {
-        CelebrationEvent event = event(1L);
-        Location location = location(1L);
-        Person priestAndReader = person(new Person(), 8L, "Padre Leitor");
-        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
-
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
-                eligible(priestAndReader, MinistryType.PRIEST),
-                eligible(priestAndReader, MinistryType.READER)
-        ));
-        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
-
-        CelebrationEventScaleRequestDTO request =
-                new CelebrationEventScaleRequestDTO(1L, 8L, List.of(8L), null, null, null);
-
-        assertSame(response, service.updateEventScale(1L, request));
-
-        List<EventAssignmentTarget> expectedTargets = List.of(
-                new EventAssignmentTarget(priestAndReader, EventAssignmentType.PRIEST),
-                new EventAssignmentTarget(priestAndReader, EventAssignmentType.READER)
-        );
-        verify(eventAssignmentCommandService).synchronizeAssignments(event, expectedTargets);
     }
 
     @Test

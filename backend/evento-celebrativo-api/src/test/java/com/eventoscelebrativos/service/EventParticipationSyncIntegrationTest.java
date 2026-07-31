@@ -62,37 +62,6 @@ class EventParticipationSyncIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void shouldPreserveParticipationResponseWhenOnlyOneOfTwoFunctionsIsRemoved() {
-        Long eventId = null;
-        Long locationId = null;
-        Long personId = null;
-        try {
-            Person person = savePersonWithMinistries("Sync Preserve Person", MinistryType.READER, MinistryType.COMMENTATOR);
-            personId = person.getId();
-            Location location = locationRepository.saveAndFlush(location("Sync Preserve Church"));
-            locationId = location.getId();
-
-            eventId = celebrationEventService.createEventWithScale(
-                    eventRequest("Sync Preserve Event", locationId, List.of(personId), List.of(personId))
-            ).getEventId();
-            respond(person.getPhoneNumber(), eventId, "CONFIRMED", null);
-            EventParticipationResponse before = findResponse(eventId, personId).orElseThrow();
-
-            celebrationEventService.updateEventScale(
-                    eventId, new CelebrationEventScaleRequestDTO(locationId, null, List.of(personId), null, null, null)
-            );
-
-            EventParticipationResponse after = findResponse(eventId, personId).orElseThrow();
-            assertEquals(before.getId(), after.getId());
-            assertEquals(ParticipationStatus.CONFIRMED, after.getStatus());
-        } finally {
-            cleanupEvent(eventId);
-            cleanupPerson(personId);
-            cleanupLocation(locationId);
-        }
-    }
-
-    @Test
     void shouldRemoveParticipationResponseWhenAllFunctionsAreRemoved() {
         Long eventId = null;
         Long locationId = null;

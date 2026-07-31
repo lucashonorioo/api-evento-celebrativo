@@ -134,7 +134,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
             locationId = location.getId();
             long eventsBefore = countAllEvents();
             RuntimeException failure = new IllegalStateException("official assignment write failed");
-            doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
+            doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any(), any());
 
             CelebrationEventWithScaleRequestDTO request = eventRequest(
                     "Official Write Failure Create Mass", locationId, priestId, null, null, null, null
@@ -169,7 +169,7 @@ class EventAssignmentOfficialWriteIntegrationTest {
             int assignmentsBefore = countRows("tb_event_assignment", "event_id", eventId);
 
             RuntimeException failure = new IllegalStateException("official assignment write failed");
-            doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any());
+            doThrow(failure).when(eventAssignmentCommandService).synchronizeAssignments(any(), any(), any());
 
             Long finalEventId = eventId;
             Long finalLocationId = locationId;

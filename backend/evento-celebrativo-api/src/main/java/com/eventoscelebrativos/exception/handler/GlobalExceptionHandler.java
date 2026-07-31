@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.exception.error.ErrorResponse;
+import com.eventoscelebrativos.exception.error.MultipleAssignmentsForPersonInEventErrorResponse;
 import com.eventoscelebrativos.exception.error.PersonUnavailableForEventErrorResponse;
 import com.eventoscelebrativos.exception.error.UnavailabilityAssignmentConflictErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
@@ -20,6 +21,7 @@ import java.time.Instant;
 public class GlobalExceptionHandler {
 
     private static final String UNAVAILABILITY_UNIQUE_CONSTRAINT = "uk_tb_person_unavailability_person_range";
+    private static final String EVENT_ASSIGNMENT_UNIQUE_CONSTRAINT = "uk_tb_event_assignment_event_person";
 
     @ExceptionHandler(UnavailabilityAssignmentConflictException.class)
     public ResponseEntity<UnavailabilityAssignmentConflictErrorResponse> handleUnavailabilityAssignmentConflict(
@@ -47,6 +49,23 @@ public class GlobalExceptionHandler {
                 ex.getErrorCode(),
                 webRequest.getDescription(false),
                 ex.getConflicts()
+        );
+        return new ResponseEntity<>(errorResponse, ex.getStatus());
+    }
+
+    @ExceptionHandler(MultipleAssignmentsForPersonInEventException.class)
+    public ResponseEntity<MultipleAssignmentsForPersonInEventErrorResponse> handleMultipleAssignmentsForPersonInEvent(
+            MultipleAssignmentsForPersonInEventException ex, WebRequest webRequest
+    ) {
+        MultipleAssignmentsForPersonInEventErrorResponse errorResponse = new MultipleAssignmentsForPersonInEventErrorResponse(
+                Instant.now(),
+                ex.getStatus().value(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                webRequest.getDescription(false),
+                ex.getEventId(),
+                ex.getPersonId(),
+                ex.getConflictingAssignmentTypes()
         );
         return new ResponseEntity<>(errorResponse, ex.getStatus());
     }
@@ -115,6 +134,16 @@ public class GlobalExceptionHandler {
                     status.value(),
                     "O período informado se sobrepõe a uma indisponibilidade já cadastrada.",
                     "UNAVAILABILITY_OVERLAP",
+                    webRequest.getDescription(false)
+            );
+            return ResponseEntity.status(status).body(errorResponse);
+        }
+        if (rootCauseMessage != null && rootCauseMessage.toLowerCase().contains(EVENT_ASSIGNMENT_UNIQUE_CONSTRAINT)) {
+            ErrorResponse errorResponse = new ErrorResponse(
+                    Instant.now(),
+                    status.value(),
+                    "A pessoa não pode exercer mais de uma função no mesmo evento.",
+                    "MULTIPLE_ASSIGNMENTS_FOR_PERSON_IN_EVENT",
                     webRequest.getDescription(false)
             );
             return ResponseEntity.status(status).body(errorResponse);

@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -28,7 +29,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EventAssignmentCommandServiceImplTest {
@@ -45,11 +45,9 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldHandleEventWithoutAssignments() {
         CelebrationEvent event = event(1L);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
 
-        service.synchronizeAssignments(event, List.of());
+        service.synchronizeAssignments(event, List.of(), List.of());
 
-        verify(eventAssignmentRepository).findAllByEventId(1L);
         verify(eventAssignmentRepository, never()).saveAll(anyCollection());
         verify(eventAssignmentRepository, never()).deleteAll(anyCollection());
     }
@@ -59,9 +57,8 @@ class EventAssignmentCommandServiceImplTest {
         CelebrationEvent event = event(1L);
         Person priest = person(new Person(), 10L);
         Person reader = person(new Person(), 11L);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
 
-        service.synchronizeAssignments(event, List.of(
+        service.synchronizeAssignments(event, List.of(), List.of(
                 new EventAssignmentTarget(priest, EventAssignmentType.PRIEST),
                 new EventAssignmentTarget(reader, EventAssignmentType.READER)
         ));
@@ -80,9 +77,9 @@ class EventAssignmentCommandServiceImplTest {
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(existing));
 
-        service.synchronizeAssignments(event, List.of(new EventAssignmentTarget(reader, EventAssignmentType.READER)));
+        service.synchronizeAssignments(event, List.of(existing),
+                List.of(new EventAssignmentTarget(reader, EventAssignmentType.READER)));
 
         assertEquals(100L, existing.getId());
         assertEquals(createdAt, existing.getCreatedAt());
@@ -98,9 +95,8 @@ class EventAssignmentCommandServiceImplTest {
         Person added = person(new Person(), 13L);
         EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
         EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(keptAssignment, removedAssignment));
 
-        service.synchronizeAssignments(event, List.of(
+        service.synchronizeAssignments(event, List.of(keptAssignment, removedAssignment), List.of(
                 new EventAssignmentTarget(kept, EventAssignmentType.READER),
                 new EventAssignmentTarget(added, EventAssignmentType.READER)
         ));
@@ -120,9 +116,9 @@ class EventAssignmentCommandServiceImplTest {
         Person oldPriest = person(new Person(), 10L);
         Person newPriest = person(new Person(), 20L);
         EventAssignment oldAssignment = assignment(100L, event, oldPriest, EventAssignmentType.PRIEST);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(oldAssignment));
 
-        service.synchronizeAssignments(event, List.of(new EventAssignmentTarget(newPriest, EventAssignmentType.PRIEST)));
+        service.synchronizeAssignments(event, List.of(oldAssignment),
+                List.of(new EventAssignmentTarget(newPriest, EventAssignmentType.PRIEST)));
 
         ArgumentCaptor<Collection<EventAssignment>> saveCaptor = collectionCaptor();
         ArgumentCaptor<Collection<EventAssignment>> deleteCaptor = collectionCaptor();
@@ -133,63 +129,25 @@ class EventAssignmentCommandServiceImplTest {
     }
 
     @Test
-    void shouldRemoveOldPairAndCreateNewPairWhenSamePersonChangesFunction() {
+    void shouldUpdateAssignmentTypeInPlaceWhenSamePersonChangesFunctionPreservingIdAndCreatedAt() {
         CelebrationEvent event = event(1L);
         Person reader = person(new Person(), 11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(existing));
 
-        service.synchronizeAssignments(event, List.of(new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)));
+        service.synchronizeAssignments(event, List.of(existing),
+                List.of(new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)));
 
-        ArgumentCaptor<Collection<EventAssignment>> saveCaptor = collectionCaptor();
-        ArgumentCaptor<Collection<EventAssignment>> deleteCaptor = collectionCaptor();
-        verify(eventAssignmentRepository).saveAll(saveCaptor.capture());
-        verify(eventAssignmentRepository).deleteAll(deleteCaptor.capture());
-        assertEquals(List.of(EventAssignmentType.COMMENTATOR),
-                saveCaptor.getValue().stream().map(EventAssignment::getAssignmentType).toList());
-        assertTrue(deleteCaptor.getValue().contains(existing));
-    }
-
-    @Test
-    void shouldAddSecondFunctionForSamePersonWithoutRemovingTheFirst() {
-        CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
-        EventAssignment existingReaderAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(existingReaderAssignment));
-
-        service.synchronizeAssignments(event, List.of(
-                new EventAssignmentTarget(reader, EventAssignmentType.READER),
-                new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
-        ));
-
-        ArgumentCaptor<Collection<EventAssignment>> saveCaptor = collectionCaptor();
-        verify(eventAssignmentRepository).saveAll(saveCaptor.capture());
         verify(eventAssignmentRepository, never()).deleteAll(anyCollection());
-        assertEquals(List.of(EventAssignmentType.COMMENTATOR),
-                saveCaptor.getValue().stream().map(EventAssignment::getAssignmentType).toList());
-        assertEquals(100L, existingReaderAssignment.getId());
-    }
-
-    @Test
-    void shouldRemoveOnlyOneFunctionAndPreserveTheOtherWhenPersonHasTwoFunctions() {
-        CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
-        EventAssignment readerAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
-        EventAssignment commentatorAssignment = assignment(101L, event, reader, EventAssignmentType.COMMENTATOR);
-        when(eventAssignmentRepository.findAllByEventId(1L))
-                .thenReturn(List.of(readerAssignment, commentatorAssignment));
-
-        service.synchronizeAssignments(event, List.of(
-                new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
-        ));
-
-        ArgumentCaptor<Collection<EventAssignment>> deleteCaptor = collectionCaptor();
-        verify(eventAssignmentRepository).deleteAll(deleteCaptor.capture());
-        verify(eventAssignmentRepository, never()).saveAll(anyCollection());
-        assertTrue(deleteCaptor.getValue().contains(readerAssignment));
-        assertEquals(1, deleteCaptor.getValue().size());
+        ArgumentCaptor<Collection<EventAssignment>> saveCaptor = collectionCaptor();
+        verify(eventAssignmentRepository).saveAll(saveCaptor.capture());
+        assertEquals(1, saveCaptor.getValue().size());
+        EventAssignment saved = saveCaptor.getValue().iterator().next();
+        assertSame(existing, saved);
+        assertEquals(100L, saved.getId());
+        assertEquals(createdAt, saved.getCreatedAt());
+        assertEquals(EventAssignmentType.COMMENTATOR, saved.getAssignmentType());
     }
 
     @Test
@@ -197,9 +155,8 @@ class EventAssignmentCommandServiceImplTest {
         CelebrationEvent event = event(1L);
         Person reader = person(new Person(), 11L);
         EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(assignment));
 
-        service.synchronizeAssignments(event, List.of());
+        service.synchronizeAssignments(event, List.of(assignment), List.of());
 
         ArgumentCaptor<Collection<EventAssignment>> deleteCaptor = collectionCaptor();
         verify(eventAssignmentRepository).deleteAll(deleteCaptor.capture());
@@ -208,31 +165,25 @@ class EventAssignmentCommandServiceImplTest {
     }
 
     @Test
-    void shouldAllowSamePersonInTwoDifferentFunctionsInTheSameTarget() {
-        CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of());
-
-        service.synchronizeAssignments(event, List.of(
-                new EventAssignmentTarget(reader, EventAssignmentType.READER),
-                new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
-        ));
-
-        ArgumentCaptor<Collection<EventAssignment>> saveCaptor = collectionCaptor();
-        verify(eventAssignmentRepository).saveAll(saveCaptor.capture());
-        assertEquals(List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR),
-                saveCaptor.getValue().stream().map(EventAssignment::getAssignmentType).toList());
-    }
-
-    @Test
-    void shouldRejectRepeatedPersonAndTypePairBeforeSaving() {
+    void shouldRejectDuplicatePersonAcrossTargetsRegardlessOfAssignmentType() {
         CelebrationEvent event = event(1L);
         Person reader = person(new Person(), 11L);
 
-        assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event, List.of(
-                new EventAssignmentTarget(reader, EventAssignmentType.READER),
-                new EventAssignmentTarget(reader, EventAssignmentType.READER)
-        )));
+        MultipleAssignmentsForPersonInEventException sameType = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> service.synchronizeAssignments(event, List.of(), List.of(
+                        new EventAssignmentTarget(reader, EventAssignmentType.READER),
+                        new EventAssignmentTarget(reader, EventAssignmentType.READER)
+                )));
+        assertEquals(1L, sameType.getEventId());
+        assertEquals(11L, sameType.getPersonId());
+
+        MultipleAssignmentsForPersonInEventException differentType = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> service.synchronizeAssignments(event, List.of(), List.of(
+                        new EventAssignmentTarget(reader, EventAssignmentType.READER),
+                        new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
+                )));
+        assertEquals(Set.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR),
+                differentType.getConflictingAssignmentTypes());
 
         verifyNoMoreInteractions(eventAssignmentRepository);
     }
@@ -241,8 +192,8 @@ class EventAssignmentCommandServiceImplTest {
     void shouldRejectInvalidEventOrTarget() {
         Person reader = person(new Person(), 11L);
 
-        assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(null), List.of()));
-        assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(1L), List.of(
+        assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(null), List.of(), List.of()));
+        assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(1L), List.of(), List.of(
                 new EventAssignmentTarget(reader, null)
         )));
     }
@@ -269,34 +220,29 @@ class EventAssignmentCommandServiceImplTest {
         Person added = person(new Person(), 13L);
         EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
         EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(keptAssignment, removedAssignment));
 
-        service.synchronizeAssignments(event, List.of(
+        service.synchronizeAssignments(event, List.of(keptAssignment, removedAssignment), List.of(
                 new EventAssignmentTarget(kept, EventAssignmentType.READER),
                 new EventAssignmentTarget(added, EventAssignmentType.READER)
         ));
 
         ArgumentCaptor<Collection<Long>> personIdsCaptor = personIdCollectionCaptor();
         verify(eventParticipationResponseService).retainOnlyForPersonIds(eq(1L), personIdsCaptor.capture());
-        assertEquals(Set.of(11L, 13L), java.util.Set.copyOf(personIdsCaptor.getValue()));
+        assertEquals(Set.of(11L, 13L), Set.copyOf(personIdsCaptor.getValue()));
     }
 
     @Test
-    void shouldPreservePersonWithTwoFunctionsWhenOnlyOneFunctionRemains() {
+    void shouldRetainSamePersonWhenOnlyFunctionChanges() {
         CelebrationEvent event = event(1L);
         Person reader = person(new Person(), 11L);
-        EventAssignment readerAssignment = assignment(100L, event, reader, EventAssignmentType.READER);
-        EventAssignment commentatorAssignment = assignment(101L, event, reader, EventAssignmentType.COMMENTATOR);
-        when(eventAssignmentRepository.findAllByEventId(1L))
-                .thenReturn(List.of(readerAssignment, commentatorAssignment));
+        EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
 
-        service.synchronizeAssignments(event, List.of(
-                new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)
-        ));
+        service.synchronizeAssignments(event, List.of(existing),
+                List.of(new EventAssignmentTarget(reader, EventAssignmentType.COMMENTATOR)));
 
         ArgumentCaptor<Collection<Long>> personIdsCaptor = personIdCollectionCaptor();
         verify(eventParticipationResponseService).retainOnlyForPersonIds(eq(1L), personIdsCaptor.capture());
-        assertEquals(Set.of(11L), java.util.Set.copyOf(personIdsCaptor.getValue()));
+        assertEquals(Set.of(11L), Set.copyOf(personIdsCaptor.getValue()));
     }
 
     @Test
@@ -304,9 +250,8 @@ class EventAssignmentCommandServiceImplTest {
         CelebrationEvent event = event(1L);
         Person reader = person(new Person(), 11L);
         EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
-        when(eventAssignmentRepository.findAllByEventId(1L)).thenReturn(List.of(assignment));
 
-        service.synchronizeAssignments(event, List.of());
+        service.synchronizeAssignments(event, List.of(assignment), List.of());
 
         verify(eventParticipationResponseService).retainOnlyForPersonIds(1L, Set.of());
     }

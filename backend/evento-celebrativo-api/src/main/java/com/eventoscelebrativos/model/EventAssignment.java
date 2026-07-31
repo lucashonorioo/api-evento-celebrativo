@@ -21,8 +21,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "tb_event_assignment",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_tb_event_assignment_event_person_type",
-                columnNames = {"event_id", "person_id", "assignment_type"}
+                name = "uk_tb_event_assignment_event_person",
+                columnNames = {"event_id", "person_id"}
         )
 )
 public class EventAssignment {

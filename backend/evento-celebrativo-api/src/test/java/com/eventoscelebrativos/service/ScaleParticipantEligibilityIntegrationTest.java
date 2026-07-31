@@ -160,7 +160,7 @@ class ScaleParticipantEligibilityIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void shouldRejectSamePersonUsedInTwoRolesWhenOnlyOneMinistryIsActive() throws Exception {
+    void shouldRejectSamePersonUsedInTwoRolesBeforeCheckingMinistryEligibility() throws Exception {
         Long locationId = null;
         Long priestId = null;
         try {
@@ -176,7 +176,9 @@ class ScaleParticipantEligibilityIntegrationTest {
                                     "Eligibility Cross Role Mass", locationId, priest.getId(),
                                     List.of(priest.getId()), null, null, null
                             ))))
-                    .andExpect(status().isUnprocessableEntity());
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("MULTIPLE_ASSIGNMENTS_FOR_PERSON_IN_EVENT"))
+                    .andExpect(jsonPath("$.personId").value(priest.getId()));
 
             assertEquals(eventsBefore, countAllEvents());
         } finally {

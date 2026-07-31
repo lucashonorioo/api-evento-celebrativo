@@ -1,11 +1,13 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -75,41 +77,22 @@ class EventScaleAssignmentPlanTest {
         EventScaleAssignmentPlan.Builder builder = EventScaleAssignmentPlan.builder()
                 .add(reader, EventAssignmentType.READER);
 
-        assertThrows(BusinessException.class, () -> builder.add(reader, EventAssignmentType.READER));
+        MultipleAssignmentsForPersonInEventException exception = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> builder.add(reader, EventAssignmentType.READER));
+        assertEquals(1L, exception.getPersonId());
+        assertEquals(Set.of(EventAssignmentType.READER), exception.getConflictingAssignmentTypes());
     }
 
     @Test
-    void shouldAllowSamePersonInDifferentAssignmentTypes() {
+    void shouldRejectSamePersonAddedTwiceWithDifferentAssignmentTypes() {
         Person person = person(1L);
+        EventScaleAssignmentPlan.Builder builder = EventScaleAssignmentPlan.builder()
+                .add(person, EventAssignmentType.PRIEST);
 
-        EventScaleAssignmentPlan plan = EventScaleAssignmentPlan.builder()
-                .add(person, EventAssignmentType.PRIEST)
-                .add(person, EventAssignmentType.READER)
-                .build();
-
-        assertEquals(2, plan.entries().size());
-        assertEquals(
-                List.of(EventAssignmentType.PRIEST, EventAssignmentType.READER),
-                plan.entries().stream().map(EventScaleAssignmentPlan.Entry::assignmentType).toList()
-        );
-        assertEquals(List.of(person, person), plan.people());
-    }
-
-    @Test
-    void shouldAllowSamePersonInThreeAssignmentTypes() {
-        Person person = person(1L);
-
-        EventScaleAssignmentPlan plan = EventScaleAssignmentPlan.builder()
-                .add(person, EventAssignmentType.PRIEST)
-                .add(person, EventAssignmentType.READER)
-                .add(person, EventAssignmentType.COMMENTATOR)
-                .build();
-
-        assertEquals(3, plan.entries().size());
-        assertEquals(
-                List.of(EventAssignmentType.PRIEST, EventAssignmentType.READER, EventAssignmentType.COMMENTATOR),
-                plan.entries().stream().map(EventScaleAssignmentPlan.Entry::assignmentType).toList()
-        );
+        MultipleAssignmentsForPersonInEventException exception = assertThrows(
+                MultipleAssignmentsForPersonInEventException.class, () -> builder.add(person, EventAssignmentType.READER));
+        assertEquals(1L, exception.getPersonId());
+        assertEquals(Set.of(EventAssignmentType.PRIEST, EventAssignmentType.READER), exception.getConflictingAssignmentTypes());
     }
 
     @Test

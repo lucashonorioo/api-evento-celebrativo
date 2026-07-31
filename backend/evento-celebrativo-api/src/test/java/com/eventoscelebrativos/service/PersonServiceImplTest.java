@@ -883,7 +883,7 @@ class PersonServiceImplTest {
     }
 
     @Test
-    void shouldKeepMultipleAssignmentsSortedByEnumNaturalOrderWithoutDuplicates() {
+    void shouldAggregateAssignmentsAcrossDifferentEventsSortedByEnumNaturalOrder() {
         Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
@@ -897,18 +897,14 @@ class PersonServiceImplTest {
                         1
                 ));
         when(eventAssignmentRepository.findAssignmentTypesByPersonIdAndEventIdIn(10L, List.of(15L)))
-                .thenReturn(List.of(
-                        assignmentProjection(15L, "COMMENTATOR"),
-                        assignmentProjection(15L, "READER"),
-                        assignmentProjection(15L, "READER")
-                ));
+                .thenReturn(List.of(assignmentProjection(15L, "COMMENTATOR")));
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of());
 
         Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
 
         assertEquals(
-                List.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR),
+                List.of(EventAssignmentType.COMMENTATOR),
                 result.getContent().get(0).getAssignments()
         );
     }

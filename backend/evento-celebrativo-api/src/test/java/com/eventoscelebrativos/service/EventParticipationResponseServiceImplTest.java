@@ -306,23 +306,6 @@ class EventParticipationResponseServiceImplTest {
     }
 
     @Test
-    void shouldAcceptSinglePersonWithTwoFunctionsAsAssigned() {
-        Person person = person(10L, "34970000019");
-        CelebrationEvent event = futureEvent(15L);
-        EventAssignment readerAssignment = new EventAssignment(event, person, EventAssignmentType.READER);
-        EventAssignment commentatorAssignment = new EventAssignment(event, person, EventAssignmentType.COMMENTATOR);
-        when(personRepository.findByPhoneNumber("34970000019")).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
-        when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
-                .thenReturn(List.of(readerAssignment, commentatorAssignment));
-        when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
-
-        service.respond("34970000019", 15L, request("CONFIRMED", null));
-
-        verify(eventParticipationResponseRepository, times(1)).save(any());
-    }
-
-    @Test
     void shouldAllowResponseBeforeEventStart() {
         Person person = person(10L, "34970000020");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0));

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -140,7 +142,7 @@ class CurrentUserScheduleIntegrationTest {
     }
 
     @Test
-    void shouldReturnBothFunctionsInOneItemWhenPersonHasReaderAndCommentatorInSameEvent() throws Exception {
+    void shouldRejectPersistingReaderAndCommentatorForSamePersonInSameEvent() {
         Long personId = null;
         Long eventId = null;
         try {
@@ -150,14 +152,10 @@ class CurrentUserScheduleIntegrationTest {
             CelebrationEvent event = saveEvent("Isolation MultiFunction Event", LocalDate.of(2026, 8, 13));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
-            saveAssignment(event, personId, EventAssignmentType.COMMENTATOR);
 
-            mockMvc.perform(scheduleRequest(phone, "2026-08-01", "2026-08-31"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.totalElements").value(1))
-                    .andExpect(jsonPath("$.content[0].assignments[0]").value("READER"))
-                    .andExpect(jsonPath("$.content[0].assignments[1]").value("COMMENTATOR"))
-                    .andExpect(jsonPath("$.content[0].assignments.length()").value(2));
+            Long finalPersonId = personId;
+            assertThrows(DataIntegrityViolationException.class,
+                    () -> saveAssignment(event, finalPersonId, EventAssignmentType.COMMENTATOR));
         } finally {
             cleanupAssignments(eventId);
             cleanupPerson(personId);

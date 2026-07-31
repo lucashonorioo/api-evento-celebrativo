@@ -410,10 +410,10 @@ class CelebrationEventControllerTest {
     }
 
     @Test
-    void shouldShowSameParticipationDataForPersonInTwoFunctions() throws Exception {
+    void shouldShowParticipationDataAcrossDifferentCategories() throws Exception {
         CelebrationEventScaleParticipationDetailResponseDTO response = scaleParticipationResponse();
         response.setCommentators(List.of(new CelebrationEventScaleParticipationPersonResponseDTO(
-                4L, "Alice Lima", ParticipationStatus.CONFIRMED, null, null
+                6L, "Helena Oliveira", ParticipationStatus.CONFIRMED, null, null
         )));
         when(celebrationEventService.findScaleParticipationByEventId(1L)).thenReturn(response);
 
