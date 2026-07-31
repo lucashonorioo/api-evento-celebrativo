@@ -66,7 +66,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
         RuntimeException failure = new IllegalStateException("assignment write-through failed");
         doThrow(failure)
                 .when(eventAssignmentCommandService)
-                .synchronizeAssignments(any(), anyCollection());
+                .synchronizeAssignments(any(), anyCollection(), anyCollection());
         try {
             Person priest = savePriest("Assignment Rollback Create Person");
             priestId = priest.getId();
@@ -109,7 +109,7 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
             RuntimeException failure = new IllegalStateException("assignment update failed");
             doThrow(failure)
                     .when(eventAssignmentCommandService)
-                    .synchronizeAssignments(any(), anyCollection());
+                    .synchronizeAssignments(any(), anyCollection(), anyCollection());
 
             Long savedEventId = eventId;
             Long savedLocationId = locationId;

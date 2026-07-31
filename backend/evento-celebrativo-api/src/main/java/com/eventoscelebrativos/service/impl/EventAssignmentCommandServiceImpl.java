@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -13,12 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class EventAssignmentCommandServiceImpl implements EventAssignmentCommandService {
@@ -36,47 +36,48 @@ public class EventAssignmentCommandServiceImpl implements EventAssignmentCommand
 
     @Override
     @Transactional
-    public void synchronizeAssignments(CelebrationEvent event, Collection<EventAssignmentTarget> targets) {
+    public void synchronizeAssignments(
+            CelebrationEvent event,
+            Collection<EventAssignment> currentAssignments,
+            Collection<EventAssignmentTarget> targets
+    ) {
         validateEvent(event);
-        List<EventAssignmentTarget> validatedTargets = validateTargets(targets);
+        List<EventAssignmentTarget> validatedTargets = validateTargets(event.getId(), targets);
+        List<EventAssignment> current = currentAssignments == null ? List.of() : List.copyOf(currentAssignments);
 
-        List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventId(event.getId());
-        Map<PersonAssignmentTypeKey, EventAssignment> currentByPair = new HashMap<>();
-        for (EventAssignment assignment : currentAssignments) {
-            currentByPair.put(
-                    new PersonAssignmentTypeKey(assignment.getPerson().getId(), assignment.getAssignmentType()),
-                    assignment
-            );
+        Map<Long, EventAssignment> currentByPersonId = new HashMap<>();
+        for (EventAssignment assignment : current) {
+            currentByPersonId.put(assignment.getPerson().getId(), assignment);
         }
 
-        Set<PersonAssignmentTypeKey> targetPairs = new HashSet<>();
-        List<EventAssignment> assignmentsToSave = new ArrayList<>();
-
+        Map<Long, EventAssignmentTarget> targetByPersonId = new LinkedHashMap<>();
         for (EventAssignmentTarget target : validatedTargets) {
-            PersonAssignmentTypeKey key = new PersonAssignmentTypeKey(target.person().getId(), target.assignmentType());
-            targetPairs.add(key);
-            if (!currentByPair.containsKey(key)) {
-                assignmentsToSave.add(new EventAssignment(event, target.person(), target.assignmentType()));
-            }
+            targetByPersonId.put(target.person().getId(), target);
         }
 
-        List<EventAssignment> assignmentsToRemove = currentAssignments.stream()
-                .filter(assignment -> !targetPairs.contains(
-                        new PersonAssignmentTypeKey(assignment.getPerson().getId(), assignment.getAssignmentType())
-                ))
+        List<EventAssignment> assignmentsToRemove = current.stream()
+                .filter(assignment -> !targetByPersonId.containsKey(assignment.getPerson().getId()))
                 .toList();
-
         if (!assignmentsToRemove.isEmpty()) {
             eventAssignmentRepository.deleteAll(assignmentsToRemove);
+        }
+
+        List<EventAssignment> assignmentsToSave = new ArrayList<>();
+        for (Map.Entry<Long, EventAssignmentTarget> entry : targetByPersonId.entrySet()) {
+            EventAssignment existingAssignment = currentByPersonId.get(entry.getKey());
+            EventAssignmentType targetType = entry.getValue().assignmentType();
+            if (existingAssignment == null) {
+                assignmentsToSave.add(new EventAssignment(event, entry.getValue().person(), targetType));
+            } else if (existingAssignment.getAssignmentType() != targetType) {
+                existingAssignment.setAssignmentType(targetType);
+                assignmentsToSave.add(existingAssignment);
+            }
         }
         if (!assignmentsToSave.isEmpty()) {
             eventAssignmentRepository.saveAll(assignmentsToSave);
         }
 
-        Set<Long> finalPersonIds = targetPairs.stream()
-                .map(PersonAssignmentTypeKey::personId)
-                .collect(Collectors.toSet());
-        eventParticipationResponseService.retainOnlyForPersonIds(event.getId(), finalPersonIds);
+        eventParticipationResponseService.retainOnlyForPersonIds(event.getId(), targetByPersonId.keySet());
     }
 
     @Override
@@ -94,25 +95,25 @@ public class EventAssignmentCommandServiceImpl implements EventAssignmentCommand
         }
     }
 
-    private List<EventAssignmentTarget> validateTargets(Collection<EventAssignmentTarget> targets) {
+    private List<EventAssignmentTarget> validateTargets(Long eventId, Collection<EventAssignmentTarget> targets) {
         if (targets == null || targets.isEmpty()) {
             return List.of();
         }
 
         List<EventAssignmentTarget> validatedTargets = new ArrayList<>(targets.size());
-        Set<PersonAssignmentTypeKey> seenPairs = new HashSet<>();
+        Map<Long, EventAssignmentType> seenTypeByPersonId = new HashMap<>();
         for (EventAssignmentTarget target : targets) {
             if (target == null || target.person() == null || target.person().getId() == null || target.assignmentType() == null) {
                 throw new BusinessException("Pessoa e tipo de atribuicao do evento sao obrigatorios");
             }
-            if (!seenPairs.add(new PersonAssignmentTypeKey(target.person().getId(), target.assignmentType()))) {
-                throw new BusinessException("A mesma pessoa nao pode ocupar a mesma funcao duas vezes na mesma escala");
+            Long personId = target.person().getId();
+            EventAssignmentType existingType = seenTypeByPersonId.putIfAbsent(personId, target.assignmentType());
+            if (existingType != null) {
+                throw new MultipleAssignmentsForPersonInEventException(
+                        eventId, personId, EnumSet.of(existingType, target.assignmentType()));
             }
             validatedTargets.add(target);
         }
         return validatedTargets;
-    }
-
-    private record PersonAssignmentTypeKey(Long personId, EventAssignmentType assignmentType) {
     }
 }

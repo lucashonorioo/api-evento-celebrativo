@@ -91,18 +91,19 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
-    void shouldAllowSamePersonInDifferentAssignmentTypesForSameEvent() {
+    void shouldRejectSamePersonInDifferentAssignmentTypesForSameEvent() {
         CelebrationEvent event = saveEvent("Assignment Multi Function Event");
         Person reader = savePerson("Assignment Multi Function Reader", "34973000003");
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
 
-        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.COMMENTATOR));
-
-        assertEquals(2, eventAssignmentRepository.findAllByEventId(event.getId()).size());
+        assertThrows(DataIntegrityViolationException.class, () ->
+                eventAssignmentRepository.saveAndFlush(
+                        new EventAssignment(event, reader, EventAssignmentType.COMMENTATOR)
+                ));
     }
 
     @Test
-    void shouldEnforceUniqueEventPersonAndAssignmentType() {
+    void shouldEnforceUniqueEventPersonRegardlessOfAssignmentType() {
         CelebrationEvent event = saveEvent("Assignment Unique Event");
         Person reader = savePerson("Assignment Unique Reader", "34973000103");
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, reader, EventAssignmentType.READER));
@@ -380,30 +381,6 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
-    void shouldPaginateByDistinctEventNotByAssignmentRowAndCountDistinctEvents() {
-        Person reader = savePerson("Schedule Pagination Reader", "34974000011");
-        CelebrationEvent multiFunctionEvent = saveEvent("Schedule Pagination MultiFunction Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
-        CelebrationEvent secondEvent = saveEvent("Schedule Pagination Second Event", LocalDate.of(2026, 8, 6), LocalTime.of(10, 0));
-        saveAssignment(multiFunctionEvent, reader, EventAssignmentType.READER);
-        saveAssignment(multiFunctionEvent, reader, EventAssignmentType.COMMENTATOR);
-        saveAssignment(secondEvent, reader, EventAssignmentType.READER);
-        entityManager.flush();
-        entityManager.clear();
-
-        Page<PersonScheduleEventProjection> firstPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 0, 1);
-
-        assertEquals(2, firstPage.getTotalElements());
-        assertEquals(2, firstPage.getTotalPages());
-        assertEquals(1, firstPage.getContent().size());
-        assertEquals(multiFunctionEvent.getId(), firstPage.getContent().get(0).getEventId());
-
-        Page<PersonScheduleEventProjection> secondPage = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), 1, 1);
-
-        assertEquals(1, secondPage.getContent().size());
-        assertEquals(secondEvent.getId(), secondPage.getContent().get(0).getEventId());
-    }
-
-    @Test
     void shouldReturnEmptyPageWhenNoAssignmentInPeriod() {
         Person reader = savePerson("Schedule Empty Reader", "34974000012");
 
@@ -494,7 +471,7 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
-    void shouldPaginateDistinctEventsWhenEventCrossesMidnightWithMultipleAssignmentsAndOtherParticipants() {
+    void shouldPaginateDistinctEventsWhenEventCrossesMidnightWithOtherParticipants() {
         Person reader = savePerson("Schedule Midnight Combined Reader", "34974000027");
         Person otherParticipant = savePerson("Schedule Midnight Combined Other", "34974000028");
         CelebrationEvent midnightEvent = saveEvent("Schedule Midnight Combined Event", LocalDate.of(2026, 8, 9), LocalTime.of(23, 30));
@@ -502,7 +479,6 @@ class EventAssignmentRepositoryTest {
         Location location = saveLocation("Schedule Midnight Combined Church");
         attachLocation(midnightEvent, location);
         saveAssignment(midnightEvent, reader, EventAssignmentType.READER);
-        saveAssignment(midnightEvent, reader, EventAssignmentType.COMMENTATOR);
         saveAssignment(midnightEvent, otherParticipant, EventAssignmentType.PRIEST);
         saveAssignment(secondEvent, reader, EventAssignmentType.READER);
         entityManager.flush();
@@ -551,22 +527,6 @@ class EventAssignmentRepositoryTest {
 
         assertNull(result.getLocationId());
         assertNull(result.getLocationName());
-    }
-
-    @Test
-    void shouldGroupBothAssignmentTypesOfSamePersonInSameEvent() {
-        Person reader = savePerson("Schedule MultiFunction Reader", "34974000016");
-        CelebrationEvent event = saveEvent("Schedule MultiFunction Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
-        saveAssignment(event, reader, EventAssignmentType.READER);
-        saveAssignment(event, reader, EventAssignmentType.COMMENTATOR);
-        entityManager.flush();
-        entityManager.clear();
-
-        List<PersonScheduleAssignmentProjection> assignments = eventAssignmentRepository
-                .findAssignmentTypesByPersonIdAndEventIdIn(reader.getId(), List.of(event.getId()));
-
-        List<String> types = assignments.stream().map(PersonScheduleAssignmentProjection::getAssignmentType).sorted().toList();
-        assertEquals(List.of("COMMENTATOR", "READER"), types);
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
@@ -58,7 +59,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -303,19 +304,19 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     @Transactional
     public CelebrationEventScaleResponseDTO updateEventScale(Long id, CelebrationEventScaleRequestDTO celebrationEventScaleRequestDTO) {
         validateId(id);
-        // Mesmo cuidado de updateEvent: os IDs desejados vem direto do DTO (sem leitura ao banco) para
-        // que o lock das Persons ocorra antes de qualquer leitura simples (localizacao, elegibilidade
-        // de ministerio, indisponibilidade), preservando a validade do snapshot da transacao sob
-        // MySQL/InnoDB REPEATABLE READ.
+        // Mesmo cuidado de updateEvent: nenhuma leitura simples (nao bloqueante) pode ocorrer antes de
+        // todos os locks necessarios, preservando a validade do snapshot da transacao sob
+        // MySQL/InnoDB REPEATABLE READ. Ordem: evento -> assignments atuais -> pessoas.
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        List<Long> currentPersonIds = eventAssignmentRepository.findAllByEventIdForUpdate(id).stream()
-                .map(assignment -> assignment.getPerson().getId())
-                .toList();
+        List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
 
-        Set<Long> unionPersonIds = new TreeSet<>(currentPersonIds);
-        unionPersonIds.addAll(extractRequestedPersonIds(celebrationEventScaleRequestDTO));
+        Map<Long, EventAssignmentType> desiredAssignmentsByPersonId =
+                buildDesiredAssignments(id, celebrationEventScaleRequestDTO);
+
+        Set<Long> unionPersonIds = new TreeSet<>(desiredAssignmentsByPersonId.keySet());
+        currentAssignments.forEach(assignment -> unionPersonIds.add(assignment.getPerson().getId()));
         personUnavailabilityConflictService.lockPersonsInOrder(unionPersonIds);
 
         ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, celebrationEventScaleRequestDTO);
@@ -325,7 +326,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
-        eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, targets);
+        eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, currentAssignments, targets);
 
         return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
     }
@@ -342,9 +343,13 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         CelebrationEventScaleRequestDTO scaleRequest = toScaleRequest(celebrationEventWithScaleRequestDTO);
 
-        // IDs extraidos diretamente do DTO (sem leitura ao banco) para bloquear as Persons antes de
+        // Estado desejado construido e validado (sem leitura ao banco) antes de qualquer lock, para
+        // rejeitar duplicidades de pessoa o mais cedo possivel.
+        Map<Long, EventAssignmentType> desiredAssignmentsByPersonId = buildDesiredAssignments(null, scaleRequest);
+
+        // IDs extraidos do mapa ja validado (sem leitura ao banco) para bloquear as Persons antes de
         // qualquer leitura simples, pelo mesmo motivo de updateEventScale.
-        personUnavailabilityConflictService.lockPersonsInOrder(extractRequestedPersonIds(scaleRequest));
+        personUnavailabilityConflictService.lockPersonsInOrder(new TreeSet<>(desiredAssignmentsByPersonId.keySet()));
 
         ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, scaleRequest);
         EventScaleAssignmentPlan plan = planResult.plan();
@@ -355,26 +360,52 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         applyLocation(celebrationEvent, planResult.location());
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
 
-        eventAssignmentCommandService.synchronizeAssignments(savedEvent, targets);
+        eventAssignmentCommandService.synchronizeAssignments(savedEvent, List.of(), targets);
 
         return celebrationEventScaleMapper.toDto(savedEvent, plan);
     }
 
-    private Set<Long> extractRequestedPersonIds(CelebrationEventScaleRequestDTO dto) {
-        Set<Long> ids = new TreeSet<>();
-        if (dto.getPriestId() != null) {
-            ids.add(dto.getPriestId());
-        }
-        addAllNonNull(ids, dto.getReaderIds());
-        addAllNonNull(ids, dto.getCommentatorIds());
-        addAllNonNull(ids, dto.getMinisterOfTheWordIds());
-        addAllNonNull(ids, dto.getEucharisticMinisterIds());
-        return ids;
+    /**
+     * Constroi o estado final desejado da escala (uma unica funcao por pessoa) a partir de todas as
+     * listas do DTO em conjunto. eventId e null durante a criacao com escala, quando o evento ainda
+     * nao foi persistido.
+     */
+    private Map<Long, EventAssignmentType> buildDesiredAssignments(Long eventId, CelebrationEventScaleRequestDTO dto) {
+        Map<Long, EventAssignmentType> desiredAssignmentsByPersonId = new LinkedHashMap<>();
+        addDesiredAssignment(eventId, desiredAssignmentsByPersonId, dto.getPriestId(), EventAssignmentType.PRIEST);
+        addDesiredAssignments(eventId, desiredAssignmentsByPersonId, dto.getReaderIds(), EventAssignmentType.READER);
+        addDesiredAssignments(eventId, desiredAssignmentsByPersonId, dto.getCommentatorIds(), EventAssignmentType.COMMENTATOR);
+        addDesiredAssignments(eventId, desiredAssignmentsByPersonId, dto.getMinisterOfTheWordIds(), EventAssignmentType.MINISTER_OF_THE_WORD);
+        addDesiredAssignments(eventId, desiredAssignmentsByPersonId, dto.getEucharisticMinisterIds(), EventAssignmentType.EUCHARISTIC_MINISTER);
+        return desiredAssignmentsByPersonId;
     }
 
-    private void addAllNonNull(Set<Long> target, List<Long> source) {
-        if (source != null) {
-            target.addAll(source);
+    private void addDesiredAssignments(
+            Long eventId,
+            Map<Long, EventAssignmentType> desiredAssignmentsByPersonId,
+            List<Long> personIds,
+            EventAssignmentType assignmentType
+    ) {
+        if (personIds == null) {
+            return;
+        }
+        for (Long personId : personIds) {
+            addDesiredAssignment(eventId, desiredAssignmentsByPersonId, personId, assignmentType);
+        }
+    }
+
+    private void addDesiredAssignment(
+            Long eventId,
+            Map<Long, EventAssignmentType> desiredAssignmentsByPersonId,
+            Long personId,
+            EventAssignmentType assignmentType
+    ) {
+        if (personId == null) {
+            return;
+        }
+        EventAssignmentType existingType = desiredAssignmentsByPersonId.putIfAbsent(personId, assignmentType);
+        if (existingType != null) {
+            throw new MultipleAssignmentsForPersonInEventException(eventId, personId, EnumSet.of(existingType, assignmentType));
         }
     }
 
@@ -461,11 +492,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         List<Long> ministerOfTheWordIds = safeList(dto.getMinisterOfTheWordIds());
         List<Long> eucharisticMinisterIds = safeList(dto.getEucharisticMinisterIds());
 
-        validateNoDuplicatedIds(readerIds, "leitor");
-        validateNoDuplicatedIds(commentatorIds, "comentarista");
-        validateNoDuplicatedIds(ministerOfTheWordIds, "ministro da Palavra");
-        validateNoDuplicatedIds(eucharisticMinisterIds, "ministro da Eucaristia");
-
         Map<MinistryType, List<Long>> idsByMinistry = new EnumMap<>(MinistryType.class);
         idsByMinistry.put(MinistryType.PRIEST, optionalId(dto.getPriestId()));
         idsByMinistry.put(MinistryType.READER, readerIds);
@@ -489,15 +515,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
     private List<Long> optionalId(Long id) {
         return id == null ? List.of() : List.of(id);
-    }
-
-    private void validateNoDuplicatedIds(List<Long> ids, String roleName) {
-        Set<Long> seen = new HashSet<>();
-        for (Long id : ids) {
-            if (!seen.add(id)) {
-                throw new BusinessException("Não é permitido informar IDs duplicados para " + roleName);
-            }
-        }
     }
 
     private Map<MinistryType, Map<Long, ScaleParticipantEligibility>> groupEligibilityByMinistry(
