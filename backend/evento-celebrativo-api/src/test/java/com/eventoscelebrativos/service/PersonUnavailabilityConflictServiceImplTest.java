@@ -1,11 +1,11 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
-import com.eventoscelebrativos.dto.response.EventAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
+import com.eventoscelebrativos.dto.response.StartedAssignmentConflictDTO;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.exception.exceptions.UnavailabilityAssignmentConflictException;
+import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
@@ -89,44 +89,51 @@ class PersonUnavailabilityConflictServiceImplTest {
     }
 
     @Test
-    void shouldNotThrowWhenNoAssignmentConflictExists() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
+    void shouldNotThrowWhenNoStartedAssignmentConflictExists() {
+        LocalDateTime currentSecond = at(2026, 8, 9, 12, 0);
+        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
+                1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), currentSecond))
                 .thenReturn(List.of());
 
-        service.validateNoAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0));
+        service.validateNoStartedAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), currentSecond);
     }
 
     @Test
-    void shouldGroupAssignmentConflictsByEventAndOrderAssignmentsByEnumOrder() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
+    void shouldThrowWithSingularAssignmentTypeWhenStartedAssignmentConflictExists() {
+        LocalDateTime currentSecond = at(2026, 8, 15, 19, 30);
+        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
+                1L, at(2026, 8, 15, 19, 15), at(2026, 8, 15, 21, 0), currentSecond))
                 .thenReturn(List.of(
-                        conflictRow(15L, "Missa das 19h", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "COMMENTATOR"),
                         conflictRow(15L, "Missa das 19h", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER")
                 ));
 
-        UnavailabilityAssignmentConflictException exception = assertThrows(
-                UnavailabilityAssignmentConflictException.class,
-                () -> service.validateNoAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)));
+        UnavailabilityConflictWithStartedAssignmentException exception = assertThrows(
+                UnavailabilityConflictWithStartedAssignmentException.class,
+                () -> service.validateNoStartedAssignmentConflict(
+                        1L, at(2026, 8, 15, 19, 15), at(2026, 8, 15, 21, 0), currentSecond));
 
         assertEquals(1, exception.getConflicts().size());
-        EventAssignmentConflictDTO conflict = exception.getConflicts().get(0);
+        StartedAssignmentConflictDTO conflict = exception.getConflicts().get(0);
         assertEquals(15L, conflict.getEventId());
-        assertEquals(List.of("READER", "COMMENTATOR"), conflict.getAssignments());
+        assertEquals("READER", conflict.getAssignmentType());
     }
 
     @Test
     void shouldOrderMultipleEventConflictsByDateTimeThenId() {
-        when(eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0)))
+        LocalDateTime currentSecond = at(2026, 8, 15, 7, 0);
+        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
+                1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0), currentSecond))
                 .thenReturn(List.of(
                         conflictRow(20L, "Missa Tarde", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER"),
                         conflictRow(10L, "Missa Manha", at(2026, 8, 15, 8, 0), at(2026, 8, 15, 9, 0), "READER")
                 ));
 
-        UnavailabilityAssignmentConflictException exception = assertThrows(
-                UnavailabilityAssignmentConflictException.class,
-                () -> service.validateNoAssignmentConflict(1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0)));
+        UnavailabilityConflictWithStartedAssignmentException exception = assertThrows(
+                UnavailabilityConflictWithStartedAssignmentException.class,
+                () -> service.validateNoStartedAssignmentConflict(
+                        1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0), currentSecond));
 
-        assertEquals(List.of(10L, 20L), exception.getConflicts().stream().map(EventAssignmentConflictDTO::getEventId).toList());
+        assertEquals(List.of(10L, 20L), exception.getConflicts().stream().map(StartedAssignmentConflictDTO::getEventId).toList());
     }
 
     @Test

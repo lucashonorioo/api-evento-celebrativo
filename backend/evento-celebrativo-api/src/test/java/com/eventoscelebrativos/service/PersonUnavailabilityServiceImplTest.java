@@ -120,7 +120,7 @@ class PersonUnavailabilityServiceImplTest {
 
         assertEquals("Viagem", result.getReason());
         verify(personUnavailabilityConflictService).validateNoOverlap(10L, TODAY, TODAY.plusDays(2), null);
-        verify(personUnavailabilityConflictService).validateNoAssignmentConflict(10L, TODAY, TODAY.plusDays(2));
+        verify(personUnavailabilityConflictService).validateNoStartedAssignmentConflict(10L, TODAY, TODAY.plusDays(2), TODAY);
     }
 
     @Test
@@ -271,6 +271,19 @@ class PersonUnavailabilityServiceImplTest {
         assertEquals(TODAY.plusDays(3), result.getEndAt());
         assertEquals("Novo", result.getReason());
         verify(personUnavailabilityConflictService).validateNoOverlap(10L, TODAY, TODAY.plusDays(3), 1L);
+    }
+
+    @Test
+    void shouldValidateStartedAssignmentConflictWhenUpdatingUnavailabilityToNewRange() {
+        Person person = person(10L, "34970000012");
+        PersonUnavailability existing = existing(1L, person, TODAY, TODAY.plusDays(1), "Antigo");
+        when(personRepository.findByPhoneNumberForUpdate("34970000012")).thenReturn(Optional.of(person));
+        when(personUnavailabilityRepository.findByIdAndPersonId(1L, 10L)).thenReturn(Optional.of(existing));
+        when(personUnavailabilityRepository.save(existing)).thenReturn(existing);
+
+        service.update("34970000012", 1L, new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusDays(3), "Novo"));
+
+        verify(personUnavailabilityConflictService).validateNoStartedAssignmentConflict(10L, TODAY, TODAY.plusDays(3), TODAY);
     }
 
     @Test

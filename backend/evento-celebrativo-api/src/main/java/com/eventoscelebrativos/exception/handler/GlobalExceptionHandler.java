@@ -3,7 +3,7 @@ package com.eventoscelebrativos.exception.handler;
 import com.eventoscelebrativos.exception.error.ErrorResponse;
 import com.eventoscelebrativos.exception.error.MultipleAssignmentsForPersonInEventErrorResponse;
 import com.eventoscelebrativos.exception.error.PersonUnavailableForEventErrorResponse;
-import com.eventoscelebrativos.exception.error.UnavailabilityAssignmentConflictErrorResponse;
+import com.eventoscelebrativos.exception.error.UnavailabilityConflictWithStartedAssignmentErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -23,11 +23,11 @@ public class GlobalExceptionHandler {
     private static final String UNAVAILABILITY_UNIQUE_CONSTRAINT = "uk_tb_person_unavailability_person_range";
     private static final String EVENT_ASSIGNMENT_UNIQUE_CONSTRAINT = "uk_tb_event_assignment_event_person";
 
-    @ExceptionHandler(UnavailabilityAssignmentConflictException.class)
-    public ResponseEntity<UnavailabilityAssignmentConflictErrorResponse> handleUnavailabilityAssignmentConflict(
-            UnavailabilityAssignmentConflictException ex, WebRequest webRequest
+    @ExceptionHandler(UnavailabilityConflictWithStartedAssignmentException.class)
+    public ResponseEntity<UnavailabilityConflictWithStartedAssignmentErrorResponse> handleUnavailabilityConflictWithStartedAssignment(
+            UnavailabilityConflictWithStartedAssignmentException ex, WebRequest webRequest
     ) {
-        UnavailabilityAssignmentConflictErrorResponse errorResponse = new UnavailabilityAssignmentConflictErrorResponse(
+        UnavailabilityConflictWithStartedAssignmentErrorResponse errorResponse = new UnavailabilityConflictWithStartedAssignmentErrorResponse(
                 Instant.now(),
                 ex.getStatus().value(),
                 ex.getMessage(),

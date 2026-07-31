@@ -11,6 +11,9 @@ import com.eventoscelebrativos.dto.response.CelebrationEventScaleResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
+import com.eventoscelebrativos.dto.response.ScheduleConflictUnavailabilityResponseDTO;
+import com.eventoscelebrativos.dto.response.ScheduleUnavailabilityConflictResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -18,7 +21,10 @@ import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupporte
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.service.CelebrationEventService;
+import com.eventoscelebrativos.service.ScheduleUnavailabilityConflictService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -62,6 +68,9 @@ class CelebrationEventControllerTest {
 
     @MockitoBean
     private CelebrationEventService celebrationEventService;
+
+    @MockitoBean
+    private ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
 
     @TestConfiguration
     @EnableMethodSecurity
@@ -694,6 +703,202 @@ class CelebrationEventControllerTest {
                 eq(10),
                 eq(true)
         );
+    }
+
+    @Test
+    void shouldReturnConflictsByEventId() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByEventId(1L)).thenReturn(List.of(
+                new ScheduleUnavailabilityConflictResponseDTO(
+                        1L, "Missa de Domingo", EVENT_START_AT, EVENT_END_AT,
+                        4L, "Arthur Costa", "READER",
+                        List.of(new ScheduleConflictUnavailabilityResponseDTO(
+                                21L, EVENT_START_AT.minusMinutes(30), EVENT_END_AT.plusHours(1)))
+                )
+        ));
+
+        mockMvc.perform(get("/eventos/1/escala/conflitos-indisponibilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].eventId").value(1))
+                .andExpect(jsonPath("$[0].personId").value(4))
+                .andExpect(jsonPath("$[0].personName").value("Arthur Costa"))
+                .andExpect(jsonPath("$[0].assignmentType").value("READER"))
+                .andExpect(jsonPath("$[0].unavailabilities[0].id").value(21))
+                .andExpect(jsonPath("$[0].unavailabilities[0].reason").doesNotExist());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenEventHasNoConflicts() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByEventId(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/eventos/1/escala/conflitos-indisponibilidade"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenEventDoesNotExistForConflictsByEvent() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByEventId(99L))
+                .thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
+
+        mockMvc.perform(get("/eventos/99/escala/conflitos-indisponibilidade"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorRequestsConflictsByEvent() throws Exception {
+        mockMvc.perform(get("/eventos/1/escala/conflitos-indisponibilidade"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(scheduleUnavailabilityConflictService);
+    }
+
+    @Test
+    void shouldReturnPaginatedConflictsByRange() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(0), eq(10)
+        )).thenReturn(new PageImpl<>(List.of(
+                new ScheduleUnavailabilityConflictResponseDTO(
+                        1L, "Missa de Domingo", EVENT_START_AT, EVENT_END_AT,
+                        4L, "Arthur Costa", "READER", List.of())
+        ), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].eventId").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "2026-08-01T00:00:00.123",   // fracao de segundo
+            "2026-08-01T00:00:00Z",      // sufixo Z
+            "2026-08-01T00:00:00-03:00", // offset
+            "2026-08-01T00:00",          // sem segundos
+            "horario-invalido"           // texto invalido
+    })
+    void shouldRejectMalformedStartAtOnPaginatedConflictsQuery(String malformedStartAt) throws Exception {
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", malformedStartAt)
+                        .param("endAt", "2026-08-31T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+
+        verifyNoInteractions(scheduleUnavailabilityConflictService);
+    }
+
+    @Test
+    void shouldRejectMissingStartAtOnPaginatedConflictsQuery() throws Exception {
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("endAt", "2026-08-31T00:00:00"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(scheduleUnavailabilityConflictService);
+    }
+
+    @Test
+    void shouldRejectMissingEndAtOnPaginatedConflictsQuery() throws Exception {
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(scheduleUnavailabilityConflictService);
+    }
+
+    @Test
+    void shouldRejectEqualStartAtAndEndAtOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(0), eq(10)
+        )).thenThrow(new BadRequestException("startAt deve ser anterior a endAt"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-01T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void shouldRejectInvertedRangeOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(0), eq(10)
+        )).thenThrow(new BadRequestException("startAt deve ser anterior a endAt"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-31T00:00:00")
+                        .param("endAt", "2026-08-01T00:00:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void shouldRejectNegativePageOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(-1), eq(10)
+        )).thenThrow(new BadRequestException("O número da página deve ser maior ou igual a zero"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00")
+                        .param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void shouldRejectZeroSizeOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(0), eq(0)
+        )).thenThrow(new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00")
+                        .param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void shouldRejectNegativeSizeOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(0), eq(-5)
+        )).thenThrow(new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00")
+                        .param("size", "-5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void shouldRejectSizeAboveOneHundredOnPaginatedConflictsQuery() throws Exception {
+        when(scheduleUnavailabilityConflictService.findByRange(
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)), eq(LocalDateTime.of(2026, 8, 31, 0, 0)), eq(0), eq(101)
+        )).thenThrow(new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100"));
+
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00")
+                        .param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorRequestsPaginatedConflicts() throws Exception {
+        mockMvc.perform(get("/eventos/escala/conflitos-indisponibilidade")
+                        .param("startAt", "2026-08-01T00:00:00")
+                        .param("endAt", "2026-08-31T00:00:00"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(scheduleUnavailabilityConflictService);
     }
 
     private CelebrationEventResponseDTO response(String nameMassOrEvent) {

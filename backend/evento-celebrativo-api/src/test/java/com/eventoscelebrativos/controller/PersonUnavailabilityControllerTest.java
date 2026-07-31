@@ -4,14 +4,14 @@ import com.eventoscelebrativos.config.TemporalJsonConfig;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
-import com.eventoscelebrativos.dto.response.EventAssignmentConflictDTO;
+import com.eventoscelebrativos.dto.response.StartedAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
-import com.eventoscelebrativos.exception.exceptions.UnavailabilityAssignmentConflictException;
+import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import org.junit.jupiter.api.Test;
@@ -261,11 +261,11 @@ class PersonUnavailabilityControllerTest {
 
     @Test
     @WithMockUser(username = "34970000005", roles = "ADMIN")
-    void shouldReturn409WithAssignmentConflictStructuredResponse() throws Exception {
+    void shouldReturn409WithStartedAssignmentConflictStructuredResponse() throws Exception {
         when(personUnavailabilityService.create(eq("34970000005"), any()))
-                .thenThrow(new UnavailabilityAssignmentConflictException(List.of(
-                        new EventAssignmentConflictDTO(15L, "Missa das 19h", LocalDateTime.of(2026, 8, 15, 19, 0), LocalDateTime.of(2026, 8, 15, 20, 0),
-                                List.of("READER", "COMMENTATOR"))
+                .thenThrow(new UnavailabilityConflictWithStartedAssignmentException(List.of(
+                        new StartedAssignmentConflictDTO(15L, "Missa das 19h", LocalDateTime.of(2026, 8, 15, 19, 0), LocalDateTime.of(2026, 8, 15, 20, 0),
+                                "READER")
                 )));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -278,10 +278,9 @@ class PersonUnavailabilityControllerTest {
                                 }
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("UNAVAILABILITY_CONFLICT_WITH_ASSIGNMENT"))
+                .andExpect(jsonPath("$.errorCode").value("UNAVAILABILITY_CONFLICT_WITH_STARTED_ASSIGNMENT"))
                 .andExpect(jsonPath("$.conflicts[0].eventId").value(15))
-                .andExpect(jsonPath("$.conflicts[0].assignments[0]").value("READER"))
-                .andExpect(jsonPath("$.conflicts[0].assignments[1]").value("COMMENTATOR"));
+                .andExpect(jsonPath("$.conflicts[0].assignmentType").value("READER"));
     }
 
     @Test

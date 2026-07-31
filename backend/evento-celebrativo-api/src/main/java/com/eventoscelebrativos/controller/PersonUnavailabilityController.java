@@ -84,8 +84,10 @@ public class PersonUnavailabilityController {
     }
 
     @Operation(summary = "Cria uma indisponibilidade da pessoa autenticada. startAt deve ser agora ou futuro; "
-            + "o intervalo [startAt, endAt) nao pode se sobrepor a outra indisponibilidade da mesma pessoa nem "
-            + "conflitar com escalas ja existentes. Dia inteiro: startAt=00:00 do dia, endAt=00:00 do dia seguinte.")
+            + "o intervalo [startAt, endAt) nao pode se sobrepor a outra indisponibilidade da mesma pessoa. Pode "
+            + "conflitar com escalas futuras (o conflito passa a ser derivado e aparece nas consultas "
+            + "administrativas); so e rejeitada quando conflita com um evento ja em andamento. Dia inteiro: "
+            + "startAt=00:00 do dia, endAt=00:00 do dia seguinte.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Indisponibilidade criada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Dados invalidos, intervalo invertido/zero ou startAt no passado"),
@@ -93,7 +95,7 @@ public class PersonUnavailabilityController {
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
             @ApiResponse(responseCode = "409", description = "Sobreposicao com outra indisponibilidade (UNAVAILABILITY_OVERLAP) ou "
-                    + "conflito com escala existente (UNAVAILABILITY_CONFLICT_WITH_ASSIGNMENT)")
+                    + "conflito com evento ja em andamento (UNAVAILABILITY_CONFLICT_WITH_STARTED_ASSIGNMENT)")
     })
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PostMapping(value = "/me/indisponibilidades")
@@ -119,7 +121,7 @@ public class PersonUnavailabilityController {
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Registro inexistente ou pertencente a outra pessoa"),
             @ApiResponse(responseCode = "409", description = "Sobreposicao com outra indisponibilidade (UNAVAILABILITY_OVERLAP) ou "
-                    + "conflito com escala existente (UNAVAILABILITY_CONFLICT_WITH_ASSIGNMENT)")
+                    + "conflito com evento ja em andamento (UNAVAILABILITY_CONFLICT_WITH_STARTED_ASSIGNMENT)")
     })
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PutMapping(value = "/me/indisponibilidades/{id}")
