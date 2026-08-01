@@ -160,9 +160,9 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
         CountDownLatch startLatch = new CountDownLatch(1);
         try {
             Future<Exception> adminAttempt = executor.submit(
-                    () -> runRoleUpdate(personId, "ROLE_ADMIN", readyLatch, startLatch));
+                    () -> runRoleUpdate(anchorAdminId, personId, "ROLE_ADMIN", readyLatch, startLatch));
             Future<Exception> operatorAttempt = executor.submit(
-                    () -> runRoleUpdate(personId, "ROLE_OPERATOR", readyLatch, startLatch));
+                    () -> runRoleUpdate(anchorAdminId, personId, "ROLE_OPERATOR", readyLatch, startLatch));
 
             assertTrue(readyLatch.await(10, TimeUnit.SECONDS), "Threads nao ficaram prontas a tempo");
             startLatch.countDown();
@@ -181,15 +181,34 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
         }
     }
 
-    private Exception runRoleUpdate(Long personId, String targetRole, CountDownLatch readyLatch, CountDownLatch startLatch) {
+    private Exception runRoleUpdate(Long actingAdminId, Long personId, String targetRole, CountDownLatch readyLatch, CountDownLatch startLatch) {
         try {
             readyLatch.countDown();
             startLatch.await(10, TimeUnit.SECONDS);
+            authenticateAsAdmin(actingAdminId);
             personService.updatePersonRole(personId, new PersonRoleUpdateRequestDTO(targetRole));
             return null;
         } catch (Exception e) {
             return e;
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }
+    }
+
+    /**
+     * Em producao, updatePersonRole so roda atras de PUT /pessoas/{id}/roles (ROLE_ADMIN
+     * autenticado); este teste chama o service diretamente para exercitar os locks reais sem o
+     * overhead HTTP, entao precisa simular esse principal para que validateSelfAdminDemotion
+     * (que agora usa AuthenticatedUserResolver) tenha um contexto valido nesta thread.
+     */
+    private void authenticateAsAdmin(Long actingAdminId) {
+        java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"));
+        com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, actingAdminId, "anchor-admin", authorities);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        authenticatedUser, null, authorities));
     }
 
     private void assertFinalStateIsConsistent(Long personId) {

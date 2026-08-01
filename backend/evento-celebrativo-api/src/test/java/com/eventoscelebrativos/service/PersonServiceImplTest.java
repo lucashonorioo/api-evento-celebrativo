@@ -25,8 +25,8 @@ import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.impl.PersonServiceImpl;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,8 +38,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -85,13 +83,11 @@ class PersonServiceImplTest {
     @Mock
     private UserAccountSynchronizationService userAccountSynchronizationService;
 
+    @Mock
+    private AuthenticatedUserResolver authenticatedUserResolver;
+
     @InjectMocks
     private PersonServiceImpl service;
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
 
     @Test
     void shouldFindPeopleWithPaginationAndCombinedFilters() {
@@ -260,6 +256,7 @@ class PersonServiceImplTest {
         otherAdmin.addRole(adminRole());
         Role operatorRole = operatorRole();
 
+        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(2L);
         when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person, otherAdmin));
@@ -339,7 +336,7 @@ class PersonServiceImplTest {
     void shouldBlockSelfAdminDemotion() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
-        authenticateAs("34999999991");
+        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(1L);
 
         when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
@@ -356,7 +353,6 @@ class PersonServiceImplTest {
     void shouldAllowCurrentUserToKeepAdminRole() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
-        authenticateAs("34999999991");
 
         when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole()));
@@ -375,6 +371,7 @@ class PersonServiceImplTest {
     void shouldBlockLastAdministratorDemotion() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
+        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
 
         when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
@@ -527,14 +524,14 @@ class PersonServiceImplTest {
     @Test
     void shouldGetCurrentUserProfileByPhoneNumberOfAuthenticatedPerson() {
         Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
                 10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
         ));
 
-        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile(10L);
 
         assertEquals(10L, response.getId());
         assertEquals("Joao da Silva", response.getName());
@@ -547,13 +544,13 @@ class PersonServiceImplTest {
     @Test
     void shouldReturnEmptyMinistriesWhenAuthenticatedPersonHasNoActiveMinistry() {
         Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
                 10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
         ));
 
-        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile(10L);
 
         assertEquals(List.of(), response.getMinistries());
     }
@@ -561,14 +558,14 @@ class PersonServiceImplTest {
     @Test
     void shouldSortCurrentUserProfileMinistriesDeterministically() {
         Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
                 10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
         ));
 
-        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile("34999999999");
+        CurrentUserProfileResponseDTO response = service.getCurrentUserProfile(10L);
 
         assertEquals(
                 List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
@@ -578,9 +575,9 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnGet() {
-        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+        when(personRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> service.getCurrentUserProfile("34900000000"));
+        assertThrows(ResourceNotFoundException.class, () -> service.getCurrentUserProfile(99L));
         verifyNoInteractions(personMinistryReadService);
     }
 
@@ -590,7 +587,7 @@ class PersonServiceImplTest {
         person.addRole(operatorRole());
         LocalDate newBirthday = LocalDate.of(1992, 3, 15);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
@@ -599,7 +596,7 @@ class PersonServiceImplTest {
         ));
 
         CurrentUserProfileResponseDTO response = service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("New Name", newBirthday)
         );
 
@@ -612,7 +609,7 @@ class PersonServiceImplTest {
     @Test
     void shouldTrimNameBeforePersistingOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
@@ -620,7 +617,7 @@ class PersonServiceImplTest {
         ));
 
         service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("  New Name  ", person.getBirthdayDate())
         );
 
@@ -632,7 +629,7 @@ class PersonServiceImplTest {
         Person person = person(10L, "Old Name", "34999999999", "encoded-password");
         person.addRole(operatorRole());
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
@@ -641,7 +638,7 @@ class PersonServiceImplTest {
         ));
 
         service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("New Name", person.getBirthdayDate())
         );
 
@@ -657,10 +654,10 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnUpdate() {
-        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+        when(personRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.updateCurrentUserProfile(
-                "34900000000",
+                99L,
                 new CurrentUserProfileUpdateRequestDTO("Name", LocalDate.of(1990, 1, 1))
         ));
         verify(personRepository, never()).save(any());
@@ -669,10 +666,10 @@ class PersonServiceImplTest {
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsBlankOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("", person.getBirthdayDate())
         ));
         verify(personRepository, never()).save(any());
@@ -681,10 +678,10 @@ class PersonServiceImplTest {
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsOnlySpacesOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("   ", person.getBirthdayDate())
         ));
         verify(personRepository, never()).save(any());
@@ -693,7 +690,7 @@ class PersonServiceImplTest {
     @Test
     void shouldUpdateOnlyAuthenticatedPersonNotAnotherPerson() {
         Person authenticatedPerson = person(10L, "Old Name", "34999999999", "encoded-password");
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(authenticatedPerson));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(authenticatedPerson));
         when(personRepository.save(authenticatedPerson)).thenReturn(authenticatedPerson);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(authenticatedPerson)).thenReturn(currentProfileResponse(
@@ -701,11 +698,11 @@ class PersonServiceImplTest {
         ));
 
         service.updateCurrentUserProfile(
-                "34999999999",
+                10L,
                 new CurrentUserProfileUpdateRequestDTO("New Name", authenticatedPerson.getBirthdayDate())
         );
 
-        verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
+        verify(personRepository, never()).findById(argThat(id -> !Long.valueOf(10L).equals(id)));
         verify(personRepository, times(1)).save(any());
         verify(personRepository).save(authenticatedPerson);
     }
@@ -717,7 +714,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
@@ -729,7 +726,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of());
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertEquals(1, result.getTotalElements());
         assertEquals(15L, result.getContent().get(0).getEventId());
@@ -749,7 +746,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
@@ -762,7 +759,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of(15L, new ParticipationResponseSnapshot(15L, 10L, ParticipationStatus.CONFIRMED, null, respondedAt)));
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertEquals(ParticipationStatus.CONFIRMED, result.getContent().get(0).getParticipationStatus());
         assertNull(result.getContent().get(0).getDeclineReason());
@@ -776,7 +773,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
@@ -789,7 +786,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of(15L, new ParticipationResponseSnapshot(15L, 10L, ParticipationStatus.DECLINED, "Viagem", respondedAt)));
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertEquals(ParticipationStatus.DECLINED, result.getContent().get(0).getParticipationStatus());
         assertEquals("Viagem", result.getContent().get(0).getDeclineReason());
@@ -803,7 +800,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(
@@ -818,7 +815,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(5L, 6L)))
                 .thenReturn(Map.of());
 
-        service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         verify(eventParticipationResponseService, times(1)).findByPersonIdAndEventIds(10L, List.of(5L, 6L));
     }
@@ -827,10 +824,10 @@ class PersonServiceImplTest {
     void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnFindSchedules() {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
-        when(personRepository.findByPhoneNumber("34900000000")).thenReturn(Optional.empty());
+        when(personRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> service.findCurrentUserSchedules("34900000000", startDate, endDate, 0, 10));
+                () -> service.findCurrentUserSchedules(99L, startDate, endDate, 0, 10));
         verifyNoInteractions(eventAssignmentRepository);
     }
 
@@ -838,7 +835,7 @@ class PersonServiceImplTest {
     void shouldRejectMissingStartDateOnFindSchedules() {
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", null, endDate, 0, 10));
+                () -> service.findCurrentUserSchedules(10L, null, endDate, 0, 10));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -846,7 +843,7 @@ class PersonServiceImplTest {
     void shouldRejectMissingEndDateOnFindSchedules() {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", startDate, null, 0, 10));
+                () -> service.findCurrentUserSchedules(10L, startDate, null, 0, 10));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -855,7 +852,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 31);
         LocalDate endDate = LocalDate.of(2026, 8, 1);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10));
+                () -> service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -864,7 +861,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, -1, 10));
+                () -> service.findCurrentUserSchedules(10L, startDate, endDate, -1, 10));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -873,7 +870,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 0));
+                () -> service.findCurrentUserSchedules(10L, startDate, endDate, 0, 0));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -882,7 +879,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
         assertThrows(BadRequestException.class,
-                () -> service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 101));
+                () -> service.findCurrentUserSchedules(10L, startDate, endDate, 0, 101));
         verifyNoInteractions(personRepository, eventAssignmentRepository);
     }
 
@@ -893,7 +890,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
@@ -905,7 +902,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of());
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertEquals(
                 List.of(EventAssignmentType.COMMENTATOR),
@@ -920,7 +917,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(
@@ -935,7 +932,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(5L, 20L)))
                 .thenReturn(Map.of());
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertEquals(List.of(5L, 20L), result.getContent().stream().map(CurrentUserScheduleResponseDTO::getEventId).toList());
     }
@@ -947,11 +944,11 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        Page<CurrentUserScheduleResponseDTO> result = service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         assertTrue(result.getContent().isEmpty());
         assertEquals(0, result.getTotalElements());
@@ -965,7 +962,7 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(
                         List.of(eventProjection(15L, "Missa das 19h", startDate, LocalTime.of(19, 0), true, 2L, "Igreja Matriz")),
@@ -977,7 +974,7 @@ class PersonServiceImplTest {
         when(eventParticipationResponseService.findByPersonIdAndEventIds(10L, List.of(15L)))
                 .thenReturn(Map.of());
 
-        service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         verifyNoInteractions(personMinistryReadService);
     }
@@ -989,15 +986,15 @@ class PersonServiceImplTest {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
 
-        when(personRepository.findByPhoneNumber("34999999999")).thenReturn(Optional.of(authenticatedPerson));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(authenticatedPerson));
         when(eventAssignmentRepository.findScheduleEventsByPersonId(10L, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay(), pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        service.findCurrentUserSchedules("34999999999", startDate, endDate, 0, 10);
+        service.findCurrentUserSchedules(10L, startDate, endDate, 0, 10);
 
         verify(eventAssignmentRepository).findScheduleEventsByPersonId(
                 eq(10L), eq(startDate.atStartOfDay()), eq(endDate.plusDays(1).atStartOfDay()), eq(pageable));
-        verify(personRepository, never()).findByPhoneNumber(argThat(phone -> !"34999999999".equals(phone)));
+        verify(personRepository, never()).findById(argThat(id -> !Long.valueOf(10L).equals(id)));
     }
 
     private PersonScheduleEventProjection eventProjection(
@@ -1067,12 +1064,6 @@ class PersonServiceImplTest {
             Long id, String name, String phoneNumber, LocalDate birthdayDate, List<String> roles
     ) {
         return new CurrentUserProfileResponseDTO(id, name, phoneNumber, birthdayDate, roles, List.of());
-    }
-
-    private void authenticateAs(String username) {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(username, "password", List.of())
-        );
     }
 
     private Person person(Long id, String name, String phoneNumber, String password) {

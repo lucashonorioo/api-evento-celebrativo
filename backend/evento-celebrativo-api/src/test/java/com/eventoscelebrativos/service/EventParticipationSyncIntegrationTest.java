@@ -75,7 +75,7 @@ class EventParticipationSyncIntegrationTest {
             eventId = celebrationEventService.createEventWithScale(
                     eventRequest("Sync Remove All Event", locationId, List.of(personId), null)
             ).getEventId();
-            respond(person.getPhoneNumber(), eventId, "DECLINED", "Viagem");
+            respond(person.getId(), eventId, "DECLINED", "Viagem");
             assertTrue(findResponse(eventId, personId).isPresent());
 
             celebrationEventService.updateEventScale(
@@ -104,7 +104,7 @@ class EventParticipationSyncIntegrationTest {
             eventId = celebrationEventService.createEventWithScale(
                     eventRequest("Sync Reentry Event", locationId, List.of(personId), null)
             ).getEventId();
-            respond(person.getPhoneNumber(), eventId, "CONFIRMED", null);
+            respond(person.getId(), eventId, "CONFIRMED", null);
 
             celebrationEventService.updateEventScale(
                     eventId, new CelebrationEventScaleRequestDTO(locationId, null, List.of(), null, null, null)
@@ -137,7 +137,7 @@ class EventParticipationSyncIntegrationTest {
             eventId = celebrationEventService.createEventWithScale(
                     eventRequest("Sync Swap Event", locationId, List.of(personId), null)
             ).getEventId();
-            respond(person.getPhoneNumber(), eventId, "CONFIRMED", null);
+            respond(person.getId(), eventId, "CONFIRMED", null);
             EventParticipationResponse before = findResponse(eventId, personId).orElseThrow();
 
             celebrationEventService.updateEventScale(
@@ -175,9 +175,9 @@ class EventParticipationSyncIntegrationTest {
             eventTwoId = celebrationEventService.createEventWithScale(
                     eventRequest("Sync Isolation Event Two", locationId, List.of(removedPersonId), null)
             ).getEventId();
-            respond(removedPerson.getPhoneNumber(), eventOneId, "CONFIRMED", null);
-            respond(keptPerson.getPhoneNumber(), eventOneId, "DECLINED", "Motivo");
-            respond(removedPerson.getPhoneNumber(), eventTwoId, "CONFIRMED", null);
+            respond(removedPerson.getId(), eventOneId, "CONFIRMED", null);
+            respond(keptPerson.getId(), eventOneId, "DECLINED", "Motivo");
+            respond(removedPerson.getId(), eventTwoId, "CONFIRMED", null);
 
             celebrationEventService.updateEventScale(
                     eventOneId, new CelebrationEventScaleRequestDTO(locationId, null, List.of(keptPersonId), null, null, null)
@@ -195,8 +195,8 @@ class EventParticipationSyncIntegrationTest {
         }
     }
 
-    private void respond(String phoneNumber, Long eventId, String status, String declineReason) {
-        eventParticipationResponseService.respond(phoneNumber, eventId, new ParticipationResponseRequestDTO(status, declineReason));
+    private void respond(Long personId, Long eventId, String status, String declineReason) {
+        eventParticipationResponseService.respond(personId, eventId, new ParticipationResponseRequestDTO(status, declineReason));
     }
 
     private Optional<EventParticipationResponse> findResponse(Long eventId, Long personId) {

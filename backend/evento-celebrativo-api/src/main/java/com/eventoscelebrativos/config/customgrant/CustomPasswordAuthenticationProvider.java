@@ -2,16 +2,17 @@ package com.eventoscelebrativos.config.customgrant;
 
 import java.security.Principal;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.eventoscelebrativos.security.AuthenticatedUser;
+import com.eventoscelebrativos.service.UserAccountAuthenticationService;
+import com.eventoscelebrativos.service.UserAccountCredentials;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClaimAccessor;
@@ -35,22 +36,28 @@ import org.springframework.util.Assert;
 public class CustomPasswordAuthenticationProvider implements AuthenticationProvider {
 
 	private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-5.2";
+	// Hash BCrypt fixo e valido (nao gerado por senha real de producao) usado apenas para igualar o
+	// tempo de resposta entre "username inexistente" e "senha incorreta"; nunca recalculado por
+	// tentativa.
+	private static final String DUMMY_PASSWORD_HASH = "$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW";
+
 	private final OAuth2AuthorizationService authorizationService;
-	private final UserDetailsService userDetailsService;
+	private final UserAccountAuthenticationService userAccountAuthenticationService;
 	private final OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator;
 	private final PasswordEncoder passwordEncoder;
 
 	public CustomPasswordAuthenticationProvider(OAuth2AuthorizationService authorizationService,
 												OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator,
-												UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+												UserAccountAuthenticationService userAccountAuthenticationService,
+												PasswordEncoder passwordEncoder) {
 
 		Assert.notNull(authorizationService, "authorizationService cannot be null");
 		Assert.notNull(tokenGenerator, "TokenGenerator cannot be null");
-		Assert.notNull(userDetailsService, "UserDetailsService cannot be null");
+		Assert.notNull(userAccountAuthenticationService, "UserAccountAuthenticationService cannot be null");
 		Assert.notNull(passwordEncoder, "PasswordEncoder cannot be null");
 		this.authorizationService = authorizationService;
 		this.tokenGenerator = tokenGenerator;
-		this.userDetailsService = userDetailsService;
+		this.userAccountAuthenticationService = userAccountAuthenticationService;
 		this.passwordEncoder = passwordEncoder;
 	}
 
@@ -64,20 +71,30 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		String username = customPasswordAuthenticationToken.getUsername();
 		String password = customPasswordAuthenticationToken.getPassword();
 
-		UserDetails userDetails = null;
-		try {
-			userDetails = userDetailsService.loadUserByUsername(username);
-		} catch (UsernameNotFoundException e) {
+		Optional<UserAccountCredentials> credentialsOptional = userAccountAuthenticationService.loadCredentialsByUsername(username);
+		String hashToCompare = credentialsOptional.map(UserAccountCredentials::passwordHash).orElse(DUMMY_PASSWORD_HASH);
+		boolean passwordMatches = passwordEncoder.matches(password, hashToCompare);
+
+		boolean validCredentials = credentialsOptional.isPresent()
+				&& passwordMatches
+				&& credentialsOptional.get().accountEnabled()
+				&& credentialsOptional.get().personActive();
+
+		if (!validCredentials) {
 			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, "Invalid credentials", ERROR_URI));
 		}
 
-		if (!passwordEncoder.matches(password, userDetails.getPassword())) {
-			throw new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, "Invalid credentials", ERROR_URI));
-		}
+		UserAccountCredentials credentials = credentialsOptional.get();
+		AuthenticatedUser authenticatedUser = new AuthenticatedUser(
+				credentials.accountId(),
+				credentials.personId(),
+				credentials.username(),
+				credentials.authorities()
+		);
 
 		Set<String> requestedScopes = customPasswordAuthenticationToken.getScopes();
 
-		Set<String> availableScopes = userDetails.getAuthorities().stream()
+		Set<String> availableScopes = authenticatedUser.authorities().stream()
 				.map(scope -> scope.getAuthority())
 				.collect(Collectors.toSet());
 
@@ -90,9 +107,9 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		}
 
 		UsernamePasswordAuthenticationToken userAuthentication = new UsernamePasswordAuthenticationToken(
-				userDetails,
+				authenticatedUser,
 				null,
-				userDetails.getAuthorities()
+				authenticatedUser.authorities()
 		);
 
 		//-----------TOKEN BUILDERS----------
@@ -133,7 +150,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 		OAuth2Authorization authorization = authorizationBuilder.build();
 		this.authorizationService.save(authorization);
 
-		return new OAuth2AccessTokenAuthenticationToken(registeredClient, userAuthentication, accessToken);
+		return new SanitizedAccessTokenAuthenticationToken(registeredClient, userAuthentication, accessToken);
 	}
 
 	@Override
@@ -151,5 +168,30 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 			return clientPrincipal;
 		}
 		throw new OAuth2AuthenticationException(OAuth2ErrorCodes.INVALID_CLIENT);
+	}
+
+	private static final class SanitizedAccessTokenAuthenticationToken extends OAuth2AccessTokenAuthenticationToken {
+
+		private final AuthenticatedUser authenticatedUser;
+
+		private SanitizedAccessTokenAuthenticationToken(
+				RegisteredClient registeredClient,
+				UsernamePasswordAuthenticationToken userAuthentication,
+				OAuth2AccessToken accessToken
+		) {
+			super(registeredClient, userAuthentication, accessToken);
+			this.authenticatedUser = (AuthenticatedUser) userAuthentication.getPrincipal();
+			setDetails(userAuthentication.getDetails());
+		}
+
+		@Override
+		public Object getPrincipal() {
+			return authenticatedUser;
+		}
+
+		@Override
+		public Object getCredentials() {
+			return null;
+		}
 	}
 }

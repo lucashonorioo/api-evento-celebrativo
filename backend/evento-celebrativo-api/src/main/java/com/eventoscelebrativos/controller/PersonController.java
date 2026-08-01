@@ -10,6 +10,7 @@ import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -24,7 +25,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -37,10 +37,16 @@ public class PersonController {
 
     private final PersonService personService;
     private final EventParticipationResponseService eventParticipationResponseService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public PersonController(PersonService personService, EventParticipationResponseService eventParticipationResponseService) {
+    public PersonController(
+            PersonService personService,
+            EventParticipationResponseService eventParticipationResponseService,
+            AuthenticatedUserResolver authenticatedUserResolver
+    ) {
         this.personService = personService;
         this.eventParticipationResponseService = eventParticipationResponseService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @Operation(summary = "Consulta o perfil da pessoa autenticada")
@@ -51,8 +57,8 @@ public class PersonController {
     })
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @GetMapping(value = "/me")
-    public ResponseEntity<CurrentUserProfileResponseDTO> findCurrentUserProfile(Authentication authentication) {
-        CurrentUserProfileResponseDTO responseDTO = personService.getCurrentUserProfile(authentication.getName());
+    public ResponseEntity<CurrentUserProfileResponseDTO> findCurrentUserProfile() {
+        CurrentUserProfileResponseDTO responseDTO = personService.getCurrentUserProfile(authenticatedUserResolver.requireCurrentPersonId());
         return ResponseEntity.ok(responseDTO);
     }
 
@@ -66,10 +72,10 @@ public class PersonController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PutMapping(value = "/me")
     public ResponseEntity<CurrentUserProfileResponseDTO> updateCurrentUserProfile(
-            Authentication authentication,
             @Valid @RequestBody CurrentUserProfileUpdateRequestDTO requestDTO
     ) {
-        CurrentUserProfileResponseDTO responseDTO = personService.updateCurrentUserProfile(authentication.getName(), requestDTO);
+        CurrentUserProfileResponseDTO responseDTO = personService.updateCurrentUserProfile(
+                authenticatedUserResolver.requireCurrentPersonId(), requestDTO);
         return ResponseEntity.ok(responseDTO);
     }
 
@@ -86,7 +92,6 @@ public class PersonController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @GetMapping(value = "/me/escalas")
     public ResponseEntity<Page<CurrentUserScheduleResponseDTO>> findCurrentUserSchedules(
-            Authentication authentication,
             @Parameter(description = "Data inicial do periodo, inclusive. Formato ISO yyyy-MM-dd")
             @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @Parameter(description = "Data final do periodo, inclusive. Formato ISO yyyy-MM-dd")
@@ -97,7 +102,7 @@ public class PersonController {
             @RequestParam(defaultValue = "10") int size
     ) {
         Page<CurrentUserScheduleResponseDTO> schedules = personService.findCurrentUserSchedules(
-                authentication.getName(),
+                authenticatedUserResolver.requireCurrentPersonId(),
                 startDate,
                 endDate,
                 page,
@@ -123,12 +128,11 @@ public class PersonController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PutMapping(value = "/me/escalas/{eventId}/participacao")
     public ResponseEntity<ParticipationResponseResponseDTO> respondToEventParticipation(
-            Authentication authentication,
             @PathVariable Long eventId,
             @RequestBody ParticipationResponseRequestDTO requestDTO
     ) {
         ParticipationResponseResponseDTO responseDTO = eventParticipationResponseService.respond(
-                authentication.getName(),
+                authenticatedUserResolver.requireCurrentPersonId(),
                 eventId,
                 requestDTO
         );

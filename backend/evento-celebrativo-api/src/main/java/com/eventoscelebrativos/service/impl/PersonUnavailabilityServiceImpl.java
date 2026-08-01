@@ -51,14 +51,14 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Override
     @Transactional(readOnly = true)
     public Page<PersonUnavailabilityResponseDTO> findMine(
-            String phoneNumber,
+            Long personId,
             LocalDateTime startAt,
             LocalDateTime endAt,
             int page,
             int size
     ) {
         validateQueryRange(startAt, endAt, page, size);
-        Person person = findAuthenticatedPerson(phoneNumber);
+        Person person = findAuthenticatedPerson(personId);
 
         Page<PersonUnavailability> result = personUnavailabilityRepository.findByPersonIdIntersecting(
                 person.getId(),
@@ -72,13 +72,13 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
     @Override
     @Transactional
-    public PersonUnavailabilityResponseDTO create(String phoneNumber, PersonUnavailabilityRequestDTO requestDTO) {
+    public PersonUnavailabilityResponseDTO create(Long personId, PersonUnavailabilityRequestDTO requestDTO) {
         LocalDateTime startAt = requestDTO.getStartAt();
         LocalDateTime endAt = requestDTO.getEndAt();
         validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
-        Person person = lockAuthenticatedPerson(phoneNumber);
+        Person person = lockAuthenticatedPerson(personId);
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
         personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, null);
@@ -92,13 +92,13 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
     @Override
     @Transactional
-    public PersonUnavailabilityResponseDTO update(String phoneNumber, Long id, PersonUnavailabilityRequestDTO requestDTO) {
+    public PersonUnavailabilityResponseDTO update(Long personId, Long id, PersonUnavailabilityRequestDTO requestDTO) {
         LocalDateTime startAt = requestDTO.getStartAt();
         LocalDateTime endAt = requestDTO.getEndAt();
         validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
-        Person person = lockAuthenticatedPerson(phoneNumber);
+        Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Indisponibilidade", id));
@@ -125,8 +125,8 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
     @Override
     @Transactional
-    public void delete(String phoneNumber, Long id) {
-        Person person = lockAuthenticatedPerson(phoneNumber);
+    public void delete(Long personId, Long id) {
+        Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Indisponibilidade", id));
@@ -151,14 +151,14 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         );
     }
 
-    private Person findAuthenticatedPerson(String phoneNumber) {
-        return personRepository.findByPhoneNumber(phoneNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
+    private Person findAuthenticatedPerson(Long personId) {
+        return personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
     }
 
-    private Person lockAuthenticatedPerson(String phoneNumber) {
-        return personRepository.findByPhoneNumberForUpdate(phoneNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
+    private Person lockAuthenticatedPerson(Long personId) {
+        return personRepository.findByIdForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
     }
 
     private void validateTemporalRule(LocalDateTime startAt, LocalDateTime endAt) {

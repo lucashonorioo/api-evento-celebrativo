@@ -32,11 +32,10 @@ import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountSynchronizationService;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +69,7 @@ public class PersonServiceImpl implements PersonService {
     private final EventAssignmentRepository eventAssignmentRepository;
     private final EventParticipationResponseService eventParticipationResponseService;
     private final UserAccountSynchronizationService userAccountSynchronizationService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -81,7 +81,8 @@ public class PersonServiceImpl implements PersonService {
             PersonMinistryCommandService personMinistryCommandService,
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
-            UserAccountSynchronizationService userAccountSynchronizationService
+            UserAccountSynchronizationService userAccountSynchronizationService,
+            AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
@@ -93,6 +94,7 @@ public class PersonServiceImpl implements PersonService {
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.userAccountSynchronizationService = userAccountSynchronizationService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @Override
@@ -207,15 +209,15 @@ public class PersonServiceImpl implements PersonService {
 
     @Override
     @Transactional(readOnly = true)
-    public CurrentUserProfileResponseDTO getCurrentUserProfile(String phoneNumber) {
-        Person person = findAuthenticatedPerson(phoneNumber);
+    public CurrentUserProfileResponseDTO getCurrentUserProfile(Long personId) {
+        Person person = findAuthenticatedPerson(personId);
         return toCurrentUserProfileDTO(person);
     }
 
     @Override
     @Transactional
-    public CurrentUserProfileResponseDTO updateCurrentUserProfile(String phoneNumber, CurrentUserProfileUpdateRequestDTO requestDTO) {
-        Person person = findAuthenticatedPerson(phoneNumber);
+    public CurrentUserProfileResponseDTO updateCurrentUserProfile(Long personId, CurrentUserProfileUpdateRequestDTO requestDTO) {
+        Person person = findAuthenticatedPerson(personId);
         person.setName(normalizeRequiredName(requestDTO.getName()));
         person.setBirthdayDate(requestDTO.getBirthdayDate());
         Person savedPerson = personRepository.save(person);
@@ -225,14 +227,14 @@ public class PersonServiceImpl implements PersonService {
     @Override
     @Transactional(readOnly = true)
     public Page<CurrentUserScheduleResponseDTO> findCurrentUserSchedules(
-            String phoneNumber,
+            Long personId,
             LocalDate startDate,
             LocalDate endDate,
             int page,
             int size
     ) {
         validateScheduleQuery(startDate, endDate, page, size);
-        Person person = findAuthenticatedPerson(phoneNumber);
+        Person person = findAuthenticatedPerson(personId);
 
         PageRequest pageable = PageRequest.of(page, size);
         Page<PersonScheduleEventProjection> eventPage = eventAssignmentRepository.findScheduleEventsByPersonId(
@@ -310,9 +312,9 @@ public class PersonServiceImpl implements PersonService {
         );
     }
 
-    private Person findAuthenticatedPerson(String phoneNumber) {
-        return personRepository.findByPhoneNumber(phoneNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
+    private Person findAuthenticatedPerson(Long personId) {
+        return personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
     }
 
     private CurrentUserProfileResponseDTO toCurrentUserProfileDTO(Person person) {
@@ -426,8 +428,8 @@ public class PersonServiceImpl implements PersonService {
     }
 
     private void validateSelfAdminDemotion(Person person) {
-        String username = currentAuthenticatedUsername();
-        if (username != null && username.equals(person.getPhoneNumber())) {
+        Long currentPersonId = authenticatedUserResolver.requireCurrentPersonId();
+        if (currentPersonId.equals(person.getId())) {
             throw new ConflictException("Voce nao pode remover o seu proprio perfil administrativo.");
         }
     }
@@ -442,11 +444,4 @@ public class PersonServiceImpl implements PersonService {
         }
     }
 
-    private String currentAuthenticatedUsername() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null;
-        }
-        return authentication.getName();
-    }
 }

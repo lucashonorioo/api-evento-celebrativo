@@ -2,6 +2,8 @@ package com.eventoscelebrativos.config;
 
 import java.util.Arrays;
 
+import com.eventoscelebrativos.security.UserAccountJwtAuthenticationConverter;
+import com.eventoscelebrativos.service.UserAccountAuthenticationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -10,13 +12,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -43,7 +46,10 @@ public class ResourceServerConfig {
 
 	@Bean
 	@Order(3)
-	public SecurityFilterChain rsSecurityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain rsSecurityFilterChain(
+			HttpSecurity http,
+			Converter<Jwt, AbstractAuthenticationToken> userAccountJwtAuthenticationConverter
+	) throws Exception {
 		http.csrf(csrf -> csrf.disable());
 
 		http.authorizeHttpRequests(authorize -> authorize
@@ -68,20 +74,22 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
 				.anyRequest().authenticated());
-		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
+		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer
+				.jwt(jwt -> jwt.jwtAuthenticationConverter(userAccountJwtAuthenticationConverter)));
 		http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
 		return http.build();
 	}
 
+	/**
+	 * Conectado explicitamente em {@link #rsSecurityFilterChain} (nao depende de autodeteccao de
+	 * bean pelo {@code JwtConfigurer}): recarrega conta/pessoa/roles atuais por {@code account_id}
+	 * a cada requisicao autenticada com bearer token.
+	 */
 	@Bean
-	public JwtAuthenticationConverter jwtAuthenticationConverter() {
-		JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-		grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
-		grantedAuthoritiesConverter.setAuthorityPrefix("");
-
-		JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-		jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
-		return jwtAuthenticationConverter;
+	public Converter<Jwt, AbstractAuthenticationToken> userAccountJwtAuthenticationConverter(
+			UserAccountAuthenticationService userAccountAuthenticationService
+	) {
+		return new UserAccountJwtAuthenticationConverter(userAccountAuthenticationService);
 	}
 
 	@Bean

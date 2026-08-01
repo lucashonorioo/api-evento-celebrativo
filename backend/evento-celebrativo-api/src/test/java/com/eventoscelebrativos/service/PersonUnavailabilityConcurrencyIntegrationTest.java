@@ -229,8 +229,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
         runConcurrently(
-                () -> personUnavailabilityService.create(phone, first),
-                () -> personUnavailabilityService.create(phone, second),
+                () -> personUnavailabilityService.create(person.getId(), first),
+                () -> personUnavailabilityService.create(person.getId(), second),
                 successes,
                 conflicts
         );
@@ -252,8 +252,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
         runConcurrently(
-                () -> personUnavailabilityService.create(phone, request),
-                () -> personUnavailabilityService.create(phone, request),
+                () -> personUnavailabilityService.create(person.getId(), request),
+                () -> personUnavailabilityService.create(person.getId(), request),
                 successes,
                 conflicts
         );
@@ -279,8 +279,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
         runConcurrently(
-                () -> personUnavailabilityService.create(phoneA, requestA),
-                () -> personUnavailabilityService.create(phoneB, requestB),
+                () -> personUnavailabilityService.create(personA.getId(), requestA),
+                () -> personUnavailabilityService.create(personB.getId(), requestB),
                 successes,
                 conflicts
         );
@@ -326,7 +326,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
                 ready.countDown();
                 await(ready, start);
                 try {
-                    personUnavailabilityService.create(phone, unavailabilityRequest);
+                    personUnavailabilityService.create(person.getId(), unavailabilityRequest);
                 } catch (ErrorResponseException ignored) {
                     // esperado quando a escala vence a corrida
                 }
@@ -398,7 +398,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
                 ready.countDown();
                 await(ready, start);
                 try {
-                    personUnavailabilityService.create(phone, unavailabilityRequest);
+                    personUnavailabilityService.create(person.getId(), unavailabilityRequest);
                 } catch (ErrorResponseException ignored) {
                     // esperado quando a atualizacao de escala vence a corrida
                 }
@@ -460,7 +460,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
         runConcurrently(
-                () -> personUnavailabilityService.create(phone, unavailabilityRequest),
+                () -> personUnavailabilityService.create(person.getId(), unavailabilityRequest),
                 () -> celebrationEventService.updateEvent(eventId, dateChangeRequest),
                 successes,
                 conflicts
@@ -502,7 +502,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         Long eventId = event.getId();
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
 
-        eventParticipationResponseService.respond(phone, eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
+        eventParticipationResponseService.respond(person.getId(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
         EventParticipationResponse participationBeforeRace = eventParticipationResponseRepository
                 .findByEventIdAndPersonId(eventId, person.getId())
                 .orElseThrow();
@@ -521,7 +521,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         AtomicInteger successes = new AtomicInteger();
         AtomicInteger conflicts = new AtomicInteger();
         runConcurrently(
-                () -> personUnavailabilityService.create(phone, unavailabilityRequest),
+                () -> personUnavailabilityService.create(person.getId(), unavailabilityRequest),
                 () -> celebrationEventService.updateEvent(eventId, endAtChangeRequest),
                 successes,
                 conflicts
@@ -602,7 +602,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // retorna normalmente, encerrando a transacao, antes de qualquer outra operacao comecar).
         PersonUnavailabilityRequestDTO unavailabilityRequest =
                 new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
-        PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(phone, unavailabilityRequest);
+        PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(person.getId(), unavailabilityRequest);
 
         assertTrue(
                 personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate))
@@ -669,7 +669,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         Long eventId = initialResponse.getEventId();
         cleanupEventId = eventId;
 
-        eventParticipationResponseService.respond(priest.getPhoneNumber(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
+        eventParticipationResponseService.respond(priest.getId(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
         EventParticipationResponse priestParticipationBefore = eventParticipationResponseRepository
                 .findByEventIdAndPersonId(eventId, priest.getId())
                 .orElseThrow();
@@ -823,12 +823,12 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         Long eventId = scaleResponse.getEventId();
         cleanupEventId = eventId;
 
-        eventParticipationResponseService.respond(phone, eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
+        eventParticipationResponseService.respond(person.getId(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
 
         // Passo 3: somente depois, em transacao separada, a pessoa cria a indisponibilidade futura.
         PersonUnavailabilityRequestDTO unavailabilityRequest =
                 new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
-        PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(phone, unavailabilityRequest);
+        PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(person.getId(), unavailabilityRequest);
 
         assertTrue(
                 personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate))
@@ -869,7 +869,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         PersonUnavailabilityRequestDTO conflictingRequest =
                 new PersonUnavailabilityRequestDTO(conflictingStartAt, conflictingEndAt, null);
 
-        assertThrows(ErrorResponseException.class, () -> personUnavailabilityService.create(phone, conflictingRequest));
+        assertThrows(ErrorResponseException.class, () -> personUnavailabilityService.create(person.getId(), conflictingRequest));
 
         assertTrue(
                 personUnavailabilityRepository.findOverlapping(person.getId(), conflictingStartAt, conflictingEndAt).isEmpty(),
@@ -898,7 +898,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         LocalDateTime originalStartAt = LocalDateTime.of(2026, 7, 2, 8, 0);
         LocalDateTime originalEndAt = LocalDateTime.of(2026, 7, 2, 9, 0);
         PersonUnavailabilityResponseDTO existing = personUnavailabilityService.create(
-                phone, new PersonUnavailabilityRequestDTO(originalStartAt, originalEndAt, null));
+                person.getId(), new PersonUnavailabilityRequestDTO(originalStartAt, originalEndAt, null));
 
         LocalDateTime conflictingStartAt = LocalDateTime.of(2026, 7, 1, 12, 30);
         LocalDateTime conflictingEndAt = LocalDateTime.of(2026, 7, 1, 14, 0);
@@ -906,7 +906,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
                 new PersonUnavailabilityRequestDTO(conflictingStartAt, conflictingEndAt, null);
 
         assertThrows(ErrorResponseException.class,
-                () -> personUnavailabilityService.update(phone, existing.getId(), conflictingUpdate));
+                () -> personUnavailabilityService.update(person.getId(), existing.getId(), conflictingUpdate));
 
         boolean stillHasOriginalRange = !personUnavailabilityRepository
                 .findOverlapping(person.getId(), originalStartAt, originalEndAt).isEmpty();

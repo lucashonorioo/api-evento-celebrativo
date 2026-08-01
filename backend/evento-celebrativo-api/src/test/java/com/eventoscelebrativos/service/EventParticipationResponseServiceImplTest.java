@@ -84,15 +84,15 @@ class EventParticipationResponseServiceImplTest {
     void shouldIdentifyPersonByAuthenticatedPhoneNumber() {
         Person person = person(10L, "34970000001");
         CelebrationEvent event = futureEvent(15L);
-        when(personRepository.findByPhoneNumber("34970000001")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        service.respond("34970000001", 15L, request("CONFIRMED", null));
+        service.respond(10L, 15L, request("CONFIRMED", null));
 
-        verify(personRepository).findByPhoneNumber("34970000001");
+        verify(personRepository).findById(10L);
     }
 
     @Test
@@ -102,7 +102,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000002", 15L, request("CONFIRMED", null));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("CONFIRMED", null));
 
         assertEquals(ParticipationStatus.CONFIRMED, response.getStatus());
         assertNull(response.getDeclineReason());
@@ -116,7 +116,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000003", 15L, request("DECLINED", "Viagem"));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", "Viagem"));
 
         assertEquals(ParticipationStatus.DECLINED, response.getStatus());
         assertEquals("Viagem", response.getDeclineReason());
@@ -129,7 +129,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000004", 15L, request("CONFIRMED", "Motivo qualquer"));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("CONFIRMED", "Motivo qualquer"));
 
         assertNull(response.getDeclineReason());
     }
@@ -141,7 +141,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000005", 15L, request("DECLINED", "  Viagem  "));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", "  Viagem  "));
 
         assertEquals("Viagem", response.getDeclineReason());
     }
@@ -153,7 +153,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000006", 15L, request("DECLINED", "   "));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", "   "));
 
         assertNull(response.getDeclineReason());
     }
@@ -164,7 +164,7 @@ class EventParticipationResponseServiceImplTest {
         CelebrationEvent event = futureEvent(15L);
         mockAssignedPerson(person, event);
 
-        assertThrows(BadRequestException.class, () -> service.respond("34970000007", 15L, request("PENDING", null)));
+        assertThrows(BadRequestException.class, () -> service.respond(10L, 15L, request("PENDING", null)));
     }
 
     @Test
@@ -173,7 +173,7 @@ class EventParticipationResponseServiceImplTest {
         CelebrationEvent event = futureEvent(15L);
         mockAssignedPerson(person, event);
 
-        assertThrows(BadRequestException.class, () -> service.respond("34970000008", 15L, request(null, null)));
+        assertThrows(BadRequestException.class, () -> service.respond(10L, 15L, request(null, null)));
     }
 
     @Test
@@ -182,7 +182,7 @@ class EventParticipationResponseServiceImplTest {
         CelebrationEvent event = futureEvent(15L);
         mockAssignedPerson(person, event);
 
-        assertThrows(BadRequestException.class, () -> service.respond("34970000009", 15L, request("UNKNOWN", null)));
+        assertThrows(BadRequestException.class, () -> service.respond(10L, 15L, request("UNKNOWN", null)));
     }
 
     @Test
@@ -192,34 +192,34 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         String tooLong = "a".repeat(501);
 
-        assertThrows(BadRequestException.class, () -> service.respond("34970000010", 15L, request("DECLINED", tooLong)));
+        assertThrows(BadRequestException.class, () -> service.respond(10L, 15L, request("DECLINED", tooLong)));
     }
 
     @Test
     void shouldReturnNotFoundWhenPersonDoesNotExist() {
-        when(personRepository.findByPhoneNumber("34970000011")).thenReturn(Optional.empty());
+        when(personRepository.findById(10L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> service.respond("34970000011", 15L, request("CONFIRMED", null)));
+        assertThrows(ResourceNotFoundException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
     }
 
     @Test
     void shouldReturnNotFoundWhenEventDoesNotExist() {
         Person person = person(10L, "34970000012");
-        when(personRepository.findByPhoneNumber("34970000012")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> service.respond("34970000012", 15L, request("CONFIRMED", null)));
+        assertThrows(ResourceNotFoundException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
     }
 
     @Test
     void shouldReturnConflictWhenPersonHasNoAssignmentInEvent() {
         Person person = person(10L, "34970000013");
         CelebrationEvent event = futureEvent(15L);
-        when(personRepository.findByPhoneNumber("34970000013")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L)).thenReturn(List.of());
 
-        assertThrows(ConflictException.class, () -> service.respond("34970000013", 15L, request("CONFIRMED", null)));
+        assertThrows(ConflictException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
         verify(eventParticipationResponseRepository, never()).save(any());
     }
 
@@ -230,7 +230,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        ParticipationResponseResponseDTO response = service.respond("34970000014", 15L, request("CONFIRMED", null));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("CONFIRMED", null));
 
         verify(eventParticipationResponseRepository, times(1)).save(any());
         assertEquals(LocalDateTime.of(2026, 7, 1, 10, 0), response.getRespondedAt());
@@ -246,7 +246,7 @@ class EventParticipationResponseServiceImplTest {
         );
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.of(existing));
 
-        ParticipationResponseResponseDTO response = service.respond("34970000015", 15L, request("DECLINED", "Motivo"));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", "Motivo"));
 
         assertEquals(ParticipationStatus.DECLINED, existing.getStatus());
         assertEquals("Motivo", existing.getDeclineReason());
@@ -265,7 +265,7 @@ class EventParticipationResponseServiceImplTest {
         );
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.of(existing));
 
-        service.respond("34970000016", 15L, request("DECLINED", "Motivo"));
+        service.respond(10L, 15L, request("DECLINED", "Motivo"));
 
         verify(eventParticipationResponseRepository, never()).save(any());
     }
@@ -281,7 +281,7 @@ class EventParticipationResponseServiceImplTest {
         );
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.of(existing));
 
-        ParticipationResponseResponseDTO response = service.respond("34970000017", 15L, request("DECLINED", " Viagem "));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", " Viagem "));
 
         assertEquals(originalRespondedAt, existing.getRespondedAt());
         assertEquals(originalRespondedAt, response.getRespondedAt());
@@ -299,7 +299,7 @@ class EventParticipationResponseServiceImplTest {
         );
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.of(existing));
 
-        ParticipationResponseResponseDTO response = service.respond("34970000018", 15L, request("DECLINED", "Outro motivo"));
+        ParticipationResponseResponseDTO response = service.respond(10L, 15L, request("DECLINED", "Outro motivo"));
 
         assertEquals(LocalDateTime.of(2026, 7, 1, 10, 0), existing.getRespondedAt());
         assertEquals(LocalDateTime.of(2026, 7, 1, 10, 0), response.getRespondedAt());
@@ -313,7 +313,7 @@ class EventParticipationResponseServiceImplTest {
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 18, 59, 59));
 
-        service.respond("34970000020", 15L, request("CONFIRMED", null));
+        service.respond(10L, 15L, request("CONFIRMED", null));
 
         verify(eventParticipationResponseRepository).save(any());
     }
@@ -322,13 +322,13 @@ class EventParticipationResponseServiceImplTest {
     void shouldBlockResponseExactlyAtEventStart() {
         Person person = person(10L, "34970000021");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0));
-        when(personRepository.findByPhoneNumber("34970000021")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0));
 
-        assertThrows(ConflictException.class, () -> service.respond("34970000021", 15L, request("CONFIRMED", null)));
+        assertThrows(ConflictException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
         verify(eventParticipationResponseRepository, never()).save(any());
     }
 
@@ -336,13 +336,13 @@ class EventParticipationResponseServiceImplTest {
     void shouldBlockResponseAfterEventStart() {
         Person person = person(10L, "34970000022");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0));
-        when(personRepository.findByPhoneNumber("34970000022")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 1));
 
-        assertThrows(ConflictException.class, () -> service.respond("34970000022", 15L, request("CONFIRMED", null)));
+        assertThrows(ConflictException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
     }
 
     @Test
@@ -353,7 +353,7 @@ class EventParticipationResponseServiceImplTest {
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 0, 100_000_000));
 
-        service.respond("34970000025", 15L, request("CONFIRMED", null));
+        service.respond(10L, 15L, request("CONFIRMED", null));
 
         verify(eventParticipationResponseRepository).save(any());
     }
@@ -362,13 +362,13 @@ class EventParticipationResponseServiceImplTest {
     void shouldBlockResponseWhenClockNanosReachEventStartInstant() {
         Person person = person(10L, "34970000026");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0, 0));
-        when(personRepository.findByPhoneNumber("34970000026")).thenReturn(Optional.of(person));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 0, 100_000_000));
 
-        assertThrows(ConflictException.class, () -> service.respond("34970000026", 15L, request("CONFIRMED", null)));
+        assertThrows(ConflictException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
         verify(eventParticipationResponseRepository, never()).save(any());
     }
 
@@ -379,7 +379,7 @@ class EventParticipationResponseServiceImplTest {
         mockAssignedPerson(person, event);
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        service.respond("34970000023", 15L, request("CONFIRMED", null));
+        service.respond(10L, 15L, request("CONFIRMED", null));
 
         verify(eventAssignmentRepository).findAllByEventIdAndPersonIdForUpdate(15L, 10L);
     }
@@ -389,13 +389,13 @@ class EventParticipationResponseServiceImplTest {
         Person personA = person(10L, "34970000024");
         Person personB = person(11L, "34970000025");
         CelebrationEvent event = futureEvent(15L);
-        when(personRepository.findByPhoneNumber("34970000024")).thenReturn(Optional.of(personA));
+        when(personRepository.findById(10L)).thenReturn(Optional.of(personA));
         when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, personA)));
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
 
-        service.respond("34970000024", 15L, request("CONFIRMED", null));
+        service.respond(10L, 15L, request("CONFIRMED", null));
 
         verify(eventAssignmentRepository, never()).findAllByEventIdAndPersonIdForUpdate(15L, personB.getId());
         verify(eventParticipationResponseRepository, never()).findByEventIdAndPersonId(15L, personB.getId());
@@ -423,7 +423,7 @@ class EventParticipationResponseServiceImplTest {
     }
 
     private void mockAssignedPerson(Person person, CelebrationEvent event) {
-        when(personRepository.findByPhoneNumber(person.getPhoneNumber())).thenReturn(Optional.of(person));
+        when(personRepository.findById(person.getId())).thenReturn(Optional.of(person));
         when(celebrationEventRepository.findById(event.getId())).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(event.getId(), person.getId()))
                 .thenReturn(List.of(assignment(event, person)));

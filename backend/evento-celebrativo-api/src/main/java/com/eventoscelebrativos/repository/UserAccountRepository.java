@@ -29,4 +29,21 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT ua FROM UserAccount ua WHERE ua.person.id = :personId")
     Optional<UserAccount> findByPersonIdForUpdate(@Param("personId") Long personId);
+
+    /**
+     * Usada exclusivamente no login: carrega conta, pessoa e roles em uma unica operacao para
+     * {@link com.eventoscelebrativos.service.UserAccountAuthenticationService}, evitando N+1 e
+     * lazy loading fora da transacao.
+     */
+    @EntityGraph(attributePaths = {"person", "roles", "roles.role"})
+    @Query("SELECT ua FROM UserAccount ua WHERE ua.username = :username")
+    Optional<UserAccount> findByUsernameForAuthentication(@Param("username") String username);
+
+    /**
+     * Usada exclusivamente na validacao do bearer token (por accountId, nunca por username), para
+     * recarregar o estado atual de conta/pessoa/roles em uma unica operacao.
+     */
+    @EntityGraph(attributePaths = {"person", "roles", "roles.role"})
+    @Query("SELECT ua FROM UserAccount ua WHERE ua.id = :accountId")
+    Optional<UserAccount> findByIdForAuthentication(@Param("accountId") Long accountId);
 }

@@ -14,6 +14,8 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParticipationStatus;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
+import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
 import org.junit.jupiter.api.Test;
@@ -45,7 +47,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(PersonController.class)
-@Import(PersonControllerTest.MethodSecurityTestConfig.class)
+@Import({PersonControllerTest.MethodSecurityTestConfig.class, AuthenticatedUserResolver.class})
 class PersonControllerTest {
 
     @Autowired
@@ -519,9 +521,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldGetOwnProfileWhenUserIsOperator() throws Exception {
-        when(personService.getCurrentUserProfile("34999999999"))
+        when(personService.getCurrentUserProfile(10L))
                 .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
 
         mockMvc.perform(get("/pessoas/me"))
@@ -537,9 +539,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 11L, username = "34999999998", authorities = {"ROLE_ADMIN"})
     void shouldGetOwnProfileWhenUserIsAdmin() throws Exception {
-        when(personService.getCurrentUserProfile("34999999998"))
+        when(personService.getCurrentUserProfile(11L))
                 .thenReturn(currentProfileResponse(11L, "Admin User", "34999999998", List.of("ROLE_ADMIN"), List.of()));
 
         mockMvc.perform(get("/pessoas/me"))
@@ -549,10 +551,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 99L, username = "34900000000", authorities = {"ROLE_OPERATOR"})
     void shouldReturnNotFoundWhenGettingOwnProfileOfMissingPerson() throws Exception {
-        when(personService.getCurrentUserProfile("34900000000"))
-                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+        when(personService.getCurrentUserProfile(99L))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
         mockMvc.perform(get("/pessoas/me"))
                 .andExpect(status().isNotFound())
@@ -569,9 +571,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldUpdateOwnProfileWhenUserIsOperator() throws Exception {
-        when(personService.updateCurrentUserProfile(eq("34999999999"), any()))
+        when(personService.updateCurrentUserProfile(eq(10L), any()))
                 .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
 
         mockMvc.perform(put("/pessoas/me")
@@ -584,9 +586,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 11L, username = "34999999998", authorities = {"ROLE_ADMIN"})
     void shouldUpdateOwnProfileWhenUserIsAdmin() throws Exception {
-        when(personService.updateCurrentUserProfile(eq("34999999998"), any()))
+        when(personService.updateCurrentUserProfile(eq(11L), any()))
                 .thenReturn(currentProfileResponse(11L, "Admin User", "34999999998", List.of("ROLE_ADMIN"), List.of()));
 
         mockMvc.perform(put("/pessoas/me")
@@ -637,10 +639,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 99L, username = "34900000000", authorities = {"ROLE_OPERATOR"})
     void shouldReturnNotFoundWhenUpdatingOwnProfileOfMissingPerson() throws Exception {
-        when(personService.updateCurrentUserProfile(eq("34900000000"), any()))
-                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+        when(personService.updateCurrentUserProfile(eq(99L), any()))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
         mockMvc.perform(put("/pessoas/me")
                         .with(csrf())
@@ -651,9 +653,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldIgnoreProtectedFieldsSentInOwnProfileUpdatePayload() throws Exception {
-        when(personService.updateCurrentUserProfile(eq("34999999999"), any()))
+        when(personService.updateCurrentUserProfile(eq(10L), any()))
                 .thenReturn(currentProfileResponse(10L, "Joao da Silva", "34999999999", List.of("ROLE_OPERATOR"), List.of(MinistryType.READER)));
 
         mockMvc.perform(put("/pessoas/me")
@@ -686,10 +688,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldGetCurrentUserSchedulesWhenUserIsOperator() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(scheduleResponse(
                                 15L, "Missa das 19h", LocalDateTime.of(2026, 7, 20, 19, 0), LocalDateTime.of(2026, 7, 20, 20, 0),
@@ -727,10 +729,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 11L, username = "34999999998", authorities = {"ROLE_ADMIN"})
     void shouldGetCurrentUserSchedulesWhenUserIsAdmin() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999998", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                11L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -781,10 +783,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenDateRangeIsInvertedOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 31), LocalDate.of(2026, 7, 1), 0, 10))
+                10L, LocalDate.of(2026, 7, 31), LocalDate.of(2026, 7, 1), 0, 10))
                 .thenThrow(new BadRequestException("A data inicial não pode ser posterior à data final"));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -795,10 +797,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenPageIsNegativeOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), -1, 10))
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), -1, 10))
                 .thenThrow(new BadRequestException("O numero da pagina deve ser maior ou igual a zero"));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -810,10 +812,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenSizeIsZeroOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 0))
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 0))
                 .thenThrow(new BadRequestException("O tamanho da pagina deve ser maior que zero e menor ou igual a 100"));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -825,10 +827,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenSizeIsGreaterThanOneHundredOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 101))
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 101))
                 .thenThrow(new BadRequestException("O tamanho da pagina deve ser maior que zero e menor ou igual a 100"));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -840,11 +842,11 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 99L, username = "34900000000", authorities = {"ROLE_OPERATOR"})
     void shouldReturnNotFoundWhenPrincipalDoesNotExistOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34900000000", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
-                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+                99L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
         mockMvc.perform(get("/pessoas/me/escalas")
                         .param("startDate", "2026-07-01")
@@ -854,10 +856,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldIgnoreUnknownPersonIdParameterOnCurrentUserSchedules() throws Exception {
         when(personService.findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -867,7 +869,7 @@ class PersonControllerTest {
                 .andExpect(status().isOk());
 
         verify(personService).findCurrentUserSchedules(
-                "34999999999", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10);
+                10L, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 0, 10);
     }
 
     @Test
@@ -880,9 +882,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldRespondToParticipationWhenUserIsOperator() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenReturn(participationResponse(15L, ParticipationStatus.CONFIRMED, null));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -896,9 +898,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999998", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 11L, username = "34999999998", authorities = {"ROLE_ADMIN"})
     void shouldRespondToParticipationWhenUserIsAdmin() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999998"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(11L), eq(15L), any()))
                 .thenReturn(participationResponse(15L, ParticipationStatus.DECLINED, "Viagem"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -923,9 +925,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenParticipationStatusIsInvalid() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenThrow(new BadRequestException("Status de participacao invalido: UNKNOWN"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -937,9 +939,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenParticipationStatusIsPending() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenThrow(new BadRequestException("O status PENDING nao pode ser definido diretamente"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -950,9 +952,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnBadRequestWhenDeclineReasonExceedsLimit() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenThrow(new BadRequestException("O motivo da recusa deve ter no maximo 500 caracteres"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -963,10 +965,10 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34900000000", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 99L, username = "34900000000", authorities = {"ROLE_OPERATOR"})
     void shouldReturnNotFoundWhenPersonDoesNotExistOnParticipation() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34900000000"), eq(15L), any()))
-                .thenThrow(new ResourceNotFoundException("Pessoa", "34900000000"));
+        when(eventParticipationResponseService.respond(eq(99L), eq(15L), any()))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
                         .with(csrf())
@@ -977,9 +979,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnNotFoundWhenEventDoesNotExistOnParticipation() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(99L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(99L), any()))
                 .thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
 
         mockMvc.perform(put("/pessoas/me/escalas/99/participacao")
@@ -990,9 +992,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnConflictWhenPersonHasNoAssignmentOnParticipation() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenThrow(new ConflictException("A pessoa autenticada nao possui atribuicao neste evento"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -1004,9 +1006,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldReturnConflictWhenEventAlreadyStarted() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenThrow(new ConflictException("Nao e possivel responder a participacao apos o inicio do evento"));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -1017,9 +1019,9 @@ class PersonControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34999999999", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
     void shouldIgnorePersonIdInParticipationPayload() throws Exception {
-        when(eventParticipationResponseService.respond(eq("34999999999"), eq(15L), any()))
+        when(eventParticipationResponseService.respond(eq(10L), eq(15L), any()))
                 .thenReturn(participationResponse(15L, ParticipationStatus.CONFIRMED, null));
 
         mockMvc.perform(put("/pessoas/me/escalas/15/participacao")
@@ -1033,7 +1035,7 @@ class PersonControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(eventParticipationResponseService).respond(eq("34999999999"), eq(15L), any());
+        verify(eventParticipationResponseService).respond(eq(10L), eq(15L), any());
     }
 
     private String participationPayload(String status, String declineReason) {

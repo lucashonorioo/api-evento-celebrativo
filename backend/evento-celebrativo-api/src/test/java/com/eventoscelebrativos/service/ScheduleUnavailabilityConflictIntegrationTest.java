@@ -93,7 +93,7 @@ class ScheduleUnavailabilityConflictIntegrationTest {
             LocalDateTime unavailabilityStartAt = eventStartAt.plusMinutes(30);
             LocalDateTime unavailabilityEndAt = eventEndAt.plusHours(1);
             PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(
-                    reader.getPhoneNumber(), new PersonUnavailabilityRequestDTO(unavailabilityStartAt, unavailabilityEndAt, null));
+                    reader.getId(), new PersonUnavailabilityRequestDTO(unavailabilityStartAt, unavailabilityEndAt, null));
             unavailabilityId = unavailability.getId();
 
             List<ScheduleUnavailabilityConflictResponseDTO> conflictsByEvent =
@@ -110,7 +110,7 @@ class ScheduleUnavailabilityConflictIntegrationTest {
                     eventStartAt.toLocalDate().atStartOfDay(), eventStartAt.toLocalDate().plusDays(1).atStartOfDay(), 0, 10);
             assertEquals(1, conflictsByRange.getTotalElements());
 
-            personUnavailabilityService.delete(reader.getPhoneNumber(), unavailabilityId);
+            personUnavailabilityService.delete(reader.getId(), unavailabilityId);
             unavailabilityId = null;
 
             assertTrue(scheduleUnavailabilityConflictService.findByEventId(eventId).isEmpty(),
@@ -143,7 +143,7 @@ class ScheduleUnavailabilityConflictIntegrationTest {
 
             // Indisponibilidade adjacente ao evento original: nao conflita ainda.
             PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(
-                    reader.getPhoneNumber(), new PersonUnavailabilityRequestDTO(eventEndAt, eventEndAt.plusHours(1), null));
+                    reader.getId(), new PersonUnavailabilityRequestDTO(eventEndAt, eventEndAt.plusHours(1), null));
             unavailabilityId = unavailability.getId();
 
             assertTrue(scheduleUnavailabilityConflictService.findByEventId(eventId).isEmpty(),
@@ -184,11 +184,11 @@ class ScheduleUnavailabilityConflictIntegrationTest {
             eventId = scaleResponse.getEventId();
 
             eventParticipationResponseService.respond(
-                    reader.getPhoneNumber(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
+                    reader.getId(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
 
             // Indisponibilidade inicial fora do intervalo do evento: ainda nao conflita.
             PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(
-                    reader.getPhoneNumber(),
+                    reader.getId(),
                     new PersonUnavailabilityRequestDTO(eventEndAt.plusDays(1), eventEndAt.plusDays(2), null));
             unavailabilityId = unavailability.getId();
 
@@ -196,7 +196,7 @@ class ScheduleUnavailabilityConflictIntegrationTest {
 
             // Atualizacao passa a conflitar com o evento futuro (ainda nao iniciado): deve ser aceita.
             PersonUnavailabilityResponseDTO updated = personUnavailabilityService.update(
-                    reader.getPhoneNumber(), unavailabilityId,
+                    reader.getId(), unavailabilityId,
                     new PersonUnavailabilityRequestDTO(eventStartAt.plusMinutes(30), eventEndAt.plusHours(1), null));
             assertEquals(eventStartAt.plusMinutes(30), updated.getStartAt());
 
