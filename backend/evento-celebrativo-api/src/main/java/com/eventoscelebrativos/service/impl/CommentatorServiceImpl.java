@@ -82,7 +82,7 @@ public class CommentatorServiceImpl implements CommentatorService {
         if(id == null || id <= 0){
             throw new BusinessException("O id deve ser positivo e não nulo");
         }
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
         commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, person);
         person.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
 

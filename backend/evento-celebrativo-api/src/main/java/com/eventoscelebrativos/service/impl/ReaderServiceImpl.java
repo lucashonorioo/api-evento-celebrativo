@@ -83,7 +83,7 @@ public class ReaderServiceImpl implements ReaderService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.READER, ENTITY_LABEL);
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.READER, ENTITY_LABEL);
         readerMapper.updateReaderFromDto(readerRequestDTO, person);
         person.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
 

@@ -167,7 +167,7 @@ class ReaderServiceImplTest {
         Person saved = reader(1L, "encoded-password");
         ReaderResponseDTO response = response(1L);
 
-        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(personMinistryCommandService.save(entity)).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
@@ -175,12 +175,13 @@ class ReaderServiceImplTest {
         assertSame(response, service.updateReader(1L, request));
         verify(readerMapper).updateReaderFromDto(request, entity);
         assertEquals("encoded-password", entity.getPassword());
+        verify(passwordEncoder, times(1)).encode("raw-password");
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenUpdatingMissingReader() {
         ReaderRequestDTO request = request();
-        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.READER, ENTITY_LABEL))
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.READER, ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
 
         assertThrows(ResourceNotFoundException.class, () -> service.updateReader(99L, request));

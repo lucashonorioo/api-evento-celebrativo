@@ -13,6 +13,7 @@ import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryDiff;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
+import com.eventoscelebrativos.service.UserAccountSynchronizationService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +28,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final PersonRepository personRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
+    private final UserAccountSynchronizationService userAccountSynchronizationService;
 
     public PersonMinistryCommandServiceImpl(
             PersonRepository personRepository,
             PersonMinistryRepository personMinistryRepository,
-            EventAssignmentRepository eventAssignmentRepository
+            EventAssignmentRepository eventAssignmentRepository,
+            UserAccountSynchronizationService userAccountSynchronizationService
     ) {
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
+        this.userAccountSynchronizationService = userAccountSynchronizationService;
     }
 
     @Override
@@ -45,6 +49,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
         Person saved = personRepository.save(person);
+        userAccountSynchronizationService.synchronizeNewPerson(saved);
         try {
             personMinistryRepository.save(new PersonMinistry(saved, ministryType));
         } catch (DataIntegrityViolationException e) {
@@ -55,10 +60,20 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
 
     @Override
     public Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel) {
+        return requireActiveMinistryPerson(personId, ministryType, entityLabel, false);
+    }
+
+    @Override
+    @Transactional
+    public Person requireActiveMinistryPersonForUpdate(Long personId, MinistryType ministryType, String entityLabel) {
+        return requireActiveMinistryPerson(personId, ministryType, entityLabel, true);
+    }
+
+    private Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel, boolean forUpdate) {
         if (personId == null || personId <= 0) {
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Person person = personRepository.findById(personId)
+        Person person = (forUpdate ? personRepository.findByIdForUpdate(personId) : personRepository.findById(personId))
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType)
                 .filter(pm -> Boolean.TRUE.equals(pm.getActive()))
@@ -69,7 +84,9 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     @Override
     @Transactional
     public Person save(Person person) {
-        return personRepository.save(person);
+        Person saved = personRepository.save(person);
+        userAccountSynchronizationService.synchronizeExistingPerson(saved);
+        return saved;
     }
 
     @Override

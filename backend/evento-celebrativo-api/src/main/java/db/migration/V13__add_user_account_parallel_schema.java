@@ -1,0 +1,159 @@
+package db.migration;
+
+import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.migration.BaseJavaMigration;
+import org.flywaydb.core.api.migration.Context;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Locale;
+
+/**
+ * tb_person.active ja existe (NOT NULL DEFAULT TRUE, backfillado para TRUE) desde V3 e nao precisa
+ * ser alterado aqui; esta migration so passa a mapea-lo em Person.java.
+ * <p>
+ * tb_user_account e tb_user_account_role tambem ja existem desde V3, mas seguem sem nenhum
+ * mapeamento Java ate esta branch (autenticacao nunca as leu nem escreveu). Diferente de uma
+ * migration SQL estatica, esta migration verifica em tempo de execucao se cada tabela existe e,
+ * caso exista, quantos registros contem: qualquer registro pre-existente interrompe a migration
+ * ANTES de qualquer DROP, sem apagar dados e sem prosseguir para V14. So quando ambas as tabelas
+ * estao vazias (ou ausentes) elas sao recriadas com o desenho definitivo desta etapa: FK com
+ * ON DELETE CASCADE ate tb_person e tb_user_account, e timestamps com precisao de segundos
+ * (TIMESTAMP(0) no H2, DATETIME(0) no MySQL - os valores de created_at/updated_at passam a ser
+ * definidos deterministicamente pela aplicacao, sem depender de DEFAULT do banco).
+ */
+public class V13__add_user_account_parallel_schema extends BaseJavaMigration {
+
+    private static final String TB_USER_ACCOUNT = "tb_user_account";
+    private static final String TB_USER_ACCOUNT_ROLE = "tb_user_account_role";
+
+    @Override
+    public void migrate(Context context) throws Exception {
+        Connection connection = context.getConnection();
+
+        boolean userAccountExists = tableExists(connection, TB_USER_ACCOUNT);
+        boolean userAccountRoleExists = tableExists(connection, TB_USER_ACCOUNT_ROLE);
+
+        failIfNotEmpty(connection, TB_USER_ACCOUNT, userAccountExists);
+        failIfNotEmpty(connection, TB_USER_ACCOUNT_ROLE, userAccountRoleExists);
+
+        try (Statement statement = connection.createStatement()) {
+            if (userAccountRoleExists) {
+                statement.executeUpdate("DROP TABLE " + TB_USER_ACCOUNT_ROLE);
+            }
+            if (userAccountExists) {
+                statement.executeUpdate("DROP TABLE " + TB_USER_ACCOUNT);
+            }
+        }
+
+        String timestampType = isMySql(connection) ? "DATETIME(0)" : "TIMESTAMP(0)";
+        createUserAccountTable(connection, timestampType);
+        createUserAccountRoleTable(connection);
+    }
+
+    private boolean tableExists(Connection connection, String tableName) throws SQLException {
+        DatabaseMetaData metaData = connection.getMetaData();
+        try (ResultSet resultSet = metaData.getTables(connection.getCatalog(), connection.getSchema(), "%", new String[]{"TABLE"})) {
+            while (resultSet.next()) {
+                if (tableName.equalsIgnoreCase(resultSet.getString("TABLE_NAME"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void failIfNotEmpty(Connection connection, String tableName, boolean exists) throws SQLException {
+        if (!exists) {
+            return;
+        }
+        long count = countRows(connection, tableName);
+        if (count > 0) {
+            throw new FlywayException(
+                    "Nao e possivel recriar " + tableName + ": " + count
+                            + " registro(s) legado(s) encontrado(s). A migration V13 nao remove dados"
+                            + " existentes; nenhuma alteracao de schema foi realizada e a migracao para V14"
+                            + " nao prosseguira.");
+        }
+    }
+
+    private long countRows(Connection connection, String tableName) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) AS total FROM " + tableName)) {
+            resultSet.next();
+            return resultSet.getLong("total");
+        }
+    }
+
+    private boolean isMySql(Connection connection) throws SQLException {
+        String productName = connection.getMetaData().getDatabaseProductName();
+        return productName != null && productName.toUpperCase(Locale.ROOT).contains("MYSQL");
+    }
+
+    private void createUserAccountTable(Connection connection, String timestampType) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate(
+                    """
+                    CREATE TABLE tb_user_account (
+                        id BIGINT NOT NULL AUTO_INCREMENT,
+                        person_id BIGINT NOT NULL,
+                        username VARCHAR(255) NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at %1$s NOT NULL,
+                        updated_at %1$s NOT NULL,
+                        CONSTRAINT pk_tb_user_account PRIMARY KEY (id),
+                        CONSTRAINT uk_tb_user_account_person_id UNIQUE (person_id),
+                        CONSTRAINT uk_tb_user_account_username UNIQUE (username)
+                    )
+                    """.formatted(timestampType));
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE tb_user_account
+                        ADD CONSTRAINT fk_tb_user_account_person
+                        FOREIGN KEY (person_id)
+                        REFERENCES tb_person (id)
+                        ON DELETE CASCADE
+                    """);
+        }
+    }
+
+    private void createUserAccountRoleTable(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate(
+                    """
+                    CREATE TABLE tb_user_account_role (
+                        user_account_id BIGINT NOT NULL,
+                        role_id BIGINT NOT NULL,
+                        CONSTRAINT pk_tb_user_account_role PRIMARY KEY (user_account_id, role_id)
+                    )
+                    """);
+
+            // A PK composta (user_account_id, role_id) atende buscas iniciadas por user_account_id;
+            // este indice cobre buscas iniciadas por role_id (ex.: todas as contas com ROLE_ADMIN).
+            statement.executeUpdate(
+                    "CREATE INDEX idx_tb_user_account_role_role_id ON tb_user_account_role (role_id)");
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE tb_user_account_role
+                        ADD CONSTRAINT fk_tb_user_account_role_user_account
+                        FOREIGN KEY (user_account_id)
+                        REFERENCES tb_user_account (id)
+                        ON DELETE CASCADE
+                    """);
+
+            statement.executeUpdate(
+                    """
+                    ALTER TABLE tb_user_account_role
+                        ADD CONSTRAINT fk_tb_user_account_role_role
+                        FOREIGN KEY (role_id)
+                        REFERENCES tb_role (id)
+                    """);
+        }
+    }
+}

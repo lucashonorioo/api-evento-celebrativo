@@ -81,7 +81,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
         ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, person);
         person.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
 

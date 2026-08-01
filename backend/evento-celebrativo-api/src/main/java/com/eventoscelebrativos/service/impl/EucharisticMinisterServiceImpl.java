@@ -81,7 +81,7 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.EUCHARISTIC_MINISTER, "Ministro de Eucaristia");
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.EUCHARISTIC_MINISTER, "Ministro de Eucaristia");
         eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterRequestDTO, person);
         person.setPassword(passwordEncoder.encode(eucharisticMinisterRequestDTO.getPassword()));
 

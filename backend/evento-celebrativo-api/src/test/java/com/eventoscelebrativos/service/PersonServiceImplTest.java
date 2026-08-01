@@ -82,6 +82,9 @@ class PersonServiceImplTest {
     @Mock
     private EventParticipationResponseService eventParticipationResponseService;
 
+    @Mock
+    private UserAccountSynchronizationService userAccountSynchronizationService;
+
     @InjectMocks
     private PersonServiceImpl service;
 
@@ -232,7 +235,7 @@ class PersonServiceImplTest {
         person.addRole(operatorRole());
         Role adminRole = adminRole();
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
@@ -246,6 +249,7 @@ class PersonServiceImplTest {
         assertEquals(List.of(MinistryType.READER), response.getMinistries());
         assertTrue(person.hasRole("ROLE_ADMIN"));
         assertFalse(person.hasRole("ROLE_OPERATOR"));
+        verify(userAccountSynchronizationService).synchronizeExistingPerson(person);
     }
 
     @Test
@@ -256,7 +260,7 @@ class PersonServiceImplTest {
         otherAdmin.addRole(adminRole());
         Role operatorRole = operatorRole();
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person, otherAdmin));
         when(personRepository.save(person)).thenReturn(person);
@@ -276,7 +280,7 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         Role adminRole = adminRole();
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
@@ -303,7 +307,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenPersonDoesNotExist() {
-        when(personRepository.findByIdWithRoles(99L)).thenReturn(Optional.empty());
+        when(personRepository.findByIdWithRolesForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
                 () -> service.updatePersonRole(99L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN")));
@@ -322,7 +326,7 @@ class PersonServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenAllowedRoleDoesNotExistInDatabase() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
@@ -337,7 +341,7 @@ class PersonServiceImplTest {
         person.addRole(adminRole());
         authenticateAs("34999999991");
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
 
         ConflictException exception = assertThrows(ConflictException.class,
@@ -354,7 +358,7 @@ class PersonServiceImplTest {
         person.addRole(adminRole());
         authenticateAs("34999999991");
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole()));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
@@ -372,7 +376,7 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
 
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
         when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person));
 

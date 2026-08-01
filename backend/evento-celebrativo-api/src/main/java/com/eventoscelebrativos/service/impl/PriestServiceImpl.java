@@ -83,7 +83,7 @@ public class PriestServiceImpl implements PriestService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positio e não nulo");
         }
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(id, MinistryType.PRIEST, ENTITY_LABEL);
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.PRIEST, ENTITY_LABEL);
         priestMapper.updatePriestFromDto(priestRequestDTO, person);
         person.setPassword(passwordEncoder.encode(priestRequestDTO.getPassword()));
 

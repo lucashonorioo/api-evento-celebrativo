@@ -59,6 +59,49 @@ INSERT INTO tb_person_role (person_id, role_id) VALUES (13, 2);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (14, 2);
 INSERT INTO tb_person_role (person_id, role_id) VALUES (15, 1);
 
+-- tb_user_account/tb_user_account_role espelham exatamente tb_person/tb_person_role acima
+-- (repeatable migrations executam depois de V14, entao o backfill nao alcanca estas linhas).
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (1, '34989374748', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (2, '34962165544', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (3, '34991564562', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (4, '34983246978', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (5, '34978956324', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (6, '34998632145', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (7, '34963284523', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (8, '34998563215', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (9, '34936984562', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (10, '34989374749', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (11, '34991234567', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (12, '34987654321', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (13, '34988776655', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (14, '34999887766', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (15, '34981112233', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (1, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (1, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (2, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (3, 1);
+
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (4, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (4, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (5, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (6, 1);
+
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (7, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (7, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (8, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (9, 1);
+
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (10, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (10, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (11, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (12, 1);
+
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (13, 1);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (13, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (14, 2);
+INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (15, 1);
+
 INSERT INTO tb_location(church_name, address) VALUES ('Igreja Matriz Nossa Senhora do Rosário', 'Praça Rui Barbosa, Centro, Ibiá - MG');
 INSERT INTO tb_location(church_name, address) VALUES ('Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG');
 INSERT INTO tb_location(church_name, address) VALUES ('Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG');

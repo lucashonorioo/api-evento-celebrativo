@@ -40,6 +40,9 @@ class PersonMinistryCommandServiceImplTest {
     @Mock
     private EventAssignmentRepository eventAssignmentRepository;
 
+    @Mock
+    private UserAccountSynchronizationService userAccountSynchronizationService;
+
     @InjectMocks
     private PersonMinistryCommandServiceImpl service;
 
@@ -56,6 +59,7 @@ class PersonMinistryCommandServiceImplTest {
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
         assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
+        verify(userAccountSynchronizationService).synchronizeNewPerson(saved);
     }
 
     @Test
@@ -127,12 +131,42 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldLockPersonWithFindByIdForUpdateWhenRequiringActiveMinistryPersonForUpdate() {
+        Person reader = reader(1L);
+        PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+                .thenReturn(Optional.of(ministry));
+
+        assertSame(reader, service.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL));
+
+        verify(personRepository).findByIdForUpdate(1L);
+        verify(personRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenPersonDoesNotExistForUpdate() {
+        when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.requireActiveMinistryPersonForUpdate(99L, MinistryType.READER, ENTITY_LABEL));
+    }
+
+    @Test
+    void shouldRejectInvalidIdOnRequireActiveMinistryPersonForUpdate() {
+        assertThrows(BusinessException.class, () -> service.requireActiveMinistryPersonForUpdate(null, MinistryType.READER, ENTITY_LABEL));
+        assertThrows(BusinessException.class, () -> service.requireActiveMinistryPersonForUpdate(0L, MinistryType.READER, ENTITY_LABEL));
+        verifyNoInteractions(personRepository);
+    }
+
+    @Test
     void shouldDelegateSaveToPersonRepository() {
         Person reader = reader(1L);
         when(personRepository.save(reader)).thenReturn(reader);
 
         assertSame(reader, service.save(reader));
         verify(personRepository).save(reader);
+        verify(userAccountSynchronizationService).synchronizeExistingPerson(reader);
     }
 
     @Test

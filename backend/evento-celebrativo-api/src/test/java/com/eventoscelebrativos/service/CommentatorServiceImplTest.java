@@ -108,7 +108,7 @@ class CommentatorServiceImplTest {
         Person entity = commentator(1L, "old-password");
         CommentatorResponseDTO response = response(1L);
 
-        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -165,7 +165,7 @@ class CommentatorServiceImplTest {
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingCommentator() {
-        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.COMMENTATOR, ENTITY_LABEL))
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.COMMENTATOR, ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateCommentator(99L, request()));
 
