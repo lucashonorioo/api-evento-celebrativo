@@ -96,7 +96,7 @@ class EventParticipationResponseIntegrationTest {
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
 
-            mockMvc.perform(participationRequest(phone, eventId, "DECLINED", "Viagem"))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "DECLINED", "Viagem"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("DECLINED"))
                     .andExpect(jsonPath("$.declineReason").value("Viagem"));
@@ -107,7 +107,7 @@ class EventParticipationResponseIntegrationTest {
             LocalDateTime firstRespondedAt = first.getRespondedAt();
 
             setNow(LocalDateTime.of(2026, 8, 2, 9, 0));
-            mockMvc.perform(participationRequest(phone, eventId, "DECLINED", " Viagem "))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "DECLINED", " Viagem "))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.respondedAt").value(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(firstRespondedAt)));
 
@@ -117,7 +117,7 @@ class EventParticipationResponseIntegrationTest {
             assertEquals(firstRespondedAt, afterNoOp.getRespondedAt());
 
             setNow(LocalDateTime.of(2026, 8, 3, 9, 0));
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("CONFIRMED"))
                     .andExpect(jsonPath("$.declineReason").doesNotExist());
@@ -146,7 +146,7 @@ class EventParticipationResponseIntegrationTest {
             CelebrationEvent event = saveEvent("Unassigned Event", LocalDate.of(2026, 9, 1), LocalTime.of(19, 0));
             eventId = event.getId();
 
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.errorCode").value("BUSINESS_CONFLICT"));
         } finally {
@@ -168,17 +168,17 @@ class EventParticipationResponseIntegrationTest {
             saveAssignment(event, personId, EventAssignmentType.READER);
 
             setNow(LocalDateTime.of(2026, 9, 10, 18, 59, 59));
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isOk());
 
             cleanupParticipation(eventId);
 
             setNow(LocalDateTime.of(2026, 9, 10, 19, 0, 0));
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isConflict());
 
             setNow(LocalDateTime.of(2026, 9, 10, 19, 0, 1));
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isConflict());
         } finally {
             resetClock();
@@ -202,6 +202,7 @@ class EventParticipationResponseIntegrationTest {
             saveAssignment(event, personId, EventAssignmentType.READER);
 
             Long finalEventId = eventId;
+            Long finalPersonId = personId;
             CountDownLatch ready = new CountDownLatch(2);
             CountDownLatch start = new CountDownLatch(1);
 
@@ -209,7 +210,7 @@ class EventParticipationResponseIntegrationTest {
                 ready.countDown();
                 try {
                     start.await(5, TimeUnit.SECONDS);
-                    mockMvc.perform(participationRequest(phone, finalEventId, "CONFIRMED", null));
+                    mockMvc.perform(participationRequest(finalPersonId, phone, finalEventId, "CONFIRMED", null));
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -248,19 +249,19 @@ class EventParticipationResponseIntegrationTest {
             mockMvc.perform(get("/pessoas/me/escalas")
                             .param("startDate", "2026-09-01")
                             .param("endDate", "2026-09-30")
-                            .with(SecurityMockMvcRequestPostProcessors.user(phone).roles("OPERATOR")))
+                            .with(authenticatedUser(personId, phone)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].participationStatus").value("PENDING"))
                     .andExpect(jsonPath("$.content[0].declineReason").doesNotExist())
                     .andExpect(jsonPath("$.content[0].respondedAt").doesNotExist());
 
-            mockMvc.perform(participationRequest(phone, eventId, "DECLINED", "Motivo"))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "DECLINED", "Motivo"))
                     .andExpect(status().isOk());
 
             mockMvc.perform(get("/pessoas/me/escalas")
                             .param("startDate", "2026-09-01")
                             .param("endDate", "2026-09-30")
-                            .with(SecurityMockMvcRequestPostProcessors.user(phone).roles("OPERATOR")))
+                            .with(authenticatedUser(personId, phone)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].participationStatus").value("DECLINED"))
                     .andExpect(jsonPath("$.content[0].declineReason").value("Motivo"))
@@ -285,7 +286,7 @@ class EventParticipationResponseIntegrationTest {
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
 
-            mockMvc.perform(participationRequest(phone, eventId, "CONFIRMED", null))
+            mockMvc.perform(participationRequest(personId, phone, eventId, "CONFIRMED", null))
                     .andExpect(status().isOk());
             assertTrue(eventParticipationResponseRepository.findByEventIdAndPersonId(eventId, personId).isPresent());
 
@@ -313,7 +314,7 @@ class EventParticipationResponseIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder participationRequest(
-            String phoneNumber, Long eventId, String status, String declineReason
+            Long personId, String phoneNumber, Long eventId, String status, String declineReason
     ) {
         String body = declineReason == null
                 ? "{\"status\": \"%s\"}".formatted(status)
@@ -321,7 +322,17 @@ class EventParticipationResponseIntegrationTest {
         return put("/pessoas/me/escalas/{eventId}/participacao", eventId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
-                .with(SecurityMockMvcRequestPostProcessors.user(phoneNumber).roles("OPERATOR"));
+                .with(authenticatedUser(personId, phoneNumber));
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor authenticatedUser(Long personId, String phoneNumber) {
+        java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OPERATOR"));
+        com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
+        return SecurityMockMvcRequestPostProcessors.authentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        authenticatedUser, null, authorities));
     }
 
     private Long savePersonWithRole(String name, String phoneNumber, String roleAuthority) {

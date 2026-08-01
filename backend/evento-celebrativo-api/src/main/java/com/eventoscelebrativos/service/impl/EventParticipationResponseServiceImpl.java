@@ -60,11 +60,11 @@ public class EventParticipationResponseServiceImpl implements EventParticipation
 
     @Override
     @Transactional
-    public ParticipationResponseResponseDTO respond(String phoneNumber, Long eventId, ParticipationResponseRequestDTO requestDTO) {
+    public ParticipationResponseResponseDTO respond(Long personId, Long eventId, ParticipationResponseRequestDTO requestDTO) {
         validateEventId(eventId);
 
-        Person person = personRepository.findByPhoneNumber(phoneNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", phoneNumber));
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
 
         CelebrationEvent event = celebrationEventRepository.findById(eventId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", eventId));

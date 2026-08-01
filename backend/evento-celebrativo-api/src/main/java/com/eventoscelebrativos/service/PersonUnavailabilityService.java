@@ -10,18 +10,18 @@ import java.time.LocalDateTime;
 public interface PersonUnavailabilityService {
 
     Page<PersonUnavailabilityResponseDTO> findMine(
-            String phoneNumber,
+            Long personId,
             LocalDateTime startAt,
             LocalDateTime endAt,
             int page,
             int size
     );
 
-    PersonUnavailabilityResponseDTO create(String phoneNumber, PersonUnavailabilityRequestDTO requestDTO);
+    PersonUnavailabilityResponseDTO create(Long personId, PersonUnavailabilityRequestDTO requestDTO);
 
-    PersonUnavailabilityResponseDTO update(String phoneNumber, Long id, PersonUnavailabilityRequestDTO requestDTO);
+    PersonUnavailabilityResponseDTO update(Long personId, Long id, PersonUnavailabilityRequestDTO requestDTO);
 
-    void delete(String phoneNumber, Long id);
+    void delete(Long personId, Long id);
 
     AdminUnavailabilityResponseDTO findByDate(LocalDateTime startAt, LocalDateTime endAt);
 }

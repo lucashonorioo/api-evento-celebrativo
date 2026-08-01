@@ -8,7 +8,7 @@ import java.util.Map;
 
 public interface EventParticipationResponseService {
 
-    ParticipationResponseResponseDTO respond(String phoneNumber, Long eventId, ParticipationResponseRequestDTO requestDTO);
+    ParticipationResponseResponseDTO respond(Long personId, Long eventId, ParticipationResponseRequestDTO requestDTO);
 
     /**
      * Chaves pelo eventId; somente respostas da pessoa informada.

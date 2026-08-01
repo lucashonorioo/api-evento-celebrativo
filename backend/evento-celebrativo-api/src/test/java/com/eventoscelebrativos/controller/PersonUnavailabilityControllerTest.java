@@ -13,6 +13,8 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
+import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PersonUnavailabilityController.class)
-@Import({PersonUnavailabilityControllerTest.MethodSecurityTestConfig.class, TemporalJsonConfig.class})
+@Import({PersonUnavailabilityControllerTest.MethodSecurityTestConfig.class, TemporalJsonConfig.class, AuthenticatedUserResolver.class})
 class PersonUnavailabilityControllerTest {
 
     @Autowired
@@ -56,9 +58,9 @@ class PersonUnavailabilityControllerTest {
     private PersonUnavailabilityService personUnavailabilityService;
 
     @Test
-    @WithMockUser(username = "34970000001", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000001", authorities = {"ROLE_OPERATOR"})
     void shouldListMyUnavailabilitiesWhenOperator() throws Exception {
-        when(personUnavailabilityService.findMine(eq("34970000001"), any(), any(), anyInt(), anyInt()))
+        when(personUnavailabilityService.findMine(eq(1L), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(
                         List.of(new PersonUnavailabilityResponseDTO(1L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), "Viagem")),
                         PageRequest.of(0, 10),
@@ -76,7 +78,7 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000001", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000001", authorities = {"ROLE_OPERATOR"})
     void shouldRejectNonCanonicalQueryDateTimes() throws Exception {
         for (String invalidStartAt : List.of(
                 "2026-08-01T00:00:00.1",
@@ -93,9 +95,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000001", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000001", authorities = {"ROLE_OPERATOR"})
     void shouldReturnStructuredBadRequestForFractionalUnavailabilityBody() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000001"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenThrow(new TemporalPrecisionNotSupportedException());
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -168,9 +170,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000015", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000015", authorities = {"ROLE_ADMIN"})
     void shouldReturnStructuredBadRequestForFractionalUpdateBody() throws Exception {
-        when(personUnavailabilityService.update(eq("34970000015"), eq(1L), any()))
+        when(personUnavailabilityService.update(eq(1L), eq(1L), any()))
                 .thenThrow(new TemporalPrecisionNotSupportedException());
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
@@ -188,9 +190,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000002", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000002", authorities = {"ROLE_ADMIN"})
     void shouldCreateUnavailabilityAndReturn201() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000002"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenReturn(new PersonUnavailabilityResponseDTO(5L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), null));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -207,9 +209,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000003", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000003", authorities = {"ROLE_ADMIN"})
     void shouldIgnoreExtraPersonIdFieldInRequestBody() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000003"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenReturn(new PersonUnavailabilityResponseDTO(6L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0), null));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -224,7 +226,7 @@ class PersonUnavailabilityControllerTest {
                                 """))
                 .andExpect(status().isCreated());
 
-        verify(personUnavailabilityService).create(eq("34970000003"), any());
+        verify(personUnavailabilityService).create(eq(1L), any());
     }
 
     @Test
@@ -241,9 +243,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000004", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000004", authorities = {"ROLE_ADMIN"})
     void shouldReturn409WithOverlapErrorCode() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000004"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenThrow(new UnavailabilityOverlapException("O período informado se sobrepõe a uma indisponibilidade já cadastrada."));
 
         mockMvc.perform(post("/pessoas/me/indisponibilidades")
@@ -260,9 +262,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000005", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000005", authorities = {"ROLE_ADMIN"})
     void shouldReturn409WithStartedAssignmentConflictStructuredResponse() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000005"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenThrow(new UnavailabilityConflictWithStartedAssignmentException(List.of(
                         new StartedAssignmentConflictDTO(15L, "Missa das 19h", LocalDateTime.of(2026, 8, 15, 19, 0), LocalDateTime.of(2026, 8, 15, 20, 0),
                                 "READER")
@@ -284,9 +286,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000006", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000006", authorities = {"ROLE_ADMIN"})
     void shouldUpdateUnavailability() throws Exception {
-        when(personUnavailabilityService.update(eq("34970000006"), eq(1L), any()))
+        when(personUnavailabilityService.update(eq(1L), eq(1L), any()))
                 .thenReturn(new PersonUnavailabilityResponseDTO(1L, LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 15, 0, 0), "Atualizado"));
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
@@ -305,9 +307,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000007", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000007", authorities = {"ROLE_ADMIN"})
     void shouldReturn404WhenUpdatingRecordThatDoesNotBelongToCaller() throws Exception {
-        when(personUnavailabilityService.update(eq("34970000007"), eq(99L), any()))
+        when(personUnavailabilityService.update(eq(1L), eq(99L), any()))
                 .thenThrow(new ResourceNotFoundException("Indisponibilidade", 99L));
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/99")
@@ -324,9 +326,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000008", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000008", authorities = {"ROLE_ADMIN"})
     void shouldReturn400WhenStartAtIsInThePast() throws Exception {
-        when(personUnavailabilityService.update(eq("34970000008"), eq(1L), any()))
+        when(personUnavailabilityService.update(eq(1L), eq(1L), any()))
                 .thenThrow(new BadRequestException("startAt não pode ser anterior ao instante atual"));
 
         mockMvc.perform(put("/pessoas/me/indisponibilidades/1")
@@ -343,19 +345,19 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000009", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000009", authorities = {"ROLE_ADMIN"})
     void shouldDeleteUnavailabilityAndReturn204() throws Exception {
         mockMvc.perform(delete("/pessoas/me/indisponibilidades/1").with(csrf()))
                 .andExpect(status().isNoContent());
 
-        verify(personUnavailabilityService).delete("34970000009", 1L);
+        verify(personUnavailabilityService).delete(1L, 1L);
     }
 
     @Test
-    @WithMockUser(username = "34970000010", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000010", authorities = {"ROLE_ADMIN"})
     void shouldReturn404WhenDeletingRecordThatDoesNotBelongToCaller() throws Exception {
         org.mockito.Mockito.doThrow(new ResourceNotFoundException("Indisponibilidade", 99L))
-                .when(personUnavailabilityService).delete("34970000010", 99L);
+                .when(personUnavailabilityService).delete(1L, 99L);
 
         mockMvc.perform(delete("/pessoas/me/indisponibilidades/99").with(csrf()))
                 .andExpect(status().isNotFound());
@@ -400,9 +402,9 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "34970000011", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 1L, username = "34970000011", authorities = {"ROLE_ADMIN"})
     void shouldReturn409StructuredResponseForPersonUnavailableForEvent() throws Exception {
-        when(personUnavailabilityService.create(eq("34970000011"), any()))
+        when(personUnavailabilityService.create(eq(1L), any()))
                 .thenThrow(new PersonUnavailableForEventException(List.of(
                         new PersonUnavailabilityEventConflictDTO(4L, "Arthur Costa", List.of("READER", "COMMENTATOR"),
                                 LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0))

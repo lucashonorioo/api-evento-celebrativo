@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.request.PersonUnavailabilityRequestDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,7 +17,6 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,9 +45,14 @@ public class PersonUnavailabilityController {
                     .withResolverStyle(ResolverStyle.STRICT);
 
     private final PersonUnavailabilityService personUnavailabilityService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public PersonUnavailabilityController(PersonUnavailabilityService personUnavailabilityService) {
+    public PersonUnavailabilityController(
+            PersonUnavailabilityService personUnavailabilityService,
+            AuthenticatedUserResolver authenticatedUserResolver
+    ) {
         this.personUnavailabilityService = personUnavailabilityService;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @Operation(summary = "Lista as indisponibilidades da pessoa autenticada que interceptam um intervalo [startAt, endAt). "
@@ -63,7 +68,6 @@ public class PersonUnavailabilityController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @GetMapping(value = "/me/indisponibilidades")
     public ResponseEntity<Page<PersonUnavailabilityResponseDTO>> findMyUnavailabilities(
-            Authentication authentication,
             @Parameter(description = "Inicio do intervalo, inclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
             @RequestParam("startAt") String startAt,
             @Parameter(description = "Fim do intervalo, exclusive. Formato ISO yyyy-MM-ddTHH:mm:ss")
@@ -74,7 +78,7 @@ public class PersonUnavailabilityController {
             @RequestParam(defaultValue = "10") int size
     ) {
         Page<PersonUnavailabilityResponseDTO> result = personUnavailabilityService.findMine(
-                authentication.getName(),
+                authenticatedUserResolver.requireCurrentPersonId(),
                 parseCanonicalDateTime(startAt),
                 parseCanonicalDateTime(endAt),
                 page,
@@ -100,10 +104,10 @@ public class PersonUnavailabilityController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PostMapping(value = "/me/indisponibilidades")
     public ResponseEntity<PersonUnavailabilityResponseDTO> createMyUnavailability(
-            Authentication authentication,
             @Valid @RequestBody PersonUnavailabilityRequestDTO requestDTO
     ) {
-        PersonUnavailabilityResponseDTO responseDTO = personUnavailabilityService.create(authentication.getName(), requestDTO);
+        PersonUnavailabilityResponseDTO responseDTO = personUnavailabilityService.create(
+                authenticatedUserResolver.requireCurrentPersonId(), requestDTO);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(responseDTO.getId())
@@ -126,12 +130,11 @@ public class PersonUnavailabilityController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @PutMapping(value = "/me/indisponibilidades/{id}")
     public ResponseEntity<PersonUnavailabilityResponseDTO> updateMyUnavailability(
-            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody PersonUnavailabilityRequestDTO requestDTO
     ) {
         PersonUnavailabilityResponseDTO responseDTO =
-                personUnavailabilityService.update(authentication.getName(), id, requestDTO);
+                personUnavailabilityService.update(authenticatedUserResolver.requireCurrentPersonId(), id, requestDTO);
         return ResponseEntity.ok(responseDTO);
     }
 
@@ -145,8 +148,8 @@ public class PersonUnavailabilityController {
     })
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
     @DeleteMapping(value = "/me/indisponibilidades/{id}")
-    public ResponseEntity<Void> deleteMyUnavailability(Authentication authentication, @PathVariable Long id) {
-        personUnavailabilityService.delete(authentication.getName(), id);
+    public ResponseEntity<Void> deleteMyUnavailability(@PathVariable Long id) {
+        personUnavailabilityService.delete(authenticatedUserResolver.requireCurrentPersonId(), id);
         return ResponseEntity.noContent().build();
     }
 

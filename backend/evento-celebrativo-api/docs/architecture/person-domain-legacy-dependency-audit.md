@@ -11,6 +11,8 @@ Esta auditoria e somente documental. Nenhum comportamento de producao, teste, pr
 > Dependencia atual restante fora do escopo deste documento (nao e legado do dominio de pessoas): nenhuma. Impacto pendente conhecido: o frontend administrativo (`admin-users/admin-user.models.ts`, `admin-user.service.ts`, `admin-user-management.component.ts`/`.html` e specs) ainda consome `personType`, removido do backend por `refactor/replace-person-type-with-ministries-contract`; a migracao desse consumo para `ministries`/`ministry` e a unica acao pendente relacionada a este documento.
 > Fora do escopo original desta auditoria (posterior a 2026-07-27, dominio novo e nao legado): a feature de confirmacao/recusa de participacao (`EventParticipationResponse`, migration `V9`) foi adicionada; nao representa dependencia legada e nao esta coberta por este documento. A branch `refactor/remove-unused-event-assignment-repository-methods` tambem removeu, sem relacao com o legado de Person, dois metodos de `EventAssignmentRepository` sem consumidor (`findByEventIdAndPersonId`, `existsByEventIdAndPersonId`); nenhuma tabela deste documento os referenciava.
 
+Atualizacao posterior adicional (`feature/user-account-authentication-cutover`, 2026-08-01): o fluxo de login foi cortado para `UserAccount`. `POST /oauth2/token` e o proxy `POST /public/login` validam a senha contra `UserAccount.passwordHash`; as authorities emitidas e carregadas vêm de `UserAccount.roles`. `PersonDetailsServiceImpl` permanece como componente legado, fora do fluxo atual de login e bearer, sem fallback para `Person`. `Person.password` e `Person.roles` permanecem no modelo apenas durante a transicao para compatibilidade com cadastros/contratos legados, mas nao sao fonte de autenticacao. Na validacao de bearer, o resource server exige `account_id` integral positivo e revalida `UserAccount.enabled`, `Person.active`, username atual (`sub`/`username`) e roles por `account_id` via `UserAccountRepository.findByIdForAuthentication`; claims de roles do token nao substituem essa consulta e nao ha fallback por username, `Person.phoneNumber`, `Person.password` ou `Person.roles`.
+
 ## 1. Resumo executivo
 
 O backend ja possui as estruturas paralelas principais:
@@ -135,7 +137,7 @@ Classificacao usada:
 | Backfill de assignments | `V5__backfill_event_assignments` | `MIGRATION_ONLY` | Deriva `tb_event_assignment` de `tb_event_person` + `person_type`. |
 | Seeds local/test | `R__load_local_demo_data.sql`, `R__load_test_fixtures.sql` | `TEST_ONLY`/demo | Criam pessoas de cada subtipo e assignments derivados. |
 | Testes de subtipo divergente | testes `*Parallel*IntegrationTest`, `*ScaleLegacyCompatibilityIntegrationTest` | `TEST_ONLY` | Provam diferenca entre subtipo e role/assignment paralelos. |
-| Autorizacao | `ResourceServerConfig`, `Role`, `Person.roles` | Nao depende de `person_type` para decisao | Login ainda usa `Person` como `UserDetails`, mas roles sao independentes. |
+| Autorizacao | `ResourceServerConfig`, `UserAccountJwtAuthenticationConverter`, `UserAccount.roles` | Nao depende de `person_type` para decisao | Login e bearer usam `UserAccount`; `Person.roles` permanece legado/transicional e nao e fonte de autenticacao. |
 
 Situacoes em que o sistema ainda nao permite funcao diferente do subtipo legado:
 
@@ -201,7 +203,7 @@ Responsavel principal atual pela validacao:
 
 - Ministerios: subtipo/repository legado e DTO de cada CRUD.
 - Escalas: subtipo Java carregado de `PersonRepository.findById`; `PersonMinistry` ainda nao e fonte de permissao de escala.
-- Roles: `Person.roles` legado.
+- Roles: `UserAccount.roles` no fluxo de autenticacao; `Person.roles` permanece legado/transicional para cadastros/contratos ainda nao removidos.
 
 ## 8. Matriz por endpoint e frontend
 
@@ -218,7 +220,7 @@ Responsavel principal atual pela validacao:
 | `/leitores`, `/comentaristas`, `/padres`, `/ministrosDaPalavra`, `/ministrosDeEucaristia` | services especificos de pessoas | `id`, `name`, `phoneNumber`, `birthdayDate`; requests com senha | subtipo legado em escrita; listagem configuravel | Nao se backend mantiver rotas/DTOs; sim se trocar por API unica sem compat | Nao bloqueado para telas atuais. |
 | `GET /pessoas`, `GET /pessoas/{id}`, `PUT /pessoas/{id}/roles` | `AdminUserService` | `personType`, roles, phone | `Person.personType` + roles | Sim se remover `personType` sem substituto | Mudanca de contrato necessaria para remover `person_type`. |
 | `GET /admin/event-assignments/consistency` (removido) | `EventAssignmentAuditService` | endpoint removido em `refactor/retire-event-assignment-operational-audit` | n/a | Sim, endpoint deixou de existir | Frontend de auditoria ja esta bloqueado agora: a tela fica sem endpoint correspondente e deve ser removida ou substituida quando o desenvolvimento frontend for retomado. |
-| `POST /public/login` | `AuthService` | token OAuth/JWT | `Person` como `UserDetails` + roles | Potencialmente sim quando separar `UserAccount` | Requer branch propria de auth. |
+| `POST /public/login` | `AuthService` | token OAuth/JWT | `UserAccount.passwordHash` + `UserAccount.roles`; sem fallback para `Person` | Nao, mantendo o contrato atual de login | Cutover de auth concluido nesta branch; `PersonDetailsServiceImpl` fica legado. |
 
 Classificacao:
 
@@ -256,7 +258,7 @@ Recomendacao profissional:
 | Subclasses SINGLE_TABLE | Sim | Sim | Sim | Sim | Sim |
 | `tb_person_ministry` | Sim, V3 | Sim, V3/V4 | Nao para rollback legacy, mas sim para paralelo | Sim | Nao |
 | `tb_event_assignment` | Sim, V3 | Sim, V3/V5 | Nao para rollback legacy, mas sim para paralelo | Sim | Nao |
-| `tb_user_account` | Criada por V3 | Criada por V3 | Ainda nao usada por login atual | Preparacao | Nao |
+| `tb_user_account` | Criada por V13 | Criada por V13/V14 | Fonte atual de login, password hash e roles de autenticacao | Modelo oficial de autenticacao | Nao |
 
 ### Migrations futuras provaveis
 
@@ -268,7 +270,7 @@ Recomendacao profissional:
 | Remover FKs/joins legados | eliminar `tb_event_person` | rollback encerrado, auditoria concluida, frontend compativel | Alto/destrutivo. |
 | Remover `person_type` | trocar heranca por `Person` concreto + ministries | API unificada e auth desacoplada | Alto/destrutivo. |
 | Remover tabelas/colunas de compatibilidade | limpar `tb_event_person`, discriminator e talvez services legacy | periodo de estabilidade | Alto. |
-| Backfill/limpeza de `tb_user_account` | separar credenciais e roles da pessoa | branch de autenticacao | Alto por impacto de login. |
+| Backfill/limpeza de `tb_user_account` | separar credenciais e roles da pessoa | concluido por `V13`/`V14` e cutover de autenticacao | Alto por impacto de login; manter regressao de auth/JWT. |
 
 Nao criar nem editar migrations nesta branch.
 
@@ -327,7 +329,7 @@ Nao foi identificada peca claramente removivel agora sem quebrar rollback, teste
 | 5 | `chore/remove-event-assignment-shadow-read` | Remover shadow read de assignments apos estabilidade | Fonte parallel oficial estabilizada | Medio | Nao | Nao | Rollback ainda pode ficar | Suite + logs sem shadow. |
 | 6 | `chore/remove-event-assignment-legacy-read` | Remover propriedades/enums/queries `LEGACY` de escala | Rollback oficialmente encerrado | Alto | Nao se contrato mantido | Nao | Nao | Regressao endpoints, MySQL, performance. |
 | 7 | `chore/remove-person-ministry-shadow-and-legacy-read` | Remover shadow/legacy das listagens ministeriais | PersonMinistry global e estavel | Alto | Nao se contrato mantido | Nao | Nao | Cinco CRUDs/listagens, segurança. |
-| 8 | `feature/user-account-auth-read-model` | Migrar login/roles para `tb_user_account` | Backfill de contas definido | Alto | Potencialmente transparente | Sim | Plano de rollback auth | Login/JWT/security. |
+| 8 | `feature/user-account-authentication-cutover` | Migrar login/roles para `tb_user_account` | Backfill de contas definido | Alto | Transparente para o contrato atual de login | Sim (`V13`/`V14`, sem novas migrations nesta rodada) | Plano de rollback auth | Login/JWT/security. |
 | 9 | `feature/person-domain-unified-person-api` | Introduzir `Person + ministries` como API oficial | API e frontend aprovados | Alto | Sim | Talvez | Manter endpoints antigos durante deprecacao | Contrato full stack. |
 | 10 | `chore/deprecate-ministry-subtype-endpoints` | Depreciar `/leitores`, etc. ou torna-los adaptadores | Frontend migrado | Medio | Sim se remover rotas | Nao | Periodo de compat | E2E/contratos. |
 | 11 | `db/remove-event-person-legacy-schema` | Remover `tb_event_person` e FKs | Escrita/leitura/auditoria sem legado | Alto/destrutivo | Nao se contrato mantido | Sim | Backup/restore, nao rollback simples | Migration MySQL, backups, dados reais. |
@@ -362,7 +364,7 @@ Antes de remover `person_type` e subclasses:
 - ~~CRUDs ministeriais ainda criam subclasses e a subclasse/repository de subtipo e a autoridade de escrita (find/update/delete restritos pelo discriminator; exclusao apaga a `Person` inteira).~~ Resolvido para find/update/delete pela `refactor/make-person-ministry-writes-official`: `Person` + `PersonMinistry` sao a autoridade de escrita; a subclasse concreta so e instanciada na criacao (dependencia transitoria de JPA, `Person` continua abstrata), nunca usada para classificar, buscar, atualizar ou excluir. Multiplos `PersonMinistry` na mesma pessoa sao preservados em update/delete; subtipo divergente do `PersonMinistry` solicitado nao bloqueia mais find/update. Pendente: nao ha ainda um endpoint para adicionar um segundo ministerio a uma pessoa ja existente atraves dos cinco CRUDs (cada `create` sempre cria uma `Person` nova); isso depende da API unificada de pessoas/ministerios (fase 9 do roadmap).
 - ~~`PersonAdminResponseDTO` e frontend admin ainda usam `personType`.~~ Resolvido no backend pela `refactor/replace-person-type-with-ministries-contract`: `PersonAdminResponseDTO` e `PersonRoleUpdateResponseDTO` expõem `ministries: List<MinistryType>`, sem `personType`. Pendente: o frontend admin (`admin-users/*`) ainda consome `personType` e precisa migrar para `ministries`/`ministry` numa branch frontend separada.
 - ~~`tb_event_person` ainda existe fisicamente e pode conter linhas historicas de eventos nunca atualizados apos o cutover da escrita.~~ Resolvido: removida fisicamente pela migration `V7` em `refactor/remove-legacy-event-person-schema` (ver atualizacao posterior no topo deste documento).
-- `tb_user_account` existe, mas login/roles atuais ainda usam `Person`.
+- ~~`tb_user_account` existe, mas login/roles atuais ainda usam `Person`.~~ Resolvido em `feature/user-account-authentication-cutover`: login usa `UserAccount.passwordHash`, authorities usam `UserAccount.roles`, bearer revalida estado atual por `account_id`, e nao ha fallback para `Person`.
 - ~~Remocao destrutiva de schema ainda nao possui plano de migration/backout.~~ Resolvido para `tb_event_person` pela `V7`; ainda pendente para a remocao futura de `person_type` e subclasses.
 
 ## 17. Itens nao bloqueadores

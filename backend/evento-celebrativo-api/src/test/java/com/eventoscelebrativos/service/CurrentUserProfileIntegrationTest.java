@@ -91,7 +91,7 @@ class CurrentUserProfileIntegrationTest {
             addMinistry(targetId, MinistryType.READER);
             Long finalTargetId = targetId;
 
-            withAuthenticatedUser(targetPhone, "OPERATOR", () -> mockMvc.perform(get("/pessoas/me"))
+            withAuthenticatedUser(finalTargetId, targetPhone, "OPERATOR", () -> mockMvc.perform(get("/pessoas/me"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(finalTargetId))
                     .andExpect(jsonPath("$.phoneNumber").value(targetPhone))
@@ -106,7 +106,7 @@ class CurrentUserProfileIntegrationTest {
 
     @Test
     void shouldReturnNotFoundWhenAuthenticatedPrincipalDoesNotCorrespondToAnyPerson() throws Exception {
-        withAuthenticatedUser(uniquePhoneNumber(), "OPERATOR", () -> mockMvc.perform(get("/pessoas/me"))
+        withAuthenticatedUser(-1L, uniquePhoneNumber(), "OPERATOR", () -> mockMvc.perform(get("/pessoas/me"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND")));
     }
@@ -130,7 +130,7 @@ class CurrentUserProfileIntegrationTest {
             LocalDate newBirthday = LocalDate.of(1985, 6, 20);
             Long finalTargetId = targetId;
 
-            withAuthenticatedUser(targetPhone, "OPERATOR", () -> mockMvc.perform(put("/pessoas/me")
+            withAuthenticatedUser(finalTargetId, targetPhone, "OPERATOR", () -> mockMvc.perform(put("/pessoas/me")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
@@ -186,7 +186,7 @@ class CurrentUserProfileIntegrationTest {
                     .when(personRepository)
                     .save(argThat(person -> person != null && finalTargetId.equals(person.getId())));
 
-            withAuthenticatedUser(targetPhone, "OPERATOR", () -> mockMvc.perform(put("/pessoas/me")
+            withAuthenticatedUser(finalTargetId, targetPhone, "OPERATOR", () -> mockMvc.perform(put("/pessoas/me")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {
@@ -204,13 +204,17 @@ class CurrentUserProfileIntegrationTest {
         }
     }
 
-    private void withAuthenticatedUser(String phoneNumber, String role, ThrowingRunnable action) throws Exception {
+    private void withAuthenticatedUser(Long personId, String phoneNumber, String role, ThrowingRunnable action) throws Exception {
         try {
+            java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
+                    new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role));
+            com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
+                    new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
             org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
                     new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                            phoneNumber,
+                            authenticatedUser,
                             "n/a",
-                            List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role))
+                            authorities
                     )
             );
             action.run();

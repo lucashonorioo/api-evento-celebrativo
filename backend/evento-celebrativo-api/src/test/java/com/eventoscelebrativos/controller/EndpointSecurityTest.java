@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.controller;
 
+import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -209,7 +210,7 @@ class EndpointSecurityTest {
     }
 
     @Test
-    @WithMockUser(username = "34962165544", roles = "OPERATOR")
+    @WithMockAuthenticatedUser(personId = 2L, username = "34962165544", authorities = {"ROLE_OPERATOR"})
     void shouldAllowOperatorOnOwnProfileEndpointsOnly() throws Exception {
         mockMvc.perform(get("/pessoas/me"))
                 .andExpect(status().isOk())
@@ -254,7 +255,7 @@ class EndpointSecurityTest {
     }
 
     @Test
-    @WithMockUser(username = "34999887766", roles = "ADMIN")
+    @WithMockAuthenticatedUser(personId = 14L, username = "34999887766", authorities = {"ROLE_ADMIN"})
     void shouldAllowAdminOnAdministrativeEndpoints() throws Exception {
         mockMvc.perform(get("/pessoas/me"))
                 .andExpect(status().isOk())

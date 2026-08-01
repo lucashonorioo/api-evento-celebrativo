@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import com.eventoscelebrativos.config.customgrant.CustomPasswordAuthenticationConverter;
 import com.eventoscelebrativos.config.customgrant.CustomPasswordAuthenticationProvider;
+import com.eventoscelebrativos.security.AuthenticatedUser;
+import com.eventoscelebrativos.service.UserAccountAuthenticationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,8 +20,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2Token;
@@ -66,7 +66,7 @@ public class AuthorizationServerConfig {
 	private Integer jwtDurationSeconds;
 
 	@Autowired
-	private UserDetailsService userDetailsService;
+	private UserAccountAuthenticationService userAccountAuthenticationService;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -81,7 +81,7 @@ public class AuthorizationServerConfig {
 		http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
 				.tokenEndpoint(tokenEndpoint -> tokenEndpoint
 						.accessTokenRequestConverter(new CustomPasswordAuthenticationConverter())
-						.authenticationProvider(new CustomPasswordAuthenticationProvider(authorizationService(), tokenGenerator(), userDetailsService, passwordEncoder)));
+						.authenticationProvider(new CustomPasswordAuthenticationProvider(authorizationService(), tokenGenerator(), userAccountAuthenticationService, passwordEncoder)));
 
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
 		// @formatter:on
@@ -155,16 +155,16 @@ public class AuthorizationServerConfig {
 
 				Authentication principal = context.getPrincipal();
 
-				if (principal.getPrincipal() instanceof UserDetails) {
-					UserDetails userDetails = (UserDetails) principal.getPrincipal();
+				if (principal.getPrincipal() instanceof AuthenticatedUser authenticatedUser) {
 
-					List<String> authorities = userDetails.getAuthorities().stream()
+					List<String> authorities = authenticatedUser.authorities().stream()
 							.map(x -> x.getAuthority())
 							.toList();
 
 					context.getClaims()
 							.claim("authorities", authorities)
-							.claim("username", userDetails.getUsername());
+							.claim("username", authenticatedUser.username())
+							.claim("account_id", authenticatedUser.accountId());
 				}
 			}
 		};

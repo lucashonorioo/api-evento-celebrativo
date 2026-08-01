@@ -31,12 +31,12 @@ public interface PersonService {
 
     PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO);
 
-    CurrentUserProfileResponseDTO getCurrentUserProfile(String phoneNumber);
+    CurrentUserProfileResponseDTO getCurrentUserProfile(Long personId);
 
-    CurrentUserProfileResponseDTO updateCurrentUserProfile(String phoneNumber, CurrentUserProfileUpdateRequestDTO requestDTO);
+    CurrentUserProfileResponseDTO updateCurrentUserProfile(Long personId, CurrentUserProfileUpdateRequestDTO requestDTO);
 
     Page<CurrentUserScheduleResponseDTO> findCurrentUserSchedules(
-            String phoneNumber,
+            Long personId,
             LocalDate startDate,
             LocalDate endDate,
             int page,

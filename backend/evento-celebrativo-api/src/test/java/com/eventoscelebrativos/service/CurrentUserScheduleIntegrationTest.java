@@ -95,7 +95,7 @@ class CurrentUserScheduleIntegrationTest {
             otherEventId = otherEvent.getId();
             saveAssignment(otherEvent, personBId, EventAssignmentType.READER);
 
-            mockMvc.perform(scheduleRequest(phoneA, "2026-08-01", "2026-08-31"))
+            mockMvc.perform(scheduleRequest(personAId, phoneA, "2026-08-01", "2026-08-31"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.totalElements").value(1))
                     .andExpect(jsonPath("$.content[0].eventId").value(ownEventId));
@@ -123,13 +123,13 @@ class CurrentUserScheduleIntegrationTest {
             saveAssignment(sharedEvent, personAId, EventAssignmentType.READER);
             saveAssignment(sharedEvent, personBId, EventAssignmentType.COMMENTATOR);
 
-            mockMvc.perform(scheduleRequest(phoneA, "2026-08-01", "2026-08-31"))
+            mockMvc.perform(scheduleRequest(personAId, phoneA, "2026-08-01", "2026-08-31"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].eventId").value(sharedEventId))
                     .andExpect(jsonPath("$.content[0].assignments[0]").value("READER"))
                     .andExpect(jsonPath("$.content[0].assignments.length()").value(1));
 
-            mockMvc.perform(scheduleRequest(phoneB, "2026-08-01", "2026-08-31"))
+            mockMvc.perform(scheduleRequest(personBId, phoneB, "2026-08-01", "2026-08-31"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].eventId").value(sharedEventId))
                     .andExpect(jsonPath("$.content[0].assignments[0]").value("COMMENTATOR"))
@@ -178,7 +178,7 @@ class CurrentUserScheduleIntegrationTest {
             ministry.deactivate();
             personMinistryRepository.saveAndFlush(ministry);
 
-            mockMvc.perform(scheduleRequest(phone, "2026-08-01", "2026-08-31"))
+            mockMvc.perform(scheduleRequest(personId, phone, "2026-08-01", "2026-08-31"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.totalElements").value(1))
                     .andExpect(jsonPath("$.content[0].assignments[0]").value("READER"));
@@ -207,7 +207,7 @@ class CurrentUserScheduleIntegrationTest {
             otherEventId = otherEvent.getId();
             saveAssignment(otherEvent, personBId, EventAssignmentType.READER);
 
-            mockMvc.perform(scheduleRequest(phoneA, "2026-08-01", "2026-08-31")
+            mockMvc.perform(scheduleRequest(personAId, phoneA, "2026-08-01", "2026-08-31")
                             .param("personId", String.valueOf(personBId)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.totalElements").value(1))
@@ -220,11 +220,17 @@ class CurrentUserScheduleIntegrationTest {
         }
     }
 
-    private MockHttpServletRequestBuilder scheduleRequest(String phoneNumber, String startDate, String endDate) {
+    private MockHttpServletRequestBuilder scheduleRequest(Long personId, String phoneNumber, String startDate, String endDate) {
+        java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
+                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OPERATOR"));
+        com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
         return get("/pessoas/me/escalas")
                 .param("startDate", startDate)
                 .param("endDate", endDate)
-                .with(SecurityMockMvcRequestPostProcessors.user(phoneNumber).roles("OPERATOR"));
+                .with(SecurityMockMvcRequestPostProcessors.authentication(
+                        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                                authenticatedUser, null, authorities)));
     }
 
     private Long savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
