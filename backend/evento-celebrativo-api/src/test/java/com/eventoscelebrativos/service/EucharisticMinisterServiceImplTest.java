@@ -109,7 +109,7 @@ class EucharisticMinisterServiceImplTest {
         Person entity = minister(1L, "old-password");
         EucharisticMinisterResponseDTO response = response(1L);
 
-        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -172,7 +172,7 @@ class EucharisticMinisterServiceImplTest {
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingEucharisticMinister() {
-        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL))
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateEucharisticMinisters(99L, request()));
 

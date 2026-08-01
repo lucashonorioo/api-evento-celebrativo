@@ -31,6 +31,7 @@ import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import com.eventoscelebrativos.service.PersonService;
+import com.eventoscelebrativos.service.UserAccountSynchronizationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -68,6 +69,7 @@ public class PersonServiceImpl implements PersonService {
     private final PersonMinistryCommandService personMinistryCommandService;
     private final EventAssignmentRepository eventAssignmentRepository;
     private final EventParticipationResponseService eventParticipationResponseService;
+    private final UserAccountSynchronizationService userAccountSynchronizationService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -78,7 +80,8 @@ public class PersonServiceImpl implements PersonService {
             PersonMinistryReadService personMinistryReadService,
             PersonMinistryCommandService personMinistryCommandService,
             EventAssignmentRepository eventAssignmentRepository,
-            EventParticipationResponseService eventParticipationResponseService
+            EventParticipationResponseService eventParticipationResponseService,
+            UserAccountSynchronizationService userAccountSynchronizationService
     ) {
         this.personRepository = personRepository;
         this.roleRepository = roleRepository;
@@ -89,6 +92,7 @@ public class PersonServiceImpl implements PersonService {
         this.personMinistryCommandService = personMinistryCommandService;
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.eventParticipationResponseService = eventParticipationResponseService;
+        this.userAccountSynchronizationService = userAccountSynchronizationService;
     }
 
     @Override
@@ -154,7 +158,7 @@ public class PersonServiceImpl implements PersonService {
         validateId(id);
         String requestedRole = normalizeRequiredRole(requestDTO.getRole());
 
-        Person person = personRepository.findByIdWithRoles(id)
+        Person person = personRepository.findByIdWithRolesForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
 
         Role role = roleRepository.findByAuthority(requestedRole)
@@ -169,6 +173,7 @@ public class PersonServiceImpl implements PersonService {
         person.addRole(role);
 
         Person savedPerson = personRepository.save(person);
+        userAccountSynchronizationService.synchronizeExistingPerson(savedPerson);
         PersonRoleUpdateResponseDTO dto = personRoleUpdateMapper.toDto(savedPerson);
         return new PersonRoleUpdateResponseDTO(
                 dto.getId(),

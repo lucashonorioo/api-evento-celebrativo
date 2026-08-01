@@ -95,4 +95,9 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Person p WHERE p.id = :id")
     Optional<Person> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "roles")
+    @Query("SELECT p FROM Person p WHERE p.id = :id")
+    Optional<Person> findByIdWithRolesForUpdate(@Param("id") Long id);
 }

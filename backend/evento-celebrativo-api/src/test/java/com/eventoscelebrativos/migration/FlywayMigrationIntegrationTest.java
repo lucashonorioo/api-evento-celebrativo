@@ -57,6 +57,8 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("10");
         assertSuccessfulMigration("11");
         assertSuccessfulMigration("12");
+        assertSuccessfulMigration("13");
+        assertSuccessfulMigration("14");
         assertTableExists("flyway_schema_history");
         assertTableExists("tb_event_participation_response");
         assertTableExists("tb_person_unavailability");
@@ -104,11 +106,11 @@ class FlywayMigrationIntegrationTest {
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history "
-                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12') "
+                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14') "
                         + "AND success = TRUE",
                 Integer.class
         );
-        assertEquals(12, successfulVersions);
+        assertEquals(14, successfulVersions);
     }
 
     @Test
@@ -131,6 +133,8 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("10");
         assertSuccessfulMigration("11");
         assertSuccessfulMigration("12");
+        assertSuccessfulMigration("13");
+        assertSuccessfulMigration("14");
         assertTableDoesNotExist("tb_event_person");
         assertColumnDoesNotExist("tb_person", "person_type");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));

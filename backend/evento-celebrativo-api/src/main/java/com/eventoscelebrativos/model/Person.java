@@ -25,6 +25,9 @@ public class Person implements Serializable, UserDetails {
     private LocalDate birthdayDate;
     private String password;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
     @ManyToMany
     @JoinTable(
             name = "tb_person_role",
@@ -84,6 +87,14 @@ public class Person implements Serializable, UserDetails {
     }
 
     public void setPassword(String password) { this.password = password;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public Set<Role> getRoles() {

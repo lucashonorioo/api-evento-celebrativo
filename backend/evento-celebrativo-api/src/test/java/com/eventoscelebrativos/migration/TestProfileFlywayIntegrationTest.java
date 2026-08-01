@@ -68,7 +68,7 @@ class TestProfileFlywayIntegrationTest {
         assertEquals(15, countPeopleWithFilledParallelColumns());
         assertPersonMinistryFixtures();
         assertEventAssignmentFixtures();
-        assertFutureUserTablesAreEmpty();
+        assertUserAccountFixturesMirrorPersonFixtures();
     }
 
     @Test
@@ -146,9 +146,46 @@ class TestProfileFlywayIntegrationTest {
         assertEquals(0, countDuplicatedEventAssignments());
     }
 
-    private void assertFutureUserTablesAreEmpty() {
-        assertEquals(0, countRows("tb_user_account"));
-        assertEquals(0, countRows("tb_user_account_role"));
+    private void assertUserAccountFixturesMirrorPersonFixtures() {
+        assertEquals(15, countRows("tb_user_account"));
+        assertEquals(20, countRows("tb_user_account_role"));
+        assertEquals(0, countUsernameMismatches());
+        assertEquals(0, countPasswordHashMismatches());
+        assertEquals(15, countAccountsEnabled());
+    }
+
+    private int countUsernameMismatches() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person p
+                JOIN tb_user_account ua ON ua.person_id = p.id
+                WHERE ua.username <> p.phone_number
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPasswordHashMismatches() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person p
+                JOIN tb_user_account ua ON ua.person_id = p.id
+                WHERE ua.password_hash <> p.password
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countAccountsEnabled() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_user_account WHERE enabled = TRUE",
+                Integer.class
+        );
+        return count == null ? 0 : count;
     }
 
     private void assertTableDoesNotExist(String tableName) {

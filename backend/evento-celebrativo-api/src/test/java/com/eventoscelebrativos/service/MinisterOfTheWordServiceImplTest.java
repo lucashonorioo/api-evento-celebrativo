@@ -109,7 +109,7 @@ class MinisterOfTheWordServiceImplTest {
         Person entity = minister(1L, "old-password");
         MinisterOfTheWordResponseDTO response = response(1L);
 
-        when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL)).thenReturn(entity);
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL)).thenReturn(entity);
         when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -172,7 +172,7 @@ class MinisterOfTheWordServiceImplTest {
 
     @Test
     void shouldThrowWhenUpdatingOrDeletingMissingMinisterOfTheWord() {
-        when(personMinistryCommandService.requireActiveMinistryPerson(99L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL))
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(MUTATION_ENTITY_LABEL, 99L));
         assertThrows(ResourceNotFoundException.class, () -> service.updateMinisterOfTheWord(99L, request()));
 

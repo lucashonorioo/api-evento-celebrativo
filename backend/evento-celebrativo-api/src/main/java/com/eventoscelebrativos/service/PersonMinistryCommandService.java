@@ -16,6 +16,15 @@ public interface PersonMinistryCommandService {
 
     Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel);
 
+    /**
+     * Igual a {@link #requireActiveMinistryPerson(Long, MinistryType, String)}, mas bloqueia a
+     * {@link Person} (PESSIMISTIC_WRITE) antes de retorna-la. Use antes de aplicar um mapper que
+     * possa alterar telefone, senha ou outros dados sincronizados com {@link com.eventoscelebrativos.model.UserAccount},
+     * garantindo que o lock de Person seja adquirido antes de qualquer mutacao e antes do lock de
+     * UserAccount feito por {@link com.eventoscelebrativos.service.UserAccountSynchronizationService}.
+     */
+    Person requireActiveMinistryPersonForUpdate(Long personId, MinistryType ministryType, String entityLabel);
+
     Person save(Person person);
 
     void removeMinistry(Long personId, MinistryType ministryType, String entityLabel);
