@@ -24,5 +24,7 @@ public @interface WithMockAuthenticatedUser {
 
     String username() default "34999999999";
 
+    long tokenVersion() default 0L;
+
     String[] authorities() default {"ROLE_OPERATOR"};
 }

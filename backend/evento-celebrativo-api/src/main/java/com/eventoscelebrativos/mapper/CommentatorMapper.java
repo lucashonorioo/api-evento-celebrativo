@@ -13,6 +13,8 @@ import java.util.List;
 public interface CommentatorMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     Person toEntity(CommentatorRequestDTO commentatorRequestDTO);
 
     default CommentatorResponseDTO toDtoFromPerson(Person person) {
@@ -31,5 +33,7 @@ public interface CommentatorMapper {
     }
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     void updateCommentatorFromDto(CommentatorRequestDTO commentatorRequestDTO, @MappingTarget Person person);
 }

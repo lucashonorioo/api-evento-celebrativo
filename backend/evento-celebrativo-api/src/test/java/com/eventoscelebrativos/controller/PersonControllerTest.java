@@ -6,10 +6,12 @@ import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
+import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
@@ -18,6 +20,7 @@ import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -43,6 +46,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -58,6 +62,9 @@ class PersonControllerTest {
 
     @MockitoBean
     private EventParticipationResponseService eventParticipationResponseService;
+
+    @MockitoBean
+    private UserAccountLifecycleService userAccountLifecycleService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -165,6 +172,151 @@ class PersonControllerTest {
         mockMvc.perform(get("/pessoas/99"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldFindAccountStateForPersonWithoutAccount() throws Exception {
+        when(userAccountLifecycleService.findAccountState(1L))
+                .thenReturn(new UserAccountLifecycleResponseDTO(1L, true, false, null, null, List.of()));
+
+        mockMvc.perform(get("/pessoas/1/conta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personId").value(1))
+                .andExpect(jsonPath("$.personActive").value(true))
+                .andExpect(jsonPath("$.accountExists").value(false))
+                .andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.accountEnabled").doesNotExist())
+                .andExpect(jsonPath("$.roles").isEmpty())
+                .andExpect(jsonPath("$.accountId").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.tokenVersion").doesNotExist());
+
+        verify(userAccountLifecycleService).findAccountState(1L);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldCreateAccountWithoutAcceptingExternalAccountId() throws Exception {
+        when(userAccountLifecycleService.createAccount(eq(1L), any()))
+                .thenReturn(new UserAccountLifecycleResponseDTO(1L, true, true, "34999999991", true, List.of("ROLE_OPERATOR")));
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "accountId": 999,
+                                  "initialPassword": "123456",
+                                  "role": "ROLE_OPERATOR"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.personId").value(1))
+                .andExpect(jsonPath("$.username").value("34999999991"))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_OPERATOR"))
+                .andExpect(jsonPath("$.accountId").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.tokenVersion").doesNotExist());
+
+        verify(userAccountLifecycleService).createAccount(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnConflictEnvelopeFromLifecycleEndpoints() throws Exception {
+        doThrow(new LifecycleConflictException("Pessoa inativa nao pode receber conta.", "PERSON_INACTIVE"))
+                .when(userAccountLifecycleService).createAccount(eq(1L), any());
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "initialPassword": "123456",
+                                  "role": "ROLE_OPERATOR"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("PERSON_INACTIVE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldDelegateAccountEnabledPersonStatusAndAdminPasswordReset() throws Exception {
+        mockMvc.perform(put("/pessoas/1/conta/habilitacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/pessoas/1/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":false}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/pessoas/1/conta/senha")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"123456\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(userAccountLifecycleService).updateAccountEnabled(eq(1L), any());
+        verify(userAccountLifecycleService).updatePersonActive(eq(1L), any());
+        verify(userAccountLifecycleService).resetPassword(eq(1L), any());
+    }
+
+    @Test
+    @WithMockAuthenticatedUser(personId = 10L, username = "34999999999", authorities = {"ROLE_OPERATOR"})
+    void shouldAllowOperatorToChangeOnlyOwnPassword() throws Exception {
+        mockMvc.perform(put("/pessoas/me/conta/senha")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "personId": 999,
+                                  "accountId": 999,
+                                  "currentPassword": "123456",
+                                  "newPassword": "654321"
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(userAccountLifecycleService).changeOwnPassword(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldRejectOperatorOnAdministrativeLifecycleEndpoints() throws Exception {
+        mockMvc.perform(get("/pessoas/1/conta"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"initialPassword\":\"123456\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/conta/habilitacao")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":false}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/conta/senha")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"123456\"}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(userAccountLifecycleService);
     }
 
     @Test

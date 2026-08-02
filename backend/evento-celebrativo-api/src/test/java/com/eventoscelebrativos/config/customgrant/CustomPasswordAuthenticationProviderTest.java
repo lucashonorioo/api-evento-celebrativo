@@ -102,6 +102,7 @@ class CustomPasswordAuthenticationProviderTest {
                 20L,
                 "34999999999",
                 "stored-password-hash",
+                0L,
                 true,
                 true,
                 authorities

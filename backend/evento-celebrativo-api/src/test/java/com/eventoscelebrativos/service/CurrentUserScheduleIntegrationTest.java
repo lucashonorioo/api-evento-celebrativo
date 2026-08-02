@@ -224,7 +224,7 @@ class CurrentUserScheduleIntegrationTest {
         java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OPERATOR"));
         com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
-                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, 0L, authorities);
         return get("/pessoas/me/escalas")
                 .param("startDate", startDate)
                 .param("endDate", endDate)

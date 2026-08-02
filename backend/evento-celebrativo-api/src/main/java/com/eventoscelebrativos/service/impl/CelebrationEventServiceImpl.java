@@ -11,6 +11,7 @@ import com.eventoscelebrativos.dto.response.EventScheduleAssignmentResponseDTO;
 import com.eventoscelebrativos.dto.response.EventScheduleQueryResponseDTO;
 import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
@@ -322,6 +323,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         List<EventAssignmentTarget> newPersonTargets = targets.stream()
                 .filter(target -> !currentPersonIds.contains(target.person().getId()))
                 .toList();
+        validateActiveForTargets(newPersonTargets);
         validateAvailabilityForTargets(newPersonTargets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
@@ -354,6 +356,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
+        validateActiveForTargets(targets);
         validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
@@ -419,6 +422,17 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                     .add(target.assignmentType());
         }
         personUnavailabilityConflictService.validateAvailabilityForEvent(typesByPerson, startAt, endAt);
+    }
+
+    private void validateActiveForTargets(Collection<EventAssignmentTarget> targets) {
+        for (EventAssignmentTarget target : targets) {
+            if (!target.person().isActive()) {
+                throw new LifecycleConflictException(
+                        "Pessoa inativa nao pode receber nova atribuicao em evento.",
+                        "PERSON_INACTIVE_FOR_ASSIGNMENT"
+                );
+            }
+        }
     }
 
     private void validateRange(LocalDateTime startAt, LocalDateTime endAt) {

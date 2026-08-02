@@ -47,6 +47,9 @@ class ReaderServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private UserAccountLifecycleService userAccountLifecycleService;
+
     @InjectMocks
     private ReaderServiceImpl service;
 
@@ -60,8 +63,12 @@ class ReaderServiceImplTest {
         ReaderResponseDTO response = response(1L);
 
         when(readerMapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
+        doAnswer(invocation -> {
+            Person person = invocation.getArgument(0);
+            person.setPassword("encoded-password");
+            person.addRole(operatorRole);
+            return null;
+        }).when(userAccountLifecycleService).applyCreationAccess(entity, request);
         when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.READER))).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
@@ -82,8 +89,8 @@ class ReaderServiceImplTest {
         Person entity = reader(null, "raw-password");
 
         when(readerMapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
+        doThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"))
+                .when(userAccountLifecycleService).applyCreationAccess(entity, request);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createReader(request));
         verify(personMinistryCommandService, never()).create(any(), any());
@@ -168,14 +175,17 @@ class ReaderServiceImplTest {
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
+        doAnswer(invocation -> {
+            entity.setPassword("encoded-password");
+            return null;
+        }).when(userAccountLifecycleService).applyMinisterialUpdateAccess(entity, request);
         when(personMinistryCommandService.save(entity)).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));
         verify(readerMapper).updateReaderFromDto(request, entity);
         assertEquals("encoded-password", entity.getPassword());
-        verify(passwordEncoder, times(1)).encode("raw-password");
+        verify(userAccountLifecycleService, times(1)).applyMinisterialUpdateAccess(entity, request);
     }
 
     @Test

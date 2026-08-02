@@ -13,6 +13,8 @@ Esta auditoria e somente documental. Nenhum comportamento de producao, teste, pr
 
 Atualizacao posterior adicional (`feature/user-account-authentication-cutover`, 2026-08-01): o fluxo de login foi cortado para `UserAccount`. `POST /oauth2/token` e o proxy `POST /public/login` validam a senha contra `UserAccount.passwordHash`; as authorities emitidas e carregadas vêm de `UserAccount.roles`. `PersonDetailsServiceImpl` permanece como componente legado, fora do fluxo atual de login e bearer, sem fallback para `Person`. `Person.password` e `Person.roles` permanecem no modelo apenas durante a transicao para compatibilidade com cadastros/contratos legados, mas nao sao fonte de autenticacao. Na validacao de bearer, o resource server exige `account_id` integral positivo e revalida `UserAccount.enabled`, `Person.active`, username atual (`sub`/`username`) e roles por `account_id` via `UserAccountRepository.findByIdForAuthentication`; claims de roles do token nao substituem essa consulta e nao ha fallback por username, `Person.phoneNumber`, `Person.password` ou `Person.roles`.
 
+Atualizacao posterior adicional (`feature/user-account-lifecycle-management`, 2026-08-01): a separacao entre `Person` e `UserAccount` passou a ser suportada explicitamente. Uma `Person` pode existir sem conta; nesse caso `Person.password` permanece `NULL`, `Person.roles` permanece vazio e nao ha linha em `tb_user_account`. A migration `V15__support_user_account_lifecycle` tornou `tb_person.password` nullable e adicionou `tb_user_account.token_version BIGINT NOT NULL DEFAULT 0 CHECK (token_version >= 0)`. O login continua usando exclusivamente `UserAccount`: senha de `UserAccount.passwordHash` e authorities de `UserAccount.roles`; `PersonDetailsServiceImpl` permanece legado e fora do fluxo. `Person.password` e `Person.roles` continuam apenas como estruturas transicionais sincronizadas para pessoas com conta. O bearer agora revalida por `account_id` o estado atual de `UserAccount.enabled`, `Person.active`, username (`sub`/`username`), roles e `token_version`; token legado sem `token_version` equivale a versao zero apenas enquanto a conta atual tambem estiver na versao zero. Nao existe fallback para `Person`, `Person.phoneNumber`, `Person.password` ou roles legadas.
+
 ## 1. Resumo executivo
 
 O backend ja possui as estruturas paralelas principais:
@@ -258,7 +260,7 @@ Recomendacao profissional:
 | Subclasses SINGLE_TABLE | Sim | Sim | Sim | Sim | Sim |
 | `tb_person_ministry` | Sim, V3 | Sim, V3/V4 | Nao para rollback legacy, mas sim para paralelo | Sim | Nao |
 | `tb_event_assignment` | Sim, V3 | Sim, V3/V5 | Nao para rollback legacy, mas sim para paralelo | Sim | Nao |
-| `tb_user_account` | Criada por V13 | Criada por V13/V14 | Fonte atual de login, password hash e roles de autenticacao | Modelo oficial de autenticacao | Nao |
+| `tb_user_account` | Criada por V13; `token_version` adicionado por V15 | Criada por V13/V14; V15 inicializa versao zero | Fonte atual de login, password hash, roles de autenticacao e invalidacao por versao | Modelo oficial de autenticacao e ciclo de vida de conta | Nao |
 
 ### Migrations futuras provaveis
 
@@ -270,9 +272,9 @@ Recomendacao profissional:
 | Remover FKs/joins legados | eliminar `tb_event_person` | rollback encerrado, auditoria concluida, frontend compativel | Alto/destrutivo. |
 | Remover `person_type` | trocar heranca por `Person` concreto + ministries | API unificada e auth desacoplada | Alto/destrutivo. |
 | Remover tabelas/colunas de compatibilidade | limpar `tb_event_person`, discriminator e talvez services legacy | periodo de estabilidade | Alto. |
-| Backfill/limpeza de `tb_user_account` | separar credenciais e roles da pessoa | concluido por `V13`/`V14` e cutover de autenticacao | Alto por impacto de login; manter regressao de auth/JWT. |
+| Backfill/limpeza de `tb_user_account` | separar credenciais, roles e versao tecnica da pessoa | concluido por `V13`/`V14`/`V15`, cutover de autenticacao e lifecycle de conta | Alto por impacto de login; manter regressao de auth/JWT/lifecycle. |
 
-Nao criar nem editar migrations nesta branch.
+No lifecycle de conta, a unica migration nova prevista foi `V15__support_user_account_lifecycle`; `V1`-`V14` permanecem imutaveis.
 
 ## 11. Testes que dependem do legado
 
@@ -364,7 +366,7 @@ Antes de remover `person_type` e subclasses:
 - ~~CRUDs ministeriais ainda criam subclasses e a subclasse/repository de subtipo e a autoridade de escrita (find/update/delete restritos pelo discriminator; exclusao apaga a `Person` inteira).~~ Resolvido para find/update/delete pela `refactor/make-person-ministry-writes-official`: `Person` + `PersonMinistry` sao a autoridade de escrita; a subclasse concreta so e instanciada na criacao (dependencia transitoria de JPA, `Person` continua abstrata), nunca usada para classificar, buscar, atualizar ou excluir. Multiplos `PersonMinistry` na mesma pessoa sao preservados em update/delete; subtipo divergente do `PersonMinistry` solicitado nao bloqueia mais find/update. Pendente: nao ha ainda um endpoint para adicionar um segundo ministerio a uma pessoa ja existente atraves dos cinco CRUDs (cada `create` sempre cria uma `Person` nova); isso depende da API unificada de pessoas/ministerios (fase 9 do roadmap).
 - ~~`PersonAdminResponseDTO` e frontend admin ainda usam `personType`.~~ Resolvido no backend pela `refactor/replace-person-type-with-ministries-contract`: `PersonAdminResponseDTO` e `PersonRoleUpdateResponseDTO` expõem `ministries: List<MinistryType>`, sem `personType`. Pendente: o frontend admin (`admin-users/*`) ainda consome `personType` e precisa migrar para `ministries`/`ministry` numa branch frontend separada.
 - ~~`tb_event_person` ainda existe fisicamente e pode conter linhas historicas de eventos nunca atualizados apos o cutover da escrita.~~ Resolvido: removida fisicamente pela migration `V7` em `refactor/remove-legacy-event-person-schema` (ver atualizacao posterior no topo deste documento).
-- ~~`tb_user_account` existe, mas login/roles atuais ainda usam `Person`.~~ Resolvido em `feature/user-account-authentication-cutover`: login usa `UserAccount.passwordHash`, authorities usam `UserAccount.roles`, bearer revalida estado atual por `account_id`, e nao ha fallback para `Person`.
+- ~~`tb_user_account` existe, mas login/roles atuais ainda usam `Person`.~~ Resolvido em `feature/user-account-authentication-cutover` e consolidado em `feature/user-account-lifecycle-management`: login usa `UserAccount.passwordHash`, authorities usam `UserAccount.roles`, bearer revalida estado atual por `account_id` e `token_version`, e nao ha fallback para `Person`. `Person.password`/`Person.roles` permanecem apenas como legado sincronizado para pessoas com conta.
 - ~~Remocao destrutiva de schema ainda nao possui plano de migration/backout.~~ Resolvido para `tb_event_person` pela `V7`; ainda pendente para a remocao futura de `person_type` e subclasses.
 
 ## 17. Itens nao bloqueadores

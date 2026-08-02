@@ -47,6 +47,9 @@ class CommentatorServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private UserAccountLifecycleService userAccountLifecycleService;
+
     @InjectMocks
     private CommentatorServiceImpl service;
 
@@ -59,8 +62,11 @@ class CommentatorServiceImplTest {
         CommentatorResponseDTO response = response(1L);
 
         when(mapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
+        doAnswer(invocation -> {
+            entity.setPassword("encoded-password");
+            entity.addRole(operatorRole);
+            return null;
+        }).when(userAccountLifecycleService).applyCreationAccess(entity, request);
         when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.COMMENTATOR))).thenReturn(saved);
         when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
@@ -76,9 +82,10 @@ class CommentatorServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenOperatorRoleDoesNotExist() {
         CommentatorRequestDTO request = request();
-        when(mapper.toEntity(request)).thenReturn(commentator(null, "raw-password"));
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
+        Person entity = commentator(null, "raw-password");
+        when(mapper.toEntity(request)).thenReturn(entity);
+        doThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"))
+                .when(userAccountLifecycleService).applyCreationAccess(entity, request);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createCommentator(request));
         verify(personMinistryCommandService, never()).create(any(), any());
@@ -109,10 +116,14 @@ class CommentatorServiceImplTest {
         CommentatorResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
-        assertSame(response, service.updateCommentator(1L, request()));
+        CommentatorRequestDTO request = request();
+        doAnswer(invocation -> {
+            entity.setPassword("encoded-password");
+            return null;
+        }).when(userAccountLifecycleService).applyMinisterialUpdateAccess(entity, request);
+        assertSame(response, service.updateCommentator(1L, request));
         assertEquals("encoded-password", entity.getPassword());
 
         service.deleteCommentatorById(1L);

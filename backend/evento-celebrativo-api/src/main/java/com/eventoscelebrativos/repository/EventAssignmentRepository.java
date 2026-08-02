@@ -142,6 +142,17 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
 
     boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
 
+    @Query("""
+            SELECT CASE WHEN COUNT(a) > 0 THEN TRUE ELSE FALSE END
+            FROM EventAssignment a
+            WHERE a.person.id = :personId
+              AND a.event.endAt > :currentSecond
+            """)
+    boolean existsActiveOrFutureAssignmentByPersonId(
+            @Param("personId") Long personId,
+            @Param("currentSecond") LocalDateTime currentSecond
+    );
+
     @Modifying
     @Query("DELETE FROM EventAssignment assignment WHERE assignment.event.id = :eventId")
     void deleteAllByEventId(@Param("eventId") Long eventId);

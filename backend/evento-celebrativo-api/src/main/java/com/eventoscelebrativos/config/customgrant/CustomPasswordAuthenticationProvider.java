@@ -89,6 +89,7 @@ public class CustomPasswordAuthenticationProvider implements AuthenticationProvi
 				credentials.accountId(),
 				credentials.personId(),
 				credentials.username(),
+				credentials.tokenVersion(),
 				credentials.authorities()
 		);
 

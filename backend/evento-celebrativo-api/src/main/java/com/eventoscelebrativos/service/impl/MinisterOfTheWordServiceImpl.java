@@ -5,14 +5,11 @@ import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,21 +19,18 @@ import java.util.List;
 public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserAccountLifecycleService userAccountLifecycleService;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public MinisterOfTheWordServiceImpl(
             MinisterOfTheWordMapper ministerOfTheWordMapper,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
+            UserAccountLifecycleService userAccountLifecycleService,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userAccountLifecycleService = userAccountLifecycleService;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -46,14 +40,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Transactional
     public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         Person ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
-
-        ministerOfTheWord.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
-
-        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
-                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
-
-        ministerOfTheWord.addRole(operatorRole);
-
+        userAccountLifecycleService.applyCreationAccess(ministerOfTheWord, ministerOfTheWordRequestDTO);
         Person saved = personMinistryCommandService.create(ministerOfTheWord, MinistryType.MINISTER_OF_THE_WORD);
         return ministerOfTheWordMapper.toDtoFromPerson(saved);
     }
@@ -83,7 +70,7 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         }
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
         ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, person);
-        person.setPassword(passwordEncoder.encode(ministerOfTheWordRequestDTO.getPassword()));
+        userAccountLifecycleService.applyMinisterialUpdateAccess(person, ministerOfTheWordRequestDTO);
 
         Person saved = personMinistryCommandService.save(person);
         return ministerOfTheWordMapper.toDtoFromPerson(saved);

@@ -207,7 +207,7 @@ class UserAccountSynchronizationIntegrationTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
                                     new ReaderRequestDTO("Legacy Orphan Reader Updated", attemptedPhone, BIRTHDAY, "new-password"))))
-                    .andExpect(status().isInternalServerError());
+                    .andExpect(status().isConflict());
 
             Person unchanged = personRepository.findById(personId).orElseThrow();
             assertEquals("original-hash", unchanged.getPassword());

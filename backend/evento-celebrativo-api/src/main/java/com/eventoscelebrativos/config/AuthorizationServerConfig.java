@@ -164,7 +164,8 @@ public class AuthorizationServerConfig {
 					context.getClaims()
 							.claim("authorities", authorities)
 							.claim("username", authenticatedUser.username())
-							.claim("account_id", authenticatedUser.accountId());
+							.claim("account_id", authenticatedUser.accountId())
+							.claim("token_version", authenticatedUser.tokenVersion());
 				}
 			}
 		};

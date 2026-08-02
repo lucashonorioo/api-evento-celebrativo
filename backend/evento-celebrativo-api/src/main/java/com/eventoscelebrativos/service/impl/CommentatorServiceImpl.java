@@ -6,13 +6,10 @@ import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.mapper.CommentatorMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
-import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +21,18 @@ public class CommentatorServiceImpl implements CommentatorService {
     private static final String ENTITY_LABEL = "Comentarista";
 
     private final CommentatorMapper commentatorMapper;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserAccountLifecycleService userAccountLifecycleService;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public CommentatorServiceImpl(
             CommentatorMapper commentatorMapper,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
+            UserAccountLifecycleService userAccountLifecycleService,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.commentatorMapper = commentatorMapper;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userAccountLifecycleService = userAccountLifecycleService;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -47,14 +41,7 @@ public class CommentatorServiceImpl implements CommentatorService {
     @Transactional
     public CommentatorResponseDTO createCommentator(CommentatorRequestDTO commentatorRequestDTO) {
         Person commentator = commentatorMapper.toEntity(commentatorRequestDTO);
-
-        commentator.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
-
-        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
-                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
-
-        commentator.addRole(operatorRole);
-
+        userAccountLifecycleService.applyCreationAccess(commentator, commentatorRequestDTO);
         Person saved = personMinistryCommandService.create(commentator, MinistryType.COMMENTATOR);
         return commentatorMapper.toDtoFromPerson(saved);
     }
@@ -84,7 +71,7 @@ public class CommentatorServiceImpl implements CommentatorService {
         }
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
         commentatorMapper.updateCommentatorFromDto(commentatorRequestDTO, person);
-        person.setPassword(passwordEncoder.encode(commentatorRequestDTO.getPassword()));
+        userAccountLifecycleService.applyMinisterialUpdateAccess(person, commentatorRequestDTO);
 
         Person saved = personMinistryCommandService.save(person);
         return commentatorMapper.toDtoFromPerson(saved);

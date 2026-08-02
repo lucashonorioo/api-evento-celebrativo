@@ -5,14 +5,11 @@ import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +21,18 @@ public class ReaderServiceImpl implements ReaderService {
     private static final String ENTITY_LABEL = "Leitor";
 
     private final ReaderMapper readerMapper;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserAccountLifecycleService userAccountLifecycleService;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public ReaderServiceImpl(
             ReaderMapper readerMapper,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
+            UserAccountLifecycleService userAccountLifecycleService,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.readerMapper = readerMapper;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userAccountLifecycleService = userAccountLifecycleService;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -48,14 +42,7 @@ public class ReaderServiceImpl implements ReaderService {
     @Transactional
     public ReaderResponseDTO createReader(ReaderRequestDTO readerRequestDTO) {
         Person reader = readerMapper.toEntity(readerRequestDTO);
-
-        reader.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
-
-        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
-                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
-
-        reader.addRole(operatorRole);
-
+        userAccountLifecycleService.applyCreationAccess(reader, readerRequestDTO);
         Person saved = personMinistryCommandService.create(reader, MinistryType.READER);
         return readerMapper.toDtoFromPerson(saved);
     }
@@ -85,7 +72,7 @@ public class ReaderServiceImpl implements ReaderService {
         }
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.READER, ENTITY_LABEL);
         readerMapper.updateReaderFromDto(readerRequestDTO, person);
-        person.setPassword(passwordEncoder.encode(readerRequestDTO.getPassword()));
+        userAccountLifecycleService.applyMinisterialUpdateAccess(person, readerRequestDTO);
 
         Person saved = personMinistryCommandService.save(person);
         return readerMapper.toDtoFromPerson(saved);

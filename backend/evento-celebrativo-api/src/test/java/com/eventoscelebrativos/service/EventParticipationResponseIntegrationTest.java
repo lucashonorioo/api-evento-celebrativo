@@ -329,7 +329,7 @@ class EventParticipationResponseIntegrationTest {
         java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OPERATOR"));
         com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
-                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, 0L, authorities);
         return SecurityMockMvcRequestPostProcessors.authentication(
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                         authenticatedUser, null, authorities));

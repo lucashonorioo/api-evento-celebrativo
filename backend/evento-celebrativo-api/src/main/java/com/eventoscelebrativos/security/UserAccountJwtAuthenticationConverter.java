@@ -30,9 +30,11 @@ public class UserAccountJwtAuthenticationConverter implements Converter<Jwt, Abs
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
         Long accountId = extractAccountId(jwt);
+        Long tokenVersion = extractTokenVersion(jwt);
 
         AuthenticatedUser authenticatedUser = userAccountAuthenticationService.loadCurrentUser(accountId)
                 .filter(user -> usernameStillMatches(jwt, user))
+                .filter(user -> user.tokenVersion().equals(tokenVersion))
                 .orElseThrow(() -> new InvalidBearerTokenException(INVALID_BEARER_TOKEN));
 
         return new UsernamePasswordAuthenticationToken(authenticatedUser, null, authenticatedUser.authorities());
@@ -60,6 +62,30 @@ public class UserAccountJwtAuthenticationConverter implements Converter<Jwt, Abs
             throw new InvalidBearerTokenException(INVALID_BEARER_TOKEN);
         }
         return accountId;
+    }
+
+    private Long extractTokenVersion(Jwt jwt) {
+        Object rawTokenVersion = jwt.getClaim("token_version");
+        if (rawTokenVersion == null) {
+            return 0L;
+        }
+        Long tokenVersion = switch (rawTokenVersion) {
+            case Byte number -> number.longValue();
+            case Short number -> number.longValue();
+            case Integer number -> number.longValue();
+            case Long number -> number;
+            case BigInteger number -> {
+                if (number.signum() < 0 || number.bitLength() > 63) {
+                    throw new InvalidBearerTokenException(INVALID_BEARER_TOKEN);
+                }
+                yield number.longValue();
+            }
+            default -> throw new InvalidBearerTokenException(INVALID_BEARER_TOKEN);
+        };
+        if (tokenVersion < 0) {
+            throw new InvalidBearerTokenException(INVALID_BEARER_TOKEN);
+        }
+        return tokenVersion;
     }
 
     private boolean usernameStillMatches(Jwt jwt, AuthenticatedUser authenticatedUser) {

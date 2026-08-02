@@ -19,20 +19,17 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import com.eventoscelebrativos.service.PersonService;
-import com.eventoscelebrativos.service.UserAccountSynchronizationService;
-import com.eventoscelebrativos.security.AuthenticatedUserResolver;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -60,7 +57,6 @@ public class PersonServiceImpl implements PersonService {
     private static final Set<String> ALLOWED_ROLES = Set.of(ROLE_ADMIN, ROLE_OPERATOR);
 
     private final PersonRepository personRepository;
-    private final RoleRepository roleRepository;
     private final PersonAdminMapper personAdminMapper;
     private final PersonRoleUpdateMapper personRoleUpdateMapper;
     private final CurrentUserProfileMapper currentUserProfileMapper;
@@ -68,12 +64,10 @@ public class PersonServiceImpl implements PersonService {
     private final PersonMinistryCommandService personMinistryCommandService;
     private final EventAssignmentRepository eventAssignmentRepository;
     private final EventParticipationResponseService eventParticipationResponseService;
-    private final UserAccountSynchronizationService userAccountSynchronizationService;
-    private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final UserAccountLifecycleService userAccountLifecycleService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
-            RoleRepository roleRepository,
             PersonAdminMapper personAdminMapper,
             PersonRoleUpdateMapper personRoleUpdateMapper,
             CurrentUserProfileMapper currentUserProfileMapper,
@@ -81,11 +75,9 @@ public class PersonServiceImpl implements PersonService {
             PersonMinistryCommandService personMinistryCommandService,
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
-            UserAccountSynchronizationService userAccountSynchronizationService,
-            AuthenticatedUserResolver authenticatedUserResolver
+            UserAccountLifecycleService userAccountLifecycleService
     ) {
         this.personRepository = personRepository;
-        this.roleRepository = roleRepository;
         this.personAdminMapper = personAdminMapper;
         this.personRoleUpdateMapper = personRoleUpdateMapper;
         this.currentUserProfileMapper = currentUserProfileMapper;
@@ -93,8 +85,7 @@ public class PersonServiceImpl implements PersonService {
         this.personMinistryCommandService = personMinistryCommandService;
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.eventParticipationResponseService = eventParticipationResponseService;
-        this.userAccountSynchronizationService = userAccountSynchronizationService;
-        this.authenticatedUserResolver = authenticatedUserResolver;
+        this.userAccountLifecycleService = userAccountLifecycleService;
     }
 
     @Override
@@ -159,23 +150,7 @@ public class PersonServiceImpl implements PersonService {
     public PersonRoleUpdateResponseDTO updatePersonRole(Long id, PersonRoleUpdateRequestDTO requestDTO) {
         validateId(id);
         String requestedRole = normalizeRequiredRole(requestDTO.getRole());
-
-        Person person = personRepository.findByIdWithRolesForUpdate(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
-
-        Role role = roleRepository.findByAuthority(requestedRole)
-                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", requestedRole));
-
-        if (removesAdminRole(person, requestedRole)) {
-            validateSelfAdminDemotion(person);
-            validateLastAdministrator();
-        }
-
-        person.getRoles().clear();
-        person.addRole(role);
-
-        Person savedPerson = personRepository.save(person);
-        userAccountSynchronizationService.synchronizeExistingPerson(savedPerson);
+        Person savedPerson = userAccountLifecycleService.updateRole(id, requestedRole);
         PersonRoleUpdateResponseDTO dto = personRoleUpdateMapper.toDto(savedPerson);
         return new PersonRoleUpdateResponseDTO(
                 dto.getId(),
@@ -421,27 +396,6 @@ public class PersonServiceImpl implements PersonService {
             throw new BadRequestException("Perfil de acesso invalido");
         }
         return normalized;
-    }
-
-    private boolean removesAdminRole(Person person, String requestedRole) {
-        return person.hasRole(ROLE_ADMIN) && !ROLE_ADMIN.equals(requestedRole);
-    }
-
-    private void validateSelfAdminDemotion(Person person) {
-        Long currentPersonId = authenticatedUserResolver.requireCurrentPersonId();
-        if (currentPersonId.equals(person.getId())) {
-            throw new ConflictException("Voce nao pode remover o seu proprio perfil administrativo.");
-        }
-    }
-
-    private void validateLastAdministrator() {
-        long totalAdministrators = personRepository.findPeopleByRoleForUpdate(ROLE_ADMIN).stream()
-                .map(Person::getId)
-                .distinct()
-                .count();
-        if (totalAdministrators <= 1) {
-            throw new ConflictException("O ultimo administrador do sistema nao pode ter seu perfil alterado.");
-        }
     }
 
 }

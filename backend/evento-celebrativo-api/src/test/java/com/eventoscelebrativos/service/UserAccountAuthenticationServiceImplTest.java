@@ -21,6 +21,8 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -54,6 +56,7 @@ class UserAccountAuthenticationServiceImplTest {
         assertTrue(credentials.accountEnabled());
         assertTrue(credentials.personActive());
         assertEquals(Set.of("ROLE_OPERATOR"), authorityNames(credentials.authorities()));
+        assertSimpleImmutableAuthoritiesWithoutJpaEntities(credentials.authorities());
     }
 
     @Test
@@ -103,6 +106,48 @@ class UserAccountAuthenticationServiceImplTest {
         assertEquals(2L, user.personId());
         assertEquals("34999999999", user.username());
         assertEquals(Set.of("ROLE_ADMIN"), authorityNames(user.authorities()));
+        assertEquals(0L, user.tokenVersion());
+        assertSimpleImmutableAuthoritiesWithoutJpaEntities(user.authorities());
+    }
+
+    @Test
+    void shouldCopyAuthenticatedUserAuthoritiesToImmutableSimpleGrantedAuthoritiesAndSanitizeToString() {
+        Role mutableJpaRole = role(3L, "ROLE_OPERATOR");
+
+        AuthenticatedUser user = new AuthenticatedUser(1L, 2L, "34999999999", 7L, Set.of(mutableJpaRole));
+        mutableJpaRole.setAuthority("ROLE_ADMIN");
+
+        assertEquals(Set.of("ROLE_OPERATOR"), authorityNames(user.authorities()));
+        assertSimpleImmutableAuthoritiesWithoutJpaEntities(user.authorities());
+        assertFalse(user.toString().contains("34999999999"));
+        assertFalse(user.toString().contains("phoneNumber"));
+        assertFalse(user.toString().contains("password"));
+        assertFalse(user.toString().contains("passwordHash"));
+        assertTrue(user.toString().contains("***9999"));
+    }
+
+    @Test
+    void shouldCopyCredentialAuthoritiesToImmutableSimpleGrantedAuthoritiesAndSanitizeToString() {
+        Role mutableJpaRole = role(3L, "ROLE_OPERATOR");
+
+        UserAccountCredentials credentials = new UserAccountCredentials(
+                1L,
+                2L,
+                "34999999999",
+                "$2a$10$secret-hash-that-must-not-leak",
+                4L,
+                true,
+                true,
+                Set.of(mutableJpaRole)
+        );
+        mutableJpaRole.setAuthority("ROLE_ADMIN");
+
+        assertEquals(Set.of("ROLE_OPERATOR"), authorityNames(credentials.authorities()));
+        assertSimpleImmutableAuthoritiesWithoutJpaEntities(credentials.authorities());
+        assertFalse(credentials.toString().contains("34999999999"));
+        assertFalse(credentials.toString().contains("$2a$10$secret-hash-that-must-not-leak"));
+        assertFalse(credentials.toString().contains("passwordHash"));
+        assertTrue(credentials.toString().contains("***9999"));
     }
 
     @Test
@@ -147,6 +192,18 @@ class UserAccountAuthenticationServiceImplTest {
 
     private Set<String> authorityNames(Set<? extends GrantedAuthority> authorities) {
         return authorities.stream().map(GrantedAuthority::getAuthority).collect(java.util.stream.Collectors.toSet());
+    }
+
+    private void assertSimpleImmutableAuthoritiesWithoutJpaEntities(Set<? extends GrantedAuthority> authorities) {
+        assertTrue(authorities.stream().allMatch(authority -> authority instanceof org.springframework.security.core.authority.SimpleGrantedAuthority));
+        assertTrue(authorities.stream().noneMatch(Role.class::isInstance));
+        assertThrows(UnsupportedOperationException.class, () -> {
+            @SuppressWarnings("unchecked")
+            Set<GrantedAuthority> mutableView = (Set<GrantedAuthority>) authorities;
+            mutableView.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_OTHER"));
+        });
+        GrantedAuthority authority = authorities.iterator().next();
+        assertInstanceOf(org.springframework.security.core.authority.SimpleGrantedAuthority.class, authority);
     }
 
     private Person person(Long id, boolean active) {

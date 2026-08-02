@@ -25,6 +25,7 @@ public class WithMockAuthenticatedUserSecurityContextFactory
                 annotation.accountId(),
                 annotation.personId(),
                 annotation.username(),
+                annotation.tokenVersion(),
                 authorities
         );
 

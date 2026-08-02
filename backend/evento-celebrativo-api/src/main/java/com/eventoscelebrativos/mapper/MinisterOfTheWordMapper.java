@@ -13,6 +13,8 @@ import java.util.List;
 public interface MinisterOfTheWordMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     Person toEntity(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO);
 
     default MinisterOfTheWordResponseDTO toDtoFromPerson(Person person) {
@@ -31,5 +33,7 @@ public interface MinisterOfTheWordMapper {
     }
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     void updateMinisterOfTheWordFromDto(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO, @MappingTarget Person person);
 }

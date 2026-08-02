@@ -35,7 +35,7 @@ class AuthenticatedUserResolverTest {
     @Test
     void shouldResolveAccountPersonAndUsernameFromAuthenticatedUser() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         setAuthentication(new UsernamePasswordAuthenticationToken(authenticatedUser, null, authorities));
 
         assertEquals(authenticatedUser, resolver.requireCurrentUser());
@@ -47,7 +47,7 @@ class AuthenticatedUserResolverTest {
     @Test
     void shouldResolveRepeatedlyFromSameSecurityContextWithoutCredentialsOrRepositoryDependency() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(authenticatedUser, null, authorities);
         setAuthentication(authentication);

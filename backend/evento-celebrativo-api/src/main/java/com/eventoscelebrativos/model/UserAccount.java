@@ -40,6 +40,9 @@ public class UserAccount {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion = 0L;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -87,6 +90,27 @@ public class UserAccount {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public void enable(LocalDateTime updatedAt) {
+        this.enabled = true;
+        this.updatedAt = updatedAt;
+    }
+
+    public void disable(LocalDateTime updatedAt) {
+        if (this.enabled) {
+            incrementTokenVersion();
+        }
+        this.enabled = false;
+        this.updatedAt = updatedAt;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void incrementTokenVersion() {
+        this.tokenVersion++;
     }
 
     public LocalDateTime getCreatedAt() {

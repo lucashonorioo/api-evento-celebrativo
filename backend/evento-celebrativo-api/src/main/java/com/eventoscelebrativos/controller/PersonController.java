@@ -1,18 +1,25 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
+import com.eventoscelebrativos.dto.request.AdminPasswordResetRequestDTO;
 import com.eventoscelebrativos.dto.request.ParticipationResponseRequestDTO;
+import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
+import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
+import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
 import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
+import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.PersonService;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import com.eventoscelebrativos.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +30,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -38,15 +46,18 @@ public class PersonController {
     private final PersonService personService;
     private final EventParticipationResponseService eventParticipationResponseService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final UserAccountLifecycleService userAccountLifecycleService;
 
     public PersonController(
             PersonService personService,
             EventParticipationResponseService eventParticipationResponseService,
-            AuthenticatedUserResolver authenticatedUserResolver
+            AuthenticatedUserResolver authenticatedUserResolver,
+            UserAccountLifecycleService userAccountLifecycleService
     ) {
         this.personService = personService;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.userAccountLifecycleService = userAccountLifecycleService;
     }
 
     @Operation(summary = "Consulta o perfil da pessoa autenticada")
@@ -139,6 +150,23 @@ public class PersonController {
         return ResponseEntity.ok(responseDTO);
     }
 
+    @Operation(
+            summary = "Altera a propria senha usando a conta autenticada.",
+            description = "Usa o accountId/personId do Bearer JWT, nunca parametros externos. Valida a senha atual contra UserAccount.passwordHash, atualiza o legado sincronizado e invalida tokens antigos via token_version."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Senha alterada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Senha invalida"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "409", description = "Senha atual invalida ou conta inexistente")
+    })
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_OPERATOR')")
+    @PutMapping(value = "/me/conta/senha")
+    public ResponseEntity<Void> changeOwnPassword(@RequestBody SelfPasswordChangeRequestDTO requestDTO) {
+        userAccountLifecycleService.changeOwnPassword(requestDTO);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Lista pessoas para administracao de usuarios")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pessoas listadas com sucesso"),
@@ -181,6 +209,110 @@ public class PersonController {
     public ResponseEntity<PersonAdminResponseDTO> findPersonById(@PathVariable Long id) {
         PersonAdminResponseDTO responseDTO = personService.findPersonById(id);
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(
+            summary = "Consulta o estado de conta de uma pessoa.",
+            description = "Pessoas podem existir com ou sem conta. A resposta nao expoe accountId, passwordHash nem tokenVersion."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estado consultado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/{id}/conta")
+    public ResponseEntity<UserAccountLifecycleResponseDTO> findAccountState(@PathVariable Long id) {
+        return ResponseEntity.ok(userAccountLifecycleService.findAccountState(id));
+    }
+
+    @Operation(
+            summary = "Cria conta de acesso para pessoa ativa existente.",
+            description = "O username e derivado do telefone. A conta nao e excluida fisicamente, usa um unico perfil ROLE_ADMIN ou ROLE_OPERATOR e inicia com token_version zero."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Conta criada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Senha ou perfil invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Pessoa inativa, conta existente ou username conflitante")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PostMapping(value = "/{id}/conta")
+    public ResponseEntity<UserAccountLifecycleResponseDTO> createAccount(
+            @PathVariable Long id,
+            @RequestBody UserAccountCreateRequestDTO requestDTO
+    ) {
+        UserAccountLifecycleResponseDTO responseDTO = userAccountLifecycleService.createAccount(id, requestDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+    }
+
+    @Operation(
+            summary = "Habilita ou desabilita conta sem excluir fisicamente e sem alterar Person.active.",
+            description = "Desabilitar invalida tokens antigos. Habilitar nao revalida tokens antigos. A regra de ultimo administrador efetivo usa UserAccount.roles, enabled e Person.active."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Estado atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Request invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Conta inexistente, self-disable ou ultimo administrador")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}/conta/habilitacao")
+    public ResponseEntity<Void> updateAccountEnabled(
+            @PathVariable Long id,
+            @Valid @RequestBody UserAccountEnabledRequestDTO requestDTO
+    ) {
+        userAccountLifecycleService.updateAccountEnabled(id, requestDTO);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Ativa ou desativa pessoa sem alterar enabled da conta.",
+            description = "Desativacao invalida tokens quando ha conta, bloqueia assignments em andamento ou futuros e preserva historico, participacoes, ministerios e escalas existentes."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Status atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Request invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Self-deactivation, ultimo administrador ou assignments ativos")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}/status")
+    public ResponseEntity<Void> updatePersonActive(
+            @PathVariable Long id,
+            @Valid @RequestBody PersonActiveRequestDTO requestDTO
+    ) {
+        userAccountLifecycleService.updatePersonActive(id, requestDTO);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Redefine administrativamente a senha de outra conta.",
+            description = "Nao pode ser usado para a propria conta. Atualiza UserAccount e legado com o mesmo hash e invalida tokens antigos via token_version."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Senha redefinida com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Senha invalida"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Conta inexistente ou self-reset administrativo")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}/conta/senha")
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable Long id,
+            @RequestBody AdminPasswordResetRequestDTO requestDTO
+    ) {
+        userAccountLifecycleService.resetPassword(id, requestDTO);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Atualiza o perfil de acesso de uma pessoa")

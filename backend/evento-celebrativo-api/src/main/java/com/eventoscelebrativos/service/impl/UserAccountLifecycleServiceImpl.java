@@ -1,0 +1,469 @@
+package com.eventoscelebrativos.service.impl;
+
+import com.eventoscelebrativos.dto.request.AdminPasswordResetRequestDTO;
+import com.eventoscelebrativos.dto.request.PersonAccessRequest;
+import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
+import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
+import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
+import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
+import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.model.Role;
+import com.eventoscelebrativos.model.UserAccount;
+import com.eventoscelebrativos.model.UserAccountRole;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.repository.UserAccountRepository;
+import com.eventoscelebrativos.repository.UserAccountRoleRepository;
+import com.eventoscelebrativos.security.AuthenticatedUserResolver;
+import com.eventoscelebrativos.service.PasswordPolicy;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+@Service
+public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleService {
+
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final String ROLE_OPERATOR = "ROLE_OPERATOR";
+    private static final Set<String> ALLOWED_ROLES = Set.of(ROLE_ADMIN, ROLE_OPERATOR);
+
+    private final PersonRepository personRepository;
+    private final UserAccountRepository userAccountRepository;
+    private final UserAccountRoleRepository userAccountRoleRepository;
+    private final RoleRepository roleRepository;
+    private final EventAssignmentRepository eventAssignmentRepository;
+    private final PasswordPolicy passwordPolicy;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final Clock clock;
+
+    public UserAccountLifecycleServiceImpl(
+            PersonRepository personRepository,
+            UserAccountRepository userAccountRepository,
+            UserAccountRoleRepository userAccountRoleRepository,
+            RoleRepository roleRepository,
+            EventAssignmentRepository eventAssignmentRepository,
+            PasswordPolicy passwordPolicy,
+            PasswordEncoder passwordEncoder,
+            AuthenticatedUserResolver authenticatedUserResolver,
+            Clock clock
+    ) {
+        this.personRepository = personRepository;
+        this.userAccountRepository = userAccountRepository;
+        this.userAccountRoleRepository = userAccountRoleRepository;
+        this.roleRepository = roleRepository;
+        this.eventAssignmentRepository = eventAssignmentRepository;
+        this.passwordPolicy = passwordPolicy;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticatedUserResolver = authenticatedUserResolver;
+        this.clock = clock;
+    }
+
+    @Override
+    @Transactional
+    public void applyCreationAccess(Person person, PersonAccessRequest request) {
+        if (person == null || request == null) {
+            throw new BadRequestException("Pessoa e dados de acesso sao obrigatorios");
+        }
+
+        AccessDecision decision = creationDecision(request);
+        person.getRoles().clear();
+        if (!decision.createAccess()) {
+            person.setPassword(null);
+            return;
+        }
+        if (!person.isActive()) {
+            throw conflict("Somente pessoa ativa pode receber uma conta.", "PERSON_INACTIVE");
+        }
+        Role role = requireRoleWithAdminMutex(decision.role());
+        String passwordHash = passwordEncoder.encode(decision.password());
+        person.setPassword(passwordHash);
+        person.addRole(role);
+    }
+
+    @Override
+    @Transactional
+    public void applyMinisterialUpdateAccess(Person person, PersonAccessRequest request) {
+        if (person == null || person.getId() == null || request == null) {
+            throw new BadRequestException("Pessoa e dados de acesso sao obrigatorios");
+        }
+        if (request.getCreateAccess() != null || normalizeOptional(request.getAccessRole()) != null) {
+            throw new BadRequestException("createAccess e accessRole nao sao aceitos em atualizacao");
+        }
+        String password = request.getPassword();
+        if (password == null) {
+            return;
+        }
+        passwordPolicy.validatePresent(password);
+        if (!userAccountRepository.existsByPersonId(person.getId())) {
+            throw conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND");
+        }
+        person.setPassword(passwordEncoder.encode(password));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserAccountLifecycleResponseDTO findAccountState(Long personId) {
+        validateId(personId);
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        Optional<UserAccount> account = userAccountRepository.findByPersonIdWithRoles(personId);
+        return account
+                .map(userAccount -> toResponse(person, userAccount))
+                .orElseGet(() -> new UserAccountLifecycleResponseDTO(
+                        person.getId(), person.isActive(), false, null, null, List.of()));
+    }
+
+    @Override
+    @Transactional
+    public UserAccountLifecycleResponseDTO createAccount(Long personId, UserAccountCreateRequestDTO request) {
+        validateId(personId);
+        String roleName = normalizeRoleOrDefault(request == null ? null : request.getRole());
+        String password = request == null ? null : request.getInitialPassword();
+        passwordPolicy.validateRequired(password);
+        Role role = requireRoleWithAdminMutex(roleName);
+
+        Person person = personRepository.findByIdWithRolesForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        if (!person.isActive()) {
+            throw conflict("Pessoa inativa nao pode receber conta de acesso.", "PERSON_INACTIVE");
+        }
+        if (userAccountRepository.findByPersonIdForUpdate(personId).isPresent()) {
+            throw conflict("Pessoa ja possui conta de acesso.", "USER_ACCOUNT_ALREADY_EXISTS");
+        }
+        validateUsernameAvailable(person.getPhoneNumber(), null);
+
+        String passwordHash = passwordEncoder.encode(password);
+        person.setPassword(passwordHash);
+        replacePersonRole(person, role);
+        personRepository.save(person);
+
+        LocalDateTime now = currentSecond();
+        UserAccount account = userAccountRepository.save(
+                new UserAccount(person, person.getPhoneNumber(), passwordHash, now, now)
+        );
+        replaceAccountRole(account, role);
+
+        return toResponse(person, account, List.of(role.getAuthority()));
+    }
+
+    @Override
+    @Transactional
+    public void updateAccountEnabled(Long personId, UserAccountEnabledRequestDTO request) {
+        validateId(personId);
+        if (request == null || request.getEnabled() == null) {
+            throw new BadRequestException("O campo enabled e obrigatorio");
+        }
+        boolean desiredEnabled = request.getEnabled();
+
+        lockAdminRoleMutex();
+        Person person = personRepository.findByIdForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        UserAccount account = userAccountRepository.findByPersonIdForUpdate(personId)
+                .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
+
+        if (!desiredEnabled && authenticatedUserResolver.requireCurrentAccountId().equals(account.getId())) {
+            throw conflict("Administrador nao pode desabilitar a propria conta.", "SELF_ACCOUNT_DISABLE_NOT_ALLOWED");
+        }
+        if (account.isEnabled() == desiredEnabled) {
+            return;
+        }
+        if (desiredEnabled) {
+            if (account.getRoles().isEmpty()) {
+                throw conflict("Conta sem perfil nao pode ser habilitada.", "USER_ACCOUNT_ROLE_REQUIRED");
+            }
+            account.enable(currentSecond());
+        } else {
+            if (isEffectiveAdmin(account, person)) {
+                validateAnotherEffectiveAdministratorExists();
+            }
+            account.disable(currentSecond());
+        }
+        userAccountRepository.save(account);
+    }
+
+    @Override
+    @Transactional
+    public void updatePersonActive(Long personId, PersonActiveRequestDTO request) {
+        validateId(personId);
+        if (request == null || request.getActive() == null) {
+            throw new BadRequestException("O campo active e obrigatorio");
+        }
+        boolean desiredActive = request.getActive();
+        LocalDateTime currentSecond = currentSecond();
+
+        lockAdminRoleMutex();
+        Person person = personRepository.findByIdForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        Optional<UserAccount> accountOptional = userAccountRepository.findByPersonIdForUpdate(personId);
+
+        if (!desiredActive && authenticatedUserResolver.requireCurrentPersonId().equals(person.getId())) {
+            throw conflict("Administrador nao pode desativar a propria pessoa.", "SELF_PERSON_DEACTIVATION_NOT_ALLOWED");
+        }
+        if (person.isActive() == desiredActive) {
+            return;
+        }
+        if (!desiredActive) {
+            if (eventAssignmentRepository.existsActiveOrFutureAssignmentByPersonId(personId, currentSecond)) {
+                throw conflict("Pessoa possui escala em andamento ou futura.", "PERSON_HAS_ACTIVE_ASSIGNMENTS");
+            }
+            if (accountOptional.filter(account -> isEffectiveAdmin(account, person)).isPresent()) {
+                validateAnotherEffectiveAdministratorExists();
+            }
+            accountOptional.ifPresent(account -> {
+                account.incrementTokenVersion();
+                account.setUpdatedAt(currentSecond);
+                userAccountRepository.save(account);
+            });
+        }
+        person.setActive(desiredActive);
+        personRepository.save(person);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(Long personId, AdminPasswordResetRequestDTO request) {
+        validateId(personId);
+        String newPassword = request == null ? null : request.getNewPassword();
+        passwordPolicy.validateRequired(newPassword);
+
+        Person person = personRepository.findByIdForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        UserAccount account = userAccountRepository.findByPersonIdForUpdate(personId)
+                .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
+        if (authenticatedUserResolver.requireCurrentAccountId().equals(account.getId())) {
+            throw conflict("Use o endpoint pessoal para alterar a propria senha.", "SELF_ADMIN_PASSWORD_RESET_NOT_ALLOWED");
+        }
+        updatePassword(person, account, newPassword);
+    }
+
+    @Override
+    @Transactional
+    public void changeOwnPassword(SelfPasswordChangeRequestDTO request) {
+        String currentPassword = request == null ? null : request.getCurrentPassword();
+        String newPassword = request == null ? null : request.getNewPassword();
+        passwordPolicy.validateRequired(currentPassword);
+        passwordPolicy.validateRequired(newPassword);
+
+        Long currentPersonId = authenticatedUserResolver.requireCurrentPersonId();
+        Long currentAccountId = authenticatedUserResolver.requireCurrentAccountId();
+        Person person = personRepository.findByIdForUpdate(currentPersonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", currentPersonId));
+        UserAccount account = userAccountRepository.findByPersonIdForUpdate(currentPersonId)
+                .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
+        if (!currentAccountId.equals(account.getId())) {
+            throw conflict("Principal autenticado divergente da conta atual.", "USER_ACCOUNT_NOT_FOUND");
+        }
+        if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
+            throw conflict("Senha atual invalida.", "CURRENT_PASSWORD_INVALID");
+        }
+        updatePassword(person, account, newPassword);
+    }
+
+    @Override
+    @Transactional
+    public Person updateRole(Long personId, String requestedRole) {
+        validateId(personId);
+        String roleName = normalizeRequiredRole(requestedRole);
+        lockAdminRoleMutex();
+
+        Person person = personRepository.findByIdWithRolesForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
+        UserAccount account = userAccountRepository.findByPersonIdForUpdate(personId)
+                .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
+
+        if (hasAdminRole(account) && !ROLE_ADMIN.equals(roleName)) {
+            if (authenticatedUserResolver.requireCurrentPersonId().equals(person.getId())) {
+                throw conflict("Administrador nao pode remover o proprio perfil administrativo.", "SELF_ADMIN_DEMOTION_NOT_ALLOWED");
+            }
+            if (isEffectiveAdmin(account, person)) {
+                validateAnotherEffectiveAdministratorExists();
+            }
+        }
+
+        Role role = requireRole(roleName);
+        replaceAccountRole(account, role);
+        account.setUpdatedAt(currentSecond());
+        userAccountRepository.save(account);
+        replacePersonRole(person, role);
+        return personRepository.save(person);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Role requireRole(String roleName) {
+        String normalized = normalizeRequiredRole(roleName);
+        return roleRepository.findByAuthority(normalized)
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", normalized));
+    }
+
+    private void updatePassword(Person person, UserAccount account, String rawPassword) {
+        String passwordHash = passwordEncoder.encode(rawPassword);
+        person.setPassword(passwordHash);
+        account.setPasswordHash(passwordHash);
+        account.incrementTokenVersion();
+        account.setUpdatedAt(currentSecond());
+        personRepository.save(person);
+        userAccountRepository.save(account);
+    }
+
+    private AccessDecision creationDecision(PersonAccessRequest request) {
+        Boolean createAccess = request.getCreateAccess();
+        String password = request.getPassword();
+        String role = normalizeOptional(request.getAccessRole());
+
+        if (Boolean.FALSE.equals(createAccess)) {
+            if (password != null || role != null) {
+                throw new BadRequestException("Senha e perfil nao podem ser enviados quando createAccess=false");
+            }
+            return AccessDecision.withoutAccess();
+        }
+
+        if (Boolean.TRUE.equals(createAccess)) {
+            passwordPolicy.validateRequired(password);
+            return AccessDecision.withAccess(password, role == null ? ROLE_OPERATOR : normalizeRequiredRole(role));
+        }
+
+        if (password == null) {
+            if (role != null) {
+                throw new BadRequestException("accessRole exige senha para criar acesso");
+            }
+            return AccessDecision.withoutAccess();
+        }
+
+        passwordPolicy.validatePresent(password);
+        return AccessDecision.withAccess(password, role == null ? ROLE_OPERATOR : normalizeRequiredRole(role));
+    }
+
+    private void replacePersonRole(Person person, Role role) {
+        person.getRoles().clear();
+        person.addRole(role);
+    }
+
+    private void replaceAccountRole(UserAccount account, Role role) {
+        List<UserAccountRole> currentRoles = userAccountRoleRepository.findByUserAccountId(account.getId());
+        boolean alreadyExactlyThisRole = currentRoles.size() == 1
+                && currentRoles.getFirst().getRole().getId().equals(role.getId());
+        if (alreadyExactlyThisRole) {
+            return;
+        }
+        userAccountRoleRepository.deleteAllByUserAccountId(account.getId());
+        userAccountRoleRepository.save(new UserAccountRole(account, role));
+    }
+
+    private UserAccountLifecycleResponseDTO toResponse(Person person, UserAccount account) {
+        return toResponse(person, account, sortedRoleNames(account));
+    }
+
+    private UserAccountLifecycleResponseDTO toResponse(Person person, UserAccount account, List<String> roles) {
+        return new UserAccountLifecycleResponseDTO(
+                person.getId(),
+                person.isActive(),
+                true,
+                account.getUsername(),
+                account.isEnabled(),
+                roles
+        );
+    }
+
+    private List<String> sortedRoleNames(UserAccount account) {
+        return account.getRoles().stream()
+                .map(userAccountRole -> userAccountRole.getRole().getAuthority())
+                .sorted()
+                .toList();
+    }
+
+    private void validateUsernameAvailable(String username, Long currentAccountId) {
+        userAccountRepository.findByUsernameForUpdate(username)
+                .filter(account -> currentAccountId == null || !account.getId().equals(currentAccountId))
+                .ifPresent(account -> {
+                    throw conflict("Username ja esta associado a outra conta.", "USER_ACCOUNT_USERNAME_CONFLICT");
+                });
+    }
+
+    private boolean isEffectiveAdmin(UserAccount account, Person person) {
+        return account.isEnabled() && person.isActive() && hasAdminRole(account);
+    }
+
+    private boolean hasAdminRole(UserAccount account) {
+        return account.getRoles().stream()
+                .anyMatch(userAccountRole -> ROLE_ADMIN.equals(userAccountRole.getRole().getAuthority()));
+    }
+
+    private void validateAnotherEffectiveAdministratorExists() {
+        if (userAccountRoleRepository.countEffectiveAdministrators() <= 1) {
+            throw conflict("O ultimo administrador efetivo deve ser preservado.", "LAST_ACTIVE_ADMIN_REQUIRED");
+        }
+    }
+
+    private Role lockAdminRoleMutex() {
+        return roleRepository.findByAuthorityForUpdate(ROLE_ADMIN)
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", ROLE_ADMIN));
+    }
+
+    private Role requireRoleWithAdminMutex(String roleName) {
+        String normalized = normalizeRequiredRole(roleName);
+        if (ROLE_ADMIN.equals(normalized)) {
+            return lockAdminRoleMutex();
+        }
+        return roleRepository.findByAuthority(normalized)
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", normalized));
+    }
+
+    private String normalizeRoleOrDefault(String role) {
+        String normalized = normalizeOptional(role);
+        return normalized == null ? ROLE_OPERATOR : normalizeRequiredRole(normalized);
+    }
+
+    private String normalizeRequiredRole(String role) {
+        String normalized = normalizeOptional(role);
+        if (normalized == null || !ALLOWED_ROLES.contains(normalized)) {
+            throw new BadRequestException("Perfil de acesso invalido");
+        }
+        return normalized;
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private void validateId(Long id) {
+        if (id == null || id <= 0) {
+            throw new BadRequestException("O Id deve ser positivo e nao nulo");
+        }
+    }
+
+    private LocalDateTime currentSecond() {
+        return LocalDateTime.now(clock).withNano(0);
+    }
+
+    private LifecycleConflictException conflict(String message, String code) {
+        return new LifecycleConflictException(message, code);
+    }
+
+    private record AccessDecision(boolean createAccess, String password, String role) {
+
+        private static AccessDecision withoutAccess() {
+            return new AccessDecision(false, null, null);
+        }
+
+        private static AccessDecision withAccess(String password, String role) {
+            return new AccessDecision(true, password, role);
+        }
+    }
+}

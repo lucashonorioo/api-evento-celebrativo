@@ -13,6 +13,8 @@ import java.util.List;
 public interface ReaderMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     Person toEntity(ReaderRequestDTO readerRequestDTO);
 
     default ReaderResponseDTO toDtoFromPerson(Person person) {
@@ -31,5 +33,7 @@ public interface ReaderMapper {
     }
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     void updateReaderFromDto(ReaderRequestDTO readerRequestDTO, @MappingTarget Person person);
 }
