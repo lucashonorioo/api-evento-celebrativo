@@ -13,6 +13,8 @@ import java.util.List;
 public interface EucharisticMinisterMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     Person toEntity(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO);
 
     default EucharisticMinisterResponseDTO toDtoFromPerson(Person person) {
@@ -31,5 +33,7 @@ public interface EucharisticMinisterMapper {
     }
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "roles", ignore = true)
     void updateEucharisticMinisterFromDto(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO, @MappingTarget Person person);
 }

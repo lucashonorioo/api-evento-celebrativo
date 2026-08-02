@@ -47,6 +47,9 @@ class PriestServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private UserAccountLifecycleService userAccountLifecycleService;
+
     @InjectMocks
     private PriestServiceImpl service;
 
@@ -59,8 +62,11 @@ class PriestServiceImplTest {
         PriestResponseDTO response = response(1L);
 
         when(mapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
+        doAnswer(invocation -> {
+            entity.setPassword("encoded-password");
+            entity.addRole(operatorRole);
+            return null;
+        }).when(userAccountLifecycleService).applyCreationAccess(entity, request);
         when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.PRIEST))).thenReturn(saved);
         when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
@@ -76,9 +82,10 @@ class PriestServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenOperatorRoleDoesNotExist() {
         PriestRequestDTO request = request();
-        when(mapper.toEntity(request)).thenReturn(priest(null, "raw-password"));
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.empty());
+        Person entity = priest(null, "raw-password");
+        when(mapper.toEntity(request)).thenReturn(entity);
+        doThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"))
+                .when(userAccountLifecycleService).applyCreationAccess(entity, request);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createPriest(request));
         verify(personMinistryCommandService, never()).create(any(), any());
@@ -107,12 +114,16 @@ class PriestServiceImplTest {
     void shouldUpdateAndDeletePriest() {
         Person entity = priest(1L, "old-password");
         PriestResponseDTO response = response(1L);
+        PriestRequestDTO request = request();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
-        when(passwordEncoder.encode("raw-password")).thenReturn("encoded-password");
+        doAnswer(invocation -> {
+            entity.setPassword("encoded-password");
+            return null;
+        }).when(userAccountLifecycleService).applyMinisterialUpdateAccess(entity, request);
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
-        assertSame(response, service.updatePriest(1L, request()));
+        assertSame(response, service.updatePriest(1L, request));
         assertEquals("encoded-password", entity.getPassword());
 
         service.deletePriestById(1L);

@@ -30,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -183,6 +184,85 @@ class ScaleParticipantEligibilityIntegrationTest {
             assertEquals(eventsBefore, countAllEvents());
         } finally {
             cleanupPerson(priestId);
+            cleanupLocation(locationId);
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldRejectInactivePersonAsNewAssignmentOnEventCreation() throws Exception {
+        Long locationId = null;
+        Long priestId = null;
+        try {
+            Person inactivePriest = savePriestWithMinistry("Eligibility Inactive Creation Person");
+            inactivePriest.setActive(false);
+            personRepository.saveAndFlush(inactivePriest);
+            priestId = inactivePriest.getId();
+            Location location = locationRepository.saveAndFlush(location("Eligibility Inactive Creation Church"));
+            locationId = location.getId();
+            long eventsBefore = countAllEvents();
+
+            mockMvc.perform(post("/eventos/com-escala")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(eventRequest(
+                                    "Eligibility Inactive Creation Mass", locationId, inactivePriest.getId(),
+                                    null, null, null, null
+                            ))))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("PERSON_INACTIVE_FOR_ASSIGNMENT"));
+
+            assertEquals(eventsBefore, countAllEvents());
+        } finally {
+            cleanupPerson(priestId);
+            cleanupLocation(locationId);
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldRejectInactivePersonOnlyWhenAddedAsNewAssignmentOnScaleUpdate() throws Exception {
+        Long eventId = null;
+        Long locationId = null;
+        Long priestId = null;
+        Long readerId = null;
+        try {
+            Person priest = savePriestWithMinistry("Eligibility Retained Inactive Priest");
+            priestId = priest.getId();
+            Person inactiveReader = saveReaderWithExtraMinistry("Eligibility New Inactive Reader", MinistryType.COMMENTATOR);
+            inactiveReader.setActive(false);
+            personRepository.saveAndFlush(inactiveReader);
+            readerId = inactiveReader.getId();
+            Location location = locationRepository.saveAndFlush(location("Eligibility Inactive Update Church"));
+            locationId = location.getId();
+
+            eventId = celebrationEventService.createEventWithScale(
+                    eventRequest("Eligibility Inactive Update Mass", locationId, priest.getId(), null, null, null, null)
+            ).getEventId();
+
+            mockMvc.perform(put("/eventos/{id}/escala", eventId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(scaleRequest(
+                                    locationId, priest.getId(), List.of(inactiveReader.getId()), null, null, null
+                            ))))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("PERSON_INACTIVE_FOR_ASSIGNMENT"));
+
+            assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
+
+            priest.setActive(false);
+            personRepository.saveAndFlush(priest);
+
+            mockMvc.perform(put("/eventos/{id}/escala", eventId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(scaleRequest(
+                                    locationId, priest.getId(), null, null, null, null
+                            ))))
+                    .andExpect(status().isOk());
+            assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
+        } finally {
+            cleanupEvent(eventId);
+            cleanupPerson(priestId);
+            cleanupPerson(readerId);
             cleanupLocation(locationId);
         }
     }

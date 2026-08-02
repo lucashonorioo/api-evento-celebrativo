@@ -5,14 +5,11 @@ import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +21,18 @@ public class PriestServiceImpl implements PriestService {
     private static final String ENTITY_LABEL = "Padre";
 
     private final PriestMapper priestMapper;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserAccountLifecycleService userAccountLifecycleService;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public PriestServiceImpl(
             PriestMapper priestMapper,
-            RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder,
+            UserAccountLifecycleService userAccountLifecycleService,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.priestMapper = priestMapper;
-        this.roleRepository = roleRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.userAccountLifecycleService = userAccountLifecycleService;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -48,14 +42,7 @@ public class PriestServiceImpl implements PriestService {
     @Transactional
     public PriestResponseDTO createPriest(PriestRequestDTO priestRequestDTO) {
         Person priest = priestMapper.toEntity(priestRequestDTO);
-
-        priest.setPassword(passwordEncoder.encode(priestRequestDTO.getPassword()));
-
-        Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR")
-                .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"));
-
-        priest.addRole(operatorRole);
-
+        userAccountLifecycleService.applyCreationAccess(priest, priestRequestDTO);
         Person saved = personMinistryCommandService.create(priest, MinistryType.PRIEST);
         return priestMapper.toDtoFromPerson(saved);
     }
@@ -85,7 +72,7 @@ public class PriestServiceImpl implements PriestService {
         }
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.PRIEST, ENTITY_LABEL);
         priestMapper.updatePriestFromDto(priestRequestDTO, person);
-        person.setPassword(passwordEncoder.encode(priestRequestDTO.getPassword()));
+        userAccountLifecycleService.applyMinisterialUpdateAccess(person, priestRequestDTO);
 
         Person saved = personMinistryCommandService.save(person);
         return priestMapper.toDtoFromPerson(saved);

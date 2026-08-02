@@ -59,6 +59,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("12");
         assertSuccessfulMigration("13");
         assertSuccessfulMigration("14");
+        assertSuccessfulMigration("15");
         assertTableExists("flyway_schema_history");
         assertTableExists("tb_event_participation_response");
         assertTableExists("tb_person_unavailability");
@@ -81,6 +82,9 @@ class FlywayMigrationIntegrationTest {
         assertColumnExists("tb_person", "active");
         assertColumnExists("tb_person", "created_at");
         assertColumnExists("tb_person", "updated_at");
+        assertColumnNullable("tb_person", "password");
+        assertColumnExists("tb_user_account", "token_version");
+        assertColumnNotNullable("tb_user_account", "token_version");
 
         assertMainConstraintExists("tb_person_ministry", "pk_tb_person_ministry");
         assertMainConstraintExists("tb_person_ministry", "uk_tb_person_ministry_person_type");
@@ -106,11 +110,11 @@ class FlywayMigrationIntegrationTest {
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history "
-                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14') "
+                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15') "
                         + "AND success = TRUE",
                 Integer.class
         );
-        assertEquals(14, successfulVersions);
+        assertEquals(15, successfulVersions);
     }
 
     @Test
@@ -135,6 +139,7 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("12");
         assertSuccessfulMigration("13");
         assertSuccessfulMigration("14");
+        assertSuccessfulMigration("15");
         assertTableDoesNotExist("tb_event_person");
         assertColumnDoesNotExist("tb_person", "person_type");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
@@ -170,6 +175,24 @@ class FlywayMigrationIntegrationTest {
                 columnName
         );
         assertEquals(1, count);
+    }
+
+    private void assertColumnNullable(String tableName, String columnName) {
+        assertColumnNullability(tableName, columnName, "YES");
+    }
+
+    private void assertColumnNotNullable(String tableName, String columnName) {
+        assertColumnNullability(tableName, columnName, "NO");
+    }
+
+    private void assertColumnNullability(String tableName, String columnName, String expected) {
+        String nullable = jdbcTemplate.queryForObject(
+                "SELECT is_nullable FROM information_schema.columns WHERE LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
+                String.class,
+                tableName,
+                columnName
+        );
+        assertEquals(expected, nullable);
     }
 
     private void assertColumnDoesNotExist(String tableName, String columnName) {

@@ -209,11 +209,11 @@ class CurrentUserProfileIntegrationTest {
             java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
                     new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + role));
             com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
-                    new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, authorities);
+                    new com.eventoscelebrativos.security.AuthenticatedUser(1L, personId, phoneNumber, 0L, authorities);
             org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
                     new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                             authenticatedUser,
-                            "n/a",
+                            null,
                             authorities
                     )
             );

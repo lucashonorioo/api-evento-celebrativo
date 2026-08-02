@@ -96,7 +96,7 @@ class UserAccountSynchronizationServiceImplTest {
 
     @Test
     void shouldSyncUsernamePasswordPreserveIdCreatedAtAndDisabledEnabledFlag() {
-        Person person = person(1L, "34999999992", "new-hash", Set.of());
+        Person person = person(1L, "34999999992", "new-hash", Set.of(role(1L, "ROLE_OPERATOR")));
         UserAccount existing = existingAccount(person, 10L, "34999999991", "old-hash", false,
                 LocalDateTime.of(2020, 1, 1, 0, 0));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
@@ -122,7 +122,7 @@ class UserAccountSynchronizationServiceImplTest {
         UserAccountSynchronizationServiceImpl syncService =
                 new UserAccountSynchronizationServiceImpl(userAccountRepository, userAccountRoleRepository, syncClock);
 
-        Person person = person(1L, "34999999991", "hash-1", Set.of());
+        Person person = person(1L, "34999999991", "hash-1", Set.of(role(1L, "ROLE_OPERATOR")));
         when(userAccountRepository.existsByPersonId(1L)).thenReturn(false);
         ArgumentCaptor<UserAccount> createCaptor = ArgumentCaptor.forClass(UserAccount.class);
         when(userAccountRepository.save(createCaptor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -171,7 +171,6 @@ class UserAccountSynchronizationServiceImplTest {
         Person person = person(1L, "34999999991", "hash", Set.of(role(1L, "ROLE_OPERATOR")));
         UserAccount existing = existingAccount(person, 10L, "34999999991", "hash", true, LocalDateTime.now());
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
-        when(userAccountRepository.save(existing)).thenReturn(existing);
         UserAccountRole currentOperatorRole = new UserAccountRole(existing, role(1L, "ROLE_OPERATOR"));
         when(userAccountRoleRepository.findByUserAccountId(10L)).thenReturn(List.of(currentOperatorRole));
 

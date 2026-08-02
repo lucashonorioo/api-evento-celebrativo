@@ -28,6 +28,7 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
                     FROM PersonMinistry pm
                     WHERE pm.ministryType = :ministryType
                       AND pm.active = TRUE
+                      AND pm.person.active = TRUE
                     ORDER BY pm.person.name ASC, pm.person.id ASC
                     """,
             countQuery = """
@@ -35,6 +36,7 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
                     FROM PersonMinistry pm
                     WHERE pm.ministryType = :ministryType
                       AND pm.active = TRUE
+                      AND pm.person.active = TRUE
                     """
     )
     Page<Long> findActivePersonIdsByMinistryType(
@@ -47,6 +49,7 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
             FROM PersonMinistry pm
             WHERE pm.ministryType = :ministryType
               AND pm.active = TRUE
+              AND pm.person.active = TRUE
             ORDER BY pm.person.name ASC, pm.person.id ASC
             """)
     List<com.eventoscelebrativos.model.Person> findActivePeopleByMinistryType(

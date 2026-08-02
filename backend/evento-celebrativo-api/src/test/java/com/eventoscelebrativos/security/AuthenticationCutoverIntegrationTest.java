@@ -306,7 +306,7 @@ class AuthenticationCutoverIntegrationTest {
     }
 
     @Test
-    void shouldIncludeAccountIdClaimInEveryIssuedToken() throws Exception {
+    void shouldIncludeAccountIdAndTokenVersionClaimsInEveryIssuedToken() throws Exception {
         // Prova, ponta a ponta, que todo token emitido apos o corte tem account_id (condicao
         // necessaria para que tokens emitidos ANTES do corte, sem esse claim, sejam rejeitados). A
         // rejeicao explicita de um token sem account_id e testada isoladamente em
@@ -318,6 +318,47 @@ class AuthenticationCutoverIntegrationTest {
         Jwt jwt = jwtDecoder.decode(obtainAccessToken(phone, "senha"));
 
         assertTrue(jwt.hasClaim("account_id"));
+        assertTrue(jwt.hasClaim("token_version"));
+        assertEquals(0L, ((Number) jwt.getClaim("token_version")).longValue());
+    }
+
+    @Test
+    void shouldAcceptLegacyBearerWithoutTokenVersionOnlyWhileAccountVersionIsZero() throws Exception {
+        String phone = uniquePhone();
+        createPersonWithAccount(phone, "senha", true, true, "ROLE_OPERATOR");
+        Long accountId = userAccountRepository.findByUsername(phone).orElseThrow().getId();
+        String legacyTokenWithoutVersionClaim = signedBearerToken(accountId, phone, phone);
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + legacyTokenWithoutVersionClaim))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldInvalidateCurrentTokenAfterOwnPasswordChangeAndRequireNewTokenVersion() throws Exception {
+        String phone = uniquePhone();
+        createPersonWithAccount(phone, "123456", true, true, "ROLE_OPERATOR");
+        String oldToken = obtainAccessToken(phone, "123456");
+
+        mockMvc.perform(put("/pessoas/me/conta/senha")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "123456",
+                                  "newPassword": "654321"
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+
+        String newToken = obtainAccessToken(phone, "654321");
+        Jwt newJwt = jwtDecoder.decode(newToken);
+        assertEquals(1L, ((Number) newJwt.getClaim("token_version")).longValue());
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -453,6 +494,131 @@ class AuthenticationCutoverIntegrationTest {
 
         mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldKeepOldTokenInvalidWhenUsernameReturnsToPreviousValue() throws Exception {
+        Long personId = createReaderViaRealFlow();
+        Person before = personRepository.findById(personId).orElseThrow();
+        String originalPhone = before.getPhoneNumber();
+        String oldToken = obtainAccessToken(originalPhone, "123456");
+        String adminToken = obtainAdminToken();
+        String intermediatePhone = uniquePhone();
+
+        updateReaderPhone(personId, intermediatePhone, adminToken);
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+
+        updateReaderPhone(personId, originalPhone, adminToken);
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+        String newToken = obtainAccessToken(originalPhone, "123456");
+        Jwt newJwt = jwtDecoder.decode(newToken);
+        assertEquals(2L, ((Number) newJwt.getClaim("token_version")).longValue());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldKeepOldTokenInvalidAfterAccountIsReenabled() throws Exception {
+        Long personId = createPersonIdWithRole("ROLE_OPERATOR");
+        Person person = personRepository.findById(personId).orElseThrow();
+        String oldToken = obtainAccessToken(person.getPhoneNumber(), "senha");
+        String adminToken = obtainAdminToken();
+
+        mockMvc.perform(put("/pessoas/{id}/conta/habilitacao", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/{id}/conta/habilitacao", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+        String newToken = obtainAccessToken(person.getPhoneNumber(), "senha");
+        Jwt newJwt = jwtDecoder.decode(newToken);
+        assertEquals(1L, ((Number) newJwt.getClaim("token_version")).longValue());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldKeepOldTokenInvalidAfterPersonIsReactivated() throws Exception {
+        Long personId = createPersonIdWithRole("ROLE_OPERATOR");
+        Person person = personRepository.findById(personId).orElseThrow();
+        String oldToken = obtainAccessToken(person.getPhoneNumber(), "senha");
+        String adminToken = obtainAdminToken();
+
+        mockMvc.perform(put("/pessoas/{id}/status", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":false}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/{id}/status", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"active\":true}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+        String newToken = obtainAccessToken(person.getPhoneNumber(), "senha");
+        Jwt newJwt = jwtDecoder.decode(newToken);
+        assertEquals(1L, ((Number) newJwt.getClaim("token_version")).longValue());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldInvalidateTokenAndPasswordsAfterAdministrativePasswordResetOfAnotherAccount() throws Exception {
+        Long personId = createPersonIdWithRole("ROLE_OPERATOR");
+        Person person = personRepository.findById(personId).orElseThrow();
+        String oldToken = obtainAccessToken(person.getPhoneNumber(), "senha");
+        String adminToken = obtainAdminToken();
+
+        mockMvc.perform(put("/pessoas/{id}/conta/senha", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"654321\"}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+        assertInvalidGrant(requestToken(person.getPhoneNumber(), "senha"));
+        String newToken = obtainAccessToken(person.getPhoneNumber(), "654321");
+        Jwt newJwt = jwtDecoder.decode(newToken);
+        assertEquals(1L, ((Number) newJwt.getClaim("token_version")).longValue());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectAdministrativePasswordResetOfOwnAccount() throws Exception {
+        Person admin = createPersonWithAccount(uniquePhone(), "senha", true, true, "ROLE_ADMIN");
+        String adminToken = obtainAccessToken(admin.getPhoneNumber(), "senha");
+
+        MvcResult result = mockMvc.perform(put("/pessoas/{id}/conta/senha", admin.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"654321\"}")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        assertEquals("SELF_ADMIN_PASSWORD_RESET_NOT_ALLOWED",
+                objectMapper.readTree(result.getResponse().getContentAsString()).get("errorCode").asText());
+        mockMvc.perform(get("/pessoas/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -634,6 +800,18 @@ class AuthenticationCutoverIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    private void updateReaderPhone(Long personId, String phone, String adminToken) throws Exception {
+        mockMvc.perform(put("/leitores/{id}", personId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "name", "Reader Phone Updated",
+                                "phoneNumber", phone,
+                                "birthdayDate", BIRTHDAY.toString()
+                        )))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isOk());
     }
 
     private Person createPersonWithAccount(String phone, String rawPassword, boolean accountEnabled, boolean personActive, String authority) {

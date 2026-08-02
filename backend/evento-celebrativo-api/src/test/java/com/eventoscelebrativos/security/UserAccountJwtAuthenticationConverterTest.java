@@ -46,7 +46,7 @@ class UserAccountJwtAuthenticationConverterTest {
     @Test
     void shouldBuildAuthenticatedUserWhenAccountIsValidAndUsernameMatches() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         Jwt jwt = jwt(10L, "34999999999", "34999999999");
@@ -129,9 +129,47 @@ class UserAccountJwtAuthenticationConverterTest {
     }
 
     @Test
+    void shouldAcceptLegacyTokenWithoutTokenVersionOnlyWhenCurrentVersionIsZero() {
+        Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
+        when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
+
+        AbstractAuthenticationToken result = converter.convert(jwt(10L, "34999999999", "34999999999"));
+
+        assertEquals(authenticatedUser, result.getPrincipal());
+    }
+
+    @Test
+    void shouldRejectLegacyTokenWithoutTokenVersionAfterVersionIncrement() {
+        Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 1L, authorities);
+        when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
+
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999")));
+    }
+
+    @Test
+    void shouldRejectInvalidTokenVersionTypes() {
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999", -1L)));
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999", BigDecimal.valueOf(1.5))));
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999", "1")));
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999", Map.of("version", 1))));
+        verify(userAccountAuthenticationService, never()).loadCurrentUser(any());
+    }
+
+    @Test
+    void shouldRejectTokenVersionDivergentFromCurrentAccountVersion() {
+        Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 2L, authorities);
+        when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
+
+        assertThrows(InvalidBearerTokenException.class, () -> converter.convert(jwt(10L, "34999999999", "34999999999", 1L)));
+    }
+
+    @Test
     void shouldRejectWhenCurrentUsernameNoLongerMatchesTokenSubject() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34988888888", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34988888888", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         // token emitido quando o username ainda era 34999999999; a conta ja mudou para 34988888888
@@ -143,7 +181,7 @@ class UserAccountJwtAuthenticationConverterTest {
     @Test
     void shouldRejectWhenSubjectIsMissing() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         Jwt jwt = jwt(10L, null, "34999999999");
@@ -155,7 +193,7 @@ class UserAccountJwtAuthenticationConverterTest {
     @Test
     void shouldRejectWhenUsernameClaimIsMissing() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         Jwt jwt = jwt(10L, "34999999999", MISSING_CLAIM);
@@ -167,7 +205,7 @@ class UserAccountJwtAuthenticationConverterTest {
     @Test
     void shouldRejectWhenSubjectDivergesFromCurrentUsername() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         Jwt jwt = jwt(10L, "34988888888", "34999999999");
@@ -179,7 +217,7 @@ class UserAccountJwtAuthenticationConverterTest {
     @Test
     void shouldRejectWhenUsernameClaimDivergesFromCurrentUsername() {
         Set<GrantedAuthority> authorities = Set.of(new SimpleGrantedAuthority("ROLE_OPERATOR"));
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", authorities);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(10L, 20L, "34999999999", 0L, authorities);
         when(userAccountAuthenticationService.loadCurrentUser(10L)).thenReturn(Optional.of(authenticatedUser));
 
         Jwt jwt = jwt(10L, "34999999999", "34988888888");
@@ -189,6 +227,10 @@ class UserAccountJwtAuthenticationConverterTest {
     }
 
     private Jwt jwt(Object accountId, String subject, Object usernameClaim) {
+        return jwt(accountId, subject, usernameClaim, MISSING_CLAIM);
+    }
+
+    private Jwt jwt(Object accountId, String subject, Object usernameClaim, Object tokenVersionClaim) {
         Jwt.Builder builder = Jwt.withTokenValue("token")
                 .header("alg", "RS256")
                 .claim("authorities", List.of("ROLE_OPERATOR"))
@@ -199,6 +241,9 @@ class UserAccountJwtAuthenticationConverterTest {
         }
         if (usernameClaim != MISSING_CLAIM) {
             builder.claim("username", usernameClaim);
+        }
+        if (tokenVersionClaim != MISSING_CLAIM) {
+            builder.claim("token_version", tokenVersionClaim);
         }
         return builder.claim("account_id", accountId).build();
     }

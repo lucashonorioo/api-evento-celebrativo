@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -84,6 +86,9 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
     private UserAccountSynchronizationService userAccountSynchronizationService;
 
     @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     @BeforeAll
@@ -145,6 +150,7 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
     @BeforeEach
     void setUp() {
         assumeTrue(mysqlAvailable, "MySQL 8.4 real nao acessivel; teste ignorado.");
+        jdbcTemplate.update("UPDATE tb_user_account SET enabled = FALSE");
     }
 
     @Test
@@ -181,6 +187,45 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
         }
     }
 
+    @Test
+    void shouldNeverLeaveZeroEffectiveAdministratorsWhenTwoAdminsAreDemotedConcurrently() throws Exception {
+        Long firstAdminId = createAdminPersonWithSyncedAccount();
+        Long secondAdminId = createAdminPersonWithSyncedAccount();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch readyLatch = new CountDownLatch(2);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        try {
+            Future<Exception> firstDemotion = executor.submit(
+                    () -> runRoleUpdate(secondAdminId, firstAdminId, "ROLE_OPERATOR", readyLatch, startLatch));
+            Future<Exception> secondDemotion = executor.submit(
+                    () -> runRoleUpdate(firstAdminId, secondAdminId, "ROLE_OPERATOR", readyLatch, startLatch));
+
+            assertTrue(readyLatch.await(10, TimeUnit.SECONDS), "Threads nao ficaram prontas a tempo");
+            startLatch.countDown();
+
+            Exception firstException = firstDemotion.get(30, TimeUnit.SECONDS);
+            Exception secondException = secondDemotion.get(30, TimeUnit.SECONDS);
+
+            long successes = java.util.stream.Stream.of(firstException, secondException)
+                    .filter(java.util.Objects::isNull)
+                    .count();
+            long lastAdminConflicts = java.util.stream.Stream.of(firstException, secondException)
+                    .filter(LifecycleConflictException.class::isInstance)
+                    .map(LifecycleConflictException.class::cast)
+                    .filter(exception -> "LAST_ACTIVE_ADMIN_REQUIRED".equals(exception.getErrorCode()))
+                    .count();
+
+            assertEquals(1, successes, "Exatamente uma democao deve concluir");
+            assertEquals(1, lastAdminConflicts, "A segunda democao deve preservar o ultimo administrador efetivo");
+            assertEquals(1, userAccountRoleRepository.countEffectiveAdministrators());
+        } finally {
+            executor.shutdownNow();
+            cleanupPerson(firstAdminId);
+            cleanupPerson(secondAdminId);
+        }
+    }
+
     private Exception runRoleUpdate(Long actingAdminId, Long personId, String targetRole, CountDownLatch readyLatch, CountDownLatch startLatch) {
         try {
             readyLatch.countDown();
@@ -205,7 +250,7 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
         java.util.Set<org.springframework.security.core.GrantedAuthority> authorities = java.util.Set.of(
                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"));
         com.eventoscelebrativos.security.AuthenticatedUser authenticatedUser =
-                new com.eventoscelebrativos.security.AuthenticatedUser(1L, actingAdminId, "anchor-admin", authorities);
+                new com.eventoscelebrativos.security.AuthenticatedUser(1L, actingAdminId, "anchor-admin", 0L, authorities);
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                         authenticatedUser, null, authorities));

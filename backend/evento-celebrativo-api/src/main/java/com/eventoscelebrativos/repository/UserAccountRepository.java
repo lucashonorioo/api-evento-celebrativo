@@ -27,6 +27,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     boolean existsByUsername(String username);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ua FROM UserAccount ua WHERE ua.username = :username")
+    Optional<UserAccount> findByUsernameForUpdate(@Param("username") String username);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"roles", "roles.role"})
     @Query("SELECT ua FROM UserAccount ua WHERE ua.person.id = :personId")
     Optional<UserAccount> findByPersonIdForUpdate(@Param("personId") Long personId);
 

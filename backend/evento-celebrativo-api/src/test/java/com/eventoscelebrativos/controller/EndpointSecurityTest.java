@@ -71,10 +71,38 @@ class EndpointSecurityTest {
                         .content(profilePayload()))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(put("/pessoas/me/conta/senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(selfPasswordPayload()))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(get("/pessoas"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/1"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/pessoas/1/conta"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountCreatePayload()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/1/conta/habilitacao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountEnabledPayload()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personActivePayload()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/1/conta/senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(adminPasswordPayload()))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/me/escalas")
@@ -167,6 +195,29 @@ class EndpointSecurityTest {
                         .content(rolePayload()))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/pessoas/1/conta"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountCreatePayload()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/conta/habilitacao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountEnabledPayload()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personActivePayload()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/pessoas/1/conta/senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(adminPasswordPayload()))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(get("/pessoas"))
                 .andExpect(status().isForbidden());
 
@@ -248,6 +299,11 @@ class EndpointSecurityTest {
                         .content(rolePayload()))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(put("/pessoas/me/conta/senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(selfPasswordPayload()))
+                .andExpect(status().isConflict());
+
         mockMvc.perform(put("/pessoas/1/ministries")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ministriesPayload()))
@@ -255,7 +311,7 @@ class EndpointSecurityTest {
     }
 
     @Test
-    @WithMockAuthenticatedUser(personId = 14L, username = "34999887766", authorities = {"ROLE_ADMIN"})
+    @WithMockAuthenticatedUser(accountId = 14L, personId = 14L, username = "34999887766", authorities = {"ROLE_ADMIN"})
     void shouldAllowAdminOnAdministrativeEndpoints() throws Exception {
         mockMvc.perform(get("/pessoas/me"))
                 .andExpect(status().isOk())
@@ -272,6 +328,29 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(rolePayload()))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas/1/conta"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/pessoas/1/conta")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountCreatePayload()))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(put("/pessoas/1/conta/habilitacao")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountEnabledPayload()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/pessoas/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(personActivePayload()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/pessoas/1/conta/senha")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(adminPasswordPayload()))
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/pessoas"))
                 .andExpect(status().isOk());
@@ -351,6 +430,48 @@ class EndpointSecurityTest {
         return """
                 {
                   "role": "ROLE_OPERATOR"
+                }
+                """;
+    }
+
+    private String accountCreatePayload() {
+        return """
+                {
+                  "initialPassword": "123456",
+                  "role": "ROLE_OPERATOR"
+                }
+                """;
+    }
+
+    private String accountEnabledPayload() {
+        return """
+                {
+                  "enabled": true
+                }
+                """;
+    }
+
+    private String personActivePayload() {
+        return """
+                {
+                  "active": true
+                }
+                """;
+    }
+
+    private String adminPasswordPayload() {
+        return """
+                {
+                  "newPassword": "123456"
+                }
+                """;
+    }
+
+    private String selfPasswordPayload() {
+        return """
+                {
+                  "currentPassword": "senha-incorreta",
+                  "newPassword": "654321"
                 }
                 """;
     }

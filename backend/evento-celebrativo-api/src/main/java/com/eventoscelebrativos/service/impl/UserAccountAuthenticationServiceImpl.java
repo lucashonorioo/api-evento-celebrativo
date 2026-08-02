@@ -1,12 +1,12 @@
 package com.eventoscelebrativos.service.impl;
 
-import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import com.eventoscelebrativos.service.UserAccountAuthenticationService;
 import com.eventoscelebrativos.service.UserAccountCredentials;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +55,7 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
                 account.getPerson().getId(),
                 account.getUsername(),
                 account.getPasswordHash(),
+                account.getTokenVersion(),
                 account.isEnabled(),
                 account.getPerson().isActive(),
                 authorities
@@ -70,13 +71,14 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
                 account.getId(),
                 account.getPerson().getId(),
                 account.getUsername(),
+                account.getTokenVersion(),
                 authorities
         ));
     }
 
     private Set<GrantedAuthority> authoritiesOf(UserAccount account) {
         return account.getRoles().stream()
-                .map(userAccountRole -> (GrantedAuthority) userAccountRole.getRole())
+                .map(userAccountRole -> (GrantedAuthority) new SimpleGrantedAuthority(userAccountRole.getRole().getAuthority()))
                 .collect(Collectors.toUnmodifiableSet());
     }
 }

@@ -10,7 +10,7 @@ import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.exception.exceptions.ConflictException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.CurrentUserProfileMapper;
 import com.eventoscelebrativos.mapper.PersonAdminMapper;
@@ -82,6 +82,9 @@ class PersonServiceImplTest {
 
     @Mock
     private UserAccountSynchronizationService userAccountSynchronizationService;
+
+    @Mock
+    private UserAccountLifecycleService userAccountLifecycleService;
 
     @Mock
     private AuthenticatedUserResolver authenticatedUserResolver;
@@ -228,12 +231,9 @@ class PersonServiceImplTest {
     @Test
     void shouldUpdatePersonRoleToAdmin() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(operatorRole());
-        Role adminRole = adminRole();
+        person.addRole(adminRole());
 
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
-        when(personRepository.save(person)).thenReturn(person);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
@@ -245,22 +245,16 @@ class PersonServiceImplTest {
         assertEquals(List.of(MinistryType.READER), response.getMinistries());
         assertTrue(person.hasRole("ROLE_ADMIN"));
         assertFalse(person.hasRole("ROLE_OPERATOR"));
-        verify(userAccountSynchronizationService).synchronizeExistingPerson(person);
+        verify(userAccountLifecycleService).updateRole(1L, "ROLE_ADMIN");
+        verifyNoInteractions(userAccountSynchronizationService);
     }
 
     @Test
     void shouldUpdatePersonRoleToOperatorWhenAnotherAdministratorExists() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
-        Person otherAdmin = person(2L, "Admin", "34999999992", "encoded-password");
-        otherAdmin.addRole(adminRole());
-        Role operatorRole = operatorRole();
+        person.addRole(operatorRole());
 
-        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(2L);
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person, otherAdmin));
-        when(personRepository.save(person)).thenReturn(person);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_OPERATOR")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_OPERATOR"));
@@ -270,25 +264,24 @@ class PersonServiceImplTest {
         assertEquals("ROLE_OPERATOR", response.getRoles().get(0));
         assertTrue(person.hasRole("ROLE_OPERATOR"));
         assertFalse(person.hasRole("ROLE_ADMIN"));
+        verify(userAccountLifecycleService).updateRole(1L, "ROLE_OPERATOR");
     }
 
     @Test
     void shouldNotChangePasswordWhenUpdatingRole() {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        Role adminRole = adminRole();
+        person.addRole(adminRole());
 
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
-        when(personRepository.save(person)).thenReturn(person);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
 
-        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
-        verify(personRepository).save(captor.capture());
-        assertEquals("encoded-password", captor.getValue().getPassword());
+        assertEquals("encoded-password", person.getPassword());
+        verify(personRepository, never()).save(any());
+        verify(userAccountSynchronizationService, never()).synchronizeExistingPerson(any());
     }
 
     @Test
@@ -299,17 +292,18 @@ class PersonServiceImplTest {
                 () -> assertThrows(BusinessException.class, () -> service.updatePersonRole(-1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN")))
         );
 
-        verifyNoInteractions(personRepository, roleRepository);
+        verifyNoInteractions(personRepository, roleRepository, userAccountLifecycleService);
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenPersonDoesNotExist() {
-        when(personRepository.findByIdWithRolesForUpdate(99L)).thenReturn(Optional.empty());
+        when(userAccountLifecycleService.updateRole(99L, "ROLE_ADMIN"))
+                .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
         assertThrows(ResourceNotFoundException.class,
                 () -> service.updatePersonRole(99L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN")));
 
-        verifyNoInteractions(roleRepository);
+        verifyNoInteractions(personRepository, roleRepository);
     }
 
     @Test
@@ -317,14 +311,13 @@ class PersonServiceImplTest {
         assertThrows(BadRequestException.class,
                 () -> service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_UNKNOWN")));
 
-        verifyNoInteractions(personRepository, roleRepository);
+        verifyNoInteractions(personRepository, roleRepository, userAccountLifecycleService);
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenAllowedRoleDoesNotExistInDatabase() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.empty());
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN"))
+                .thenThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_ADMIN"));
 
         assertThrows(ResourceNotFoundException.class,
                 () -> service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN")));
@@ -334,17 +327,15 @@ class PersonServiceImplTest {
 
     @Test
     void shouldBlockSelfAdminDemotion() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
-        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(1L);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_OPERATOR"))
+                .thenThrow(new LifecycleConflictException(
+                        "Administrador nao pode remover o proprio perfil administrativo.",
+                        "SELF_ADMIN_DEMOTION_NOT_ALLOWED"));
 
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
-
-        ConflictException exception = assertThrows(ConflictException.class,
+        LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
                 () -> service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_OPERATOR")));
 
-        assertEquals("Voce nao pode remover o seu proprio perfil administrativo.", exception.getMessage());
+        assertEquals("SELF_ADMIN_DEMOTION_NOT_ALLOWED", exception.getErrorCode());
         verify(personRepository, never()).save(any());
         verify(personRepository, never()).findPeopleByRoleForUpdate(any());
     }
@@ -354,9 +345,7 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991", "encoded-password");
         person.addRole(adminRole());
 
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_ADMIN")).thenReturn(Optional.of(adminRole()));
-        when(personRepository.save(person)).thenReturn(person);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
@@ -369,18 +358,15 @@ class PersonServiceImplTest {
 
     @Test
     void shouldBlockLastAdministratorDemotion() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
-        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
+        when(userAccountLifecycleService.updateRole(1L, "ROLE_OPERATOR"))
+                .thenThrow(new LifecycleConflictException(
+                        "O ultimo administrador efetivo deve ser preservado.",
+                        "LAST_ACTIVE_ADMIN_REQUIRED"));
 
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole()));
-        when(personRepository.findPeopleByRoleForUpdate("ROLE_ADMIN")).thenReturn(List.of(person));
-
-        ConflictException exception = assertThrows(ConflictException.class,
+        LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
                 () -> service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_OPERATOR")));
 
-        assertEquals("O ultimo administrador do sistema nao pode ter seu perfil alterado.", exception.getMessage());
+        assertEquals("LAST_ACTIVE_ADMIN_REQUIRED", exception.getErrorCode());
         verify(personRepository, never()).save(any());
     }
 
