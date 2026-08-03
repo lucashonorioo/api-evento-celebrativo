@@ -1,0 +1,163 @@
+package db.migration;
+
+import org.flywaydb.core.api.migration.BaseJavaMigration;
+import org.flywaydb.core.api.migration.Context;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Locale;
+
+/**
+ * Cria o schema de gerenciamento de notificacoes internas: tb_notification (registro imutavel do
+ * envio), tb_notification_recipient (snapshot por destinatario, com read_at individual) e
+ * tb_notification_ministry (ministerios selecionados quando audience = MINISTRY).
+ * <p>
+ * origin/audience/category e ministry_type sao persistidos como VARCHAR sem CHECK restrito aos
+ * valores atuais do enum Java, para permitir novos valores futuros sem nova migration de schema.
+ * As unicas CHECK constraints desta migration protegem invariantes estruturais que nao dependem do
+ * conjunto de valores de um enum: origin versus presenca de sender, e os pares reference/source
+ * (ambos nulos ou ambos preenchidos).
+ */
+public class V16__create_notification_management extends BaseJavaMigration {
+
+    @Override
+    public void migrate(Context context) throws Exception {
+        Connection connection = context.getConnection();
+        String timestampType = isMySql(connection) ? "DATETIME(0)" : "TIMESTAMP(0)";
+
+        createNotificationTable(connection, timestampType);
+        createNotificationRecipientTable(connection, timestampType);
+        createNotificationMinistryTable(connection);
+    }
+
+    private void createNotificationTable(Connection connection, String timestampType) throws SQLException {
+        execute(connection, """
+                CREATE TABLE tb_notification (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    origin VARCHAR(20) NOT NULL,
+                    audience VARCHAR(20) NOT NULL,
+                    category VARCHAR(20) NOT NULL,
+                    title VARCHAR(120) NOT NULL,
+                    message VARCHAR(2000) NOT NULL,
+                    sender_user_account_id BIGINT NULL,
+                    sender_name_snapshot VARCHAR(255) NOT NULL,
+                    reference_type VARCHAR(50) NULL,
+                    reference_id BIGINT NULL,
+                    source_type VARCHAR(50) NULL,
+                    source_key VARCHAR(255) NULL,
+                    created_at %1$s NOT NULL,
+                    resolved_at %1$s NULL,
+                    CONSTRAINT pk_tb_notification PRIMARY KEY (id)
+                )
+                """.formatted(timestampType));
+
+        execute(connection, """
+                ALTER TABLE tb_notification
+                    ADD CONSTRAINT fk_tb_notification_sender
+                    FOREIGN KEY (sender_user_account_id)
+                    REFERENCES tb_user_account (id)
+                    ON DELETE RESTRICT
+                """);
+
+        execute(connection, """
+                ALTER TABLE tb_notification
+                    ADD CONSTRAINT ck_tb_notification_origin_sender
+                    CHECK (
+                        (origin = 'ADMIN' AND sender_user_account_id IS NOT NULL)
+                        OR (origin = 'SYSTEM' AND sender_user_account_id IS NULL)
+                    )
+                """);
+
+        execute(connection, """
+                ALTER TABLE tb_notification
+                    ADD CONSTRAINT ck_tb_notification_reference_pair
+                    CHECK (
+                        (reference_type IS NULL AND reference_id IS NULL)
+                        OR (reference_type IS NOT NULL AND reference_id IS NOT NULL)
+                    )
+                """);
+
+        execute(connection, """
+                ALTER TABLE tb_notification
+                    ADD CONSTRAINT ck_tb_notification_source_pair
+                    CHECK (
+                        (source_type IS NULL AND source_key IS NULL)
+                        OR (source_type IS NOT NULL AND source_key IS NOT NULL)
+                    )
+                """);
+
+        execute(connection, "CREATE INDEX idx_tb_notification_created_at_id ON tb_notification (created_at, id)");
+        execute(connection,
+                "CREATE INDEX idx_tb_notification_sender_created_at_id "
+                        + "ON tb_notification (sender_user_account_id, created_at, id)");
+        execute(connection, "CREATE INDEX idx_tb_notification_source ON tb_notification (source_type, source_key)");
+    }
+
+    private void createNotificationRecipientTable(Connection connection, String timestampType) throws SQLException {
+        execute(connection, """
+                CREATE TABLE tb_notification_recipient (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    notification_id BIGINT NOT NULL,
+                    user_account_id BIGINT NOT NULL,
+                    recipient_name_snapshot VARCHAR(255) NOT NULL,
+                    read_at %1$s NULL,
+                    CONSTRAINT pk_tb_notification_recipient PRIMARY KEY (id),
+                    CONSTRAINT uk_tb_notification_recipient_notification_user_account
+                        UNIQUE (notification_id, user_account_id)
+                )
+                """.formatted(timestampType));
+
+        execute(connection, """
+                ALTER TABLE tb_notification_recipient
+                    ADD CONSTRAINT fk_tb_notification_recipient_notification
+                    FOREIGN KEY (notification_id)
+                    REFERENCES tb_notification (id)
+                    ON DELETE CASCADE
+                """);
+
+        execute(connection, """
+                ALTER TABLE tb_notification_recipient
+                    ADD CONSTRAINT fk_tb_notification_recipient_user_account
+                    FOREIGN KEY (user_account_id)
+                    REFERENCES tb_user_account (id)
+                    ON DELETE RESTRICT
+                """);
+
+        execute(connection,
+                "CREATE INDEX idx_tb_notification_recipient_account_read_notification "
+                        + "ON tb_notification_recipient (user_account_id, read_at, notification_id)");
+        execute(connection,
+                "CREATE INDEX idx_tb_notification_recipient_notification_read_name_id "
+                        + "ON tb_notification_recipient (notification_id, read_at, recipient_name_snapshot, id)");
+    }
+
+    private void createNotificationMinistryTable(Connection connection) throws SQLException {
+        execute(connection, """
+                CREATE TABLE tb_notification_ministry (
+                    notification_id BIGINT NOT NULL,
+                    ministry_type VARCHAR(50) NOT NULL,
+                    CONSTRAINT pk_tb_notification_ministry PRIMARY KEY (notification_id, ministry_type)
+                )
+                """);
+
+        execute(connection, """
+                ALTER TABLE tb_notification_ministry
+                    ADD CONSTRAINT fk_tb_notification_ministry_notification
+                    FOREIGN KEY (notification_id)
+                    REFERENCES tb_notification (id)
+                    ON DELETE CASCADE
+                """);
+    }
+
+    private boolean isMySql(Connection connection) throws SQLException {
+        String productName = connection.getMetaData().getDatabaseProductName();
+        return productName != null && productName.toUpperCase(Locale.ROOT).contains("MYSQL");
+    }
+
+    private void execute(Connection connection, String sql) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate(sql);
+        }
+    }
+}

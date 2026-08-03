@@ -2,6 +2,7 @@ package com.eventoscelebrativos.exception.handler;
 
 import com.eventoscelebrativos.exception.error.ErrorResponse;
 import com.eventoscelebrativos.exception.error.MultipleAssignmentsForPersonInEventErrorResponse;
+import com.eventoscelebrativos.exception.error.NotificationInvalidRecipientsErrorResponse;
 import com.eventoscelebrativos.exception.error.PersonUnavailableForEventErrorResponse;
 import com.eventoscelebrativos.exception.error.UnavailabilityConflictWithStartedAssignmentErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
@@ -66,6 +67,21 @@ public class GlobalExceptionHandler {
                 ex.getEventId(),
                 ex.getPersonId(),
                 ex.getConflictingAssignmentTypes()
+        );
+        return new ResponseEntity<>(errorResponse, ex.getStatus());
+    }
+
+    @ExceptionHandler(NotificationInvalidRecipientsException.class)
+    public ResponseEntity<NotificationInvalidRecipientsErrorResponse> handleNotificationInvalidRecipients(
+            NotificationInvalidRecipientsException ex, WebRequest webRequest
+    ) {
+        NotificationInvalidRecipientsErrorResponse errorResponse = new NotificationInvalidRecipientsErrorResponse(
+                Instant.now(),
+                ex.getStatus().value(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                webRequest.getDescription(false),
+                ex.getInvalidRecipients()
         );
         return new ResponseEntity<>(errorResponse, ex.getStatus());
     }

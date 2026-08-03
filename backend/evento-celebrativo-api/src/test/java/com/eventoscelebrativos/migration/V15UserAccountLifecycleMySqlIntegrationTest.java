@@ -151,10 +151,13 @@ class V15UserAccountLifecycleMySqlIntegrationTest {
                 .migrate();
     }
 
+    // Alvo fixo em "15": este teste cobre especificamente a migration V15 e nao deve ser afetado por
+    // migrations futuras (ex.: V16) adicionadas depois dela.
     private MigrateResult migrateAll(DataSource dataSource) {
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
+                .target("15")
                 .load()
                 .migrate();
     }

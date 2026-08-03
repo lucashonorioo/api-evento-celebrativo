@@ -16,8 +16,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Espelho de acesso de uma {@link Person}, mantido sincronizado pelos fluxos legados.
- * Nao e usado como principal de autenticacao nesta etapa (ver feature/user-account-authentication-cutover).
+ * Conta de acesso de uma {@link Person}, fonte real de autenticacao e autorizacao em runtime
+ * (ver {@code UserAccountAuthenticationServiceImpl} e {@code UserAccountJwtAuthenticationConverter}).
+ * O invariante de dominio e que uma conta consistente possui exatamente uma {@link UserAccountRole};
+ * conta com zero ou mais de uma role e tratada como inconsistente e tem login e bearer rejeitados.
  */
 @Entity
 @Table(name = "tb_user_account")

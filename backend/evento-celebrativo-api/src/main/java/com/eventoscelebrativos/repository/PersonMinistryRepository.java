@@ -2,9 +2,11 @@ package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.PersonMinistry;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -77,6 +79,21 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
     List<PersonMinistryStatusView> findAllMinistryStatusesByPersonIds(@Param("personIds") Collection<Long> personIds);
 
     void deleteAllByPersonId(Long personId);
+
+    /**
+     * Usada pelo envio de notificacoes de audience MINISTRY: bloqueia os vinculos ativos relevantes
+     * de uma pessoa ja com Person e UserAccount bloqueados, para revalidar apos o lock se algum dos
+     * ministerios selecionados continua ativo.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT pm FROM PersonMinistry pm
+            WHERE pm.person.id = :personId AND pm.ministryType IN :ministryTypes
+            """)
+    List<PersonMinistry> findByPersonIdAndMinistryTypeInForUpdate(
+            @Param("personId") Long personId,
+            @Param("ministryTypes") Collection<MinistryType> ministryTypes
+    );
 
     interface PersonMinistryTypeView {
         Long getPersonId();

@@ -79,6 +79,13 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/roles").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.POST, "/notificacoes").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.GET, "/notificacoes/nao-lidas/contagem").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
+				.requestMatchers(HttpMethod.PUT, "/notificacoes/leitura/todas").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
+				.requestMatchers(HttpMethod.PUT, "/notificacoes/*/leitura").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
+				.requestMatchers(HttpMethod.GET, "/notificacoes", "/notificacoes/*").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
+				.requestMatchers(HttpMethod.GET, "/admin/notificacoes/*/destinatarios").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.GET, "/admin/notificacoes", "/admin/notificacoes/*").hasAuthority("ROLE_ADMIN")
 				.anyRequest().authenticated());
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer
 				.jwt(jwt -> jwt.jwtAuthenticationConverter(userAccountJwtAuthenticationConverter)));
