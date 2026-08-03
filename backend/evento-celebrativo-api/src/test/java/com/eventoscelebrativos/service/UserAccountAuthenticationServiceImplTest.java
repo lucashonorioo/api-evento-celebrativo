@@ -90,6 +90,15 @@ class UserAccountAuthenticationServiceImplTest {
     }
 
     @Test
+    void shouldReturnEmptyCredentialsWhenAccountHasMultipleRoles() {
+        UserAccount account = account(1L, person(2L, true), "34999999999", "hash", true,
+                Set.of(role(3L, "ROLE_OPERATOR"), role(4L, "ROLE_ADMIN")));
+        when(userAccountRepository.findByUsernameForAuthentication("34999999999")).thenReturn(Optional.of(account));
+
+        assertTrue(service.loadCredentialsByUsername("34999999999").isEmpty());
+    }
+
+    @Test
     void shouldReturnEmptyCredentialsForBlankOrNullUsername() {
         assertTrue(service.loadCredentialsByUsername(null).isEmpty());
         assertTrue(service.loadCredentialsByUsername("  ").isEmpty());
@@ -183,6 +192,15 @@ class UserAccountAuthenticationServiceImplTest {
         assertTrue(service.loadCurrentUser(1L).isEmpty());
         verify(person, never()).getRoles();
         verify(person, never()).getAuthorities();
+    }
+
+    @Test
+    void shouldReturnEmptyCurrentUserWhenAccountHasMultipleRoles() {
+        UserAccount account = account(1L, person(2L, true), "34999999999", "hash", true,
+                Set.of(role(3L, "ROLE_OPERATOR"), role(4L, "ROLE_ADMIN")));
+        when(userAccountRepository.findByIdForAuthentication(1L)).thenReturn(Optional.of(account));
+
+        assertTrue(service.loadCurrentUser(1L).isEmpty());
     }
 
     @Test

@@ -46,6 +46,9 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
     }
 
     private Optional<UserAccountCredentials> credentialsOf(UserAccount account) {
+        if (!hasExactlyOneRole(account)) {
+            return Optional.empty();
+        }
         Set<GrantedAuthority> authorities = authoritiesOf(account);
         if (authorities.isEmpty()) {
             return Optional.empty();
@@ -63,6 +66,9 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
     }
 
     private Optional<AuthenticatedUser> authenticatedUserOf(UserAccount account) {
+        if (!hasExactlyOneRole(account)) {
+            return Optional.empty();
+        }
         Set<GrantedAuthority> authorities = authoritiesOf(account);
         if (authorities.isEmpty()) {
             return Optional.empty();
@@ -80,5 +86,11 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
         return account.getRoles().stream()
                 .map(userAccountRole -> (GrantedAuthority) new SimpleGrantedAuthority(userAccountRole.getRole().getAuthority()))
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    // Conta com zero ou mais de uma role e um estado inconsistente que nao deve autenticar,
+    // mesmo que a colecao de authorities resultante nao fique vazia (caso de duas roles distintas).
+    private boolean hasExactlyOneRole(UserAccount account) {
+        return account.getRoles().size() == 1;
     }
 }
