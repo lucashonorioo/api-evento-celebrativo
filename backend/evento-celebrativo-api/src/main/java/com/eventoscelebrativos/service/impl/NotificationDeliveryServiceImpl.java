@@ -50,7 +50,11 @@ import java.util.Set;
 public class NotificationDeliveryServiceImpl implements NotificationDeliveryService {
 
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final Set<String> VALID_AUTHORITIES = Set.of("ROLE_ADMIN", "ROLE_OPERATOR");
     private static final int MAX_REPORTED_INVALID_RECIPIENTS = 50;
+    private static final int MAX_REFERENCE_TYPE_LENGTH = 50;
+    private static final int MAX_SOURCE_TYPE_LENGTH = 50;
+    private static final int MAX_SOURCE_KEY_LENGTH = 255;
 
     private final NotificationRepository notificationRepository;
     private final NotificationRecipientRepository notificationRecipientRepository;
@@ -58,6 +62,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
     private final PersonRepository personRepository;
     private final UserAccountRepository userAccountRepository;
     private final PersonMinistryRepository personMinistryRepository;
+    private final AdminRoleMutexService adminRoleMutexService;
     private final Clock clock;
 
     public NotificationDeliveryServiceImpl(
@@ -67,6 +72,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             PersonRepository personRepository,
             UserAccountRepository userAccountRepository,
             PersonMinistryRepository personMinistryRepository,
+            AdminRoleMutexService adminRoleMutexService,
             Clock clock
     ) {
         this.notificationRepository = notificationRepository;
@@ -75,6 +81,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
         this.personRepository = personRepository;
         this.userAccountRepository = userAccountRepository;
         this.personMinistryRepository = personMinistryRepository;
+        this.adminRoleMutexService = adminRoleMutexService;
         this.clock = clock;
     }
 
@@ -96,7 +103,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
 
         RequestContext context = new RequestContext(
                 NotificationOrigin.ADMIN, senderAccountId, NotificationCategory.GENERAL,
-                title, message, null, null, null, null
+                title, message, null, null, null, null, null
         );
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
         return audience == NotificationAudience.DIRECT
@@ -107,18 +114,38 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
     @Override
     @Transactional
     public NotificationCreateResponseDTO sendSystemNotification(SystemNotificationCommand command) {
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        return doSendSystem(command, null, currentSecond);
+    }
+
+    @Override
+    @Transactional
+    public NotificationCreateResponseDTO sendSystemNotificationForConflictReconciliation(
+            SystemNotificationCommand command,
+            String activeSourceKey,
+            LocalDateTime currentSecond
+    ) {
+        Objects.requireNonNull(activeSourceKey, "activeSourceKey é obrigatório");
+        return doSendSystem(command, activeSourceKey, currentSecond);
+    }
+
+    private NotificationCreateResponseDTO doSendSystem(
+            SystemNotificationCommand command,
+            String activeSourceKey,
+            LocalDateTime currentSecond
+    ) {
         String title = NotificationContentValidator.normalizeTitle(command.title());
         String message = NotificationContentValidator.normalizeMessage(command.message());
         List<MinistryType> ministryTypes = dedupeMinistryTypes(command.ministryTypes());
         List<Long> personIds = dedupePersonIds(command.personIds());
         validateAudienceFields(command.audience(), ministryTypes, personIds);
+        validateSystemMetadata(command);
 
         RequestContext context = new RequestContext(
                 NotificationOrigin.SYSTEM, null, command.category(),
                 title, message, command.referenceType(), command.referenceId(),
-                command.sourceType(), command.sourceKey()
+                command.sourceType(), command.sourceKey(), activeSourceKey
         );
-        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
         return command.audience() == NotificationAudience.DIRECT
                 ? deliverDirect(context, personIds, currentSecond)
                 : deliverBroadcast(context, command.audience(), ministryTypes, currentSecond);
@@ -130,6 +157,8 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             List<MinistryType> ministryTypes,
             LocalDateTime currentSecond
     ) {
+        adminRoleMutexService.lockAdminRole();
+
         Map<Long, Long> personIdByAccountId = new LinkedHashMap<>();
 
         if (audience == NotificationAudience.MINISTRY) {
@@ -264,6 +293,8 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             List<Long> personIds,
             LocalDateTime currentSecond
     ) {
+        adminRoleMutexService.lockAdminRole();
+
         List<Long> sortedPersonIds = personIds.stream().sorted().toList();
 
         Long senderAccountId = context.senderAccountId();
@@ -315,7 +346,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
                 invalidRecipients.add(new InvalidRecipientDTO(personId, InvalidRecipientReason.PERSON_INACTIVE));
                 continue;
             }
-            if (account.getRoles().size() != 1) {
+            if (!hasValidRole(account)) {
                 invalidRecipients.add(new InvalidRecipientDTO(personId, InvalidRecipientReason.USER_ACCOUNT_ROLE_INVALID));
                 continue;
             }
@@ -344,13 +375,20 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             List<MinistryType> ministryTypesToPersist,
             LocalDateTime currentSecond
     ) {
-        Notification notification = context.origin() == NotificationOrigin.ADMIN
-                ? Notification.administrative(
-                        sender, sender.getPerson().getName(), audience, context.title(), context.message(), currentSecond)
-                : Notification.system(
-                        audience, context.category(), context.title(), context.message(),
-                        context.referenceType(), context.referenceId(), context.sourceType(), context.sourceKey(),
-                        currentSecond);
+        Notification notification;
+        if (context.origin() == NotificationOrigin.ADMIN) {
+            notification = Notification.administrative(
+                    sender, sender.getPerson().getName(), audience, context.title(), context.message(), currentSecond);
+        } else if (context.activeSourceKey() != null) {
+            notification = Notification.scheduleConflict(
+                    audience, context.title(), context.message(), context.referenceType(), context.referenceId(),
+                    context.sourceType(), context.sourceKey(), context.activeSourceKey(), currentSecond);
+        } else {
+            notification = Notification.system(
+                    audience, context.category(), context.title(), context.message(),
+                    context.referenceType(), context.referenceId(), context.sourceType(), context.sourceKey(),
+                    currentSecond);
+        }
         notification = notificationRepository.save(notification);
 
         for (MinistryType type : ministryTypesToPersist) {
@@ -388,7 +426,12 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
     private boolean isEligibleAccount(UserAccount account, Person person) {
         return account != null && person != null
                 && account.isEnabled() && person.isActive()
-                && account.getRoles().size() == 1;
+                && hasValidRole(account);
+    }
+
+    private boolean hasValidRole(UserAccount account) {
+        return account.getRoles().size() == 1
+                && VALID_AUTHORITIES.contains(account.getRoles().iterator().next().getRole().getAuthority());
     }
 
     private boolean hasRole(UserAccount account, String authority) {
@@ -417,6 +460,42 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             return invalidRecipients;
         }
         return new ArrayList<>(invalidRecipients.subList(0, MAX_REPORTED_INVALID_RECIPIENTS));
+    }
+
+    private void validateSystemMetadata(SystemNotificationCommand command) {
+        boolean hasReferenceType = command.referenceType() != null && !command.referenceType().isBlank();
+        boolean hasReferenceId = command.referenceId() != null;
+        if (hasReferenceType != hasReferenceId) {
+            throw new BadRequestException(
+                    "referenceType e referenceId devem ser ambos ausentes ou ambos presentes.",
+                    "NOTIFICATION_REFERENCE_PAIR_INVALID");
+        }
+        if (hasReferenceType && command.referenceType().length() > MAX_REFERENCE_TYPE_LENGTH) {
+            throw new BadRequestException(
+                    "referenceType deve ter no máximo " + MAX_REFERENCE_TYPE_LENGTH + " caracteres.",
+                    "NOTIFICATION_REFERENCE_TYPE_TOO_LONG");
+        }
+        if (hasReferenceId && command.referenceId() <= 0) {
+            throw new BadRequestException("referenceId deve ser positivo.", "NOTIFICATION_REFERENCE_ID_INVALID");
+        }
+
+        boolean hasSourceType = command.sourceType() != null && !command.sourceType().isBlank();
+        boolean hasSourceKey = command.sourceKey() != null && !command.sourceKey().isBlank();
+        if (hasSourceType != hasSourceKey) {
+            throw new BadRequestException(
+                    "sourceType e sourceKey devem ser ambos ausentes ou ambos presentes.",
+                    "NOTIFICATION_SOURCE_PAIR_INVALID");
+        }
+        if (hasSourceType && command.sourceType().length() > MAX_SOURCE_TYPE_LENGTH) {
+            throw new BadRequestException(
+                    "sourceType deve ter no máximo " + MAX_SOURCE_TYPE_LENGTH + " caracteres.",
+                    "NOTIFICATION_SOURCE_TYPE_TOO_LONG");
+        }
+        if (hasSourceKey && command.sourceKey().length() > MAX_SOURCE_KEY_LENGTH) {
+            throw new BadRequestException(
+                    "sourceKey deve ter no máximo " + MAX_SOURCE_KEY_LENGTH + " caracteres.",
+                    "NOTIFICATION_SOURCE_KEY_TOO_LONG");
+        }
     }
 
     private void validateAudienceFields(NotificationAudience audience, List<MinistryType> ministryTypes, List<Long> personIds) {
@@ -458,7 +537,8 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             String referenceType,
             Long referenceId,
             String sourceType,
-            String sourceKey
+            String sourceKey,
+            String activeSourceKey
     ) {
     }
 }

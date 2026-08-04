@@ -4,14 +4,10 @@ import com.eventoscelebrativos.config.TemporalJsonConfig;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityRangeDTO;
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityResponseDTO;
-import com.eventoscelebrativos.dto.response.StartedAssignmentConflictDTO;
-import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
-import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
-import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
@@ -262,30 +258,6 @@ class PersonUnavailabilityControllerTest {
     }
 
     @Test
-    @WithMockAuthenticatedUser(personId = 1L, username = "34970000005", authorities = {"ROLE_ADMIN"})
-    void shouldReturn409WithStartedAssignmentConflictStructuredResponse() throws Exception {
-        when(personUnavailabilityService.create(eq(1L), any()))
-                .thenThrow(new UnavailabilityConflictWithStartedAssignmentException(List.of(
-                        new StartedAssignmentConflictDTO(15L, "Missa das 19h", LocalDateTime.of(2026, 8, 15, 19, 0), LocalDateTime.of(2026, 8, 15, 20, 0),
-                                "READER")
-                )));
-
-        mockMvc.perform(post("/pessoas/me/indisponibilidades")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "startAt": "2026-08-15T00:00:00",
-                                  "endAt": "2026-08-16T00:00:00"
-                                }
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("UNAVAILABILITY_CONFLICT_WITH_STARTED_ASSIGNMENT"))
-                .andExpect(jsonPath("$.conflicts[0].eventId").value(15))
-                .andExpect(jsonPath("$.conflicts[0].assignmentType").value("READER"));
-    }
-
-    @Test
     @WithMockAuthenticatedUser(personId = 1L, username = "34970000006", authorities = {"ROLE_ADMIN"})
     void shouldUpdateUnavailability() throws Exception {
         when(personUnavailabilityService.update(eq(1L), eq(1L), any()))
@@ -399,29 +371,6 @@ class PersonUnavailabilityControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(personUnavailabilityService);
-    }
-
-    @Test
-    @WithMockAuthenticatedUser(personId = 1L, username = "34970000011", authorities = {"ROLE_ADMIN"})
-    void shouldReturn409StructuredResponseForPersonUnavailableForEvent() throws Exception {
-        when(personUnavailabilityService.create(eq(1L), any()))
-                .thenThrow(new PersonUnavailableForEventException(List.of(
-                        new PersonUnavailabilityEventConflictDTO(4L, "Arthur Costa", List.of("READER", "COMMENTATOR"),
-                                LocalDateTime.of(2026, 8, 10, 0, 0), LocalDateTime.of(2026, 8, 12, 0, 0))
-                )));
-
-        mockMvc.perform(post("/pessoas/me/indisponibilidades")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "startAt": "2026-08-10T00:00:00",
-                                  "endAt": "2026-08-12T00:00:00"
-                                }
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("PERSON_UNAVAILABLE_FOR_EVENT"))
-                .andExpect(jsonPath("$.conflicts[0].personId").value(4));
     }
 
     @TestConfiguration

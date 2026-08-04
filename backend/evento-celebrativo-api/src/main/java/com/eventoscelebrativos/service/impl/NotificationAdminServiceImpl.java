@@ -8,6 +8,7 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Notification;
 import com.eventoscelebrativos.model.NotificationAudience;
+import com.eventoscelebrativos.model.NotificationCategory;
 import com.eventoscelebrativos.model.NotificationOrigin;
 import com.eventoscelebrativos.model.NotificationRecipient;
 import com.eventoscelebrativos.model.UserAccount;
@@ -54,6 +55,7 @@ public class NotificationAdminServiceImpl implements NotificationAdminService {
             LocalDate startDate,
             LocalDate endDate,
             Long senderPersonId,
+            String resolutionFilter,
             int page,
             int size
     ) {
@@ -63,9 +65,11 @@ public class NotificationAdminServiceImpl implements NotificationAdminService {
         }
         LocalDateTime startInclusive = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime endExclusive = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
+        ResolutionFilter resolution = parseResolutionFilter(resolutionFilter);
 
         Page<Notification> notifications = notificationRepository.findAdminHistory(
-                origin, audience, senderPersonId, startInclusive, endExclusive, PageRequest.of(page, size));
+                origin, audience, senderPersonId, startInclusive, endExclusive,
+                resolution.categoryFilter(), resolution.resolvedFilter(), PageRequest.of(page, size));
 
         List<Long> ids = notifications.getContent().stream().map(Notification::getId).toList();
         Map<Long, NotificationRecipientRepository.NotificationRecipientCounts> countsById = ids.isEmpty()
@@ -163,6 +167,19 @@ public class NotificationAdminServiceImpl implements NotificationAdminService {
             case "READ" -> Boolean.FALSE;
             default -> throw new BadRequestException("O filtro deve ser ALL, UNREAD ou READ");
         };
+    }
+
+    private ResolutionFilter parseResolutionFilter(String resolutionFilter) {
+        String normalized = resolutionFilter == null ? "ALL" : resolutionFilter.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "ALL" -> new ResolutionFilter(null, null);
+            case "ACTIVE" -> new ResolutionFilter(NotificationCategory.SCHEDULE_CONFLICT, Boolean.FALSE);
+            case "RESOLVED" -> new ResolutionFilter(NotificationCategory.SCHEDULE_CONFLICT, Boolean.TRUE);
+            default -> throw new BadRequestException("O filtro de resolucao deve ser ALL, ACTIVE ou RESOLVED");
+        };
+    }
+
+    private record ResolutionFilter(NotificationCategory categoryFilter, Boolean resolvedFilter) {
     }
 
     private void validatePage(int page, int size) {

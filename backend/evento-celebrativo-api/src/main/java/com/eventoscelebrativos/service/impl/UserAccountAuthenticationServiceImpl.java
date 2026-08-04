@@ -17,6 +17,8 @@ import java.util.stream.Collectors;
 @Service
 public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenticationService {
 
+    private static final Set<String> VALID_AUTHORITIES = Set.of("ROLE_ADMIN", "ROLE_OPERATOR");
+
     private final UserAccountRepository userAccountRepository;
 
     public UserAccountAuthenticationServiceImpl(UserAccountRepository userAccountRepository) {
@@ -46,7 +48,7 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
     }
 
     private Optional<UserAccountCredentials> credentialsOf(UserAccount account) {
-        if (!hasExactlyOneRole(account)) {
+        if (!hasValidRole(account)) {
             return Optional.empty();
         }
         Set<GrantedAuthority> authorities = authoritiesOf(account);
@@ -66,7 +68,7 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
     }
 
     private Optional<AuthenticatedUser> authenticatedUserOf(UserAccount account) {
-        if (!hasExactlyOneRole(account)) {
+        if (!hasValidRole(account)) {
             return Optional.empty();
         }
         Set<GrantedAuthority> authorities = authoritiesOf(account);
@@ -88,9 +90,12 @@ public class UserAccountAuthenticationServiceImpl implements UserAccountAuthenti
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    // Conta com zero ou mais de uma role e um estado inconsistente que nao deve autenticar,
-    // mesmo que a colecao de authorities resultante nao fique vazia (caso de duas roles distintas).
-    private boolean hasExactlyOneRole(UserAccount account) {
-        return account.getRoles().size() == 1;
+    // Conta com zero ou mais de uma role e um estado inconsistente que nao deve autenticar, mesmo
+    // que a colecao de authorities resultante nao fique vazia (caso de duas roles distintas). Uma
+    // unica role cuja authority nao seja ROLE_ADMIN/ROLE_OPERATOR tambem e invalida (dado corrompido
+    // ou role desconhecida nunca deve autenticar).
+    private boolean hasValidRole(UserAccount account) {
+        return account.getRoles().size() == 1
+                && VALID_AUTHORITIES.contains(account.getRoles().iterator().next().getRole().getAuthority());
     }
 }

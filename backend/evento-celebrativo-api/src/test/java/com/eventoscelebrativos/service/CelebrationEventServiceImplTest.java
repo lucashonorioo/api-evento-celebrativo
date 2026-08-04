@@ -13,7 +13,6 @@ import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPersonInEventException;
-import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.CelebrationEventMapper;
@@ -34,6 +33,8 @@ import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
+import com.eventoscelebrativos.repository.NotificationRepository;
+import com.eventoscelebrativos.service.impl.AdminRoleMutexService;
 import com.eventoscelebrativos.service.impl.CelebrationEventServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -104,6 +105,15 @@ class CelebrationEventServiceImplTest {
 
     @Mock
     private PersonUnavailabilityConflictService personUnavailabilityConflictService;
+
+    @Mock
+    private AdminRoleMutexService adminRoleMutexService;
+
+    @Mock
+    private ScheduleConflictNotificationService scheduleConflictNotificationService;
+
+    @Mock
+    private NotificationRepository notificationRepository;
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-08-15T21:00:00Z"), APPLICATION_ZONE);
@@ -910,7 +920,8 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldDeleteEventWhenExists() {
-        when(repository.existsById(1L)).thenReturn(true);
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event(1L)));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of());
 
         service.deleteEventById(1L);
 
@@ -920,7 +931,7 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenDeletingMissingEvent() {
-        when(repository.existsById(99L)).thenReturn(false);
+        when(repository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.deleteEventById(99L));
         verify(repository, never()).deleteById(anyLong());
@@ -929,7 +940,8 @@ class CelebrationEventServiceImplTest {
 
     @Test
     void shouldThrowDatabaseExceptionWhenDeletingReferencedEvent() {
-        when(repository.existsById(1L)).thenReturn(true);
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event(1L)));
+        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of());
         doThrow(new DataIntegrityViolationException("constraint")).when(repository).flush();
 
         assertThrows(DatabaseException.class, () -> service.deleteEventById(1L));
@@ -1224,22 +1236,6 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldRejectEventWithScaleCreationWhenPersonIsUnavailable() {
-        Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
-
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
-        PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_START_AT), eq(EVENT_END_AT));
-
-        assertThrows(PersonUnavailableForEventException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
-
-        verify(repository, never()).save(any());
-        verifyNoInteractions(eventAssignmentCommandService);
-    }
-
-    @Test
     void shouldLockPersonsInAscendingOrderBeforeSavingEventWithScale() {
         Location location = location(1L);
         Person lowerId = person(new Person(), 2L, "Leitor");
@@ -1267,27 +1263,6 @@ class CelebrationEventServiceImplTest {
         InOrder inOrder = inOrder(personUnavailabilityConflictService, repository);
         inOrder.verify(personUnavailabilityConflictService).lockPersonsInOrder(java.util.Set.of(2L, 8L));
         inOrder.verify(repository).save(any(CelebrationEvent.class));
-    }
-
-    @Test
-    void shouldRejectScaleUpdateWhenPersonIsUnavailablePreservingLocationAndAssignments() {
-        CelebrationEvent event = event(1L);
-        Location oldLocation = location(9L);
-        event.getLocations().add(oldLocation);
-        Location newLocation = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
-
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(newLocation));
-        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
-        PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(any(), eq(EVENT_START_AT), eq(EVENT_END_AT));
-
-        assertThrows(PersonUnavailableForEventException.class,
-                () -> service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null)));
-
-        assertEquals(List.of(oldLocation), event.getLocations());
-        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -1327,64 +1302,10 @@ class CelebrationEventServiceImplTest {
         when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
 
         // Mesma pessoa (3L), agora como comentarista em vez de leitor: a funcao mudou, mas a pessoa
-        // continua retida (ja estava atribuida ao evento) e nunca deve ser validada contra indisponibilidade.
+        // continua retida (ja estava atribuida ao evento).
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, null, null, List.of(3L), null, null));
 
-        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
         verify(eventAssignmentCommandService).synchronizeAssignments(eq(event), anyList(), anyList());
-    }
-
-    @Test
-    void shouldOnlyValidateNewPersonWhenRetainedPersonCoexistsWithNewPersonOnScaleUpdate() {
-        CelebrationEvent event = event(1L);
-        Location location = location(1L);
-        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
-        Person newPerson = person(new Person(), 8L, "Padre Novo");
-        CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
-
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
-        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
-                eventAssignment(event, retainedPerson, EventAssignmentType.READER)
-        ));
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
-                eligible(retainedPerson, MinistryType.READER),
-                eligible(newPerson, MinistryType.PRIEST)
-        ));
-        when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(response);
-
-        service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, List.of(3L), null, null, null));
-
-        verify(personUnavailabilityConflictService).validateAvailabilityForEvent(
-                eq(Map.of(8L, Set.of(EventAssignmentType.PRIEST))), eq(EVENT_START_AT), eq(EVENT_END_AT));
-    }
-
-    @Test
-    void shouldRollBackEntireScaleUpdateWhenNewPersonIsUnavailableEvenIfRetainedPersonAlsoConflicts() {
-        CelebrationEvent event = event(1L);
-        Location location = location(1L);
-        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
-        Person newUnavailablePerson = person(new Person(), 8L, "Padre Indisponivel");
-
-        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
-        when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
-                eventAssignment(event, retainedPerson, EventAssignmentType.READER)
-        ));
-        when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
-        when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(
-                eligible(retainedPerson, MinistryType.READER),
-                eligible(newUnavailablePerson, MinistryType.PRIEST)
-        ));
-        PersonUnavailableForEventException conflict = new PersonUnavailableForEventException(List.of());
-        doThrow(conflict).when(personUnavailabilityConflictService).validateAvailabilityForEvent(
-                eq(Map.of(8L, Set.of(EventAssignmentType.PRIEST))), eq(EVENT_START_AT), eq(EVENT_END_AT));
-
-        assertThrows(PersonUnavailableForEventException.class, () -> service.updateEventScale(
-                1L, new CelebrationEventScaleRequestDTO(1L, 8L, List.of(3L), null, null, null)));
-
-        // Mesmo com a pessoa retida (3L) tambem em conflito, a rejeicao da pessoa nova (8L) deve
-        // impedir totalmente a sincronizacao da escala: nao ha persistencia parcial.
-        verifyNoInteractions(eventAssignmentCommandService);
     }
 
     @Test
@@ -1403,7 +1324,6 @@ class CelebrationEventServiceImplTest {
 
         assertSame(responseDto, service.updateEvent(1L, sameRange));
 
-        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
         verifyNoInteractions(eventAssignmentCommandService);
     }
 
@@ -1426,7 +1346,6 @@ class CelebrationEventServiceImplTest {
 
         verify(mapper).updateCelebrationEventMapperFromDto(request, existingEvent);
         verify(repository).save(existingEvent);
-        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
     }
 
     @Test
@@ -1453,7 +1372,6 @@ class CelebrationEventServiceImplTest {
         verify(mapper).updateCelebrationEventMapperFromDto(changedDateRequest, existingEvent);
         verify(repository).save(existingEvent);
         verify(personUnavailabilityConflictService).lockPersonsInOrder(List.of(3L));
-        verify(personUnavailabilityConflictService, never()).validateAvailabilityForEvent(any(), any(), any());
         verifyNoInteractions(eventAssignmentCommandService);
     }
 

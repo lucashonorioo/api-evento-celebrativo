@@ -65,19 +65,6 @@ public interface PersonUnavailabilityRepository extends JpaRepository<PersonUnav
     @Query("""
             SELECT u.person.id AS personId, u.person.name AS personName, u.startAt AS startAt, u.endAt AS endAt
             FROM PersonUnavailability u
-            WHERE u.person.id IN :personIds
-              AND u.startAt < :endAt
-              AND u.endAt > :startAt
-            """)
-    List<PersonUnavailabilityPersonProjection> findByPersonIdsAndRange(
-            @Param("personIds") Collection<Long> personIds,
-            @Param("startAt") LocalDateTime startAt,
-            @Param("endAt") LocalDateTime endAt
-    );
-
-    @Query("""
-            SELECT u.person.id AS personId, u.person.name AS personName, u.startAt AS startAt, u.endAt AS endAt
-            FROM PersonUnavailability u
             WHERE u.startAt < :endAt
               AND u.endAt > :startAt
             ORDER BY u.person.name ASC, u.person.id ASC, u.startAt ASC

@@ -91,55 +91,6 @@ class EventAssignmentRepositoryTest {
     }
 
     @Test
-    void shouldTreatAssignmentAsStartedWhenEventStartsExactlyAtCurrentSecond() {
-        Person reader = savePerson("Started Conflict Boundary Reader", "34973000201");
-        LocalDateTime currentSecond = LocalDateTime.of(2026, 9, 1, 19, 0, 0);
-        CelebrationEvent event = saveEventWithRange("Started Boundary Event", currentSecond, currentSecond.plusHours(1));
-        saveAssignment(event, reader, EventAssignmentType.READER);
-        entityManager.flush();
-
-        List<com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection> result =
-                eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                        reader.getId(), currentSecond.minusMinutes(30), currentSecond.plusMinutes(30), currentSecond);
-
-        assertEquals(1, result.size(), "Evento com startAt == currentSecond ja esta em andamento e deve bloquear");
-        assertEquals(event.getId(), result.get(0).getEventId());
-    }
-
-    @Test
-    void shouldNotTreatAssignmentAsStartedWhenEventStartsOneSecondAfterCurrentSecond() {
-        Person reader = savePerson("Started Conflict Future Reader", "34973000202");
-        LocalDateTime currentSecond = LocalDateTime.of(2026, 9, 1, 19, 0, 0);
-        LocalDateTime eventStartAt = currentSecond.plusSeconds(1);
-        CelebrationEvent event = saveEventWithRange("Future Boundary Event", eventStartAt, eventStartAt.plusHours(1));
-        saveAssignment(event, reader, EventAssignmentType.READER);
-        entityManager.flush();
-
-        List<com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection> result =
-                eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                        reader.getId(), currentSecond.minusMinutes(30), eventStartAt.plusMinutes(30), currentSecond);
-
-        assertTrue(result.isEmpty(), "Evento comecando 1 segundo no futuro ainda nao comecou e nao deve bloquear");
-    }
-
-    @Test
-    void shouldNotTreatAssignmentAsStartedWhenEventHasAlreadyEnded() {
-        Person reader = savePerson("Started Conflict Ended Reader", "34973000203");
-        LocalDateTime eventStartAt = LocalDateTime.of(2026, 9, 1, 19, 0, 0);
-        LocalDateTime eventEndAt = eventStartAt.plusHours(1);
-        LocalDateTime currentSecond = eventEndAt;
-        CelebrationEvent event = saveEventWithRange("Ended Boundary Event", eventStartAt, eventEndAt);
-        saveAssignment(event, reader, EventAssignmentType.READER);
-        entityManager.flush();
-
-        List<com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection> result =
-                eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                        reader.getId(), eventStartAt.minusMinutes(30), currentSecond.plusMinutes(30), currentSecond);
-
-        assertTrue(result.isEmpty(), "Evento com endAt <= currentSecond ja encerrou e nao deve bloquear");
-    }
-
-    @Test
     void shouldRejectSamePersonInDifferentAssignmentTypesForSameEvent() {
         CelebrationEvent event = saveEvent("Assignment Multi Function Event");
         Person reader = savePerson("Assignment Multi Function Reader", "34973000003");

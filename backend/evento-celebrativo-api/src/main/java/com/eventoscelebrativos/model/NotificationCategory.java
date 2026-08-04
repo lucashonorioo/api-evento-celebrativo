@@ -6,5 +6,6 @@ package com.eventoscelebrativos.model;
  * comandos SYSTEM futuros (ex.: conflitos de escala) sem nova migration de schema.
  */
 public enum NotificationCategory {
-    GENERAL
+    GENERAL,
+    SCHEDULE_CONFLICT
 }

@@ -66,15 +66,20 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     Optional<UserAccount> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * Contas elegiveis para notificacao (habilitadas, com pessoa ativa e exatamente uma role).
-     * Quando {@code requiredAuthority} e informado, restringe as contas cuja unica role possua essa
-     * authority (usado pela audience ADMIN); quando nulo, serve a audience GLOBAL.
+     * Contas elegiveis para notificacao (habilitadas, com pessoa ativa e exatamente uma role, cuja
+     * authority esteja em ROLE_ADMIN/ROLE_OPERATOR). Quando {@code requiredAuthority} e informado,
+     * restringe ainda mais as contas cuja unica role possua essa authority (usado pela audience
+     * ADMIN); quando nulo, serve a audience GLOBAL.
      */
     @Query("""
             SELECT ua.id AS accountId, ua.person.id AS personId FROM UserAccount ua
             WHERE ua.enabled = TRUE
               AND ua.person.active = TRUE
               AND (SELECT COUNT(uar) FROM UserAccountRole uar WHERE uar.userAccount = ua) = 1
+              AND EXISTS (
+                  SELECT 1 FROM UserAccountRole uarValid
+                  WHERE uarValid.userAccount = ua AND uarValid.role.authority IN ('ROLE_ADMIN', 'ROLE_OPERATOR')
+              )
               AND (:requiredAuthority IS NULL OR EXISTS (
                   SELECT 1 FROM UserAccountRole uar2
                   WHERE uar2.userAccount = ua AND uar2.role.authority = :requiredAuthority
@@ -84,9 +89,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     /**
      * Ternas (accountId, personId, ministryType) de contas elegiveis (habilitadas, pessoa ativa,
-     * exatamente uma role) cuja pessoa possui vinculo ativo com algum dos ministerios informados.
-     * Usada tanto para descobrir o conjunto de candidatos da audience MINISTRY quanto para checar,
-     * por tipo, se ha pelo menos um destinatario elegivel.
+     * exatamente uma role valida - ROLE_ADMIN ou ROLE_OPERATOR) cuja pessoa possui vinculo ativo com
+     * algum dos ministerios informados. Usada tanto para descobrir o conjunto de candidatos da
+     * audience MINISTRY quanto para checar, por tipo, se ha pelo menos um destinatario elegivel.
      */
     @Query("""
             SELECT ua.id AS accountId, ua.person.id AS personId, pm.ministryType AS ministryType
@@ -97,6 +102,10 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
               AND pm.active = TRUE
               AND pm.ministryType IN :ministryTypes
               AND (SELECT COUNT(uar) FROM UserAccountRole uar WHERE uar.userAccount = ua) = 1
+              AND EXISTS (
+                  SELECT 1 FROM UserAccountRole uarValid
+                  WHERE uarValid.userAccount = ua AND uarValid.role.authority IN ('ROLE_ADMIN', 'ROLE_OPERATOR')
+              )
             """)
     List<EligibleMinistryAccount> findEligibleAccountsByMinistryTypes(
             @Param("ministryTypes") Collection<MinistryType> ministryTypes);

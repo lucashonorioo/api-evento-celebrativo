@@ -53,6 +53,7 @@ public class NotificationAdminController {
             @Parameter(description = "yyyy-MM-dd, inclusive") @RequestParam(required = false) String startDate,
             @Parameter(description = "yyyy-MM-dd, inclusive") @RequestParam(required = false) String endDate,
             @RequestParam(required = false) Long senderPersonId,
+            @Parameter(description = "ALL, ACTIVE ou RESOLVED (conflitos de escala)") @RequestParam(defaultValue = "ALL") String resolutionFilter,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -62,6 +63,7 @@ public class NotificationAdminController {
                 parseDate(startDate),
                 parseDate(endDate),
                 senderPersonId,
+                resolutionFilter,
                 page,
                 size
         );

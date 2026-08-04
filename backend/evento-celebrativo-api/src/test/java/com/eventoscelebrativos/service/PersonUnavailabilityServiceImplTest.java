@@ -10,8 +10,11 @@ import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupporte
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
+import com.eventoscelebrativos.service.impl.AdminRoleMutexService;
 import com.eventoscelebrativos.service.impl.PersonUnavailabilityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +56,18 @@ class PersonUnavailabilityServiceImplTest {
     @Mock
     private PersonUnavailabilityConflictService personUnavailabilityConflictService;
 
+    @Mock
+    private EventAssignmentRepository eventAssignmentRepository;
+
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private AdminRoleMutexService adminRoleMutexService;
+
+    @Mock
+    private ScheduleConflictNotificationService scheduleConflictNotificationService;
+
     private final PersonUnavailabilityMapper mapper = new PersonUnavailabilityMapper() {
         @Override
         public PersonUnavailabilityResponseDTO toDto(PersonUnavailability entity) {
@@ -69,7 +84,9 @@ class PersonUnavailabilityServiceImplTest {
     void setUp() {
         Clock fixedClock = Clock.fixed(TODAY.atZone(ZONE).toInstant(), ZONE);
         service = new PersonUnavailabilityServiceImpl(
-                personUnavailabilityRepository, personRepository, personUnavailabilityConflictService, mapper, fixedClock);
+                personUnavailabilityRepository, personRepository, eventAssignmentRepository, notificationRepository,
+                personUnavailabilityConflictService, adminRoleMutexService, scheduleConflictNotificationService,
+                mapper, fixedClock);
     }
 
     @Test
@@ -120,7 +137,6 @@ class PersonUnavailabilityServiceImplTest {
 
         assertEquals("Viagem", result.getReason());
         verify(personUnavailabilityConflictService).validateNoOverlap(10L, TODAY, TODAY.plusDays(2), null);
-        verify(personUnavailabilityConflictService).validateNoStartedAssignmentConflict(10L, TODAY, TODAY.plusDays(2), TODAY);
     }
 
     @Test
@@ -243,7 +259,9 @@ class PersonUnavailabilityServiceImplTest {
     void shouldNormalizeClockNanosToSecondPrecisionOnCreate() {
         Clock nanosClock = Clock.fixed(TODAY.atZone(ZONE).toInstant().plusNanos(900_000_000), ZONE);
         PersonUnavailabilityServiceImpl nanosService = new PersonUnavailabilityServiceImpl(
-                personUnavailabilityRepository, personRepository, personUnavailabilityConflictService, mapper, nanosClock);
+                personUnavailabilityRepository, personRepository, eventAssignmentRepository, notificationRepository,
+                personUnavailabilityConflictService, adminRoleMutexService, scheduleConflictNotificationService,
+                mapper, nanosClock);
 
         LocalDateTime pastStart = TODAY.minusSeconds(1);
         assertThrows(BadRequestException.class, () -> nanosService.create(
@@ -271,19 +289,6 @@ class PersonUnavailabilityServiceImplTest {
         assertEquals(TODAY.plusDays(3), result.getEndAt());
         assertEquals("Novo", result.getReason());
         verify(personUnavailabilityConflictService).validateNoOverlap(10L, TODAY, TODAY.plusDays(3), 1L);
-    }
-
-    @Test
-    void shouldValidateStartedAssignmentConflictWhenUpdatingUnavailabilityToNewRange() {
-        Person person = person(10L, "34970000012");
-        PersonUnavailability existing = existing(1L, person, TODAY, TODAY.plusDays(1), "Antigo");
-        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
-        when(personUnavailabilityRepository.findByIdAndPersonId(1L, 10L)).thenReturn(Optional.of(existing));
-        when(personUnavailabilityRepository.save(existing)).thenReturn(existing);
-
-        service.update(10L, 1L, new PersonUnavailabilityRequestDTO(TODAY, TODAY.plusDays(3), "Novo"));
-
-        verify(personUnavailabilityConflictService).validateNoStartedAssignmentConflict(10L, TODAY, TODAY.plusDays(3), TODAY);
     }
 
     @Test

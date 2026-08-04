@@ -8,6 +8,7 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Notification;
 import com.eventoscelebrativos.model.NotificationAudience;
+import com.eventoscelebrativos.model.NotificationCategory;
 import com.eventoscelebrativos.model.NotificationRecipient;
 import com.eventoscelebrativos.repository.NotificationRecipientRepository;
 import com.eventoscelebrativos.repository.NotificationTargetMinistryRepository;
@@ -57,11 +58,12 @@ public class NotificationInboxServiceImpl implements NotificationInboxService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<NotificationSummaryResponseDTO> findMine(Long accountId, String filter, int page, int size) {
+    public Page<NotificationSummaryResponseDTO> findMine(Long accountId, String filter, String resolutionFilter, int page, int size) {
         Boolean onlyUnread = parseFilter(filter);
+        ResolutionFilter resolution = parseResolutionFilter(resolutionFilter);
         validatePage(page, size);
-        Page<NotificationRecipient> result =
-                notificationRecipientRepository.findInbox(accountId, onlyUnread, PageRequest.of(page, size));
+        Page<NotificationRecipient> result = notificationRecipientRepository.findInbox(
+                accountId, onlyUnread, resolution.categoryFilter(), resolution.resolvedFilter(), PageRequest.of(page, size));
         return result.map(this::toSummary);
     }
 
@@ -173,6 +175,19 @@ public class NotificationInboxServiceImpl implements NotificationInboxService {
             case "READ" -> Boolean.FALSE;
             default -> throw new BadRequestException("O filtro deve ser ALL, UNREAD ou READ");
         };
+    }
+
+    private ResolutionFilter parseResolutionFilter(String resolutionFilter) {
+        String normalized = resolutionFilter == null ? "ALL" : resolutionFilter.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "ALL" -> new ResolutionFilter(null, null);
+            case "ACTIVE" -> new ResolutionFilter(NotificationCategory.SCHEDULE_CONFLICT, Boolean.FALSE);
+            case "RESOLVED" -> new ResolutionFilter(NotificationCategory.SCHEDULE_CONFLICT, Boolean.TRUE);
+            default -> throw new BadRequestException("O filtro de resolucao deve ser ALL, ACTIVE ou RESOLVED");
+        };
+    }
+
+    private record ResolutionFilter(NotificationCategory categoryFilter, Boolean resolvedFilter) {
     }
 
     private void validatePage(int page, int size) {

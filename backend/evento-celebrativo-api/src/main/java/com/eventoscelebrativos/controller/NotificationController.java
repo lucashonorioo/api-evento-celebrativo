@@ -84,11 +84,12 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<Page<NotificationSummaryResponseDTO>> findMine(
             @Parameter(description = "ALL, UNREAD ou READ") @RequestParam(defaultValue = "ALL") String filter,
+            @Parameter(description = "ALL, ACTIVE ou RESOLVED (conflitos de escala)") @RequestParam(defaultValue = "ALL") String resolutionFilter,
             @Parameter(description = "Número da página, iniciando em 0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Quantidade por página. Máximo: 100") @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(notificationInboxService.findMine(
-                authenticatedUserResolver.requireCurrentAccountId(), filter, page, size));
+                authenticatedUserResolver.requireCurrentAccountId(), filter, resolutionFilter, page, size));
     }
 
     @Operation(summary = "Detalha uma notificação da conta autenticada. Não marca como lida.")
