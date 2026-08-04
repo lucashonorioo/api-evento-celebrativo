@@ -256,9 +256,12 @@ public class Notification {
     /**
      * Resolve uma ocorrencia ativa de conflito de escala: libera {@code activeSourceKey} (permitindo
      * uma nova ocorrencia futura para a mesma identidade eventId+personId) e registra
-     * {@code resolvedAt}. Idempotente (segunda chamada e no-op) e nunca reabre uma notificacao ja
-     * resolvida. Restrito a SCHEDULE_CONFLICT: as demais categorias nunca tem activeSourceKey e nao
-     * fazem sentido "resolvidas".
+     * {@code resolvedAt}. Idempotente (segunda chamada e no-op, mesmo que o argumento passado nao
+     * seja mais validado nesse caso) e nunca reabre uma notificacao ja resolvida. Restrito a
+     * SCHEDULE_CONFLICT: as demais categorias nunca tem activeSourceKey e nao fazem sentido
+     * "resolvidas". Na primeira resolucao, exige um instante nao nulo com precisao de segundo
+     * (nanos = 0, o mesmo grau de precisao de {@code currentSecond} em toda a reconciliacao) -
+     * rejeitado antes de tocar {@code activeSourceKey}, nunca depois.
      */
     public void resolve(LocalDateTime resolvedAt) {
         if (category != NotificationCategory.SCHEDULE_CONFLICT) {
@@ -266,6 +269,12 @@ public class Notification {
         }
         if (this.resolvedAt != null) {
             return;
+        }
+        if (resolvedAt == null) {
+            throw new IllegalArgumentException("resolvedAt nao pode ser nulo.");
+        }
+        if (resolvedAt.getNano() != 0) {
+            throw new IllegalArgumentException("resolvedAt deve ter precisao de segundo (nanos = 0).");
         }
         this.resolvedAt = resolvedAt;
         this.activeSourceKey = null;

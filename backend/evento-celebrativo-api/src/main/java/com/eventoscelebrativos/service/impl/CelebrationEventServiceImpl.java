@@ -33,7 +33,6 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
-import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -291,7 +290,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         // Mutex central (secao 8): sempre entre o lock de assignments e o lock de pessoas, nunca
         // apos ja ter travado uma pessoa.
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
 
         if (!assignedPersonIds.isEmpty()) {
             personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
@@ -310,7 +309,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 || !celebrationEvent.getEndAt().equals(previousEndAt);
         if (scheduleChanged) {
             for (Long personId : assignedPersonIds) {
-                scheduleConflictNotificationService.reconcile(mutexGuard, id, personId, currentSecond);
+                scheduleConflictNotificationService.reconcile(id, personId, currentSecond);
             }
         }
 
@@ -339,7 +338,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         unionPersonIds.addAll(currentPersonIds);
 
         // Mutex central (secao 8): sempre entre o lock de assignments e o lock de pessoas.
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
         personUnavailabilityConflictService.lockPersonsInOrder(unionPersonIds);
 
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
@@ -361,7 +360,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, currentAssignments, targets);
 
         for (Long personId : unionPersonIds) {
-            scheduleConflictNotificationService.reconcile(mutexGuard, id, personId, currentSecond);
+            scheduleConflictNotificationService.reconcile(id, personId, currentSecond);
         }
 
         return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
@@ -386,7 +385,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         // Mutex central (secao 8): antes do lock de Persons (nao ha evento/assignments existentes
         // para travar antes, pois o evento ainda esta sendo criado).
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
         personUnavailabilityConflictService.lockPersonsInOrder(personIds);
 
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
@@ -403,7 +402,7 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         eventAssignmentCommandService.synchronizeAssignments(savedEvent, List.of(), targets);
 
         for (Long personId : personIds) {
-            scheduleConflictNotificationService.reconcile(mutexGuard, savedEvent.getId(), personId, currentSecond);
+            scheduleConflictNotificationService.reconcile(savedEvent.getId(), personId, currentSecond);
         }
 
         return celebrationEventScaleMapper.toDto(savedEvent, plan);

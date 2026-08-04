@@ -15,7 +15,6 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
-import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import com.eventoscelebrativos.service.PersonUnavailabilityConflictService;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
 import com.eventoscelebrativos.service.ScheduleConflictNotificationService;
@@ -100,7 +99,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         String reason = normalizeReason(requestDTO.getReason());
 
         // Mutex central (secao 8): sempre antes do lock de Person no fluxo de indisponibilidade.
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
@@ -110,7 +109,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         PersonUnavailability saved = personUnavailabilityRepository.save(entity);
 
         for (Long eventId : eventAssignmentRepository.findEventIdsByPersonIdAndEndAtAfter(person.getId(), currentSecond)) {
-            scheduleConflictNotificationService.reconcile(mutexGuard, eventId, person.getId(), currentSecond);
+            scheduleConflictNotificationService.reconcile(eventId, person.getId(), currentSecond);
         }
 
         return personUnavailabilityMapper.toDto(saved);
@@ -124,7 +123,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
@@ -158,7 +157,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
             affectedEventIds.add(notification.getReferenceId());
         }
         for (Long eventId : affectedEventIds) {
-            scheduleConflictNotificationService.reconcile(mutexGuard, eventId, person.getId(), currentSecond);
+            scheduleConflictNotificationService.reconcile(eventId, person.getId(), currentSecond);
         }
 
         return personUnavailabilityMapper.toDto(saved);
@@ -167,7 +166,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Override
     @Transactional
     public void delete(Long personId, Long id) {
-        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
@@ -177,7 +176,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
         for (Notification notification : notificationRepository.findActiveScheduleConflictsByPersonId(person.getId())) {
-            scheduleConflictNotificationService.reconcile(mutexGuard, notification.getReferenceId(), person.getId(), currentSecond);
+            scheduleConflictNotificationService.reconcile(notification.getReferenceId(), person.getId(), currentSecond);
         }
     }
 

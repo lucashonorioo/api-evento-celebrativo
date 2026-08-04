@@ -13,7 +13,6 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
-import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import com.eventoscelebrativos.service.NotificationDeliveryService;
 import com.eventoscelebrativos.service.ScheduleConflictNotificationService;
 import com.eventoscelebrativos.service.SystemNotificationCommand;
@@ -46,6 +45,7 @@ public class ScheduleConflictNotificationServiceImpl implements ScheduleConflict
     private final PersonUnavailabilityRepository personUnavailabilityRepository;
     private final PersonRepository personRepository;
     private final NotificationDeliveryService notificationDeliveryService;
+    private final AdminRoleMutexService adminRoleMutexService;
 
     public ScheduleConflictNotificationServiceImpl(
             NotificationRepository notificationRepository,
@@ -53,7 +53,8 @@ public class ScheduleConflictNotificationServiceImpl implements ScheduleConflict
             EventAssignmentRepository eventAssignmentRepository,
             PersonUnavailabilityRepository personUnavailabilityRepository,
             PersonRepository personRepository,
-            NotificationDeliveryService notificationDeliveryService
+            NotificationDeliveryService notificationDeliveryService,
+            AdminRoleMutexService adminRoleMutexService
     ) {
         this.notificationRepository = notificationRepository;
         this.celebrationEventRepository = celebrationEventRepository;
@@ -61,17 +62,18 @@ public class ScheduleConflictNotificationServiceImpl implements ScheduleConflict
         this.personUnavailabilityRepository = personUnavailabilityRepository;
         this.personRepository = personRepository;
         this.notificationDeliveryService = notificationDeliveryService;
+        this.adminRoleMutexService = adminRoleMutexService;
     }
 
     @Override
     @Transactional
-    public void reconcile(AdminRoleMutexGuard mutexGuard, Long eventId, Long personId, LocalDateTime currentSecond) {
-        // mutexGuard nao e usado: sua unica funcao e provar, em tempo de compilacao, que o
-        // chamador ja passou por AdminRoleMutexService#lockAdminRole nesta transacao (ver Javadoc
-        // da interface). Sem essa garantia de ordem, o gap lock desta leitura FOR UPDATE (linha
-        // abaixo) sobre active_source_key ainda inexistente pode formar ciclo de deadlock com o
-        // lock de ROLE_ADMIN adquirido depois dentro de deliverBroadcast, como comprovado sob MySQL
-        // real ao chamar reconcile sem o mutex previamente travado.
+    public void reconcile(Long eventId, Long personId, LocalDateTime currentSecond) {
+        // Precondicao real (nao apenas documentada): sem essa garantia de ordem, o gap lock desta
+        // leitura FOR UPDATE (linha abaixo) sobre active_source_key ainda inexistente pode formar
+        // ciclo de deadlock com o lock de ROLE_ADMIN adquirido depois dentro de deliverBroadcast,
+        // como comprovado sob MySQL real ao chamar reconcile sem o mutex previamente travado.
+        adminRoleMutexService.requireLockedInCurrentTransaction();
+
         String sourceKey = eventId + ":" + personId;
         String activeSourceKey = SOURCE_TYPE + ":" + sourceKey;
 

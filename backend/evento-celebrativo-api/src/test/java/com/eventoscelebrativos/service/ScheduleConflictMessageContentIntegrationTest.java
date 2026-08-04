@@ -73,10 +73,11 @@ class ScheduleConflictMessageContentIntegrationTest {
     @Autowired
     private AdminRoleMutexService adminRoleMutexService;
 
-    // reconcile() agora exige o guard de AdminRoleMutexService#lockAdminRole (contrato seguro: nao
-    // ha como chamar reconcile sem o mutex ja travado nesta transacao).
+    // reconcile() agora exige o mutex ROLE_ADMIN ja adquirido nesta transacao (contrato seguro,
+    // verificado em runtime por AdminRoleMutexService#requireLockedInCurrentTransaction).
     private void reconcile(Long eventId, Long personId, LocalDateTime currentSecond) {
-        scheduleConflictNotificationService.reconcile(adminRoleMutexService.lockAdminRole(), eventId, personId, currentSecond);
+        adminRoleMutexService.lockAdminRole();
+        scheduleConflictNotificationService.reconcile(eventId, personId, currentSecond);
     }
 
     @Test

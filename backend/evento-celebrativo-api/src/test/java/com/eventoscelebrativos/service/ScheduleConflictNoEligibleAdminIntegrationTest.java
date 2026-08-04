@@ -221,10 +221,11 @@ class ScheduleConflictNoEligibleAdminIntegrationTest {
     }
 
     private void assertReconcileRejectedWithNoEligibleAdmin(ConflictScenario scenario) {
-        // reconcile() exige o guard de AdminRoleMutexService#lockAdminRole (contrato seguro); a
+        // reconcile() exige o mutex ROLE_ADMIN ja adquirido nesta transacao (contrato seguro); a
         // ausencia de admin elegivel so e detectada depois, dentro de deliverBroadcast.
+        adminRoleMutexService.lockAdminRole();
         LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
-                () -> scheduleConflictNotificationService.reconcile(adminRoleMutexService.lockAdminRole(),
+                () -> scheduleConflictNotificationService.reconcile(
                         scenario.event().getId(), scenario.person().getId(), LocalDateTime.now().withNano(0)));
 
         assertEquals("NOTIFICATION_NO_ELIGIBLE_RECIPIENTS", exception.getErrorCode());
