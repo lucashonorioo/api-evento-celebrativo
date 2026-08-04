@@ -123,24 +123,27 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             @Param("endAt") LocalDateTime endAt
     );
 
+    boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
+
+    boolean existsByEvent_IdAndPerson_Id(Long eventId, Long personId);
+
+    /**
+     * EventIds distintos aos quais a pessoa esta atribuida e cujo evento ainda nao encerrou
+     * (endAt > currentSecond), em ordem crescente. Usada apos criar uma indisponibilidade para saber
+     * quais eventos reconciliar (secao 12); a verificacao de sobreposicao real e feita pelo proprio
+     * reconciliador por evento, nao aqui.
+     */
     @Query("""
-            SELECT a.event.id AS eventId, a.event.nameMassOrEvent AS eventName, a.event.startAt AS startAt,
-                   a.event.endAt AS endAt, a.assignmentType AS assignmentType
+            SELECT DISTINCT a.event.id
             FROM EventAssignment a
             WHERE a.person.id = :personId
-              AND a.event.startAt < :endAt
-              AND a.event.endAt > :startAt
-              AND a.event.startAt <= :currentSecond
               AND a.event.endAt > :currentSecond
+            ORDER BY a.event.id ASC
             """)
-    List<PersonUnavailabilityAssignmentConflictProjection> findStartedAssignmentConflictsByPersonIdAndRange(
+    List<Long> findEventIdsByPersonIdAndEndAtAfter(
             @Param("personId") Long personId,
-            @Param("startAt") LocalDateTime startAt,
-            @Param("endAt") LocalDateTime endAt,
             @Param("currentSecond") LocalDateTime currentSecond
     );
-
-    boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
 
     @Query("""
             SELECT CASE WHEN COUNT(a) > 0 THEN TRUE ELSE FALSE END
@@ -153,7 +156,15 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             @Param("currentSecond") LocalDateTime currentSecond
     );
 
-    @Modifying
+    // clearAutomatically evita entidades "zumbis": deleteEventById agora carrega os assignments
+    // (findAllByEventIdForUpdate) antes deste delete em lote para travá-los, e um DELETE JPQL em
+    // lote nao sincroniza o contexto de persistencia sozinho, deixando esses assignments ja
+    // excluidos no banco ainda "gerenciados" na sessao - o que quebra o flush seguinte ao remover o
+    // proprio evento. Locks JA adquiridos na transacao (linhas de banco) nao sao afetados por este
+    // clear, que atua apenas no cache de primeiro nivel do Hibernate. flushAutomatically e
+    // obrigatorio junto: sem ele, o clear descartaria sem persistir qualquer alteracao pendente no
+    // contexto (ex.: Notification.resolve(...) chamado por deleteEventById antes deste delete).
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM EventAssignment assignment WHERE assignment.event.id = :eventId")
     void deleteAllByEventId(@Param("eventId") Long eventId);
 }

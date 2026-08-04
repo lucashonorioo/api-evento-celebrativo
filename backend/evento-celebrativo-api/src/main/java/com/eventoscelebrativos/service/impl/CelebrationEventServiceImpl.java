@@ -28,9 +28,12 @@ import com.eventoscelebrativos.projection.EventScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.EventScheduleEventProjection;
 import com.eventoscelebrativos.projection.EucharistScaleEventProjection;
 import com.eventoscelebrativos.model.EventAssignment;
+import com.eventoscelebrativos.model.Notification;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
+import com.eventoscelebrativos.repository.NotificationRepository;
+import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
@@ -44,6 +47,7 @@ import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryEligibilityResolver;
 import com.eventoscelebrativos.service.PersonUnavailabilityConflictService;
 import com.eventoscelebrativos.service.ScaleParticipantEligibility;
+import com.eventoscelebrativos.service.ScheduleConflictNotificationService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -64,7 +68,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -87,6 +90,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
     private final EventParticipationResponseService eventParticipationResponseService;
     private final PersonMinistryEligibilityResolver personMinistryEligibilityResolver;
     private final PersonUnavailabilityConflictService personUnavailabilityConflictService;
+    private final AdminRoleMutexService adminRoleMutexService;
+    private final ScheduleConflictNotificationService scheduleConflictNotificationService;
+    private final NotificationRepository notificationRepository;
     private final Clock clock;
 
     public CelebrationEventServiceImpl(
@@ -102,6 +108,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
             EventParticipationResponseService eventParticipationResponseService,
             PersonMinistryEligibilityResolver personMinistryEligibilityResolver,
             PersonUnavailabilityConflictService personUnavailabilityConflictService,
+            AdminRoleMutexService adminRoleMutexService,
+            ScheduleConflictNotificationService scheduleConflictNotificationService,
+            NotificationRepository notificationRepository,
             Clock clock
     ) {
         this.celebrationEventRepository = celebrationEventRepository;
@@ -116,6 +125,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.personMinistryEligibilityResolver = personMinistryEligibilityResolver;
         this.personUnavailabilityConflictService = personUnavailabilityConflictService;
+        this.adminRoleMutexService = adminRoleMutexService;
+        this.scheduleConflictNotificationService = scheduleConflictNotificationService;
+        this.notificationRepository = notificationRepository;
         this.clock = clock;
     }
 
@@ -267,12 +279,9 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         CelebrationEvent celebrationEvent = celebrationEventRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
 
-        // Todos os participantes deste fluxo sao pessoas atuais (nenhuma pessoa nova e adicionada
-        // por aqui). Uma alteracao de startAt/endAt pode tornar assignments existentes
-        // incompatíveis com indisponibilidades ja cadastradas; isso e permitido e o conflito passa
-        // a ser derivado nas consultas administrativas, em vez de bloquear esta operacao. O lock das
-        // pessoas e mantido apenas como ponto de serializacao comum com o fluxo pessoal de
-        // indisponibilidade (secao 25/30), nao para validacao bloqueante.
+        // Uma alteracao de startAt/endAt pode criar ou resolver conflitos entre EventAssignment e
+        // PersonUnavailability (secao 3/4): isso e permitido, persistido como Notification e
+        // reconciliado apos salvar, em vez de bloquear esta operacao.
         List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
         List<Long> assignedPersonIds = currentAssignments.stream()
                 .map(assignment -> assignment.getPerson().getId())
@@ -280,12 +289,30 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
                 .sorted()
                 .toList();
 
+        // Mutex central (secao 8): sempre entre o lock de assignments e o lock de pessoas, nunca
+        // apos ja ter travado uma pessoa.
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+
         if (!assignedPersonIds.isEmpty()) {
             personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
         }
 
+        LocalDateTime previousStartAt = celebrationEvent.getStartAt();
+        LocalDateTime previousEndAt = celebrationEvent.getEndAt();
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+
         celebrationEventMapper.updateCelebrationEventMapperFromDto(celebrationEventRequestDTO, celebrationEvent);
         celebrationEvent = celebrationEventRepository.save(celebrationEvent);
+
+        // Nome/local nao disparam reconciliacao nem atualizam a mensagem ativa (secao 11): somente
+        // mudanca de startAt/endAt pode criar ou resolver um conflito.
+        boolean scheduleChanged = !celebrationEvent.getStartAt().equals(previousStartAt)
+                || !celebrationEvent.getEndAt().equals(previousEndAt);
+        if (scheduleChanged) {
+            for (Long personId : assignedPersonIds) {
+                scheduleConflictNotificationService.reconcile(mutexGuard, id, personId, currentSecond);
+            }
+        }
 
         return celebrationEventMapper.toDto(celebrationEvent);
     }
@@ -310,24 +337,32 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
 
         Set<Long> unionPersonIds = new TreeSet<>(desiredAssignmentsByPersonId.keySet());
         unionPersonIds.addAll(currentPersonIds);
+
+        // Mutex central (secao 8): sempre entre o lock de assignments e o lock de pessoas.
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
         personUnavailabilityConflictService.lockPersonsInOrder(unionPersonIds);
+
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
         ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, celebrationEventScaleRequestDTO);
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
         // Pessoa retida (personId ja atribuido ao evento antes desta chamada, mesmo que a funcao
-        // tenha mudado) pode permanecer mesmo em conflito com indisponibilidade existente; somente
-        // pessoa nova (personId ainda nao atribuido) e validada contra a indisponibilidade
-        // bloqueante, evitando barrar quem ja estava na escala por um conflito derivado.
+        // tenha mudado) pode permanecer mesmo se inativa/indisponivel; somente pessoa nova (personId
+        // ainda nao atribuido) e validada quanto a estar ativa. Conflito com indisponibilidade nunca
+        // mais bloqueia (secao 3): e permitido e reconciliado apos sincronizar a escala.
         List<EventAssignmentTarget> newPersonTargets = targets.stream()
                 .filter(target -> !currentPersonIds.contains(target.person().getId()))
                 .toList();
         validateActiveForTargets(newPersonTargets);
-        validateAvailabilityForTargets(newPersonTargets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
         eventAssignmentCommandService.synchronizeAssignments(celebrationEvent, currentAssignments, targets);
+
+        for (Long personId : unionPersonIds) {
+            scheduleConflictNotificationService.reconcile(mutexGuard, id, personId, currentSecond);
+        }
 
         return celebrationEventScaleMapper.toDto(celebrationEvent, plan);
     }
@@ -347,22 +382,29 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         // Estado desejado construido e validado (sem leitura ao banco) antes de qualquer lock, para
         // rejeitar duplicidades de pessoa o mais cedo possivel.
         Map<Long, EventAssignmentType> desiredAssignmentsByPersonId = buildDesiredAssignments(null, scaleRequest);
+        Set<Long> personIds = new TreeSet<>(desiredAssignmentsByPersonId.keySet());
 
-        // IDs extraidos do mapa ja validado (sem leitura ao banco) para bloquear as Persons antes de
-        // qualquer leitura simples, pelo mesmo motivo de updateEventScale.
-        personUnavailabilityConflictService.lockPersonsInOrder(new TreeSet<>(desiredAssignmentsByPersonId.keySet()));
+        // Mutex central (secao 8): antes do lock de Persons (nao ha evento/assignments existentes
+        // para travar antes, pois o evento ainda esta sendo criado).
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
+        personUnavailabilityConflictService.lockPersonsInOrder(personIds);
+
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
         ScalePlanResult planResult = buildScalePlanResult(celebrationEvent, scaleRequest);
         EventScaleAssignmentPlan plan = planResult.plan();
         List<EventAssignmentTarget> targets = plan.toTargets();
 
         validateActiveForTargets(targets);
-        validateAvailabilityForTargets(targets, celebrationEvent.getStartAt(), celebrationEvent.getEndAt());
 
         applyLocation(celebrationEvent, planResult.location());
         CelebrationEvent savedEvent = celebrationEventRepository.save(celebrationEvent);
 
         eventAssignmentCommandService.synchronizeAssignments(savedEvent, List.of(), targets);
+
+        for (Long personId : personIds) {
+            scheduleConflictNotificationService.reconcile(mutexGuard, savedEvent.getId(), personId, currentSecond);
+        }
 
         return celebrationEventScaleMapper.toDto(savedEvent, plan);
     }
@@ -409,19 +451,6 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if (existingType != null) {
             throw new MultipleAssignmentsForPersonInEventException(eventId, personId, EnumSet.of(existingType, assignmentType));
         }
-    }
-
-    private void validateAvailabilityForTargets(Collection<EventAssignmentTarget> targets, LocalDateTime startAt, LocalDateTime endAt) {
-        if (targets.isEmpty()) {
-            return;
-        }
-        Map<Long, Set<EventAssignmentType>> typesByPerson = new TreeMap<>();
-        for (EventAssignmentTarget target : targets) {
-            typesByPerson
-                    .computeIfAbsent(target.person().getId(), personId -> EnumSet.noneOf(EventAssignmentType.class))
-                    .add(target.assignmentType());
-        }
-        personUnavailabilityConflictService.validateAvailabilityForEvent(typesByPerson, startAt, endAt);
     }
 
     private void validateActiveForTargets(Collection<EventAssignmentTarget> targets) {
@@ -473,9 +502,32 @@ public class CelebrationEventServiceImpl implements CelebrationEventService {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
-        if(!celebrationEventRepository.existsById(id)){
-            throw new ResourceNotFoundException("Evento celebrativo", id);
+
+        // Ordem de locks (secao 11): evento -> assignments -> mutex ROLE_ADMIN -> pessoas -> resolver
+        // notificacoes ativas -> excluir assignments -> excluir evento. Falha em qualquer passo reverte
+        // tudo (mesma transacao).
+        celebrationEventRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", id));
+
+        List<EventAssignment> currentAssignments = eventAssignmentRepository.findAllByEventIdForUpdate(id);
+        List<Long> assignedPersonIds = currentAssignments.stream()
+                .map(assignment -> assignment.getPerson().getId())
+                .distinct()
+                .sorted()
+                .toList();
+
+        adminRoleMutexService.lockAdminRole();
+        if (!assignedPersonIds.isEmpty()) {
+            personUnavailabilityConflictService.lockPersonsInOrder(assignedPersonIds);
         }
+
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        List<Notification> activeConflicts =
+                notificationRepository.findActiveScheduleConflictsByReferenceId("CELEBRATION_EVENT", id);
+        for (Notification notification : activeConflicts) {
+            notification.resolve(currentSecond);
+        }
+
         try{
             eventAssignmentCommandService.deleteAllForEvent(id);
             celebrationEventRepository.deleteById(id);

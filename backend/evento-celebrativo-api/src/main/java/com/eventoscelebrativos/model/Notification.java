@@ -15,13 +15,10 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * Notificacao interna enviada a uma ou mais {@link UserAccount}. Imutavel apos a criacao: todo o
- * conteudo, publico e metadados sao definidos no momento do envio por {@code NotificationDeliveryService}
- * e nao podem ser alterados depois (sem edicao, reenvio ou exclusao nesta branch).
- * <p>
- * {@code resolvedAt} e reservado para a futura integracao com conflitos de escala
- * (feature/schedule-conflict-notifications): comeca sempre nulo e nao possui mutador publico nesta
- * branch.
+ * Notificacao interna enviada a uma ou mais {@link UserAccount}. Conteudo, publico e metadados sao
+ * definidos no momento do envio por {@code NotificationDeliveryService} e nunca sao alterados depois
+ * (sem edicao, reenvio ou exclusao). O unico estado mutavel e a resolucao de conflitos de escala:
+ * {@code resolvedAt}/{@code activeSourceKey}, controlados exclusivamente por {@link #resolve}.
  */
 @Entity
 @Table(name = "tb_notification")
@@ -74,6 +71,9 @@ public class Notification {
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
+    @Column(name = "active_source_key", length = 255)
+    private String activeSourceKey;
+
     protected Notification() {
     }
 
@@ -89,6 +89,7 @@ public class Notification {
             Long referenceId,
             String sourceType,
             String sourceKey,
+            String activeSourceKey,
             LocalDateTime createdAt
     ) {
         this.origin = origin;
@@ -102,6 +103,7 @@ public class Notification {
         this.referenceId = referenceId;
         this.sourceType = sourceType;
         this.sourceKey = sourceKey;
+        this.activeSourceKey = activeSourceKey;
         this.createdAt = createdAt;
     }
 
@@ -121,6 +123,7 @@ public class Notification {
                 message,
                 sender,
                 senderNameSnapshot,
+                null,
                 null,
                 null,
                 null,
@@ -152,6 +155,40 @@ public class Notification {
                 referenceId,
                 sourceType,
                 sourceKey,
+                null,
+                createdAt
+        );
+    }
+
+    /**
+     * Unico ponto de criacao de notificacao com {@code activeSourceKey}: forca origin=SYSTEM e
+     * category=SCHEDULE_CONFLICT, garantindo que nenhuma outra combinacao possa possuir uma chave
+     * ativa (invariante "somente SYSTEM/SCHEDULE_CONFLICT podem possuir activeSourceKey").
+     */
+    public static Notification scheduleConflict(
+            NotificationAudience audience,
+            String title,
+            String message,
+            String referenceType,
+            Long referenceId,
+            String sourceType,
+            String sourceKey,
+            String activeSourceKey,
+            LocalDateTime createdAt
+    ) {
+        return new Notification(
+                NotificationOrigin.SYSTEM,
+                audience,
+                NotificationCategory.SCHEDULE_CONFLICT,
+                title,
+                message,
+                null,
+                "Sistema",
+                referenceType,
+                referenceId,
+                sourceType,
+                sourceKey,
+                activeSourceKey,
                 createdAt
         );
     }
@@ -210,5 +247,27 @@ public class Notification {
 
     public LocalDateTime getResolvedAt() {
         return resolvedAt;
+    }
+
+    public String getActiveSourceKey() {
+        return activeSourceKey;
+    }
+
+    /**
+     * Resolve uma ocorrencia ativa de conflito de escala: libera {@code activeSourceKey} (permitindo
+     * uma nova ocorrencia futura para a mesma identidade eventId+personId) e registra
+     * {@code resolvedAt}. Idempotente (segunda chamada e no-op) e nunca reabre uma notificacao ja
+     * resolvida. Restrito a SCHEDULE_CONFLICT: as demais categorias nunca tem activeSourceKey e nao
+     * fazem sentido "resolvidas".
+     */
+    public void resolve(LocalDateTime resolvedAt) {
+        if (category != NotificationCategory.SCHEDULE_CONFLICT) {
+            throw new IllegalStateException("Somente notificacoes SCHEDULE_CONFLICT podem ser resolvidas.");
+        }
+        if (this.resolvedAt != null) {
+            return;
+        }
+        this.resolvedAt = resolvedAt;
+        this.activeSourceKey = null;
     }
 }

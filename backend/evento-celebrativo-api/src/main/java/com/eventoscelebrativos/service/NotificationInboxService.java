@@ -11,7 +11,7 @@ import org.springframework.data.domain.Page;
  */
 public interface NotificationInboxService {
 
-    Page<NotificationSummaryResponseDTO> findMine(Long accountId, String filter, int page, int size);
+    Page<NotificationSummaryResponseDTO> findMine(Long accountId, String filter, String resolutionFilter, int page, int size);
 
     NotificationDetailResponseDTO findMineById(Long accountId, Long notificationId);
 

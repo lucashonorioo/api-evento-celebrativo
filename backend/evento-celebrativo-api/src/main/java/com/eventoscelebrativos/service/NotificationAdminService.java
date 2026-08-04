@@ -20,6 +20,7 @@ public interface NotificationAdminService {
             LocalDate startDate,
             LocalDate endDate,
             Long senderPersonId,
+            String resolutionFilter,
             int page,
             int size
     );

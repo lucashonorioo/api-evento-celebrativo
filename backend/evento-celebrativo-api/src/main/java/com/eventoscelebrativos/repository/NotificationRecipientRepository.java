@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.repository;
 
+import com.eventoscelebrativos.model.NotificationCategory;
 import com.eventoscelebrativos.model.NotificationRecipient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +34,10 @@ public interface NotificationRecipientRepository extends JpaRepository<Notificat
      * Caixa pessoal, filtrada e ordenada no banco antes da paginacao. {@code onlyUnread} nulo
      * corresponde ao filtro ALL, {@code TRUE} a UNREAD e {@code FALSE} a READ. O join com Notification
      * e 1:1 por causa da unicidade (notification_id, user_account_id), entao a paginacao aqui e
-     * sempre correta.
+     * sempre correta. {@code categoryFilter}/{@code resolvedFilter} implementam
+     * NotificationResolutionFilter (secao 14): ambos nulos correspondem a ALL; caso contrario
+     * category=categoryFilter AND (resolvedAt IS NULL quando resolvedFilter=FALSE, IS NOT NULL
+     * quando TRUE).
      */
     @Query("""
             SELECT r FROM NotificationRecipient r
@@ -42,11 +46,17 @@ public interface NotificationRecipientRepository extends JpaRepository<Notificat
               AND (:onlyUnread IS NULL
                    OR (:onlyUnread = TRUE AND r.readAt IS NULL)
                    OR (:onlyUnread = FALSE AND r.readAt IS NOT NULL))
+              AND (:categoryFilter IS NULL OR n.category = :categoryFilter)
+              AND (:resolvedFilter IS NULL
+                   OR (:resolvedFilter = TRUE AND n.resolvedAt IS NOT NULL)
+                   OR (:resolvedFilter = FALSE AND n.resolvedAt IS NULL))
             ORDER BY n.createdAt DESC, n.id DESC
             """)
     Page<NotificationRecipient> findInbox(
             @Param("accountId") Long accountId,
             @Param("onlyUnread") Boolean onlyUnread,
+            @Param("categoryFilter") NotificationCategory categoryFilter,
+            @Param("resolvedFilter") Boolean resolvedFilter,
             Pageable pageable
     );
 

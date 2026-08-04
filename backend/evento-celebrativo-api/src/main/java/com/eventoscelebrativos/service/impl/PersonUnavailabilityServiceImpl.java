@@ -7,12 +7,18 @@ import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
 import com.eventoscelebrativos.mapper.PersonUnavailabilityMapper;
+import com.eventoscelebrativos.model.Notification;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
+import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
+import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
+import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import com.eventoscelebrativos.service.PersonUnavailabilityConflictService;
 import com.eventoscelebrativos.service.PersonUnavailabilityService;
+import com.eventoscelebrativos.service.ScheduleConflictNotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -20,7 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Service
 public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityService {
@@ -30,20 +39,32 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
 
     private final PersonUnavailabilityRepository personUnavailabilityRepository;
     private final PersonRepository personRepository;
+    private final EventAssignmentRepository eventAssignmentRepository;
+    private final NotificationRepository notificationRepository;
     private final PersonUnavailabilityConflictService personUnavailabilityConflictService;
+    private final AdminRoleMutexService adminRoleMutexService;
+    private final ScheduleConflictNotificationService scheduleConflictNotificationService;
     private final PersonUnavailabilityMapper personUnavailabilityMapper;
     private final Clock clock;
 
     public PersonUnavailabilityServiceImpl(
             PersonUnavailabilityRepository personUnavailabilityRepository,
             PersonRepository personRepository,
+            EventAssignmentRepository eventAssignmentRepository,
+            NotificationRepository notificationRepository,
             PersonUnavailabilityConflictService personUnavailabilityConflictService,
+            AdminRoleMutexService adminRoleMutexService,
+            ScheduleConflictNotificationService scheduleConflictNotificationService,
             PersonUnavailabilityMapper personUnavailabilityMapper,
             Clock clock
     ) {
         this.personUnavailabilityRepository = personUnavailabilityRepository;
         this.personRepository = personRepository;
+        this.eventAssignmentRepository = eventAssignmentRepository;
+        this.notificationRepository = notificationRepository;
         this.personUnavailabilityConflictService = personUnavailabilityConflictService;
+        this.adminRoleMutexService = adminRoleMutexService;
+        this.scheduleConflictNotificationService = scheduleConflictNotificationService;
         this.personUnavailabilityMapper = personUnavailabilityMapper;
         this.clock = clock;
     }
@@ -78,14 +99,19 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
+        // Mutex central (secao 8): sempre antes do lock de Person no fluxo de indisponibilidade.
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
 
         personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, null);
-        personUnavailabilityConflictService.validateNoStartedAssignmentConflict(person.getId(), startAt, endAt, currentSecond);
 
         PersonUnavailability entity = new PersonUnavailability(person, startAt, endAt, reason);
         PersonUnavailability saved = personUnavailabilityRepository.save(entity);
+
+        for (Long eventId : eventAssignmentRepository.findEventIdsByPersonIdAndEndAtAfter(person.getId(), currentSecond)) {
+            scheduleConflictNotificationService.reconcile(mutexGuard, eventId, person.getId(), currentSecond);
+        }
 
         return personUnavailabilityMapper.toDto(saved);
     }
@@ -98,6 +124,7 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
         validateTemporalRule(startAt, endAt);
         String reason = normalizeReason(requestDTO.getReason());
 
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
@@ -111,14 +138,28 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
             return personUnavailabilityMapper.toDto(existing);
         }
 
-        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        LocalDateTime previousStartAt = existing.getStartAt();
+        LocalDateTime previousEndAt = existing.getEndAt();
+
         personUnavailabilityConflictService.validateNoOverlap(person.getId(), startAt, endAt, id);
-        personUnavailabilityConflictService.validateNoStartedAssignmentConflict(person.getId(), startAt, endAt, currentSecond);
 
         existing.setStartAt(startAt);
         existing.setEndAt(endAt);
         existing.setReason(reason);
         PersonUnavailability saved = personUnavailabilityRepository.save(existing);
+
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        TreeSet<Long> affectedEventIds = new TreeSet<>();
+        collectEventIds(affectedEventIds, eventAssignmentRepository
+                .findAssignmentConflictsByPersonIdAndRange(person.getId(), previousStartAt, previousEndAt));
+        collectEventIds(affectedEventIds, eventAssignmentRepository
+                .findAssignmentConflictsByPersonIdAndRange(person.getId(), startAt, endAt));
+        for (Notification notification : notificationRepository.findActiveScheduleConflictsByPersonId(person.getId())) {
+            affectedEventIds.add(notification.getReferenceId());
+        }
+        for (Long eventId : affectedEventIds) {
+            scheduleConflictNotificationService.reconcile(mutexGuard, eventId, person.getId(), currentSecond);
+        }
 
         return personUnavailabilityMapper.toDto(saved);
     }
@@ -126,12 +167,27 @@ public class PersonUnavailabilityServiceImpl implements PersonUnavailabilityServ
     @Override
     @Transactional
     public void delete(Long personId, Long id) {
+        AdminRoleMutexGuard mutexGuard = adminRoleMutexService.lockAdminRole();
         Person person = lockAuthenticatedPerson(personId);
 
         PersonUnavailability existing = personUnavailabilityRepository.findByIdAndPersonId(id, person.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Indisponibilidade", id));
 
         personUnavailabilityRepository.delete(existing);
+
+        LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
+        for (Notification notification : notificationRepository.findActiveScheduleConflictsByPersonId(person.getId())) {
+            scheduleConflictNotificationService.reconcile(mutexGuard, notification.getReferenceId(), person.getId(), currentSecond);
+        }
+    }
+
+    private void collectEventIds(
+            Set<Long> target,
+            List<PersonUnavailabilityAssignmentConflictProjection> rows
+    ) {
+        for (PersonUnavailabilityAssignmentConflictProjection row : rows) {
+            target.add(row.getEventId());
+        }
     }
 
     @Override

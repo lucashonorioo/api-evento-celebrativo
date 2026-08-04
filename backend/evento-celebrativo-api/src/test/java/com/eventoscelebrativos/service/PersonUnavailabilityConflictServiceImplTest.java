@@ -1,18 +1,11 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.response.AdminUnavailabilityPersonDTO;
-import com.eventoscelebrativos.dto.response.PersonUnavailabilityEventConflictDTO;
-import com.eventoscelebrativos.dto.response.StartedAssignmentConflictDTO;
-import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.exception.exceptions.UnavailabilityConflictWithStartedAssignmentException;
 import com.eventoscelebrativos.exception.exceptions.UnavailabilityOverlapException;
-import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonUnavailability;
-import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import com.eventoscelebrativos.projection.PersonUnavailabilityPersonProjection;
-import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
 import com.eventoscelebrativos.service.impl.PersonUnavailabilityConflictServiceImpl;
@@ -24,11 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,14 +30,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Desde a branch feature/schedule-conflict-notifications, este service nao valida mais conflito
+ * entre EventAssignment e PersonUnavailability (nem evento em andamento, nem nova atribuicao): esse
+ * conflito e sempre permitido e tratado por {@code ScheduleConflictNotificationService}. Este teste
+ * cobre apenas o que permanece aqui: sobreposicao entre indisponibilidades da mesma pessoa, o lock
+ * ordenado de pessoas e a consulta administrativa por intervalo.
+ */
 @ExtendWith(MockitoExtension.class)
 class PersonUnavailabilityConflictServiceImplTest {
 
     @Mock
     private PersonUnavailabilityRepository personUnavailabilityRepository;
-
-    @Mock
-    private EventAssignmentRepository eventAssignmentRepository;
 
     @Mock
     private PersonRepository personRepository;
@@ -56,8 +50,7 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new PersonUnavailabilityConflictServiceImpl(
-                personUnavailabilityRepository, eventAssignmentRepository, personRepository);
+        service = new PersonUnavailabilityConflictServiceImpl(personUnavailabilityRepository, personRepository);
     }
 
     @Test
@@ -89,54 +82,6 @@ class PersonUnavailabilityConflictServiceImplTest {
     }
 
     @Test
-    void shouldNotThrowWhenNoStartedAssignmentConflictExists() {
-        LocalDateTime currentSecond = at(2026, 8, 9, 12, 0);
-        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), currentSecond))
-                .thenReturn(List.of());
-
-        service.validateNoStartedAssignmentConflict(1L, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), currentSecond);
-    }
-
-    @Test
-    void shouldThrowWithSingularAssignmentTypeWhenStartedAssignmentConflictExists() {
-        LocalDateTime currentSecond = at(2026, 8, 15, 19, 30);
-        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                1L, at(2026, 8, 15, 19, 15), at(2026, 8, 15, 21, 0), currentSecond))
-                .thenReturn(List.of(
-                        conflictRow(15L, "Missa das 19h", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER")
-                ));
-
-        UnavailabilityConflictWithStartedAssignmentException exception = assertThrows(
-                UnavailabilityConflictWithStartedAssignmentException.class,
-                () -> service.validateNoStartedAssignmentConflict(
-                        1L, at(2026, 8, 15, 19, 15), at(2026, 8, 15, 21, 0), currentSecond));
-
-        assertEquals(1, exception.getConflicts().size());
-        StartedAssignmentConflictDTO conflict = exception.getConflicts().get(0);
-        assertEquals(15L, conflict.getEventId());
-        assertEquals("READER", conflict.getAssignmentType());
-    }
-
-    @Test
-    void shouldOrderMultipleEventConflictsByDateTimeThenId() {
-        LocalDateTime currentSecond = at(2026, 8, 15, 7, 0);
-        when(eventAssignmentRepository.findStartedAssignmentConflictsByPersonIdAndRange(
-                1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0), currentSecond))
-                .thenReturn(List.of(
-                        conflictRow(20L, "Missa Tarde", at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0), "READER"),
-                        conflictRow(10L, "Missa Manha", at(2026, 8, 15, 8, 0), at(2026, 8, 15, 9, 0), "READER")
-                ));
-
-        UnavailabilityConflictWithStartedAssignmentException exception = assertThrows(
-                UnavailabilityConflictWithStartedAssignmentException.class,
-                () -> service.validateNoStartedAssignmentConflict(
-                        1L, at(2026, 8, 1, 0, 0), at(2026, 8, 31, 0, 0), currentSecond));
-
-        assertEquals(List.of(10L, 20L), exception.getConflicts().stream().map(StartedAssignmentConflictDTO::getEventId).toList());
-    }
-
-    @Test
     void shouldLockPersonsInAscendingOrderRegardlessOfInputOrder() {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Person()));
         when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(new Person()));
@@ -165,41 +110,6 @@ class PersonUnavailabilityConflictServiceImplTest {
     }
 
     @Test
-    void shouldNotThrowWhenNoPersonIsUnavailableOnEventRange() {
-        Map<Long, Set<EventAssignmentType>> plan = Map.of(4L, EnumSet.of(EventAssignmentType.READER));
-        when(personUnavailabilityRepository.findByPersonIdsAndRange(plan.keySet(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)))
-                .thenReturn(List.of());
-
-        service.validateAvailabilityForEvent(plan, at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0));
-    }
-
-    @Test
-    void shouldThrowPersonUnavailableForEventExceptionGroupingAssignmentTypesByPerson() {
-        Map<Long, Set<EventAssignmentType>> plan = Map.of(
-                4L, EnumSet.of(EventAssignmentType.READER, EventAssignmentType.COMMENTATOR)
-        );
-        when(personUnavailabilityRepository.findByPersonIdsAndRange(plan.keySet(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)))
-                .thenReturn(List.of(personProjection(4L, "Arthur Costa", at(2026, 8, 10, 0, 0), at(2026, 8, 20, 0, 0))));
-
-        PersonUnavailableForEventException exception = assertThrows(
-                PersonUnavailableForEventException.class,
-                () -> service.validateAvailabilityForEvent(plan, at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0)));
-
-        assertEquals(1, exception.getConflicts().size());
-        PersonUnavailabilityEventConflictDTO conflict = exception.getConflicts().get(0);
-        assertEquals(4L, conflict.getPersonId());
-        assertEquals("Arthur Costa", conflict.getPersonName());
-        assertEquals(List.of("READER", "COMMENTATOR"), conflict.getAssignmentTypes());
-    }
-
-    @Test
-    void shouldDoNothingWhenValidatingAvailabilityForEmptyPlan() {
-        service.validateAvailabilityForEvent(Map.of(), at(2026, 8, 15, 19, 0), at(2026, 8, 15, 20, 0));
-
-        verify(personUnavailabilityRepository, never()).findByPersonIdsAndRange(any(), any(), any());
-    }
-
-    @Test
     void shouldDeduplicatePeopleWhenListingAdminUnavailabilityOnRange() {
         when(personUnavailabilityRepository.findAllByRange(at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0)))
                 .thenReturn(List.of(
@@ -225,37 +135,6 @@ class PersonUnavailabilityConflictServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals(2, result.get(0).getUnavailabilities().size());
-    }
-
-    private PersonUnavailabilityAssignmentConflictProjection conflictRow(
-            Long eventId, String eventName, LocalDateTime startAt, LocalDateTime endAt, String assignmentType
-    ) {
-        return new PersonUnavailabilityAssignmentConflictProjection() {
-            @Override
-            public Long getEventId() {
-                return eventId;
-            }
-
-            @Override
-            public String getEventName() {
-                return eventName;
-            }
-
-            @Override
-            public LocalDateTime getStartAt() {
-                return startAt;
-            }
-
-            @Override
-            public LocalDateTime getEndAt() {
-                return endAt;
-            }
-
-            @Override
-            public String getAssignmentType() {
-                return assignmentType;
-            }
-        };
     }
 
     private PersonUnavailabilityPersonProjection personProjection(Long personId, String personName, LocalDateTime startAt, LocalDateTime endAt) {

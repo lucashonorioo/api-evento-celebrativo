@@ -8,7 +8,6 @@ import com.eventoscelebrativos.dto.request.PersonUnavailabilityRequestDTO;
 import com.eventoscelebrativos.dto.response.PersonUnavailabilityResponseDTO;
 import com.eventoscelebrativos.dto.response.ScheduleUnavailabilityConflictResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.ErrorResponseException;
-import com.eventoscelebrativos.exception.exceptions.PersonUnavailableForEventException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -42,16 +41,12 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,7 +67,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Prova, com transacoes reais e threads concorrentes, que o invariante "nao pode existir
@@ -191,9 +185,6 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
     @Autowired
     private ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -565,238 +556,6 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
     }
 
     @Test
-    void shouldRejectScaleAdditionWhenUnavailabilityWasAlreadyConfirmedInAPriorTransaction() {
-        // Ordem estritamente deterministica, sem depender do escalonador de threads: cada chamada de
-        // service abaixo e uma transacao @Transactional independente que comita integralmente ao
-        // retornar (esta classe de teste nao envolve os testes em uma transacao externa), entao a
-        // simples sequencia de chamadas Java reproduz exatamente "transacao 1 comita antes da
-        // transacao 2 comecar" sem qualquer necessidade de latches artificiais.
-        String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Deterministic Unavailability Wins Person", phone, "ROLE_OPERATOR");
-        cleanupPersonIdA = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
-
-        Person priest = savePersonWithRole("Deterministic Unavailability Wins Priest", uniquePhoneNumber(), "ROLE_OPERATOR");
-        cleanupPersonIdB = priest.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
-
-        Long locationId = locationRepository.saveAndFlush(new Location(null, "Deterministic Church", "Address")).getId();
-        LocalDate eventDate = LocalDate.of(2026, 12, 1);
-        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
-        LocalDateTime eventEndAt = eventStartAt.plusHours(1);
-
-        // Estado inicial: evento futuro ja existe com escala previa (padre); a pessoa alvo ainda nao
-        // esta escalada e ainda nao possui indisponibilidade.
-        CelebrationEventWithScaleRequestDTO initialScale = new CelebrationEventWithScaleRequestDTO();
-        initialScale.setNameMassOrEvent("Deterministic Unavailability Wins Event " + UUID.randomUUID());
-        initialScale.setStartAt(eventStartAt);
-        initialScale.setEndAt(eventEndAt);
-        initialScale.setMassOrCelebration(true);
-        initialScale.setLocationId(locationId);
-        initialScale.setPriestId(priest.getId());
-        var initialResponse = celebrationEventService.createEventWithScale(initialScale);
-        Long eventId = initialResponse.getEventId();
-        cleanupEventId = eventId;
-
-        // Passo 1-3: a transacao da indisponibilidade bloqueia a Person, persiste e COMITA (a chamada
-        // retorna normalmente, encerrando a transacao, antes de qualquer outra operacao comecar).
-        PersonUnavailabilityRequestDTO unavailabilityRequest =
-                new PersonUnavailabilityRequestDTO(dayStart(eventDate), dayEndExclusive(eventDate), null);
-        PersonUnavailabilityResponseDTO unavailability = personUnavailabilityService.create(person.getId(), unavailabilityRequest);
-
-        assertTrue(
-                personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate))
-                        .stream().anyMatch(u -> u.getId().equals(unavailability.getId())),
-                "A indisponibilidade deve estar persistida e comitada antes da tentativa de escala"
-        );
-
-        // Passo 4-6: somente depois, em uma transacao inteiramente separada, a operacao administrativa
-        // tenta adicionar a pessoa a escala; ela bloqueia a Person e releem as indisponibilidades ja
-        // comitadas (nao uma leitura anterior ao lock), rejeitando a inclusao.
-        CelebrationEventScaleRequestDTO scaleUpdate =
-                new CelebrationEventScaleRequestDTO(locationId, priest.getId(), List.of(person.getId()), null, null, null);
-
-        PersonUnavailableForEventException exception = assertThrows(
-                PersonUnavailableForEventException.class, () -> celebrationEventService.updateEventScale(eventId, scaleUpdate));
-        assertEquals("PERSON_UNAVAILABLE_FOR_EVENT", exception.getErrorCode());
-
-        List<EventAssignment> finalAssignments = eventAssignmentRepository.findAllByEventId(eventId);
-        assertEquals(1, finalAssignments.size(), "A escala anterior (somente o padre) deve permanecer preservada");
-        assertEquals(EventAssignmentType.PRIEST, finalAssignments.get(0).getAssignmentType());
-        assertTrue(
-                finalAssignments.stream().noneMatch(assignment -> assignment.getPerson().getId().equals(person.getId())),
-                "O assignment da pessoa indisponivel nao deve ter sido persistido (sem persistencia parcial)"
-        );
-        assertTrue(
-                eventParticipationResponseRepository.findByEventIdAndPersonId(eventId, person.getId()).isEmpty(),
-                "Nenhuma participacao deve ter sido criada para a pessoa rejeitada"
-        );
-    }
-
-    @Test
-    void shouldMakeScaleUpdateWaitForPersonLockAndRejectAfterRereadingCommittedUnavailability() throws Exception {
-        // Cenario genuinamente concorrente (diferente do teste deterministico-sequencial acima):
-        // a transacao A (indisponibilidade) mantem o lock da Person e a linha aberta (nao comitada)
-        // enquanto a transacao B (updateEventScale) e efetivamente iniciada em paralelo e comprovada,
-        // via performance_schema.data_lock_waits, genuinamente bloqueada aguardando o lock real do
-        // MySQL antes de A comitar. A ordenacao entre "A adquiriu o lock e persistiu" e "B comecou" e
-        // garantida por CountDownLatch; a prova de que B ficou bloqueada no lock (e nao apenas lenta)
-        // vem do catalogo de locks do proprio MySQL, nao de sleep.
-        String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Lock Wait Person", phone, "ROLE_OPERATOR");
-        cleanupPersonIdA = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
-
-        Person priest = savePersonWithRole("Concurrent Lock Wait Priest", uniquePhoneNumber(), "ROLE_OPERATOR");
-        cleanupPersonIdB = priest.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
-
-        Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Lock Wait Church", "Address")).getId();
-        LocalDate eventDate = LocalDate.of(2026, 12, 10);
-        LocalDateTime eventStartAt = LocalDateTime.of(eventDate, LocalTime.of(19, 0));
-        LocalDateTime eventEndAt = eventStartAt.plusHours(1);
-
-        // Estado inicial: evento futuro com padre ja escalado; pessoa alvo ainda nao escalada e sem
-        // indisponibilidade; nenhuma participacao da pessoa alvo.
-        CelebrationEventWithScaleRequestDTO initialScale = new CelebrationEventWithScaleRequestDTO();
-        initialScale.setNameMassOrEvent("Concurrent Lock Wait Event " + UUID.randomUUID());
-        initialScale.setStartAt(eventStartAt);
-        initialScale.setEndAt(eventEndAt);
-        initialScale.setMassOrCelebration(true);
-        initialScale.setLocationId(locationId);
-        initialScale.setPriestId(priest.getId());
-        var initialResponse = celebrationEventService.createEventWithScale(initialScale);
-        Long eventId = initialResponse.getEventId();
-        cleanupEventId = eventId;
-
-        eventParticipationResponseService.respond(priest.getId(), eventId, new ParticipationResponseRequestDTO("CONFIRMED", null));
-        EventParticipationResponse priestParticipationBefore = eventParticipationResponseRepository
-                .findByEventIdAndPersonId(eventId, priest.getId())
-                .orElseThrow();
-
-        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-        transactionTemplate.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
-        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-
-        CountDownLatch unavailabilityLockedAndPersisted = new CountDownLatch(1);
-        CountDownLatch releaseUnavailabilityTransaction = new CountDownLatch(1);
-
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            // Transacao A: abre uma transacao real independente, bloqueia a Person, persiste a
-            // indisponibilidade (flush, ainda nao comitada) e so comita quando sinalizada.
-            Future<?> futureA = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                Person lockedPerson = personRepository.findByPhoneNumberForUpdate(phone).orElseThrow();
-                PersonUnavailability entity = new PersonUnavailability(
-                        lockedPerson, dayStart(eventDate), dayEndExclusive(eventDate), null);
-                personUnavailabilityRepository.saveAndFlush(entity);
-                unavailabilityLockedAndPersisted.countDown();
-                awaitLatch(releaseUnavailabilityTransaction);
-            }));
-
-            assertTrue(
-                    unavailabilityLockedAndPersisted.await(5, TimeUnit.SECONDS),
-                    "A transacao A deveria ter adquirido o lock da Person e persistido a indisponibilidade"
-            );
-
-            // Transacao B: somente agora, com a Person ja bloqueada por A, a operacao administrativa
-            // e efetivamente iniciada tentando incluir a mesma pessoa na escala.
-            CelebrationEventScaleRequestDTO scaleUpdate =
-                    new CelebrationEventScaleRequestDTO(locationId, priest.getId(), List.of(person.getId()), null, null, null);
-            Future<PersonUnavailableForEventException> futureB = executor.submit(() -> {
-                try {
-                    celebrationEventService.updateEventScale(eventId, scaleUpdate);
-                    return null;
-                } catch (PersonUnavailableForEventException e) {
-                    return e;
-                }
-            });
-
-            // Comprovacao real (via MySQL, nao via sleep) de que a transacao B efetivamente comecou
-            // e esta bloqueada aguardando o lock da Person mantido por A.
-            awaitLockWaitInMySql(Duration.ofSeconds(15));
-
-            // Somente agora A comita, liberando o lock para B reler a indisponibilidade ja confirmada.
-            releaseUnavailabilityTransaction.countDown();
-            futureA.get(15, TimeUnit.SECONDS);
-
-            PersonUnavailableForEventException exceptionFromB = futureB.get(15, TimeUnit.SECONDS);
-
-            assertTrue(exceptionFromB != null, "A transacao B deveria ter sido rejeitada apos reler a indisponibilidade comitada");
-            assertEquals("PERSON_UNAVAILABLE_FOR_EVENT", exceptionFromB.getErrorCode());
-        } finally {
-            executor.shutdownNow();
-        }
-
-        assertFalse(
-                personUnavailabilityRepository.findOverlapping(person.getId(), dayStart(eventDate), dayEndExclusive(eventDate)).isEmpty(),
-                "A indisponibilidade da transacao A deve estar persistida e comitada"
-        );
-
-        List<EventAssignment> finalAssignments = eventAssignmentRepository.findAllByEventId(eventId);
-        assertEquals(1, finalAssignments.size(), "A escala anterior (somente o padre) deve permanecer preservada");
-        assertEquals(EventAssignmentType.PRIEST, finalAssignments.get(0).getAssignmentType());
-        assertEquals(priest.getId(), finalAssignments.get(0).getPerson().getId(), "O padre permanece atribuido");
-        assertTrue(
-                finalAssignments.stream().noneMatch(assignment -> assignment.getPerson().getId().equals(person.getId())),
-                "A pessoa alvo nao deve possuir EventAssignment (sem persistencia parcial)"
-        );
-
-        assertTrue(
-                eventParticipationResponseRepository.findByEventIdAndPersonId(eventId, person.getId()).isEmpty(),
-                "Nenhuma participacao deve ter sido criada para a pessoa alvo"
-        );
-        EventParticipationResponse priestParticipationAfter = eventParticipationResponseRepository
-                .findByEventIdAndPersonId(eventId, priest.getId())
-                .orElseThrow();
-        assertEquals(priestParticipationBefore.getId(), priestParticipationAfter.getId(),
-                "A participacao anterior do padre nao deve ter sido alterada");
-        assertEquals(ParticipationStatus.CONFIRMED, priestParticipationAfter.getStatus());
-
-        Long persistedLocationId = jdbcTemplate.queryForObject(
-                "SELECT location_id FROM tb_event_location WHERE event_id = ?", Long.class, eventId);
-        assertEquals(locationId, persistedLocationId, "A localizacao do evento nao deve ter sido alterada");
-    }
-
-    /**
-     * Poll deliberadamente curto (nao a sincronizacao principal, que e feita por CountDownLatch) que
-     * consulta o catalogo de locks real do MySQL para confirmar que uma transacao esta genuinamente
-     * bloqueada aguardando um lock de outra (performance_schema.data_lock_waits), em vez de assumir
-     * isso por ausencia de resposta dentro de um prazo.
-     */
-    private void awaitLockWaitInMySql(Duration timeout) {
-        long deadlineNanos = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadlineNanos) {
-            Integer dataLockWaits = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM performance_schema.data_lock_waits", Integer.class);
-            if (dataLockWaits != null && dataLockWaits > 0) {
-                return;
-            }
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(e);
-            }
-        }
-        fail(
-                "A transacao B nao entrou em estado de espera de lock dentro do tempo esperado; pode indicar leitura "
-                        + "simples antes do lock, snapshot antigo, ausencia de releitura pos-lock ou ordem incorreta de locks."
-        );
-    }
-
-    private void awaitLatch(CountDownLatch latch) {
-        try {
-            if (!latch.await(60, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("Latch nao foi liberada dentro do tempo esperado");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
-    }
-
-    @Test
     void shouldAllowUnavailabilityAfterScaleConfirmedInAPriorTransactionAndExposeExactlyOneAdministrativeConflict() {
         // Ordem estritamente deterministica (mesma justificativa do teste anterior, sequencia inversa):
         // o assignment comita integralmente antes de a pessoa criar a indisponibilidade futura.
@@ -847,77 +606,6 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         assertEquals(eventId, conflicts.get(0).getEventId());
         assertEquals(person.getId(), conflicts.get(0).getPersonId());
         assertEquals("READER", conflicts.get(0).getAssignmentType());
-    }
-
-    @Test
-    void shouldRejectUnavailabilityConflictingWithEventInProgressPreservingAssignmentWithoutPartialPersistence() {
-        // Usa o FixedClockConfig desta classe (2026-07-01T12:00:00 em America/Sao_Paulo) para simular
-        // um evento em andamento de forma deterministica, sem depender de tempo real decorrido.
-        String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Started Event Person", phone, "ROLE_OPERATOR");
-        cleanupPersonIdA = person.getId();
-
-        LocalDateTime eventStartAt = LocalDateTime.of(2026, 7, 1, 11, 0);
-        LocalDateTime eventEndAt = LocalDateTime.of(2026, 7, 1, 13, 0);
-        CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Started Event " + UUID.randomUUID(), eventStartAt, eventEndAt, true));
-        cleanupEventId = event.getId();
-        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
-
-        LocalDateTime conflictingStartAt = LocalDateTime.of(2026, 7, 1, 12, 30);
-        LocalDateTime conflictingEndAt = LocalDateTime.of(2026, 7, 1, 14, 0);
-        PersonUnavailabilityRequestDTO conflictingRequest =
-                new PersonUnavailabilityRequestDTO(conflictingStartAt, conflictingEndAt, null);
-
-        assertThrows(ErrorResponseException.class, () -> personUnavailabilityService.create(person.getId(), conflictingRequest));
-
-        assertTrue(
-                personUnavailabilityRepository.findOverlapping(person.getId(), conflictingStartAt, conflictingEndAt).isEmpty(),
-                "Nenhuma indisponibilidade deve ter sido persistida (rollback completo, sem persistencia parcial)"
-        );
-        assertEquals(1, eventAssignmentRepository.findAllByEventId(event.getId()).size(),
-                "O assignment do evento em andamento deve permanecer preservado");
-    }
-
-    @Test
-    void shouldRejectUnavailabilityUpdateConflictingWithEventInProgressPreservingOriginalRangeWithoutPartialPersistence() {
-        // Mesma logica do teste de create acima, mas exercitando update(): a indisponibilidade ja
-        // existente (fora de qualquer conflito) e alterada para um intervalo que passa a conflitar
-        // com um evento ja em andamento sob o FixedClockConfig desta classe.
-        String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Started Update Person", phone, "ROLE_OPERATOR");
-        cleanupPersonIdA = person.getId();
-
-        LocalDateTime eventStartAt = LocalDateTime.of(2026, 7, 1, 11, 0);
-        LocalDateTime eventEndAt = LocalDateTime.of(2026, 7, 1, 13, 0);
-        CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
-                null, "Concurrent Started Update Event " + UUID.randomUUID(), eventStartAt, eventEndAt, true));
-        cleanupEventId = event.getId();
-        eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, EventAssignmentType.READER));
-
-        LocalDateTime originalStartAt = LocalDateTime.of(2026, 7, 2, 8, 0);
-        LocalDateTime originalEndAt = LocalDateTime.of(2026, 7, 2, 9, 0);
-        PersonUnavailabilityResponseDTO existing = personUnavailabilityService.create(
-                person.getId(), new PersonUnavailabilityRequestDTO(originalStartAt, originalEndAt, null));
-
-        LocalDateTime conflictingStartAt = LocalDateTime.of(2026, 7, 1, 12, 30);
-        LocalDateTime conflictingEndAt = LocalDateTime.of(2026, 7, 1, 14, 0);
-        PersonUnavailabilityRequestDTO conflictingUpdate =
-                new PersonUnavailabilityRequestDTO(conflictingStartAt, conflictingEndAt, null);
-
-        assertThrows(ErrorResponseException.class,
-                () -> personUnavailabilityService.update(person.getId(), existing.getId(), conflictingUpdate));
-
-        boolean stillHasOriginalRange = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), originalStartAt, originalEndAt).isEmpty();
-        boolean hasConflictingRange = !personUnavailabilityRepository
-                .findOverlapping(person.getId(), conflictingStartAt, conflictingEndAt).isEmpty();
-
-        assertTrue(stillHasOriginalRange,
-                "A indisponibilidade deve permanecer com o intervalo original (rollback completo, sem persistencia parcial)");
-        assertFalse(hasConflictingRange, "O intervalo conflitante nao deve ter sido persistido");
-        assertEquals(1, eventAssignmentRepository.findAllByEventId(event.getId()).size(),
-                "O assignment do evento em andamento deve permanecer preservado");
     }
 
     private void runConcurrently(

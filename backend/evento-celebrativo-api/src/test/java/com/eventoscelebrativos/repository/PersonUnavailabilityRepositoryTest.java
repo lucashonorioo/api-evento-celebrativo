@@ -268,23 +268,6 @@ class PersonUnavailabilityRepositoryTest {
     }
 
     @Test
-    void shouldFindUnavailablePeopleForGivenPersonIdsAndRangeInBatch() {
-        Person first = savePerson("Unavailability Batch First", "34975000013");
-        Person second = savePerson("Unavailability Batch Second", "34975000014");
-        Person notIncluded = savePerson("Unavailability Batch NotIncluded", "34975000015");
-        saveUnavailability(first, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
-        saveUnavailability(second, at(2026, 8, 5, 0, 0), at(2026, 8, 20, 0, 0), null);
-        saveUnavailability(notIncluded, at(2026, 8, 10, 0, 0), at(2026, 8, 12, 0, 0), null);
-
-        List<PersonUnavailabilityPersonProjection> result = personUnavailabilityRepository.findByPersonIdsAndRange(
-                List.of(first.getId(), second.getId()), at(2026, 8, 11, 0, 0), at(2026, 8, 11, 12, 0));
-
-        assertEquals(2, result.size());
-        assertTrue(result.stream().map(PersonUnavailabilityPersonProjection::getPersonId)
-                .toList().containsAll(List.of(first.getId(), second.getId())));
-    }
-
-    @Test
     void shouldFindAllUnavailablePeopleOnRangeOrderedByNameThenId() {
         Person zelia = savePerson("Zelia Almeida", "34975000016");
         Person arthur = savePerson("Arthur Costa", "34975000017");
