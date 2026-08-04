@@ -1,8 +1,9 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.repository.RoleRepository;
-import com.eventoscelebrativos.service.AdminRoleMutexGuard;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Mutex central de notificacoes: trava a linha de {@code ROLE_ADMIN} com PESSIMISTIC_WRITE antes de
@@ -18,6 +19,15 @@ import org.springframework.stereotype.Service;
  * causando leituras obsoletas em validacoes subsequentes (ex.: validateNoOverlap). Travar
  * diretamente por chave primaria (indexada) tambem evita o table scan que uma busca por authority
  * (coluna sem indice) faria sob FOR UPDATE, que travaria todas as linhas de tb_role.
+ * <p>
+ * A posse do mutex e comprovada por um recurso vinculado a transacao Spring atual via
+ * {@link TransactionSynchronizationManager} (nao por um objeto Java devolvido ao chamador): um
+ * marker-interface publico como guard anterior podia ser "forjado" por qualquer classe que o
+ * implementasse (nada impede {@code new AlgumaClasse() implements AdminRoleMutexGuard {}} em outro
+ * pacote), entao nao provava posse real do lock. O recurso e removido automaticamente ao final da
+ * transacao (commit ou rollback), nunca sobrevive entre transacoes e e restaurado corretamente por
+ * transacoes {@code REQUIRES_NEW} suspensas/retomadas na mesma thread (comportamento padrao do
+ * Spring para recursos vinculados a transacao).
  */
 @Service
 public class AdminRoleMutexService {
@@ -35,20 +45,54 @@ public class AdminRoleMutexService {
     }
 
     /**
-     * Trava a role ROLE_ADMIN e devolve um comprovante de posse do mutex nesta transacao. O
-     * comprovante e o unico parametro aceito por {@link com.eventoscelebrativos.service.ScheduleConflictNotificationService#reconcile}
-     * - como {@link AdminRoleMutexGuardToken} so pode ser construido aqui (construtor privado da
-     * classe aninhada), nao ha como chamar reconcile sem ter passado por este metodo primeiro
-     * (secao 2 da auditoria: precondicao de reconcile deixa de ser apenas documentada em Javadoc).
+     * Trava a role ROLE_ADMIN e vincula a posse do mutex a transacao Spring atual. Idempotente:
+     * chamadas repetidas na mesma transacao nao releem o banco (o lock de linha do InnoDB ja e
+     * reentrante dentro da mesma transacao, mas evitar o round-trip extra tambem evita reabrir a
+     * discussao sobre reentrancia a cada chamador). Exige uma transacao com sincronizacao ativa
+     * (todo chamador de producao e {@code @Transactional}).
      */
-    public AdminRoleMutexGuard lockAdminRole() {
+    public void lockAdminRole() {
+        if (isLockedInCurrentTransaction()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException(
+                    "lockAdminRole() exige uma transacao Spring ativa com sincronizacao habilitada.");
+        }
+
         roleRepository.findByIdForUpdate(adminRoleId)
                 .orElseThrow(() -> new IllegalStateException("Role ROLE_ADMIN ausente na base de dados."));
-        return new AdminRoleMutexGuardToken();
+
+        TransactionSynchronizationManager.bindResource(this, Boolean.TRUE);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (TransactionSynchronizationManager.hasResource(AdminRoleMutexService.this)) {
+                    TransactionSynchronizationManager.unbindResource(AdminRoleMutexService.this);
+                }
+            }
+        });
     }
 
-    private static final class AdminRoleMutexGuardToken implements AdminRoleMutexGuard {
-        private AdminRoleMutexGuardToken() {
+    /**
+     * Precondicao real (nao apenas documentada) de {@link com.eventoscelebrativos.service.ScheduleConflictNotificationService#reconcile}:
+     * falha quando nao ha transacao ativa ou quando o mutex nao foi adquirido nesta transacao
+     * especifica (o estado de outra transacao, mesmo que ja concluida na mesma thread, nunca e
+     * aceito - o recurso e removido no {@code afterCompletion} de cada transacao).
+     */
+    public void requireLockedInCurrentTransaction() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException(
+                    "Mutex ROLE_ADMIN nao adquirido: nao ha transacao ativa nesta chamada.");
         }
+        if (!isLockedInCurrentTransaction()) {
+            throw new IllegalStateException(
+                    "Mutex ROLE_ADMIN nao adquirido na transacao atual; chame lockAdminRole() antes.");
+        }
+    }
+
+    private boolean isLockedInCurrentTransaction() {
+        return Boolean.TRUE.equals(TransactionSynchronizationManager.getResource(this));
     }
 }

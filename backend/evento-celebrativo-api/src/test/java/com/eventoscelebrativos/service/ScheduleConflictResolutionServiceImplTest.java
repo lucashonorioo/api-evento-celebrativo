@@ -117,7 +117,7 @@ class ScheduleConflictResolutionServiceImplTest {
         notificationRepository.saveAndFlush(resolved);
 
         List<ScheduleConflictResolutionService.ScheduleConflictReference> batch =
-                scheduleConflictResolutionService.findActiveConflictsBatch(100);
+                scheduleConflictResolutionService.findActiveConflictsBatch(100, CURRENT_SECOND);
 
         assertTrue(batch.stream().anyMatch(reference -> reference.notificationId().equals(active.getId())));
         assertTrue(batch.stream().noneMatch(reference -> reference.notificationId().equals(resolved.getId())));

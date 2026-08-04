@@ -40,7 +40,7 @@ public class ScheduleConflictResolutionScheduler {
             return;
         }
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
-        for (var reference : scheduleConflictResolutionService.findActiveConflictsBatch(batchSize)) {
+        for (var reference : scheduleConflictResolutionService.findActiveConflictsBatch(batchSize, currentSecond)) {
             scheduleConflictResolutionService.resolveOne(reference.notificationId(), reference.eventId(), currentSecond);
         }
     }

@@ -18,6 +18,7 @@ import java.util.Optional;
 public class ScheduleConflictResolutionServiceImpl implements ScheduleConflictResolutionService {
 
     private static final Logger log = LoggerFactory.getLogger(ScheduleConflictResolutionServiceImpl.class);
+    private static final String REFERENCE_TYPE = "CELEBRATION_EVENT";
 
     private final NotificationRepository notificationRepository;
     private final CelebrationEventRepository celebrationEventRepository;
@@ -32,8 +33,9 @@ public class ScheduleConflictResolutionServiceImpl implements ScheduleConflictRe
 
     @Override
     @Transactional(readOnly = true)
-    public List<ScheduleConflictReference> findActiveConflictsBatch(int batchSize) {
-        return notificationRepository.findActiveScheduleConflictsBatch(PageRequest.of(0, batchSize)).stream()
+    public List<ScheduleConflictReference> findActiveConflictsBatch(int batchSize, LocalDateTime currentSecond) {
+        return notificationRepository.findResolvableScheduleConflictsBatch(
+                        REFERENCE_TYPE, currentSecond, PageRequest.of(0, batchSize)).stream()
                 .map(notification -> new ScheduleConflictReference(notification.getId(), notification.getReferenceId()))
                 .toList();
     }

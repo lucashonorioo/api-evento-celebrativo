@@ -128,13 +128,25 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     /**
      * Leitura em lote (sem lock) para o scheduler de resolucao temporal; o lock e adquirido por item
-     * em uma transacao curta separada.
+     * em uma transacao curta separada. Restrita a ocorrencias resolviveis (evento inexistente ou ja
+     * encerrado, endAt &lt;= currentSecond): sem esse filtro, um lote cheio de conflitos ainda ativos
+     * (evento futuro) com id menor impediria para sempre que conflitos encerrados com id maior fossem
+     * alcancados dentro de batchSize, gerando starvation. O LEFT JOIN com CelebrationEvent e por
+     * referenceId (sem relacao JPA mapeada entre as entidades) para distinguir evento inexistente
+     * (e.id IS NULL) de evento ainda em curso.
      */
     @Query("""
             SELECT n FROM Notification n
+            LEFT JOIN CelebrationEvent e ON e.id = n.referenceId
             WHERE n.category = com.eventoscelebrativos.model.NotificationCategory.SCHEDULE_CONFLICT
               AND n.resolvedAt IS NULL
+              AND n.referenceType = :referenceType
+              AND (e.id IS NULL OR e.endAt <= :currentSecond)
             ORDER BY n.id ASC
             """)
-    List<Notification> findActiveScheduleConflictsBatch(Pageable pageable);
+    List<Notification> findResolvableScheduleConflictsBatch(
+            @Param("referenceType") String referenceType,
+            @Param("currentSecond") LocalDateTime currentSecond,
+            Pageable pageable
+    );
 }

@@ -94,6 +94,28 @@ class ScheduleConflictResolutionSchedulerTest {
 
     @Test
     @Transactional
+    void shouldNotStarveEndedConflictsWithHigherIdsBehindFutureConflictsWithLowerIds() {
+        int batchSize = 3;
+        // Conflitos de eventos futuros, com id menor (inseridos primeiro): ainda ativos, nao
+        // resolviveis. Sem o filtro de resolubilidade na consulta, um lote ORDER BY id ASC LIMIT
+        // batchSize seria preenchido inteiramente por estes, e os conflitos encerrados abaixo
+        // (id maior) nunca seriam alcancados - starvation.
+        List<Long> futureNotificationIds = createFutureConflicts(batchSize + 2);
+        // Conflitos encerrados, com id maior (inseridos depois): resolviveis.
+        List<Long> endedNotificationIds = createEndedConflicts(batchSize);
+        ScheduleConflictResolutionScheduler scheduler =
+                new ScheduleConflictResolutionScheduler(scheduleConflictResolutionService, clock, true, batchSize);
+
+        scheduler.run();
+
+        assertEquals(batchSize, countResolved(endedNotificationIds),
+                "O scheduler deve alcancar e resolver os conflitos encerrados apesar de terem id maior que os futuros");
+        assertEquals(0, countResolved(futureNotificationIds),
+                "Conflitos de eventos ainda nao encerrados nao podem ser resolvidos pelo scheduler");
+    }
+
+    @Test
+    @Transactional
     void shouldResolveAtMostBatchSizePerRun() {
         List<Long> notificationIds = createEndedConflicts(5);
         ScheduleConflictResolutionScheduler scheduler =
@@ -171,6 +193,18 @@ class ScheduleConflictResolutionSchedulerTest {
         return notificationIds.stream()
                 .filter(id -> notificationRepository.findById(id).orElseThrow().getResolvedAt() != null)
                 .count();
+    }
+
+    private List<Long> createFutureConflicts(int count) {
+        List<Long> ids = new ArrayList<>();
+        LocalDateTime eventEndAt = CURRENT_SECOND.plusHours(2);
+        for (int i = 0; i < count; i++) {
+            CelebrationEvent event = celebrationEventRepository.saveAndFlush(
+                    new CelebrationEvent(null, "Scheduler Future Event " + UUID.randomUUID(), eventEndAt.minusHours(1), eventEndAt, true));
+            Notification notification = notificationRepository.saveAndFlush(activeConflict(event.getId(), (long) i));
+            ids.add(notification.getId());
+        }
+        return ids;
     }
 
     private List<Long> createEndedConflicts(int count) {
