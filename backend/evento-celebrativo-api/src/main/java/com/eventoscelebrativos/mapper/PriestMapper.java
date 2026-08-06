@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.request.PriestUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
@@ -13,8 +14,6 @@ import java.util.List;
 public interface PriestMapper {
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
     Person toEntity(PriestRequestDTO priestRequestDTO);
 
     default PriestResponseDTO toDtoFromPerson(Person person) {
@@ -33,7 +32,5 @@ public interface PriestMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
-    void updatePriestFromDto(PriestRequestDTO priestRequestDTO, @MappingTarget Person person);
+    void updatePriestFromDto(PriestUpdateRequestDTO priestUpdateRequestDTO, @MappingTarget Person person);
 }

@@ -2,12 +2,10 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.AdminPasswordResetRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
-import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
 import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
-import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
@@ -40,17 +38,21 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Cobre exclusivamente o ciclo de vida pos-provisionamento (habilitar/desabilitar conta, ativar/
+ * desativar pessoa, redefinir/alterar senha, atualizar role, criar conta para pessoa existente).
+ * O provisionamento na criacao (antigo applyCreationAccess/applyMinisterialUpdateAccess) foi
+ * substituido por {@link com.eventoscelebrativos.service.impl.PersonAccountCoordinatorImpl},
+ * coberto em PersonAccountCoordinatorImplTest.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserAccountLifecycleServiceImplTest {
 
@@ -97,132 +99,15 @@ class UserAccountLifecycleServiceImplTest {
     }
 
     @Test
-    void shouldCreatePersonWithoutAccessWhenCreateAccessFalse() {
-        Person person = person(1L, "34999999991", true);
-        person.setPassword("stale-hash");
-        person.addRole(role(1L, "ROLE_OPERATOR"));
-        ReaderRequestDTO request = readerRequest(null);
-        request.setCreateAccess(false);
-
-        service.applyCreationAccess(person, request);
-
-        assertNull(person.getPassword());
-        assertTrue(person.getRoles().isEmpty());
-        verifyNoInteractions(passwordEncoder, roleRepository);
-    }
-
-    @Test
-    void shouldRejectPasswordOrRoleWhenCreateAccessFalse() {
-        Person person = person(1L, "34999999991", true);
-        ReaderRequestDTO requestWithPassword = readerRequest("123456");
-        requestWithPassword.setCreateAccess(false);
-
-        assertThrows(BadRequestException.class, () -> service.applyCreationAccess(person, requestWithPassword));
-        verifyNoInteractions(passwordEncoder, roleRepository);
-
-        ReaderRequestDTO requestWithRole = readerRequest(null);
-        requestWithRole.setCreateAccess(false);
-        requestWithRole.setAccessRole("ROLE_OPERATOR");
-
-        assertThrows(BadRequestException.class, () -> service.applyCreationAccess(person, requestWithRole));
-        verifyNoInteractions(passwordEncoder, roleRepository);
-    }
-
-    @Test
-    void shouldCreateAccessWithDefaultOperatorWhenLegacyPasswordIsPresent() {
-        Person person = person(1L, "34999999991", true);
-        Role operator = role(1L, "ROLE_OPERATOR");
-        ReaderRequestDTO request = readerRequest("123456");
-        when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operator));
-        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-
-        service.applyCreationAccess(person, request);
-
-        assertEquals("encoded-password", person.getPassword());
-        assertEquals(Set.of(operator), person.getRoles());
-        verify(passwordEncoder, times(1)).encode("123456");
-    }
-
-    @Test
-    void shouldRejectAccessRoleWithoutPasswordWhenCreateAccessIsAbsent() {
-        Person person = person(1L, "34999999991", true);
-        ReaderRequestDTO request = readerRequest(null);
-        request.setAccessRole("ROLE_ADMIN");
-
-        assertThrows(BadRequestException.class, () -> service.applyCreationAccess(person, request));
-        verifyNoInteractions(passwordEncoder, roleRepository);
-    }
-
-    @Test
-    void shouldCreateAdminAccessOnlyAfterTakingAdminRoleMutex() {
-        Person person = person(1L, "34999999991", true);
-        Role admin = role(2L, "ROLE_ADMIN");
-        ReaderRequestDTO request = readerRequest("123456");
-        request.setCreateAccess(true);
-        request.setAccessRole("ROLE_ADMIN");
-        when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(admin));
-        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-
-        service.applyCreationAccess(person, request);
-
-        verify(roleRepository).findByAuthorityForUpdate("ROLE_ADMIN");
-        verify(roleRepository, never()).findByAuthority("ROLE_ADMIN");
-        assertEquals("encoded-password", person.getPassword());
-        assertEquals(Set.of(admin), person.getRoles());
-    }
-
-    @Test
-    void shouldPreserveMinisterialPasswordWhenPasswordIsAbsentOnUpdate() {
-        Person person = person(1L, "34999999991", true);
-        person.setPassword("current-hash");
-        ReaderRequestDTO request = readerRequest(null);
-
-        service.applyMinisterialUpdateAccess(person, request);
-
-        assertEquals("current-hash", person.getPassword());
-        verifyNoInteractions(userAccountRepository, passwordEncoder);
-    }
-
-    @Test
-    void shouldRejectCreateAccessAndAccessRoleOnMinisterialUpdate() {
-        Person person = person(1L, "34999999991", true);
-        ReaderRequestDTO request = readerRequest(null);
-        request.setCreateAccess(true);
-
-        assertThrows(BadRequestException.class, () -> service.applyMinisterialUpdateAccess(person, request));
-
-        request.setCreateAccess(null);
-        request.setAccessRole("ROLE_OPERATOR");
-        assertThrows(BadRequestException.class, () -> service.applyMinisterialUpdateAccess(person, request));
-        verifyNoInteractions(userAccountRepository, passwordEncoder);
-    }
-
-    @Test
-    void shouldRejectMinisterialPasswordUpdateWhenPersonHasNoAccount() {
-        Person person = person(1L, "34999999991", true);
-        ReaderRequestDTO request = readerRequest("123456");
-        when(userAccountRepository.existsByPersonId(1L)).thenReturn(false);
-
-        LifecycleConflictException exception = assertThrows(
-                LifecycleConflictException.class,
-                () -> service.applyMinisterialUpdateAccess(person, request)
-        );
-
-        assertEquals("USER_ACCOUNT_NOT_FOUND", exception.getErrorCode());
-        verify(passwordEncoder, never()).encode(any());
-    }
-
-    @Test
     void shouldCreateAccountForActivePersonWithDefaultRoleAndTokenVersionZero() {
         Person person = person(1L, "34999999991", true);
         Role operator = role(1L, "ROLE_OPERATOR");
         UserAccountCreateRequestDTO request = accountCreateRequest("123456", null);
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operator));
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.empty());
         when(userAccountRepository.findByUsernameForUpdate("34999999991")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
-        when(personRepository.save(person)).thenReturn(person);
         when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> {
             UserAccount account = invocation.getArgument(0);
             setField(account, "id", 10L);
@@ -232,8 +117,6 @@ class UserAccountLifecycleServiceImplTest {
 
         UserAccountLifecycleResponseDTO response = service.createAccount(1L, request);
 
-        assertEquals("encoded-password", person.getPassword());
-        assertEquals(Set.of(operator), person.getRoles());
         assertEquals(1L, response.getPersonId());
         assertTrue(response.isAccountExists());
         assertEquals(List.of("ROLE_OPERATOR"), response.getRoles());
@@ -248,6 +131,7 @@ class UserAccountLifecycleServiceImplTest {
         assertEquals(CURRENT_SECOND, account.getCreatedAt());
         assertEquals(CURRENT_SECOND, account.getUpdatedAt());
         verify(passwordEncoder, times(1)).encode("123456");
+        verify(personRepository, never()).save(any());
     }
 
     @Test
@@ -255,7 +139,7 @@ class UserAccountLifecycleServiceImplTest {
         Person inactive = person(1L, "34999999991", false);
         Role operator = role(1L, "ROLE_OPERATOR");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operator));
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(inactive));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(inactive));
 
         LifecycleConflictException exception = assertThrows(
                 LifecycleConflictException.class,
@@ -442,9 +326,8 @@ class UserAccountLifecycleServiceImplTest {
     }
 
     @Test
-    void shouldResetPasswordWithSameHashInBothModelsAndIncrementVersion() {
+    void shouldResetPasswordOnlyOnUserAccountAndIncrementVersion() {
         Person person = person(1L, "34999999991", false);
-        person.setPassword("old-legacy-hash");
         UserAccount account = account(10L, person, "34999999991", "old-account-hash", false, Set.of(role(1L, "ROLE_OPERATOR")));
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
@@ -453,18 +336,16 @@ class UserAccountLifecycleServiceImplTest {
 
         service.resetPassword(1L, adminPasswordRequest("123456"));
 
-        assertEquals("new-hash", person.getPassword());
         assertEquals("new-hash", account.getPasswordHash());
         assertEquals(1L, account.getTokenVersion());
         verify(passwordEncoder, times(1)).encode("123456");
-        verify(personRepository).save(person);
+        verify(personRepository, never()).save(any());
         verify(userAccountRepository).save(account);
     }
 
     @Test
     void shouldChangeOwnPasswordValidatingCurrentPasswordOnlyAgainstUserAccountHash() {
         Person person = person(1L, "34999999991", true);
-        person.setPassword("different-legacy-hash");
         UserAccount account = account(10L, person, "34999999991", "current-account-hash", true, Set.of(role(1L, "ROLE_OPERATOR")));
         when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(1L);
         when(authenticatedUserResolver.requireCurrentAccountId()).thenReturn(10L);
@@ -475,11 +356,11 @@ class UserAccountLifecycleServiceImplTest {
 
         service.changeOwnPassword(selfPasswordRequest("123456", "654321"));
 
-        assertEquals("new-hash", person.getPassword());
         assertEquals("new-hash", account.getPasswordHash());
         assertEquals(1L, account.getTokenVersion());
         verify(passwordEncoder, times(1)).matches("123456", "current-account-hash");
         verify(passwordEncoder, times(1)).encode("654321");
+        verify(personRepository, never()).save(any());
     }
 
     @Test
@@ -505,38 +386,35 @@ class UserAccountLifecycleServiceImplTest {
     @Test
     void shouldUpdateRoleUsingAccountRolesForLastAdminAndNotIncrementTokenVersion() {
         Person person = person(1L, "34999999991", true);
-        person.addRole(role(1L, "ROLE_OPERATOR"));
         Role admin = role(2L, "ROLE_ADMIN");
         Role operator = role(1L, "ROLE_OPERATOR");
         UserAccount account = account(10L, person, "34999999991", "hash", true, Set.of(admin));
         UserAccountRole currentAdminRole = new UserAccountRole(account, admin);
         when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(admin));
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
         when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
         when(userAccountRoleRepository.countEffectiveAdministrators()).thenReturn(2L);
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operator));
         when(userAccountRoleRepository.findByUserAccountId(10L)).thenReturn(List.of(currentAdminRole));
-        when(personRepository.save(person)).thenReturn(person);
 
         Person updated = service.updateRole(1L, "ROLE_OPERATOR");
 
         assertEquals(person, updated);
-        assertEquals(Set.of(operator), person.getRoles());
         assertEquals(0L, account.getTokenVersion());
         verify(userAccountRoleRepository).deleteAllByUserAccountId(10L);
         verify(userAccountRoleRepository).save(any(UserAccountRole.class));
         verify(userAccountRepository).save(account);
+        verify(personRepository, never()).save(any());
     }
 
     @Test
-    void shouldBlockLastEffectiveAdministratorBasedOnUserAccountRolesNotLegacyPersonRoles() {
+    void shouldBlockLastEffectiveAdministratorBasedOnUserAccountRoles() {
         Person person = person(1L, "34999999991", true);
-        person.addRole(role(1L, "ROLE_OPERATOR"));
         Role admin = role(2L, "ROLE_ADMIN");
         UserAccount account = account(10L, person, "34999999991", "hash", true, Set.of(admin));
         when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(admin));
-        when(personRepository.findByIdWithRolesForUpdate(1L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
         when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
         when(userAccountRoleRepository.countEffectiveAdministrators()).thenReturn(1L);
@@ -548,10 +426,6 @@ class UserAccountLifecycleServiceImplTest {
 
         assertEquals("LAST_ACTIVE_ADMIN_REQUIRED", exception.getErrorCode());
         verify(userAccountRepository, never()).save(any());
-    }
-
-    private ReaderRequestDTO readerRequest(String password) {
-        return new ReaderRequestDTO("Reader", "34999999991", BIRTHDAY, password);
     }
 
     private UserAccountCreateRequestDTO accountCreateRequest(String password, String role) {

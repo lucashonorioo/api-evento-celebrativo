@@ -5,7 +5,6 @@ import com.eventoscelebrativos.model.Person;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -19,12 +18,7 @@ import java.util.Optional;
 @Repository
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
-    @EntityGraph(attributePaths = "roles")
     Optional<Person> findByPhoneNumber(String phoneNumber);
-
-    @EntityGraph(attributePaths = "roles")
-    @Query("SELECT p FROM Person p WHERE p.id = :id")
-    Optional<Person> findByIdWithRoles(@Param("id") Long id);
 
     @Query(
             value = """
@@ -40,9 +34,10 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                             AND pm.active = TRUE
                       ))
                       AND (:role IS NULL OR EXISTS (
-                          SELECT r.id
-                          FROM p.roles r
-                          WHERE r.authority = :role
+                          SELECT uar
+                          FROM UserAccountRole uar
+                          WHERE uar.userAccount.person = p
+                            AND uar.role.authority = :role
                       ))
                     ORDER BY p.name ASC, p.id ASC
                     """,
@@ -59,9 +54,10 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                             AND pm.active = TRUE
                       ))
                       AND (:role IS NULL OR EXISTS (
-                          SELECT r.id
-                          FROM p.roles r
-                          WHERE r.authority = :role
+                          SELECT uar
+                          FROM UserAccountRole uar
+                          WHERE uar.userAccount.person = p
+                            AND uar.role.authority = :role
                       ))
                     """
     )
@@ -73,20 +69,8 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
             Pageable pageable
     );
 
-    @Query("SELECT DISTINCT p FROM Person p LEFT JOIN FETCH p.roles WHERE p.id IN :ids")
-    List<Person> findAllByIdInWithRoles(@Param("ids") Collection<Long> ids);
-
     @Query("SELECT p FROM Person p WHERE p.id IN :ids")
     List<Person> findAllByIdIn(@Param("ids") Collection<Long> ids);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            SELECT DISTINCT p
-            FROM Person p
-            JOIN FETCH p.roles r
-            WHERE r.authority = :authority
-            """)
-    List<Person> findPeopleByRoleForUpdate(@Param("authority") String authority);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Person p WHERE p.phoneNumber = :phoneNumber")
@@ -95,9 +79,4 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Person p WHERE p.id = :id")
     Optional<Person> findByIdForUpdate(@Param("id") Long id);
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "roles")
-    @Query("SELECT p FROM Person p WHERE p.id = :id")
-    Optional<Person> findByIdWithRolesForUpdate(@Param("id") Long id);
 }

@@ -1206,11 +1206,10 @@ class CelebrationEventServiceImplTest {
     }
 
     @Test
-    void shouldNotChangePersonPasswordRolesOrRegistrationDataWhenUpdatingScale() {
+    void shouldNotChangePersonRegistrationDataWhenUpdatingScale() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
         Person priest = person(new Person(), 8L, "Padre");
-        priest.setPassword("encoded");
         priest.setPhoneNumber("34999999999");
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
@@ -1220,7 +1219,6 @@ class CelebrationEventServiceImplTest {
 
         service.updateEventScale(1L, new CelebrationEventScaleRequestDTO(1L, 8L, null, null, null, null));
 
-        assertEquals("encoded", priest.getPassword());
         assertEquals("34999999999", priest.getPhoneNumber());
     }
 

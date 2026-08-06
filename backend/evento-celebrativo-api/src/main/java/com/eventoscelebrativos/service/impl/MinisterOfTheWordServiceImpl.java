@@ -1,15 +1,16 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.mapper.MinisterOfTheWordMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.service.PersonAccountCoordinator;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,18 +20,18 @@ import java.util.List;
 public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
     private final MinisterOfTheWordMapper ministerOfTheWordMapper;
-    private final UserAccountLifecycleService userAccountLifecycleService;
+    private final PersonAccountCoordinator personAccountCoordinator;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public MinisterOfTheWordServiceImpl(
             MinisterOfTheWordMapper ministerOfTheWordMapper,
-            UserAccountLifecycleService userAccountLifecycleService,
+            PersonAccountCoordinator personAccountCoordinator,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.ministerOfTheWordMapper = ministerOfTheWordMapper;
-        this.userAccountLifecycleService = userAccountLifecycleService;
+        this.personAccountCoordinator = personAccountCoordinator;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -40,8 +41,8 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
     @Transactional
     public MinisterOfTheWordResponseDTO createMinisterOfTheWord(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
         Person ministerOfTheWord = ministerOfTheWordMapper.toEntity(ministerOfTheWordRequestDTO);
-        userAccountLifecycleService.applyCreationAccess(ministerOfTheWord, ministerOfTheWordRequestDTO);
         Person saved = personMinistryCommandService.create(ministerOfTheWord, MinistryType.MINISTER_OF_THE_WORD);
+        personAccountCoordinator.provisionAccess(saved, ministerOfTheWordRequestDTO);
         return ministerOfTheWordMapper.toDtoFromPerson(saved);
     }
 
@@ -64,13 +65,13 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
 
     @Override
     @Transactional
-    public MinisterOfTheWordResponseDTO updateMinisterOfTheWord(Long id, MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO) {
+    public MinisterOfTheWordResponseDTO updateMinisterOfTheWord(Long id, MinisterOfTheWordUpdateRequestDTO ministerOfTheWordUpdateRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        ministerOfTheWordUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
-        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordRequestDTO, person);
-        userAccountLifecycleService.applyMinisterialUpdateAccess(person, ministerOfTheWordRequestDTO);
+        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordUpdateRequestDTO, person);
 
         Person saved = personMinistryCommandService.save(person);
         return ministerOfTheWordMapper.toDtoFromPerson(saved);

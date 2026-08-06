@@ -119,7 +119,6 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
         person.setName(name);
         person.setPhoneNumber(uniquePhoneNumber());
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
     }
 
     private void saveMinistry(Person person, MinistryType ministryType, boolean active) {

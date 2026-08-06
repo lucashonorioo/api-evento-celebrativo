@@ -113,7 +113,6 @@ class EventParticipationSyncRollbackIntegrationTest {
         person.setName(name + " " + UUID.randomUUID());
         person.setPhoneNumber(uniquePhoneNumber());
         person.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        person.setPassword("encoded-password");
         person = personRepository.saveAndFlush(person);
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
         return person;
@@ -150,9 +149,7 @@ class EventParticipationSyncRollbackIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_participation_response WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 
     private void cleanupLocation(Long locationId) {

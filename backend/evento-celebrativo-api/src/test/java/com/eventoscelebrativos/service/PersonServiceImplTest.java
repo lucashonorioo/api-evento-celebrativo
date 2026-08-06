@@ -19,12 +19,12 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.impl.PersonServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -81,7 +81,7 @@ class PersonServiceImplTest {
     private EventParticipationResponseService eventParticipationResponseService;
 
     @Mock
-    private UserAccountSynchronizationService userAccountSynchronizationService;
+    private UserAccountRoleRepository userAccountRoleRepository;
 
     @Mock
     private UserAccountLifecycleService userAccountLifecycleService;
@@ -95,12 +95,12 @@ class PersonServiceImplTest {
     @Test
     void shouldFindPeopleWithPaginationAndCombinedFilters() {
         PageRequest pageable = PageRequest.of(0, 10);
-        Person first = person(2L, "Alice", "34911111111", "encoded-password");
-        Person second = person(1L, "Alice", "34922222222", "encoded-password");
+        Person first = person(2L, "Alice", "34911111111");
+        Person second = person(1L, "Alice", "34922222222");
 
         when(personRepository.findAdminPageIds("Ali", "349", MinistryType.READER, "ROLE_ADMIN", pageable))
                 .thenReturn(new PageImpl<>(List.of(2L, 1L), pageable, 2));
-        when(personRepository.findAllByIdInWithRoles(List.of(2L, 1L)))
+        when(personRepository.findAllByIdIn(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(2L, 1L)))
                 .thenReturn(Map.of(2L, Set.of(MinistryType.READER)));
@@ -120,11 +120,11 @@ class PersonServiceImplTest {
     @Test
     void shouldFindPeopleWithSeveralMinistriesSortedDeterministicallyWithoutDuplicates() {
         PageRequest pageable = PageRequest.of(0, 10);
-        Person person = person(1L, "Alice", "34911111111", "encoded-password");
+        Person person = person(1L, "Alice", "34911111111");
 
         when(personRepository.findAdminPageIds(null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(1L), pageable, 1));
-        when(personRepository.findAllByIdInWithRoles(List.of(1L)))
+        when(personRepository.findAllByIdIn(List.of(1L)))
                 .thenReturn(List.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
@@ -148,7 +148,7 @@ class PersonServiceImplTest {
 
         assertTrue(result.getContent().isEmpty());
         assertEquals(0, result.getTotalElements());
-        verify(personRepository, never()).findAllByIdInWithRoles(any());
+        verify(personRepository, never()).findAllByIdIn(any());
     }
 
     @Test
@@ -183,8 +183,8 @@ class PersonServiceImplTest {
 
     @Test
     void shouldFindPersonById() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        Person person = person(1L, "Reader", "34999999991");
+        when(personRepository.findById(1L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
@@ -198,8 +198,8 @@ class PersonServiceImplTest {
 
     @Test
     void shouldFindPersonByIdWithSeveralMinistriesSortedDeterministically() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        when(personRepository.findByIdWithRoles(1L)).thenReturn(Optional.of(person));
+        Person person = person(1L, "Reader", "34999999991");
+        when(personRepository.findById(1L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
@@ -214,7 +214,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenFindingMissingPersonById() {
-        when(personRepository.findByIdWithRoles(99L)).thenReturn(Optional.empty());
+        when(personRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.findPersonById(99L));
     }
@@ -230,12 +230,13 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdatePersonRoleToAdmin() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
+        Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
+        when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
+                .thenReturn(Map.of(1L, List.of("ROLE_ADMIN")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
@@ -243,34 +244,29 @@ class PersonServiceImplTest {
         assertEquals(1L, response.getId());
         assertEquals("ROLE_ADMIN", response.getRoles().get(0));
         assertEquals(List.of(MinistryType.READER), response.getMinistries());
-        assertTrue(person.hasRole("ROLE_ADMIN"));
-        assertFalse(person.hasRole("ROLE_OPERATOR"));
         verify(userAccountLifecycleService).updateRole(1L, "ROLE_ADMIN");
-        verifyNoInteractions(userAccountSynchronizationService);
     }
 
     @Test
     void shouldUpdatePersonRoleToOperatorWhenAnotherAdministratorExists() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(operatorRole());
+        Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_OPERATOR")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
+        when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
+                .thenReturn(Map.of(1L, List.of("ROLE_OPERATOR")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_OPERATOR"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_OPERATOR"));
 
         assertEquals("ROLE_OPERATOR", response.getRoles().get(0));
-        assertTrue(person.hasRole("ROLE_OPERATOR"));
-        assertFalse(person.hasRole("ROLE_ADMIN"));
         verify(userAccountLifecycleService).updateRole(1L, "ROLE_OPERATOR");
     }
 
     @Test
-    void shouldNotChangePasswordWhenUpdatingRole() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
+    void shouldNotPersistPersonWhenUpdatingRole() {
+        Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
@@ -279,9 +275,7 @@ class PersonServiceImplTest {
 
         service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
 
-        assertEquals("encoded-password", person.getPassword());
         verify(personRepository, never()).save(any());
-        verify(userAccountSynchronizationService, never()).synchronizeExistingPerson(any());
     }
 
     @Test
@@ -337,23 +331,22 @@ class PersonServiceImplTest {
 
         assertEquals("SELF_ADMIN_DEMOTION_NOT_ALLOWED", exception.getErrorCode());
         verify(personRepository, never()).save(any());
-        verify(personRepository, never()).findPeopleByRoleForUpdate(any());
     }
 
     @Test
     void shouldAllowCurrentUserToKeepAdminRole() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
-        person.addRole(adminRole());
+        Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
                 .thenReturn(Map.of());
+        when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
+                .thenReturn(Map.of(1L, List.of("ROLE_ADMIN")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         PersonRoleUpdateResponseDTO response = service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
 
         assertEquals("ROLE_ADMIN", response.getRoles().get(0));
-        verify(personRepository, never()).findPeopleByRoleForUpdate(any());
     }
 
     @Test
@@ -426,7 +419,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdatePersonMinistriesDelegatingParsedSetToCommandService() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991");
         PersonMinistrySyncResult result = new PersonMinistrySyncResult(
                 person,
                 Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
@@ -449,7 +442,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldAllowEmptyMinistriesListInUpdateRequestMeaningRemoveAll() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991");
         PersonMinistrySyncResult result = new PersonMinistrySyncResult(
                 person, Set.of(), Set.of(), Set.of(), Set.of(MinistryType.READER), Set.of()
         );
@@ -493,7 +486,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldAcceptMinistryValueRegardlessOfCase() {
-        Person person = person(1L, "Reader", "34999999991", "encoded-password");
+        Person person = person(1L, "Reader", "34999999991");
         PersonMinistrySyncResult result = new PersonMinistrySyncResult(
                 person, Set.of(MinistryType.READER), Set.of(MinistryType.READER), Set.of(), Set.of(), Set.of()
         );
@@ -509,10 +502,12 @@ class PersonServiceImplTest {
 
     @Test
     void shouldGetCurrentUserProfileByPhoneNumberOfAuthenticatedPerson() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+        when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(10L)))
+                .thenReturn(Map.of(10L, List.of("ROLE_OPERATOR")));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
                 10L, "Joao da Silva", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
         ));
@@ -529,7 +524,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldReturnEmptyMinistriesWhenAuthenticatedPersonHasNoActiveMinistry() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
@@ -543,7 +538,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldSortCurrentUserProfileMinistriesDeterministically() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
@@ -569,8 +564,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdateCurrentUserProfileNameAndBirthdayDate() {
-        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
-        person.addRole(operatorRole());
+        Person person = person(10L, "Old Name", "34999999999");
         LocalDate newBirthday = LocalDate.of(1992, 3, 15);
 
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
@@ -594,7 +588,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldTrimNameBeforePersistingOnUpdate() {
-        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        Person person = person(10L, "Old Name", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personRepository.save(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
@@ -612,8 +606,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldKeepProtectedFieldsUnchangedWhenUpdatingCurrentUserProfile() {
-        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
-        person.addRole(operatorRole());
+        Person person = person(10L, "Old Name", "34999999999");
 
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
         when(personRepository.save(person)).thenReturn(person);
@@ -633,8 +626,6 @@ class PersonServiceImplTest {
         Person saved = captor.getValue();
         assertEquals(10L, saved.getId());
         assertEquals("34999999999", saved.getPhoneNumber());
-        assertEquals("encoded-password", saved.getPassword());
-        assertTrue(saved.hasRole("ROLE_OPERATOR"));
         verifyNoInteractions(roleRepository, personMinistryCommandService);
     }
 
@@ -651,7 +642,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsBlankOnUpdate() {
-        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        Person person = person(10L, "Old Name", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
@@ -663,7 +654,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsOnlySpacesOnUpdate() {
-        Person person = person(10L, "Old Name", "34999999999", "encoded-password");
+        Person person = person(10L, "Old Name", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
@@ -675,7 +666,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUpdateOnlyAuthenticatedPersonNotAnotherPerson() {
-        Person authenticatedPerson = person(10L, "Old Name", "34999999999", "encoded-password");
+        Person authenticatedPerson = person(10L, "Old Name", "34999999999");
         when(personRepository.findById(10L)).thenReturn(Optional.of(authenticatedPerson));
         when(personRepository.save(authenticatedPerson)).thenReturn(authenticatedPerson);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
@@ -695,7 +686,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldFindCurrentUserSchedulesByPhoneNumberOfAuthenticatedPerson() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -727,7 +718,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldMapConfirmedParticipationOnCurrentUserSchedules() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -754,7 +745,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldMapDeclinedParticipationWithReasonOnCurrentUserSchedules() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -781,7 +772,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldFetchParticipationResponsesInBatchByPersonAndEventIdsOnFindSchedules() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -871,7 +862,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldAggregateAssignmentsAcrossDifferentEventsSortedByEnumNaturalOrder() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -898,7 +889,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldPreserveEventOrderReturnedByRepositoryOnFindSchedules() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -925,7 +916,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldReturnEmptyPageWithoutFetchingAssignmentsWhenNoEventsMatchOnFindSchedules() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -943,7 +934,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldNotConsultMinistriesToDecideScheduleResults() {
-        Person person = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person person = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -967,7 +958,7 @@ class PersonServiceImplTest {
 
     @Test
     void shouldUseIdFoundByAuthenticatedPrincipalNotAnotherPerson() {
-        Person authenticatedPerson = person(10L, "Joao da Silva", "34999999999", "encoded-password");
+        Person authenticatedPerson = person(10L, "Joao da Silva", "34999999999");
         PageRequest pageable = PageRequest.of(0, 10);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 31);
@@ -1052,22 +1043,13 @@ class PersonServiceImplTest {
         return new CurrentUserProfileResponseDTO(id, name, phoneNumber, birthdayDate, roles, List.of());
     }
 
-    private Person person(Long id, String name, String phoneNumber, String password) {
+    private Person person(Long id, String name, String phoneNumber) {
         Person person = new Person();
         person.setId(id);
         person.setName(name);
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        person.setPassword(password);
         return person;
-    }
-
-    private Role adminRole() {
-        return new Role(2L, "ROLE_ADMIN");
-    }
-
-    private Role operatorRole() {
-        return new Role(1L, "ROLE_OPERATOR");
     }
 
     private PersonAdminResponseDTO adminResponse(Long id, String name, String role) {

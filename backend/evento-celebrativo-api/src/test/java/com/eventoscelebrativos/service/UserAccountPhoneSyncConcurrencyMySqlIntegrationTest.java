@@ -1,6 +1,6 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -29,6 +29,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,9 +92,6 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private UserAccountRoleRepository userAccountRoleRepository;
-
-    @Autowired
-    private UserAccountSynchronizationService userAccountSynchronizationService;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -212,7 +210,7 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
         try {
             readyLatch.countDown();
             startLatch.await(10, TimeUnit.SECONDS);
-            readerService.updateReader(personId, new ReaderRequestDTO("Concurrent Phone Reader", newPhone, BIRTHDAY, "concurrent-pass"));
+            readerService.updateReader(personId, new ReaderUpdateRequestDTO("Concurrent Phone Reader", newPhone, BIRTHDAY));
             return null;
         } catch (Exception e) {
             return e;
@@ -220,20 +218,18 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
     }
 
     private void assertFinalStateIsConsistent(Long personId, Set<String> acceptablePhones) {
-        Person person = personRepository.findByIdWithRoles(personId).orElseThrow();
+        Person person = personRepository.findById(personId).orElseThrow();
         UserAccount account = userAccountRepository.findByPersonId(personId).orElseThrow();
         List<UserAccountRole> accountRoles = userAccountRoleRepository.findByUserAccountId(account.getId());
 
         assertTrue(acceptablePhones.contains(person.getPhoneNumber()));
         assertEquals(person.getPhoneNumber(), account.getUsername());
-        assertEquals(person.getPassword(), account.getPasswordHash());
         assertEquals(1, userAccountRepository.findByPersonId(personId).stream().count());
         assertTrue(account.isEnabled());
 
-        Set<String> personRoleAuthorities = person.getRoles().stream().map(Role::getAuthority).collect(Collectors.toSet());
         Set<String> accountRoleAuthorities = accountRoles.stream()
                 .map(UserAccountRole::getRole).map(Role::getAuthority).collect(Collectors.toSet());
-        assertEquals(personRoleAuthorities, accountRoleAuthorities);
+        assertEquals(Set.of("ROLE_OPERATOR"), accountRoleAuthorities);
     }
 
     private Long createReaderPersonWithSyncedAccount() {
@@ -243,11 +239,13 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
             person.setName("Concurrent Phone Reader");
             person.setPhoneNumber(uniquePhoneNumber());
             person.setBirthdayDate(BIRTHDAY);
-            person.setPassword("encoded-password");
-            person.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
             Person saved = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));
-            userAccountSynchronizationService.synchronizeNewPerson(saved);
+            Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+            UserAccount account = userAccountRepository.save(
+                    new UserAccount(saved, saved.getPhoneNumber(), "encoded-password", now, now));
+            userAccountRoleRepository.save(new UserAccountRole(account, operatorRole));
             return saved.getId();
         });
     }
@@ -259,6 +257,9 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         transactionTemplate.executeWithoutResult(status -> {
             jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
+            jdbcTemplate.update("DELETE FROM tb_user_account_role WHERE user_account_id IN "
+                    + "(SELECT id FROM tb_user_account WHERE person_id = ?)", personId);
+            jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
             personRepository.deleteById(personId);
         });
     }

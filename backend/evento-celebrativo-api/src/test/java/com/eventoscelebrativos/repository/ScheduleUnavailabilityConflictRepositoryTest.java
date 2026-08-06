@@ -193,7 +193,6 @@ class ScheduleUnavailabilityConflictRepositoryTest {
         person.setName(name);
         person.setPhoneNumber(uniquePhoneNumber());
         person.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        person.setPassword("encoded-password");
         entityManager.persist(person);
         entityManager.flush();
         return person;

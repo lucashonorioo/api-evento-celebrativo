@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,15 +77,11 @@ class UserAccountAuthenticationServiceImplTest {
     }
 
     @Test
-    void shouldReturnEmptyCredentialsWhenAccountHasNoRolesWithoutConsultingLegacyPersonRoles() {
-        Person person = spy(person(2L, true));
-        person.addRole(role(4L, "ROLE_ADMIN"));
-        UserAccount account = account(1L, person, "34999999999", "hash", true, Set.of());
+    void shouldReturnEmptyCredentialsWhenAccountHasNoRoles() {
+        UserAccount account = account(1L, person(2L, true), "34999999999", "hash", true, Set.of());
         when(userAccountRepository.findByUsernameForAuthentication("34999999999")).thenReturn(Optional.of(account));
 
         assertTrue(service.loadCredentialsByUsername("34999999999").isEmpty());
-        verify(person, never()).getRoles();
-        verify(person, never()).getAuthorities();
     }
 
     @Test
@@ -183,15 +178,11 @@ class UserAccountAuthenticationServiceImplTest {
     }
 
     @Test
-    void shouldReturnEmptyCurrentUserWhenAccountHasNoRolesWithoutConsultingLegacyPersonRoles() {
-        Person person = spy(person(2L, true));
-        person.addRole(role(4L, "ROLE_ADMIN"));
-        UserAccount account = account(1L, person, "34999999999", "hash", true, Set.of());
+    void shouldReturnEmptyCurrentUserWhenAccountHasNoRoles() {
+        UserAccount account = account(1L, person(2L, true), "34999999999", "hash", true, Set.of());
         when(userAccountRepository.findByIdForAuthentication(1L)).thenReturn(Optional.of(account));
 
         assertTrue(service.loadCurrentUser(1L).isEmpty());
-        verify(person, never()).getRoles();
-        verify(person, never()).getAuthorities();
     }
 
     @Test

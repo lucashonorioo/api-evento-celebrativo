@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
+import com.eventoscelebrativos.dto.request.EucharisticMinisterUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -55,8 +56,8 @@ public class EucharisticMinisterController {
     @Operation(summary = "Atualiza um ministro da Eucaristia")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
-    public ResponseEntity<EucharisticMinisterResponseDTO> updateEucharisticMinisters(@PathVariable Long id, @Valid @RequestBody EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO){
-        EucharisticMinisterResponseDTO eucharisticMinisterResponseDTO = eucharisticMinisterService.updateEucharisticMinisters(id, eucharisticMinisterRequestDTO);
+    public ResponseEntity<EucharisticMinisterResponseDTO> updateEucharisticMinisters(@PathVariable Long id, @Valid @RequestBody EucharisticMinisterUpdateRequestDTO eucharisticMinisterUpdateRequestDTO){
+        EucharisticMinisterResponseDTO eucharisticMinisterResponseDTO = eucharisticMinisterService.updateEucharisticMinisters(id, eucharisticMinisterUpdateRequestDTO);
         return ResponseEntity.ok().body(eucharisticMinisterResponseDTO);
     }
 

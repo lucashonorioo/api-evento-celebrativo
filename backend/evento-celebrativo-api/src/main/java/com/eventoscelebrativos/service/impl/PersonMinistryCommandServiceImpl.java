@@ -10,10 +10,10 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.service.PersonAccountCoordinator;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryDiff;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
-import com.eventoscelebrativos.service.UserAccountSynchronizationService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,18 +28,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final PersonRepository personRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
-    private final UserAccountSynchronizationService userAccountSynchronizationService;
+    private final PersonAccountCoordinator personAccountCoordinator;
 
     public PersonMinistryCommandServiceImpl(
             PersonRepository personRepository,
             PersonMinistryRepository personMinistryRepository,
             EventAssignmentRepository eventAssignmentRepository,
-            UserAccountSynchronizationService userAccountSynchronizationService
+            PersonAccountCoordinator personAccountCoordinator
     ) {
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
-        this.userAccountSynchronizationService = userAccountSynchronizationService;
+        this.personAccountCoordinator = personAccountCoordinator;
     }
 
     @Override
@@ -49,7 +49,6 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
         Person saved = personRepository.save(person);
-        userAccountSynchronizationService.synchronizeNewPerson(saved);
         try {
             personMinistryRepository.save(new PersonMinistry(saved, ministryType));
         } catch (DataIntegrityViolationException e) {
@@ -85,7 +84,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     @Transactional
     public Person save(Person person) {
         Person saved = personRepository.save(person);
-        userAccountSynchronizationService.synchronizeExistingPerson(saved);
+        personAccountCoordinator.synchronizeAccountAfterPersonUpdate(saved);
         return saved;
     }
 

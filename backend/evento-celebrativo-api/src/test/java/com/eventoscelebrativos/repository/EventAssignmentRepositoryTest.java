@@ -669,7 +669,6 @@ class EventAssignmentRepositoryTest {
         person.setName(name);
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        person.setPassword("encoded-password");
     }
 
     private Statistics hibernateStatistics() {

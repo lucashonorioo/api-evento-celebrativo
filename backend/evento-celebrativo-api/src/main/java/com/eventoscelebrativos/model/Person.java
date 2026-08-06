@@ -1,17 +1,15 @@
 package com.eventoscelebrativos.model;
 
 import jakarta.persistence.*;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Objects;
 
 @Entity
 @Table(name = "tb_person")
-public class Person implements Serializable, UserDetails {
+public class Person implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -23,17 +21,9 @@ public class Person implements Serializable, UserDetails {
     @Column(unique = true)
     private String phoneNumber;
     private LocalDate birthdayDate;
-    private String password;
 
     @Column(nullable = false)
     private boolean active = true;
-
-    @ManyToMany
-    @JoinTable(
-            name = "tb_person_role",
-            joinColumns = @JoinColumn(name = "person_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id"))
-    protected Set<Role> roles = new HashSet<>();
 
     public Person(){
 
@@ -83,64 +73,12 @@ public class Person implements Serializable, UserDetails {
         this.birthdayDate = birthdayDate;
     }
 
-    public String getPassword() { return password;
-    }
-
-    public void setPassword(String password) { this.password = password;
-    }
-
     public boolean isActive() {
         return active;
     }
 
     public void setActive(boolean active) {
         this.active = active;
-    }
-
-    public Set<Role> getRoles() {
-        return roles;
-    }
-
-    public void addRole(Role role){ roles.add(role);
-    }
-
-    public Boolean hasRole(String roleName){
-        for(Role role : roles){
-            if(role.getAuthority().equals(roleName)){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles;
-    }
-
-    @Override
-    public String getUsername() {
-        return getPhoneNumber();
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return true;
     }
 
 }

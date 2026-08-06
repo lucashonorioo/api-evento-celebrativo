@@ -7,15 +7,11 @@ import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
-import com.eventoscelebrativos.model.MinistryType;
-import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.PersonMinistry;
+import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
-import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import org.junit.jupiter.api.Test;
@@ -31,7 +27,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -39,7 +34,6 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,10 +42,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Prova, pelos endpoints reais e pelo servico de sincronizacao real (H2, transacoes reais), que
- * UserAccount permanece espelhando Person em todos os fluxos de producao integrados nesta etapa:
- * Person.phoneNumber = UserAccount.username, Person.password = UserAccount.passwordHash e
- * Person.roles = UserAccount.roles.
+ * Prova, pelos endpoints reais e por PersonAccountCoordinator real (H2, transacoes reais), que os
+ * cinco fluxos de criacao ministerial provisionam UserAccount/UserAccountRole corretamente e que
+ * atualizacoes cadastrais (telefone) propagam para UserAccount.username sem recriptar senha nem
+ * aceitar campos de conta. Person nao carrega mais password nem roles - nao ha "espelhamento" para
+ * verificar, apenas o resultado do provisionamento e da sincronizacao de telefone/username.
  */
 @SpringBootTest(properties = {
         "spring.jpa.show-sql=false",
@@ -75,19 +70,10 @@ class UserAccountSynchronizationIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private PersonMinistryRepository personMinistryRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
     private UserAccountRepository userAccountRepository;
 
     @Autowired
     private UserAccountRoleRepository userAccountRoleRepository;
-
-    @Autowired
-    private UserAccountSynchronizationService userAccountSynchronizationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -96,7 +82,7 @@ class UserAccountSynchronizationIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Test
-    void shouldCreateMirroredUserAccountForEachOfTheFiveMinisterialCreationFlows() throws Exception {
+    void shouldCreateAccountWithSingleOperatorRoleForEachOfTheFiveMinisterialCreationFlows() throws Exception {
         List<Long> personIds = List.of(
                 createReader("Sync Reader"),
                 createCommentator("Sync Commentator"),
@@ -106,9 +92,10 @@ class UserAccountSynchronizationIntegrationTest {
         );
         try {
             for (Long personId : personIds) {
-                assertAccountMirrorsPerson(personId);
+                UserAccount account = userAccountRepository.findByPersonId(personId).orElseThrow();
+                assertTrue(personRepository.findById(personId).isPresent());
                 assertEquals(Set.of("ROLE_OPERATOR"), roleAuthoritiesOfAccount(personId));
-                assertTrue(userAccountRepository.findByPersonId(personId).orElseThrow().isEnabled());
+                assertTrue(account.isEnabled());
             }
         } finally {
             personIds.forEach(this::cleanupPerson);
@@ -116,28 +103,48 @@ class UserAccountSynchronizationIntegrationTest {
     }
 
     @Test
-    void shouldSyncUsernameAndPasswordHashWithoutRecryptingWhenMinisterialUpdateChangesThem() throws Exception {
+    void shouldSyncUsernameWithoutRecryptingPasswordWhenMinisterialUpdateChangesPhoneNumber() throws Exception {
         Long personId = null;
         try {
             personId = createReader("Sync Update Reader");
             UserAccount before = userAccountRepository.findByPersonId(personId).orElseThrow();
             Long accountId = before.getId();
+            long tokenVersionBefore = before.getTokenVersion();
 
             String newPhone = uniquePhoneNumber();
             mockMvc.perform(put("/leitores/{id}", personId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
-                                    new ReaderRequestDTO("Sync Update Reader Renamed", newPhone, BIRTHDAY, "654321"))))
+                                    new ReaderUpdateRequestDTO("Sync Update Reader Renamed", newPhone, BIRTHDAY))))
                     .andExpect(status().isOk());
 
-            Person person = personRepository.findById(personId).orElseThrow();
             UserAccount after = userAccountRepository.findByPersonId(personId).orElseThrow();
 
             assertEquals(accountId, after.getId());
             assertEquals(newPhone, after.getUsername());
-            assertEquals(person.getPassword(), after.getPasswordHash());
-            assertNotEquals(before.getPasswordHash(), after.getPasswordHash());
-            verify(passwordEncoder, times(1)).encode("654321");
+            assertEquals(before.getPasswordHash(), after.getPasswordHash());
+            assertEquals(tokenVersionBefore + 1, after.getTokenVersion());
+            verify(passwordEncoder, times(1)).encode("123456");
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldRejectPasswordFieldOnMinisterialUpdateEvenForOrphanPerson() throws Exception {
+        Long personId = createReader("Reader Attempting Password Update");
+        try {
+            String attemptedPhone = uniquePhoneNumber();
+            mockMvc.perform(put("/leitores/{id}", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Reader Renamed\",\"phoneNumber\":\"" + attemptedPhone
+                                    + "\",\"birthdayDate\":\"" + BIRTHDAY + "\",\"password\":\"new-password\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.errorCode")
+                            .value("ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE"));
+
+            UserAccount unchanged = userAccountRepository.findByPersonId(personId).orElseThrow();
+            assertNotEquals(attemptedPhone, unchanged.getUsername());
         } finally {
             cleanupPerson(personId);
         }
@@ -162,7 +169,6 @@ class UserAccountSynchronizationIntegrationTest {
             assertTrue(!after.getUpdatedAt().isBefore(before.getUpdatedAt()));
             assertEquals(before.isEnabled(), after.isEnabled());
             assertEquals(Set.of("ROLE_ADMIN"), roleAuthoritiesOfAccount(personId));
-            assertAccountMirrorsPerson(personId);
         } finally {
             cleanupPerson(personId);
         }
@@ -186,67 +192,6 @@ class UserAccountSynchronizationIntegrationTest {
         } finally {
             cleanupPerson(personId);
         }
-    }
-
-    @Test
-    void shouldFailAndRollBackWholeUpdateWhenAccountIsMissingForExistingPerson() throws Exception {
-        Long personId = null;
-        try {
-            Person orphanPerson = new Person();
-            orphanPerson.setName("Legacy Orphan Reader");
-            orphanPerson.setPhoneNumber(uniquePhoneNumber());
-            orphanPerson.setPassword("original-hash");
-            orphanPerson.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
-            orphanPerson = personRepository.saveAndFlush(orphanPerson);
-            personId = orphanPerson.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(orphanPerson, MinistryType.READER));
-            assertTrue(userAccountRepository.findByPersonId(personId).isEmpty());
-
-            String attemptedPhone = uniquePhoneNumber();
-            mockMvc.perform(put("/leitores/{id}", personId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(
-                                    new ReaderRequestDTO("Legacy Orphan Reader Updated", attemptedPhone, BIRTHDAY, "new-password"))))
-                    .andExpect(status().isConflict());
-
-            Person unchanged = personRepository.findById(personId).orElseThrow();
-            assertEquals("original-hash", unchanged.getPassword());
-            assertNotEquals(attemptedPhone, unchanged.getPhoneNumber());
-            assertTrue(userAccountRepository.findByPersonId(personId).isEmpty());
-        } finally {
-            cleanupPerson(personId);
-        }
-    }
-
-    @Test
-    void shouldFailWhenSynchronizingNewPersonThatAlreadyHasAnAccount() {
-        Long personId = null;
-        try {
-            Person person = new Person();
-            person.setName("Duplicate Account Person");
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setPassword("hash");
-            person = personRepository.saveAndFlush(person);
-            personId = person.getId();
-
-            UserAccount preexisting = new UserAccount(
-                    person, person.getPhoneNumber(), person.getPassword(),
-                    LocalDateTime.now().withNano(0), LocalDateTime.now().withNano(0));
-            userAccountRepository.saveAndFlush(preexisting);
-
-            Person finalPerson = person;
-            assertThrows(RuntimeException.class,
-                    () -> userAccountSynchronizationService.synchronizeNewPerson(finalPerson));
-        } finally {
-            cleanupPerson(personId);
-        }
-    }
-
-    private void assertAccountMirrorsPerson(Long personId) {
-        Person person = personRepository.findById(personId).orElseThrow();
-        UserAccount account = userAccountRepository.findByPersonId(personId).orElseThrow();
-        assertEquals(person.getPhoneNumber(), account.getUsername());
-        assertEquals(person.getPassword(), account.getPasswordHash());
     }
 
     private Set<String> roleAuthoritiesOfAccount(Long personId) {
@@ -313,7 +258,9 @@ class UserAccountSynchronizationIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
+        jdbcTemplate.update("DELETE FROM tb_user_account_role WHERE user_account_id IN "
+                + "(SELECT id FROM tb_user_account WHERE person_id = ?)", personId);
+        jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 

@@ -10,7 +10,6 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -62,9 +61,6 @@ class CurrentUserScheduleIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
@@ -84,8 +80,8 @@ class CurrentUserScheduleIntegrationTest {
         Long otherEventId = null;
         try {
             String phoneA = uniquePhoneNumber();
-            personAId = savePersonWithRole("Isolation Person A", phoneA, "ROLE_OPERATOR");
-            personBId = savePersonWithRole("Isolation Person B", uniquePhoneNumber(), "ROLE_OPERATOR");
+            personAId = savePersonWithRole("Isolation Person A", phoneA);
+            personBId = savePersonWithRole("Isolation Person B", uniquePhoneNumber());
 
             CelebrationEvent ownEvent = saveEvent("Isolation Own Event", LocalDate.of(2026, 8, 10));
             ownEventId = ownEvent.getId();
@@ -115,8 +111,8 @@ class CurrentUserScheduleIntegrationTest {
         try {
             String phoneA = uniquePhoneNumber();
             String phoneB = uniquePhoneNumber();
-            personAId = savePersonWithRole("Shared Event Person A", phoneA, "ROLE_OPERATOR");
-            personBId = savePersonWithRole("Shared Event Person B", phoneB, "ROLE_OPERATOR");
+            personAId = savePersonWithRole("Shared Event Person A", phoneA);
+            personBId = savePersonWithRole("Shared Event Person B", phoneB);
 
             CelebrationEvent sharedEvent = saveEvent("Isolation Shared Event", LocalDate.of(2026, 8, 12));
             sharedEventId = sharedEvent.getId();
@@ -147,7 +143,7 @@ class CurrentUserScheduleIntegrationTest {
         Long eventId = null;
         try {
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("MultiFunction Person", phone, "ROLE_OPERATOR");
+            personId = savePersonWithRole("MultiFunction Person", phone);
 
             CelebrationEvent event = saveEvent("Isolation MultiFunction Event", LocalDate.of(2026, 8, 13));
             eventId = event.getId();
@@ -168,7 +164,7 @@ class CurrentUserScheduleIntegrationTest {
         Long eventId = null;
         try {
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Ministry History Person", phone, "ROLE_OPERATOR");
+            personId = savePersonWithRole("Ministry History Person", phone);
             PersonMinistry ministry = addMinistry(personId, MinistryType.READER);
 
             CelebrationEvent event = saveEvent("Isolation Ministry History Event", LocalDate.of(2026, 8, 14));
@@ -196,8 +192,8 @@ class CurrentUserScheduleIntegrationTest {
         Long otherEventId = null;
         try {
             String phoneA = uniquePhoneNumber();
-            personAId = savePersonWithRole("Ignore PersonId A", phoneA, "ROLE_OPERATOR");
-            personBId = savePersonWithRole("Ignore PersonId B", uniquePhoneNumber(), "ROLE_OPERATOR");
+            personAId = savePersonWithRole("Ignore PersonId A", phoneA);
+            personBId = savePersonWithRole("Ignore PersonId B", uniquePhoneNumber());
 
             CelebrationEvent ownEvent = saveEvent("Ignore PersonId Own Event", LocalDate.of(2026, 8, 15));
             ownEventId = ownEvent.getId();
@@ -233,13 +229,11 @@ class CurrentUserScheduleIntegrationTest {
                                 authenticatedUser, null, authorities)));
     }
 
-    private Long savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
+    private Long savePersonWithRole(String name, String phoneNumber) {
         Person person = new Person();
         person.setName(name + " " + UUID.randomUUID());
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
-        person.addRole(roleRepository.findByAuthority(roleAuthority).orElseThrow());
         return personRepository.saveAndFlush(person).getId();
     }
 
@@ -281,7 +275,6 @@ class CurrentUserScheduleIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 

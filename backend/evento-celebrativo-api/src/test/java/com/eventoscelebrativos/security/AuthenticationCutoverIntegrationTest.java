@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.security;
 
-import com.eventoscelebrativos.service.impl.PersonDetailsServiceImpl;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
@@ -117,9 +116,6 @@ class AuthenticationCutoverIntegrationTest {
     @Autowired
     private JWKSource<SecurityContext> jwkSource;
 
-    @MockitoSpyBean
-    private PersonDetailsServiceImpl personDetailsService;
-
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -172,35 +168,16 @@ class AuthenticationCutoverIntegrationTest {
         Person person = new Person();
         person.setName("Sem Conta");
         person.setPhoneNumber(phone);
-        person.setPassword(passwordEncoder.encode("senha-legada"));
         person.setActive(true);
-        person.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
         personRepository.saveAndFlush(person);
 
-        assertInvalidGrant(requestToken(phone, "senha-legada"));
+        assertInvalidGrant(requestToken(phone, "qualquer-senha"));
     }
 
     @Test
-    void shouldAuthenticateUsingAccountHashRegardlessOfDivergentLegacyPersonPassword() throws Exception {
+    void shouldRejectLoginWhenAccountHasNoRoles() throws Exception {
         String phone = uniquePhone();
-        Person person = createPerson(phone, "outra-senha-legada", true);
-        person.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
-        personRepository.saveAndFlush(person);
-        createAccount(person, phone, "senha-da-conta", Set.of("ROLE_OPERATOR"));
-
-        // login com a senha da CONTA funciona mesmo com Person.password divergente (nunca consultado)
-        MvcResult success = requestToken(phone, "senha-da-conta");
-        assertEquals(200, success.getResponse().getStatus());
-
-        // login com a senha legada da Person falha: nao ha fallback para Person.password
-        assertInvalidGrant(requestToken(phone, "outra-senha-legada"));
-    }
-
-    @Test
-    void shouldRejectLoginWhenAccountHasNoRolesWithoutUsingLegacyPersonRolesOrPersonDetailsService() throws Exception {
-        String phone = uniquePhone();
-        Person person = createPerson(phone, "senha-legada", true);
-        person.addRole(roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow());
+        Person person = createPerson(phone, true);
         Person saved = personRepository.saveAndFlush(person);
         createAccount(saved, phone, "senha-da-conta", Set.of());
 
@@ -208,15 +185,13 @@ class AuthenticationCutoverIntegrationTest {
         MvcResult result = requestToken(phone, "senha-da-conta");
 
         assertInvalidGrant(result);
-        verify(personDetailsService, never()).loadUserByUsername(anyString());
         verify(personRepository, never()).findByPhoneNumber(anyString());
     }
 
     @Test
-    void shouldUseAccountRolesNotLegacyPersonRolesForAuthorities() throws Exception {
+    void shouldUseAccountRolesForAuthorities() throws Exception {
         String phone = uniquePhone();
-        Person person = createPerson(phone, "senha", true);
-        person.addRole(roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow());
+        Person person = createPerson(phone, true);
         personRepository.saveAndFlush(person);
         createAccount(person, phone, "senha", Set.of("ROLE_OPERATOR"));
 
@@ -404,7 +379,6 @@ class AuthenticationCutoverIntegrationTest {
             );
             verify(userAccountRepository, never()).findByUsernameForAuthentication(anyString());
             verify(personRepository, never()).findByPhoneNumber(anyString());
-            verify(personDetailsService, never()).loadUserByUsername(anyString());
         }
     }
 
@@ -425,8 +399,7 @@ class AuthenticationCutoverIntegrationTest {
     @Test
     void shouldRejectBearerTokenWhenAccountHasNoRolesEvenIfTokenCarriesAuthoritiesClaim() throws Exception {
         String phone = uniquePhone();
-        Person person = createPerson(phone, "senha-legada", true);
-        person.addRole(roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow());
+        Person person = createPerson(phone, true);
         Person saved = personRepository.saveAndFlush(person);
         UserAccount account = createAccount(saved, phone, "senha-da-conta", Set.of());
         String token = signedBearerToken(account.getId(), phone, phone, List.of("ROLE_ADMIN"));
@@ -438,7 +411,6 @@ class AuthenticationCutoverIntegrationTest {
         verify(userAccountRepository, times(1)).findByIdForAuthentication(account.getId());
         verify(userAccountRepository, never()).findByUsernameForAuthentication(anyString());
         verify(personRepository, never()).findByPhoneNumber(anyString());
-        verify(personDetailsService, never()).loadUserByUsername(anyString());
     }
 
     @Test
@@ -486,8 +458,7 @@ class AuthenticationCutoverIntegrationTest {
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
                                 "name", "Reader Renamed",
                                 "phoneNumber", newPhone,
-                                "birthdayDate", BIRTHDAY.toString(),
-                                "password", "123456"
+                                "birthdayDate", BIRTHDAY.toString()
                         )))
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + obtainAdminToken()))
                 .andExpect(status().isOk());
@@ -696,9 +667,7 @@ class AuthenticationCutoverIntegrationTest {
 
         verify(userAccountRepository, times(1)).findByIdForAuthentication(accountId);
         verify(userAccountRepository, never()).findByUsernameForAuthentication(anyString());
-        verify(personRepository, never()).findByPhoneNumber(anyString());
-        verify(personDetailsService, never()).loadUserByUsername(anyString());
-    }
+        verify(personRepository, never()).findByPhoneNumber(anyString());    }
 
     @Test
     void shouldNotRequireAuthenticationForOptionsPreflight() throws Exception {
@@ -723,7 +692,7 @@ class AuthenticationCutoverIntegrationTest {
     }
 
     private void clearAuthenticationInvocations() {
-        clearInvocations(userAccountRepository, personRepository, personDetailsService);
+        clearInvocations(userAccountRepository, personRepository);
     }
 
     private String signedBearerToken(Object accountIdClaim, String subject, Object usernameClaim) {
@@ -815,8 +784,7 @@ class AuthenticationCutoverIntegrationTest {
     }
 
     private Person createPersonWithAccount(String phone, String rawPassword, boolean accountEnabled, boolean personActive, String authority) {
-        Person person = createPerson(phone, rawPassword, personActive);
-        person.addRole(roleRepository.findByAuthority(authority).orElseThrow());
+        Person person = createPerson(phone, personActive);
         Person saved = personRepository.saveAndFlush(person);
         createAccount(saved, phone, rawPassword, Set.of(authority));
         if (!accountEnabled) {
@@ -825,12 +793,11 @@ class AuthenticationCutoverIntegrationTest {
         return saved;
     }
 
-    private Person createPerson(String phone, String rawPassword, boolean active) {
+    private Person createPerson(String phone, boolean active) {
         Person person = new Person();
         person.setName("Auth Cutover Person");
         person.setPhoneNumber(phone);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword(passwordEncoder.encode(rawPassword));
         person.setActive(active);
         return person;
     }

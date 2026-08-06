@@ -26,8 +26,7 @@ class FlywayMigrationIntegrationTest {
             "tb_location",
             "tb_person",
             "tb_role",
-            "tb_event_location",
-            "tb_person_role"
+            "tb_event_location"
     };
 
     private static final String[] PARALLEL_DOMAIN_TABLES = {
@@ -60,11 +59,16 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("13");
         assertSuccessfulMigration("14");
         assertSuccessfulMigration("15");
+        assertSuccessfulMigration("16");
+        assertSuccessfulMigration("17");
+        assertSuccessfulMigration("18");
         assertTableExists("flyway_schema_history");
         assertTableExists("tb_event_participation_response");
         assertTableExists("tb_person_unavailability");
         assertTableDoesNotExist("tb_event_person");
+        assertTableDoesNotExist("tb_person_role");
         assertColumnDoesNotExist("tb_person", "person_type");
+        assertColumnDoesNotExist("tb_person", "password");
         assertColumnDoesNotExist("tb_celebration_event", "event_date");
         assertColumnDoesNotExist("tb_celebration_event", "event_time");
         assertColumnExists("tb_celebration_event", "start_at");
@@ -82,7 +86,6 @@ class FlywayMigrationIntegrationTest {
         assertColumnExists("tb_person", "active");
         assertColumnExists("tb_person", "created_at");
         assertColumnExists("tb_person", "updated_at");
-        assertColumnNullable("tb_person", "password");
         assertColumnExists("tb_user_account", "token_version");
         assertColumnNotNullable("tb_user_account", "token_version");
 
@@ -95,6 +98,7 @@ class FlywayMigrationIntegrationTest {
         assertMainConstraintExists("tb_user_account", "uk_tb_user_account_username");
         assertMainConstraintExists("tb_user_account", "fk_tb_user_account_person");
         assertMainConstraintExists("tb_user_account_role", "pk_tb_user_account_role");
+        assertMainConstraintExists("tb_user_account_role", "uk_tb_user_account_role_user_account");
         assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_user_account");
         assertMainConstraintExists("tb_user_account_role", "fk_tb_user_account_role_role");
         assertMainConstraintExists("tb_event_assignment", "pk_tb_event_assignment");
@@ -110,11 +114,11 @@ class FlywayMigrationIntegrationTest {
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history "
-                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15') "
+                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18') "
                         + "AND success = TRUE",
                 Integer.class
         );
-        assertEquals(15, successfulVersions);
+        assertEquals(18, successfulVersions);
     }
 
     @Test
@@ -140,8 +144,13 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("13");
         assertSuccessfulMigration("14");
         assertSuccessfulMigration("15");
+        assertSuccessfulMigration("16");
+        assertSuccessfulMigration("17");
+        assertSuccessfulMigration("18");
         assertTableDoesNotExist("tb_event_person");
+        assertTableDoesNotExist("tb_person_role");
         assertColumnDoesNotExist("tb_person", "person_type");
+        assertColumnDoesNotExist("tb_person", "password");
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         for (String table : PARALLEL_DOMAIN_TABLES) {

@@ -33,14 +33,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
@@ -50,6 +50,15 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+/**
+ * Prova, pelos cinco endpoints ministeriais reais, a matriz de criacao de acesso (createAccess x
+ * senha x accessRole) e o comportamento pos-remocao do login legado: updates ministeriais aceitam
+ * somente dados cadastrais e rejeitam a PRESENCA de password/createAccess/accessRole no JSON
+ * (mesmo com valor null/vazio/false) com ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE, sem tocar em
+ * PasswordEncoder; telefone continua sincronizado para UserAccount.username com tokenVersion
+ * incrementado uma unica vez. Person nao carrega mais password nem roles - todo o estado de acesso
+ * e verificado exclusivamente via UserAccount/UserAccountRole.
+ */
 @SpringBootTest(properties = {
         "spring.jpa.show-sql=false",
         "logging.level.org.springframework=WARN",
@@ -62,7 +71,6 @@ class MinisterialAccessLifecycleIntegrationTest {
     private static final LocalDate BIRTHDAY = LocalDate.of(1990, 1, 10);
     private static final LocalDate UPDATED_BIRTHDAY = LocalDate.of(1991, 2, 11);
     private static final String CURRENT_PASSWORD = "123456";
-    private static final String NEW_PASSWORD = "654321";
 
     @Autowired
     private org.springframework.test.web.servlet.MockMvc mockMvc;
@@ -166,81 +174,49 @@ class MinisterialAccessLifecycleIntegrationTest {
         }
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
+    @ParameterizedTest(name = "{0} - {1}={2}")
+    @MethodSource("forbiddenUpdateFieldMatrix")
     @WithMockUser(roles = "ADMIN")
-    void shouldRejectCreateAccessAndAccessRoleOnUpdateWithoutCreatingAccount(MinisterialEndpoint endpoint) throws Exception {
+    void shouldRejectAccountFieldOnMinisterialUpdateRegardlessOfValue(
+            MinisterialEndpoint endpoint,
+            String fieldName,
+            String rawJsonValue
+    ) throws Exception {
         Person person = createMinisterialPerson(endpoint, uniquePhone(), false, null, null);
         String originalPhone = person.getPhoneNumber();
+        clearInvocations(passwordEncoder);
 
-        MvcResult createAccessResult = mockMvc.perform(put(endpoint.updatePath(person.getId()))
+        String payload = updatePayloadWithRawField("Should Reject", uniquePhone(), UPDATED_BIRTHDAY, fieldName, rawJsonValue);
+
+        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Updated", uniquePhone(), BIRTHDAY, null, true, null)))
+                        .content(payload))
                 .andReturn();
 
-        assertEquals(400, createAccessResult.getResponse().getStatus(), createAccessResult.getResponse().getContentAsString());
+        assertEquals(400, result.getResponse().getStatus(), result.getResponse().getContentAsString());
+        assertEquals(
+                "ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE",
+                objectMapper.readTree(result.getResponse().getContentAsString()).get("errorCode").asText()
+        );
         assertPersonUnchangedWithoutAccount(person.getId(), originalPhone, "Person " + endpoint.label());
-
-        MvcResult accessRoleResult = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Updated", uniquePhone(), BIRTHDAY, null, null, "ROLE_ADMIN")))
-                .andReturn();
-
-        assertEquals(400, accessRoleResult.getResponse().getStatus(), accessRoleResult.getResponse().getContentAsString());
-        assertPersonUnchangedWithoutAccount(person.getId(), originalPhone, "Person " + endpoint.label());
+        verify(passwordEncoder, never()).encode(anyString());
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("ministerialEndpoints")
     @WithMockUser(roles = "ADMIN")
-    void shouldUpdateMinisterialPersonWithoutAccountWhenPasswordIsAbsent(MinisterialEndpoint endpoint) throws Exception {
+    void shouldUpdateMinisterialPersonWithoutAccountWhenNoAccountFieldsPresent(MinisterialEndpoint endpoint) throws Exception {
         Person person = createMinisterialPerson(endpoint, uniquePhone(), false, null, null);
         String newPhone = uniquePhone();
         clearInvocations(passwordEncoder);
 
         MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("No Account Updated", newPhone, UPDATED_BIRTHDAY, null, null, null)))
+                        .content(cadastralUpdatePayload("No Account Updated", newPhone, UPDATED_BIRTHDAY)))
                 .andReturn();
 
         assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
         assertPersonWithoutAccount(person.getId(), newPhone, "No Account Updated", UPDATED_BIRTHDAY, endpoint.ministryType());
-        verify(passwordEncoder, never()).encode(anyString());
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
-    @WithMockUser(roles = "ADMIN")
-    void shouldRejectMinisterialPasswordUpdateWhenPersonHasNoAccountAndRollback(MinisterialEndpoint endpoint) throws Exception {
-        Person person = createMinisterialPerson(endpoint, uniquePhone(), false, null, null);
-        String originalPhone = person.getPhoneNumber();
-        clearInvocations(passwordEncoder);
-
-        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Should Rollback", uniquePhone(), UPDATED_BIRTHDAY, NEW_PASSWORD, null, null)))
-                .andReturn();
-
-        assertEquals(409, result.getResponse().getStatus(), result.getResponse().getContentAsString());
-        assertEquals("USER_ACCOUNT_NOT_FOUND", objectMapper.readTree(result.getResponse().getContentAsString()).get("errorCode").asText());
-        assertPersonUnchangedWithoutAccount(person.getId(), originalPhone, "Person " + endpoint.label());
-        verify(passwordEncoder, never()).encode(anyString());
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
-    @WithMockUser(roles = "ADMIN")
-    void shouldRejectBlankMinisterialPasswordOnUpdateWithoutEncoding(MinisterialEndpoint endpoint) throws Exception {
-        Person person = createMinisterialPerson(endpoint, uniquePhone(), false, null, null);
-        clearInvocations(passwordEncoder);
-
-        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Blank Password", uniquePhone(), UPDATED_BIRTHDAY, "   ", null, null)))
-                .andReturn();
-
-        assertEquals(400, result.getResponse().getStatus(), result.getResponse().getContentAsString());
-        assertPersonUnchangedWithoutAccount(person.getId(), person.getPhoneNumber(), "Person " + endpoint.label());
         verify(passwordEncoder, never()).encode(anyString());
     }
 
@@ -256,84 +232,15 @@ class MinisterialAccessLifecycleIntegrationTest {
 
         MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Phone Updated", newPhone, BIRTHDAY, null, null, null)))
+                        .content(cadastralUpdatePayload("Phone Updated", newPhone, BIRTHDAY)))
                 .andReturn();
 
         assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
         assertEquals(newPhone, personPhone(person.getId()));
         assertEquals(newPhone, accountUsername(accountId));
         assertEquals(oldHash, accountHash(accountId));
-        assertEquals(List.of("ROLE_OPERATOR"), personRoles(person.getId()));
-        assertEquals(List.of("ROLE_OPERATOR"), accountRoles(accountId));
+        assertEquals(Set.of("ROLE_OPERATOR"), accountRoleAuthorities(accountId));
         assertEquals(1L, tokenVersion(accountId));
-        verify(passwordEncoder, never()).encode(anyString());
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
-    @WithMockUser(roles = "ADMIN")
-    void shouldSynchronizePasswordChangeAndIncrementVersionOnceOnMinisterialUpdate(MinisterialEndpoint endpoint) throws Exception {
-        Person person = createMinisterialPerson(endpoint, uniquePhone(), true, CURRENT_PASSWORD, "ROLE_OPERATOR");
-        long accountId = accountIdByPersonId(person.getId());
-        String oldHash = accountHash(accountId);
-        clearInvocations(passwordEncoder);
-
-        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Password Updated", person.getPhoneNumber(), BIRTHDAY, NEW_PASSWORD, null, null)))
-                .andReturn();
-
-        assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
-        assertEquals(1L, tokenVersion(accountId));
-        assertEquals(accountHash(accountId), personPassword(person.getId()));
-        assertNotEquals(oldHash, accountHash(accountId));
-        assertTrue(passwordEncoder.matches(NEW_PASSWORD, accountHash(accountId)));
-        verify(passwordEncoder, times(1)).encode(NEW_PASSWORD);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
-    @WithMockUser(roles = "ADMIN")
-    void shouldIncrementVersionOnlyOnceWhenPhoneAndPasswordChangeTogether(MinisterialEndpoint endpoint) throws Exception {
-        Person person = createMinisterialPerson(endpoint, uniquePhone(), true, CURRENT_PASSWORD, "ROLE_OPERATOR");
-        long accountId = accountIdByPersonId(person.getId());
-        String newPhone = uniquePhone();
-        clearInvocations(passwordEncoder);
-
-        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Phone Password Updated", newPhone, BIRTHDAY, NEW_PASSWORD, null, null)))
-                .andReturn();
-
-        assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
-        assertEquals(newPhone, accountUsername(accountId));
-        assertEquals(1L, tokenVersion(accountId));
-        assertEquals(accountHash(accountId), personPassword(person.getId()));
-        assertTrue(passwordEncoder.matches(NEW_PASSWORD, accountHash(accountId)));
-        verify(passwordEncoder, times(1)).encode(NEW_PASSWORD);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("ministerialEndpoints")
-    @WithMockUser(roles = "ADMIN")
-    void shouldNotIncrementVersionWhenOnlyNameOrBirthdayChangesOnMinisterialUpdate(MinisterialEndpoint endpoint) throws Exception {
-        Person person = createMinisterialPerson(endpoint, uniquePhone(), true, CURRENT_PASSWORD, "ROLE_OPERATOR");
-        long accountId = accountIdByPersonId(person.getId());
-        String originalPhone = person.getPhoneNumber();
-        String originalHash = accountHash(accountId);
-        clearInvocations(passwordEncoder);
-
-        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Only Name Birthday Updated", originalPhone, UPDATED_BIRTHDAY, null, null, null)))
-                .andReturn();
-
-        assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
-        assertEquals("Only Name Birthday Updated", personName(person.getId()));
-        assertEquals(UPDATED_BIRTHDAY, personBirthday(person.getId()));
-        assertEquals(originalPhone, accountUsername(accountId));
-        assertEquals(originalHash, accountHash(accountId));
-        assertEquals(0L, tokenVersion(accountId));
         verify(passwordEncoder, never()).encode(anyString());
     }
 
@@ -362,6 +269,30 @@ class MinisterialAccessLifecycleIntegrationTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("ministerialEndpoints")
     @WithMockUser(roles = "ADMIN")
+    void shouldNotIncrementVersionWhenOnlyNameOrBirthdayChangesOnMinisterialUpdate(MinisterialEndpoint endpoint) throws Exception {
+        Person person = createMinisterialPerson(endpoint, uniquePhone(), true, CURRENT_PASSWORD, "ROLE_OPERATOR");
+        long accountId = accountIdByPersonId(person.getId());
+        String originalPhone = person.getPhoneNumber();
+        String originalHash = accountHash(accountId);
+        clearInvocations(passwordEncoder);
+
+        MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(cadastralUpdatePayload("Only Name Birthday Updated", originalPhone, UPDATED_BIRTHDAY)))
+                .andReturn();
+
+        assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
+        assertEquals("Only Name Birthday Updated", personName(person.getId()));
+        assertEquals(UPDATED_BIRTHDAY, personBirthday(person.getId()));
+        assertEquals(originalPhone, accountUsername(accountId));
+        assertEquals(originalHash, accountHash(accountId));
+        assertEquals(0L, tokenVersion(accountId));
+        verify(passwordEncoder, never()).encode(anyString());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("ministerialEndpoints")
+    @WithMockUser(roles = "ADMIN")
     void shouldRollbackPersonAndMinistryWhenMinisterialSynchronizationFails(MinisterialEndpoint endpoint) throws Exception {
         Person person = createMinisterialPerson(endpoint, uniquePhone(), true, CURRENT_PASSWORD, "ROLE_OPERATOR");
         long accountId = accountIdByPersonId(person.getId());
@@ -371,7 +302,7 @@ class MinisterialAccessLifecycleIntegrationTest {
 
         MvcResult result = mockMvc.perform(put(endpoint.updatePath(person.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload("Should Rollback Sync", conflictingUsername, UPDATED_BIRTHDAY, null, null, null)))
+                        .content(cadastralUpdatePayload("Should Rollback Sync", conflictingUsername, UPDATED_BIRTHDAY)))
                 .andReturn();
 
         assertEquals(409, result.getResponse().getStatus(), result.getResponse().getContentAsString());
@@ -406,6 +337,23 @@ class MinisterialAccessLifecycleIntegrationTest {
                 .flatMap(endpoint -> scenarios.stream().map(scenario -> Arguments.of(endpoint, scenario)));
     }
 
+    private static Stream<Arguments> forbiddenUpdateFieldMatrix() {
+        List<Arguments> fieldScenarios = List.of(
+                Arguments.of("password", "\"654321\""),
+                Arguments.of("password", "\"\""),
+                Arguments.of("password", "\"   \""),
+                Arguments.of("password", "null"),
+                Arguments.of("createAccess", "true"),
+                Arguments.of("createAccess", "false"),
+                Arguments.of("createAccess", "null"),
+                Arguments.of("accessRole", "\"ROLE_ADMIN\""),
+                Arguments.of("accessRole", "\"\""),
+                Arguments.of("accessRole", "null")
+        );
+        return ministerialEndpoints().flatMap(endpoint -> fieldScenarios.stream()
+                .map(scenario -> Arguments.of(endpoint, scenario.get()[0], scenario.get()[1])));
+    }
+
     private static Stream<MinisterialEndpoint> ministerialEndpoints() {
         return Stream.of(
                 new MinisterialEndpoint("padre", "/padres", MinistryType.PRIEST),
@@ -417,32 +365,10 @@ class MinisterialAccessLifecycleIntegrationTest {
     }
 
     private String creationPayload(String name, String phone, String password, Boolean createAccess, String accessRole) throws Exception {
-        return personPayload(name, phone, BIRTHDAY, password, createAccess, accessRole);
-    }
-
-    private String updatePayload(
-            String name,
-            String phone,
-            LocalDate birthday,
-            String password,
-            Boolean createAccess,
-            String accessRole
-    ) throws Exception {
-        return personPayload(name, phone, birthday, password, createAccess, accessRole);
-    }
-
-    private String personPayload(
-            String name,
-            String phone,
-            LocalDate birthday,
-            String password,
-            Boolean createAccess,
-            String accessRole
-    ) throws Exception {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", name);
         payload.put("phoneNumber", phone);
-        payload.put("birthdayDate", birthday.toString());
+        payload.put("birthdayDate", BIRTHDAY.toString());
         if (password != null) {
             payload.put("password", password);
         }
@@ -453,6 +379,30 @@ class MinisterialAccessLifecycleIntegrationTest {
             payload.put("accessRole", accessRole);
         }
         return objectMapper.writeValueAsString(payload);
+    }
+
+    private String cadastralUpdatePayload(String name, String phone, LocalDate birthday) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", name);
+        payload.put("phoneNumber", phone);
+        payload.put("birthdayDate", birthday.toString());
+        return objectMapper.writeValueAsString(payload);
+    }
+
+    /**
+     * Monta o JSON manualmente (nao via serializacao de Map) para poder incluir uma chave com
+     * valor JSON literal `null`, algo que a serializacao padrao de um Map com valor Java null nao
+     * garante representar da mesma forma em todo ObjectMapper.
+     */
+    private String updatePayloadWithRawField(String name, String phone, LocalDate birthday, String fieldName, String rawJsonValue) {
+        return """
+                {
+                  "name": "%s",
+                  "phoneNumber": "%s",
+                  "birthdayDate": "%s",
+                  "%s": %s
+                }
+                """.formatted(name, phone, birthday, fieldName, rawJsonValue);
     }
 
     private Person createMinisterialPerson(
@@ -467,18 +417,13 @@ class MinisterialAccessLifecycleIntegrationTest {
         person.setPhoneNumber(phone);
         person.setBirthdayDate(BIRTHDAY);
         person.setActive(true);
+        person = personRepository.saveAndFlush(person);
         if (withAccount) {
             Role role = roleRepository.findByAuthority(authority).orElseThrow();
             String hash = passwordEncoder.encode(rawPassword);
-            person.setPassword(hash);
-            person.addRole(role);
-            person = personRepository.saveAndFlush(person);
             UserAccount account = new UserAccount(person, phone, hash, currentSecond(), currentSecond());
             UserAccount savedAccount = userAccountRepository.saveAndFlush(account);
             userAccountRoleRepository.saveAndFlush(new UserAccountRole(savedAccount, role));
-        } else {
-            person.setPassword(null);
-            person = personRepository.saveAndFlush(person);
         }
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, endpoint.ministryType()));
         return person;
@@ -491,11 +436,9 @@ class MinisterialAccessLifecycleIntegrationTest {
         anchor.setPhoneNumber(anchorPhone);
         anchor.setBirthdayDate(BIRTHDAY);
         anchor.setActive(true);
+        anchor = personRepository.saveAndFlush(anchor);
         Role operator = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();
         String hash = passwordEncoder.encode(CURRENT_PASSWORD);
-        anchor.setPassword(hash);
-        anchor.addRole(operator);
-        anchor = personRepository.saveAndFlush(anchor);
         UserAccount account = new UserAccount(anchor, username, hash, currentSecond(), currentSecond());
         UserAccount savedAccount = userAccountRepository.saveAndFlush(account);
         userAccountRoleRepository.saveAndFlush(new UserAccountRole(savedAccount, operator));
@@ -511,23 +454,18 @@ class MinisterialAccessLifecycleIntegrationTest {
         assertEquals(1, countRows("tb_person", "id", personId));
         assertEquals(1, activeMinistryCount(personId, ministryType));
         if (!expectedAccount) {
-            assertNull(personPassword(personId));
-            assertTrue(personRoles(personId).isEmpty());
             assertEquals(0, countRows("tb_user_account", "person_id", personId));
             return;
         }
 
         long accountId = accountIdByPersonId(personId);
-        String personHash = personPassword(personId);
         String accountHash = accountHash(accountId);
-        assertNotNull(personHash);
-        assertEquals(personHash, accountHash);
+        assertNotNull(accountHash);
         assertTrue(passwordEncoder.matches(rawPassword, accountHash));
         assertEquals(personPhone(personId), accountUsername(accountId));
         assertTrue(accountEnabled(accountId));
         assertEquals(0L, tokenVersion(accountId));
-        assertEquals(List.of(expectedRole), personRoles(personId));
-        assertEquals(List.of(expectedRole), accountRoles(accountId));
+        assertEquals(Set.of(expectedRole), accountRoleAuthorities(accountId));
     }
 
     private void assertPersonUnchangedWithoutAccount(long personId, String originalPhone, String originalName) {
@@ -544,8 +482,6 @@ class MinisterialAccessLifecycleIntegrationTest {
         assertEquals(phone, personPhone(personId));
         assertEquals(name, personName(personId));
         assertEquals(birthday, personBirthday(personId));
-        assertNull(personPassword(personId));
-        assertTrue(personRoles(personId).isEmpty());
         assertEquals(0, countRows("tb_user_account", "person_id", personId));
         if (ministryType != null) {
             assertEquals(1, activeMinistryCount(personId, ministryType));
@@ -578,10 +514,6 @@ class MinisterialAccessLifecycleIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT birthday_date FROM tb_person WHERE id = ?", LocalDate.class, personId);
     }
 
-    private String personPassword(long personId) {
-        return jdbcTemplate.queryForObject("SELECT password FROM tb_person WHERE id = ?", String.class, personId);
-    }
-
     private String accountUsername(long accountId) {
         return jdbcTemplate.queryForObject("SELECT username FROM tb_user_account WHERE id = ?", String.class, accountId);
     }
@@ -600,32 +532,11 @@ class MinisterialAccessLifecycleIntegrationTest {
         return tokenVersion == null ? -1L : tokenVersion;
     }
 
-    private List<String> personRoles(long personId) {
-        return jdbcTemplate.queryForList(
-                """
-                SELECT r.authority
-                FROM tb_person_role pr
-                JOIN tb_role r ON r.id = pr.role_id
-                WHERE pr.person_id = ?
-                ORDER BY r.authority
-                """,
-                String.class,
-                personId
-        );
-    }
-
-    private List<String> accountRoles(long accountId) {
-        return jdbcTemplate.queryForList(
-                """
-                SELECT r.authority
-                FROM tb_user_account_role uar
-                JOIN tb_role r ON r.id = uar.role_id
-                WHERE uar.user_account_id = ?
-                ORDER BY r.authority
-                """,
-                String.class,
-                accountId
-        );
+    private Set<String> accountRoleAuthorities(long accountId) {
+        return userAccountRoleRepository.findByUserAccountId(accountId).stream()
+                .map(UserAccountRole::getRole)
+                .map(Role::getAuthority)
+                .collect(Collectors.toSet());
     }
 
     private int activeMinistryCount(long personId, MinistryType ministryType) {
@@ -658,7 +569,6 @@ class MinisterialAccessLifecycleIntegrationTest {
                 personId
         );
         jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 

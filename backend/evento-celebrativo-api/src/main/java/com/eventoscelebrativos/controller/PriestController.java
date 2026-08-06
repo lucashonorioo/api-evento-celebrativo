@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.request.PriestUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.service.PriestService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -55,8 +56,8 @@ public class PriestController {
     @Operation(summary = "Atualiza um padre")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
-    public ResponseEntity<PriestResponseDTO> updatePriest(@PathVariable Long id, @Valid @RequestBody PriestRequestDTO priestRequestDTO){
-        PriestResponseDTO priestResponseDTO = priestService.updatePriest(id, priestRequestDTO);
+    public ResponseEntity<PriestResponseDTO> updatePriest(@PathVariable Long id, @Valid @RequestBody PriestUpdateRequestDTO priestUpdateRequestDTO){
+        PriestResponseDTO priestResponseDTO = priestService.updatePriest(id, priestUpdateRequestDTO);
         return ResponseEntity.ok().body(priestResponseDTO);
     }
 

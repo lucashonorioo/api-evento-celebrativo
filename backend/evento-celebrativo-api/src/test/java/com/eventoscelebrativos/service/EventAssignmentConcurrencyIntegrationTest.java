@@ -13,7 +13,6 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -136,9 +135,6 @@ class EventAssignmentConcurrencyIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
@@ -166,9 +162,7 @@ class EventAssignmentConcurrencyIntegrationTest {
         }
         if (cleanupPersonId != null) {
             jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", cleanupPersonId);
-            jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", cleanupPersonId);
-            jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", cleanupPersonId);
-            jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", cleanupPersonId);
+            jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", cleanupPersonId);            jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", cleanupPersonId);
         }
         if (cleanupLocationId != null) {
             jdbcTemplate.update("DELETE FROM tb_location WHERE id = ?", cleanupLocationId);
@@ -180,7 +174,7 @@ class EventAssignmentConcurrencyIntegrationTest {
 
     @Test
     void shouldAllowOnlyOneConcurrentInsertForSamePersonAndEventWithDifferentTypes() throws Exception {
-        Person person = savePersonWithRole("Concurrent Assignment Insert Person", uniquePhoneNumber(), "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Assignment Insert Person", uniquePhoneNumber());
         cleanupPersonId = person.getId();
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
                 null, "Concurrent Assignment Insert Event " + UUID.randomUUID(),
@@ -204,7 +198,7 @@ class EventAssignmentConcurrencyIntegrationTest {
 
     @Test
     void shouldSerializeConcurrentFullScaleUpdatesForSamePersonAndKeepExactlyOneFunction() throws Exception {
-        Person person = savePersonWithRole("Concurrent Scale Update Person", uniquePhoneNumber(), "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Scale Update Person", uniquePhoneNumber());
         cleanupPersonId = person.getId();
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.COMMENTATOR));
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.EUCHARISTIC_MINISTER));
@@ -293,13 +287,11 @@ class EventAssignmentConcurrencyIntegrationTest {
         }
     }
 
-    private Person savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
+    private Person savePerson(String name, String phoneNumber) {
         Person person = new Person();
         person.setName(name);
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
-        person.addRole(roleRepository.findByAuthority(roleAuthority).orElseThrow());
         return personRepository.saveAndFlush(person);
     }
 

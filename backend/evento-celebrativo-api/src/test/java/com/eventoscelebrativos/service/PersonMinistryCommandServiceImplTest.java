@@ -41,7 +41,7 @@ class PersonMinistryCommandServiceImplTest {
     private EventAssignmentRepository eventAssignmentRepository;
 
     @Mock
-    private UserAccountSynchronizationService userAccountSynchronizationService;
+    private PersonAccountCoordinator personAccountCoordinator;
 
     @InjectMocks
     private PersonMinistryCommandServiceImpl service;
@@ -59,7 +59,7 @@ class PersonMinistryCommandServiceImplTest {
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
         assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
-        verify(userAccountSynchronizationService).synchronizeNewPerson(saved);
+        verifyNoInteractions(personAccountCoordinator);
     }
 
     @Test
@@ -166,7 +166,7 @@ class PersonMinistryCommandServiceImplTest {
 
         assertSame(reader, service.save(reader));
         verify(personRepository).save(reader);
-        verify(userAccountSynchronizationService).synchronizeExistingPerson(reader);
+        verify(personAccountCoordinator).synchronizeAccountAfterPersonUpdate(reader);
     }
 
     @Test
@@ -430,7 +430,6 @@ class PersonMinistryCommandServiceImplTest {
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");
-        reader.setPassword("encoded-password");
         return reader;
     }
 }

@@ -29,6 +29,21 @@ public interface UserAccountRoleRepository extends JpaRepository<UserAccountRole
                 .collect(Collectors.groupingBy(uar -> uar.getUserAccount().getId()));
     }
 
+    @EntityGraph(attributePaths = {"role", "userAccount", "userAccount.person"})
+    @Query("SELECT uar FROM UserAccountRole uar WHERE uar.userAccount.person.id IN :personIds")
+    List<UserAccountRole> findByUserAccountPersonIdIn(@Param("personIds") Collection<Long> personIds);
+
+    /**
+     * Roles (nomes de authority, ordenados) por personId, em uma unica consulta em lote. Pessoa sem
+     * conta simplesmente nao aparece no mapa resultante (tratada pelo chamador como lista vazia).
+     */
+    default Map<Long, List<String>> findRoleAuthoritiesByPersonIdsGroupedByPerson(Collection<Long> personIds) {
+        return findByUserAccountPersonIdIn(personIds).stream()
+                .collect(Collectors.groupingBy(
+                        uar -> uar.getUserAccount().getPerson().getId(),
+                        Collectors.mapping(uar -> uar.getRole().getAuthority(), Collectors.toList())));
+    }
+
     @Modifying
     @Query("DELETE FROM UserAccountRole uar WHERE uar.userAccount.id = :userAccountId")
     void deleteAllByUserAccountId(@Param("userAccountId") Long userAccountId);

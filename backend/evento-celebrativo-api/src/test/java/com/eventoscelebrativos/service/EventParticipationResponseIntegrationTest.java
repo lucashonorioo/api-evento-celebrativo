@@ -10,7 +10,6 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.EventParticipationResponseRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -67,9 +66,6 @@ class EventParticipationResponseIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
     private CelebrationEventRepository celebrationEventRepository;
 
     @Autowired
@@ -91,7 +87,7 @@ class EventParticipationResponseIntegrationTest {
         try {
             setNow(LocalDateTime.of(2026, 8, 1, 9, 0));
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Idempotency Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("Idempotency Person", phone);
             CelebrationEvent event = saveEvent("Idempotency Event", LocalDate.of(2026, 9, 1), LocalTime.of(19, 0));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
@@ -142,7 +138,7 @@ class EventParticipationResponseIntegrationTest {
         try {
             setNow(LocalDateTime.of(2026, 8, 1, 9, 0));
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Unassigned Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("Unassigned Person", phone);
             CelebrationEvent event = saveEvent("Unassigned Event", LocalDate.of(2026, 9, 1), LocalTime.of(19, 0));
             eventId = event.getId();
 
@@ -162,7 +158,7 @@ class EventParticipationResponseIntegrationTest {
         Long eventId = null;
         try {
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Temporal Rule Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("Temporal Rule Person", phone);
             CelebrationEvent event = saveEvent("Temporal Rule Event", LocalDate.of(2026, 9, 10), LocalTime.of(19, 0));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
@@ -196,7 +192,7 @@ class EventParticipationResponseIntegrationTest {
         try {
             setNow(LocalDateTime.of(2026, 8, 1, 9, 0));
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Concurrency Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("Concurrency Person", phone);
             CelebrationEvent event = saveEvent("Concurrency Event", LocalDate.of(2026, 9, 20), LocalTime.of(19, 0));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
@@ -241,7 +237,7 @@ class EventParticipationResponseIntegrationTest {
         try {
             setNow(LocalDateTime.of(2026, 8, 1, 9, 0));
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("My Schedules Participation Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("My Schedules Participation Person", phone);
             CelebrationEvent event = saveEvent("My Schedules Participation Event", LocalDate.of(2026, 9, 25), LocalTime.of(19, 0));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
@@ -281,7 +277,7 @@ class EventParticipationResponseIntegrationTest {
         try {
             setNow(LocalDateTime.of(2026, 8, 1, 9, 0));
             String phone = uniquePhoneNumber();
-            personId = savePersonWithRole("Sync Cleanup Person", phone, "ROLE_OPERATOR");
+            personId = savePerson("Sync Cleanup Person", phone);
             CelebrationEvent event = saveEvent("Sync Cleanup Event", LocalDate.of(2026, 9, 28), LocalTime.of(19, 0));
             eventId = event.getId();
             saveAssignment(event, personId, EventAssignmentType.READER);
@@ -335,13 +331,11 @@ class EventParticipationResponseIntegrationTest {
                         authenticatedUser, null, authorities));
     }
 
-    private Long savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
+    private Long savePerson(String name, String phoneNumber) {
         Person person = new Person();
         person.setName(name + " " + UUID.randomUUID());
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
-        person.addRole(roleRepository.findByAuthority(roleAuthority).orElseThrow());
         return personRepository.saveAndFlush(person).getId();
     }
 
@@ -383,9 +377,7 @@ class EventParticipationResponseIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_participation_response WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 
     private String uniquePhoneNumber() {

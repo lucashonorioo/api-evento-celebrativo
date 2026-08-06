@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -81,9 +82,6 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private UserAccountRoleRepository userAccountRoleRepository;
-
-    @Autowired
-    private UserAccountSynchronizationService userAccountSynchronizationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -257,47 +255,40 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
     }
 
     private void assertFinalStateIsConsistent(Long personId) {
-        Person person = personRepository.findByIdWithRoles(personId).orElseThrow();
+        Person person = personRepository.findById(personId).orElseThrow();
         UserAccount account = userAccountRepository.findByPersonId(personId).orElseThrow();
         List<UserAccountRole> accountRoles = userAccountRoleRepository.findByUserAccountId(account.getId());
 
-        Set<String> personRoleAuthorities = person.getRoles().stream().map(Role::getAuthority).collect(Collectors.toSet());
         Set<String> accountRoleAuthorities = accountRoles.stream()
                 .map(UserAccountRole::getRole).map(Role::getAuthority).collect(Collectors.toSet());
 
-        assertEquals(1, personRoleAuthorities.size());
-        assertEquals(personRoleAuthorities, accountRoleAuthorities);
+        assertEquals(1, accountRoleAuthorities.size());
         assertEquals(1, accountRoles.size());
         assertTrue(account.isEnabled());
         assertEquals(1, userAccountRepository.findByPersonId(personId).stream().count());
         assertEquals(account.getUsername(), person.getPhoneNumber());
-        assertEquals(account.getPasswordHash(), person.getPassword());
     }
 
     private Long createOperatorPersonWithSyncedAccount() {
-        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-        return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName("Concurrency Role Person");
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setPassword("encoded-password");
-            person.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
-            Person saved = personRepository.save(person);
-            userAccountSynchronizationService.synchronizeNewPerson(saved);
-            return saved.getId();
-        });
+        return createPersonWithSyncedAccount("Concurrency Role Person", "ROLE_OPERATOR");
     }
 
     private Long createAdminPersonWithSyncedAccount() {
+        return createPersonWithSyncedAccount("Concurrency Anchor Admin", "ROLE_ADMIN");
+    }
+
+    private Long createPersonWithSyncedAccount(String name, String authority) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
             Person person = new Person();
-            person.setName("Concurrency Anchor Admin");
+            person.setName(name);
             person.setPhoneNumber(uniquePhoneNumber());
-            person.setPassword("encoded-password");
-            person.addRole(roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow());
             Person saved = personRepository.save(person);
-            userAccountSynchronizationService.synchronizeNewPerson(saved);
+            Role role = roleRepository.findByAuthority(authority).orElseThrow();
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+            UserAccount account = userAccountRepository.save(
+                    new UserAccount(saved, saved.getPhoneNumber(), "encoded-password", now, now));
+            userAccountRoleRepository.save(new UserAccountRole(account, role));
             return saved.getId();
         });
     }
@@ -307,7 +298,12 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
             return;
         }
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-        transactionTemplate.executeWithoutResult(status -> personRepository.deleteById(personId));
+        transactionTemplate.executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM tb_user_account_role WHERE user_account_id IN "
+                    + "(SELECT id FROM tb_user_account WHERE person_id = ?)", personId);
+            jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
+            personRepository.deleteById(personId);
+        });
     }
 
     private String uniquePhoneNumber() {

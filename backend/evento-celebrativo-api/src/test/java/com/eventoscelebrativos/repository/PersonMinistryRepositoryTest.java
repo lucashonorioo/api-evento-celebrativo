@@ -197,7 +197,6 @@ class PersonMinistryRepositoryTest {
         reader.setName(name);
         reader.setPhoneNumber(phoneNumber);
         reader.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        reader.setPassword("encoded-password");
         entityManager.persist(reader);
         entityManager.flush();
         return reader;
