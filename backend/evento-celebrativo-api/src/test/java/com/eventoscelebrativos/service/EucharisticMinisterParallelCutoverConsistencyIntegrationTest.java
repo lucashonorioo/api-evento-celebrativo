@@ -212,7 +212,7 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
                 .with(user("admin").roles("ADMIN"))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(ministerPayload(name, phoneNumber)));
+                .content(ministerUpdatePayload(name, phoneNumber)));
     }
 
     private org.springframework.test.web.servlet.ResultActions deleteEucharisticMinister(Long ministerId) throws Exception {
@@ -426,7 +426,10 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", ministerId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", ministerId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", ministerId);
+        jdbcTemplate.update(
+                "DELETE FROM tb_user_account_role WHERE user_account_id IN (SELECT id FROM tb_user_account WHERE person_id = ?)",
+                ministerId);
+        jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", ministerId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", ministerId);
     }
 
@@ -437,6 +440,16 @@ class EucharisticMinisterParallelCutoverConsistencyIntegrationTest {
                   "phoneNumber": "%s",
                   "birthdayDate": "%s",
                   "password": "123456"
+                }
+                """.formatted(name, phoneNumber, BIRTHDAY);
+    }
+
+    private String ministerUpdatePayload(String name, String phoneNumber) {
+        return """
+                {
+                  "name": "%s",
+                  "phoneNumber": "%s",
+                  "birthdayDate": "%s"
                 }
                 """.formatted(name, phoneNumber, BIRTHDAY);
     }

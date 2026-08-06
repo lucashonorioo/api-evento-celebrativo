@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -8,20 +9,15 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.ReaderServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,10 +32,7 @@ class ReaderServiceImplTest {
     private ReaderMapper readerMapper;
 
     @Mock
-    private RoleRepository roleRepository;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
+    private PersonAccountCoordinator personAccountCoordinator;
 
     @Mock
     private PersonMinistryCommandService personMinistryCommandService;
@@ -47,58 +40,45 @@ class ReaderServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
-    @Mock
-    private UserAccountLifecycleService userAccountLifecycleService;
-
     @InjectMocks
     private ReaderServiceImpl service;
 
     @Test
-    void shouldCreateReaderWithEncryptedPasswordAndOperatorRole() {
+    void shouldCreateReaderAndProvisionAccessAfterPersisting() {
         ReaderRequestDTO request = request();
-        Person entity = reader(null, "raw-password");
-        Role operatorRole = new Role(1L, "ROLE_OPERATOR");
-        Person saved = reader(1L, "encoded-password");
-        saved.addRole(operatorRole);
+        Person entity = reader(null);
+        Person saved = reader(1L);
         ReaderResponseDTO response = response(1L);
 
         when(readerMapper.toEntity(request)).thenReturn(entity);
-        doAnswer(invocation -> {
-            Person person = invocation.getArgument(0);
-            person.setPassword("encoded-password");
-            person.addRole(operatorRole);
-            return null;
-        }).when(userAccountLifecycleService).applyCreationAccess(entity, request);
-        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.READER))).thenReturn(saved);
+        when(personMinistryCommandService.create(entity, MinistryType.READER)).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         ReaderResponseDTO result = service.createReader(request);
 
         assertSame(response, result);
-        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
-        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.READER));
-        Person readerToSave = captor.getValue();
-        assertEquals("encoded-password", readerToSave.getPassword());
-        assertNotEquals("raw-password", readerToSave.getPassword());
-        assertTrue(readerToSave.hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCommandService).create(entity, MinistryType.READER);
+        verify(personAccountCoordinator).provisionAccess(saved, request);
     }
 
     @Test
-    void shouldThrowResourceNotFoundWhenOperatorRoleDoesNotExist() {
+    void shouldPropagateProvisioningFailureAfterPersonAlreadyCreated() {
         ReaderRequestDTO request = request();
-        Person entity = reader(null, "raw-password");
+        Person entity = reader(null);
+        Person saved = reader(1L);
 
         when(readerMapper.toEntity(request)).thenReturn(entity);
+        when(personMinistryCommandService.create(entity, MinistryType.READER)).thenReturn(saved);
         doThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"))
-                .when(userAccountLifecycleService).applyCreationAccess(entity, request);
+                .when(personAccountCoordinator).provisionAccess(saved, request);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createReader(request));
-        verify(personMinistryCommandService, never()).create(any(), any());
+        verify(personMinistryCommandService).create(entity, MinistryType.READER);
     }
 
     @Test
     void shouldFindReaderByIdWhenExists() {
-        Person reader = reader(1L, "encoded-password");
+        Person reader = reader(1L);
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(reader);
@@ -126,8 +106,8 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldListReadersUsingPersonMinistryWithoutCallingLegacyRepository() {
-        Person reader = reader(1L, "encoded-password");
-        Person commentatorWithReaderMinistry = commentator(2L, "encoded-password");
+        Person reader = reader(1L);
+        Person commentatorWithReaderMinistry = commentator(2L);
         List<Person> people = List.of(reader, commentatorWithReaderMinistry);
         List<ReaderResponseDTO> responses = List.of(response(1L), response(2L));
 
@@ -143,8 +123,8 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldPreserveReadOrderReturnedByPersonMinistryReadService() {
-        Person commentatorWithReaderMinistry = commentator(2L, "encoded-password");
-        Person reader = reader(1L, "encoded-password");
+        Person commentatorWithReaderMinistry = commentator(2L);
+        Person reader = reader(1L);
         List<Person> people = List.of(commentatorWithReaderMinistry, reader);
         List<ReaderResponseDTO> responses = List.of(response(2L), response(1L));
 
@@ -169,28 +149,23 @@ class ReaderServiceImplTest {
 
     @Test
     void shouldUpdateReaderWhenExists() {
-        ReaderRequestDTO request = request();
-        Person entity = reader(1L, "old-password");
-        Person saved = reader(1L, "encoded-password");
+        ReaderUpdateRequestDTO request = updateRequest();
+        Person entity = reader(1L);
+        Person saved = reader(1L);
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
-        doAnswer(invocation -> {
-            entity.setPassword("encoded-password");
-            return null;
-        }).when(userAccountLifecycleService).applyMinisterialUpdateAccess(entity, request);
         when(personMinistryCommandService.save(entity)).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));
         verify(readerMapper).updateReaderFromDto(request, entity);
-        assertEquals("encoded-password", entity.getPassword());
-        verify(userAccountLifecycleService, times(1)).applyMinisterialUpdateAccess(entity, request);
+        verifyNoInteractions(personAccountCoordinator);
     }
 
     @Test
     void shouldThrowResourceNotFoundWhenUpdatingMissingReader() {
-        ReaderRequestDTO request = request();
+        ReaderUpdateRequestDTO request = updateRequest();
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.READER, ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
 
@@ -224,13 +199,16 @@ class ReaderServiceImplTest {
         return new ReaderRequestDTO("Reader", "34999999991", BIRTHDAY, "raw-password");
     }
 
-    private Person reader(Long id, String password) {
+    private ReaderUpdateRequestDTO updateRequest() {
+        return new ReaderUpdateRequestDTO("Reader", "34999999991", BIRTHDAY);
+    }
+
+    private Person reader(Long id) {
         Person reader = new Person();
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");
         reader.setBirthdayDate(BIRTHDAY);
-        reader.setPassword(password);
         return reader;
     }
 
@@ -238,13 +216,12 @@ class ReaderServiceImplTest {
         return new ReaderResponseDTO(id, "Reader", "34999999991", BIRTHDAY);
     }
 
-    private Person commentator(Long id, String password) {
+    private Person commentator(Long id) {
         Person commentator = new Person();
         commentator.setId(id);
         commentator.setName("Commentator");
         commentator.setPhoneNumber("34999999992");
         commentator.setBirthdayDate(BIRTHDAY);
-        commentator.setPassword(password);
         return commentator;
     }
 }

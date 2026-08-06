@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
@@ -13,8 +14,6 @@ import java.util.List;
 public interface ReaderMapper {
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
     Person toEntity(ReaderRequestDTO readerRequestDTO);
 
     default ReaderResponseDTO toDtoFromPerson(Person person) {
@@ -33,7 +32,5 @@ public interface ReaderMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
-    void updateReaderFromDto(ReaderRequestDTO readerRequestDTO, @MappingTarget Person person);
+    void updateReaderFromDto(ReaderUpdateRequestDTO readerUpdateRequestDTO, @MappingTarget Person person);
 }

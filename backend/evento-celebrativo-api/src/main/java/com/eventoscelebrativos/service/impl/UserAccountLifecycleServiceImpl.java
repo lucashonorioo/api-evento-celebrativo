@@ -1,7 +1,6 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.AdminPasswordResetRequestDTO;
-import com.eventoscelebrativos.dto.request.PersonAccessRequest;
 import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
 import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
@@ -72,48 +71,6 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
     }
 
     @Override
-    @Transactional
-    public void applyCreationAccess(Person person, PersonAccessRequest request) {
-        if (person == null || request == null) {
-            throw new BadRequestException("Pessoa e dados de acesso sao obrigatorios");
-        }
-
-        AccessDecision decision = creationDecision(request);
-        person.getRoles().clear();
-        if (!decision.createAccess()) {
-            person.setPassword(null);
-            return;
-        }
-        if (!person.isActive()) {
-            throw conflict("Somente pessoa ativa pode receber uma conta.", "PERSON_INACTIVE");
-        }
-        Role role = requireRoleWithAdminMutex(decision.role());
-        String passwordHash = passwordEncoder.encode(decision.password());
-        person.setPassword(passwordHash);
-        person.addRole(role);
-    }
-
-    @Override
-    @Transactional
-    public void applyMinisterialUpdateAccess(Person person, PersonAccessRequest request) {
-        if (person == null || person.getId() == null || request == null) {
-            throw new BadRequestException("Pessoa e dados de acesso sao obrigatorios");
-        }
-        if (request.getCreateAccess() != null || normalizeOptional(request.getAccessRole()) != null) {
-            throw new BadRequestException("createAccess e accessRole nao sao aceitos em atualizacao");
-        }
-        String password = request.getPassword();
-        if (password == null) {
-            return;
-        }
-        passwordPolicy.validatePresent(password);
-        if (!userAccountRepository.existsByPersonId(person.getId())) {
-            throw conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND");
-        }
-        person.setPassword(passwordEncoder.encode(password));
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public UserAccountLifecycleResponseDTO findAccountState(Long personId) {
         validateId(personId);
@@ -135,7 +92,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         passwordPolicy.validateRequired(password);
         Role role = requireRoleWithAdminMutex(roleName);
 
-        Person person = personRepository.findByIdWithRolesForUpdate(personId)
+        Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         if (!person.isActive()) {
             throw conflict("Pessoa inativa nao pode receber conta de acesso.", "PERSON_INACTIVE");
@@ -146,10 +103,6 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         validateUsernameAvailable(person.getPhoneNumber(), null);
 
         String passwordHash = passwordEncoder.encode(password);
-        person.setPassword(passwordHash);
-        replacePersonRole(person, role);
-        personRepository.save(person);
-
         LocalDateTime now = currentSecond();
         UserAccount account = userAccountRepository.save(
                 new UserAccount(person, person.getPhoneNumber(), passwordHash, now, now)
@@ -239,14 +192,14 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         String newPassword = request == null ? null : request.getNewPassword();
         passwordPolicy.validateRequired(newPassword);
 
-        Person person = personRepository.findByIdForUpdate(personId)
+        personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         UserAccount account = userAccountRepository.findByPersonIdForUpdate(personId)
                 .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
         if (authenticatedUserResolver.requireCurrentAccountId().equals(account.getId())) {
             throw conflict("Use o endpoint pessoal para alterar a propria senha.", "SELF_ADMIN_PASSWORD_RESET_NOT_ALLOWED");
         }
-        updatePassword(person, account, newPassword);
+        updatePassword(account, newPassword);
     }
 
     @Override
@@ -259,7 +212,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
 
         Long currentPersonId = authenticatedUserResolver.requireCurrentPersonId();
         Long currentAccountId = authenticatedUserResolver.requireCurrentAccountId();
-        Person person = personRepository.findByIdForUpdate(currentPersonId)
+        personRepository.findByIdForUpdate(currentPersonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", currentPersonId));
         UserAccount account = userAccountRepository.findByPersonIdForUpdate(currentPersonId)
                 .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
@@ -269,7 +222,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
             throw conflict("Senha atual invalida.", "CURRENT_PASSWORD_INVALID");
         }
-        updatePassword(person, account, newPassword);
+        updatePassword(account, newPassword);
     }
 
     @Override
@@ -279,7 +232,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         String roleName = normalizeRequiredRole(requestedRole);
         lockAdminRoleMutex();
 
-        Person person = personRepository.findByIdWithRolesForUpdate(personId)
+        Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         UserAccount account = userAccountRepository.findByPersonIdForUpdate(personId)
                 .orElseThrow(() -> conflict("Pessoa nao possui conta de acesso.", "USER_ACCOUNT_NOT_FOUND"));
@@ -297,8 +250,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         replaceAccountRole(account, role);
         account.setUpdatedAt(currentSecond());
         userAccountRepository.save(account);
-        replacePersonRole(person, role);
-        return personRepository.save(person);
+        return person;
     }
 
     @Override
@@ -309,47 +261,12 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
                 .orElseThrow(() -> new ResourceNotFoundException("Perfil de acesso", normalized));
     }
 
-    private void updatePassword(Person person, UserAccount account, String rawPassword) {
+    private void updatePassword(UserAccount account, String rawPassword) {
         String passwordHash = passwordEncoder.encode(rawPassword);
-        person.setPassword(passwordHash);
         account.setPasswordHash(passwordHash);
         account.incrementTokenVersion();
         account.setUpdatedAt(currentSecond());
-        personRepository.save(person);
         userAccountRepository.save(account);
-    }
-
-    private AccessDecision creationDecision(PersonAccessRequest request) {
-        Boolean createAccess = request.getCreateAccess();
-        String password = request.getPassword();
-        String role = normalizeOptional(request.getAccessRole());
-
-        if (Boolean.FALSE.equals(createAccess)) {
-            if (password != null || role != null) {
-                throw new BadRequestException("Senha e perfil nao podem ser enviados quando createAccess=false");
-            }
-            return AccessDecision.withoutAccess();
-        }
-
-        if (Boolean.TRUE.equals(createAccess)) {
-            passwordPolicy.validateRequired(password);
-            return AccessDecision.withAccess(password, role == null ? ROLE_OPERATOR : normalizeRequiredRole(role));
-        }
-
-        if (password == null) {
-            if (role != null) {
-                throw new BadRequestException("accessRole exige senha para criar acesso");
-            }
-            return AccessDecision.withoutAccess();
-        }
-
-        passwordPolicy.validatePresent(password);
-        return AccessDecision.withAccess(password, role == null ? ROLE_OPERATOR : normalizeRequiredRole(role));
-    }
-
-    private void replacePersonRole(Person person, Role role) {
-        person.getRoles().clear();
-        person.addRole(role);
     }
 
     private void replaceAccountRole(UserAccount account, Role role) {
@@ -454,16 +371,5 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
 
     private LifecycleConflictException conflict(String message, String code) {
         return new LifecycleConflictException(message, code);
-    }
-
-    private record AccessDecision(boolean createAccess, String password, String role) {
-
-        private static AccessDecision withoutAccess() {
-            return new AccessDecision(false, null, null);
-        }
-
-        private static AccessDecision withAccess(String password, String role) {
-            return new AccessDecision(true, password, role);
-        }
     }
 }

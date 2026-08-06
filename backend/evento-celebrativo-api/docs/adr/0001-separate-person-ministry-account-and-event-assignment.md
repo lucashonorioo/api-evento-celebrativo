@@ -6,6 +6,8 @@ Accepted
 
 Data de aceitacao: 2026-07-17
 
+Implementacao concluida em 2026-08-06: `UserAccount`/`UserAccountRole` sao a unica fonte de credenciais/autorizacao, `Person` nao possui mais `password`, roles nem `UserDetails`, e as tabelas legadas `tb_person_role`/`tb_person.password` foram removidas pela migration `V18`. Detalhes na secao "Remocao definitiva da autenticacao legada de Person" de `person-domain-migration-roadmap.md`. A secao "Fatos confirmados no codigo atual" abaixo descreve o estado anterior a esta ADR (2026-07-17) e nao deve ser lida como o estado atual do codigo.
+
 ## 2. Contexto
 
 ### Fatos confirmados no codigo atual

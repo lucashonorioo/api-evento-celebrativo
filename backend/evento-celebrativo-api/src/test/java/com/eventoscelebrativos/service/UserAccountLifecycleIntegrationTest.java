@@ -104,8 +104,6 @@ class UserAccountLifecycleIntegrationTest {
 
             assertEquals(1, countRows("tb_person", "id", personId));
             assertEquals(0, countRows("tb_user_account", "person_id", personId));
-            assertEquals(0, countRows("tb_person_role", "person_id", personId));
-            assertEquals(0, countRows("tb_person", "id", personId, "password IS NOT NULL"));
 
             mockMvc.perform(post("/pessoas/{id}/conta", personId)
                             .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
@@ -132,15 +130,10 @@ class UserAccountLifecycleIntegrationTest {
             assertEquals(phone, jdbcTemplate.queryForObject(
                     "SELECT username FROM tb_user_account WHERE id = ?", String.class, accountId));
 
-            String legacyHash = jdbcTemplate.queryForObject(
-                    "SELECT password FROM tb_person WHERE id = ?", String.class, personId);
             String accountHash = jdbcTemplate.queryForObject(
                     "SELECT password_hash FROM tb_user_account WHERE id = ?", String.class, accountId);
-            assertNotNull(legacyHash);
-            assertEquals(legacyHash, accountHash);
             assertTrue(passwordEncoder.matches("123456", accountHash));
             assertEquals(List.of("ROLE_OPERATOR"), accountRoles(accountId));
-            assertEquals(List.of("ROLE_OPERATOR"), personRoles(personId));
         } finally {
             cleanupPeople(cleanupPersonIds);
         }
@@ -175,7 +168,7 @@ class UserAccountLifecycleIntegrationTest {
     }
 
     @Test
-    void shouldRollbackMinisterialUpdateWithPasswordWhenPersonHasNoAccount() throws Exception {
+    void shouldRejectMinisterialUpdateWithPasswordField() throws Exception {
         List<Long> cleanupPersonIds = new ArrayList<>();
         try {
             String adminToken = adminToken(cleanupPersonIds);
@@ -209,13 +202,12 @@ class UserAccountLifecycleIntegrationTest {
                                       "password": "654321"
                                     }
                                     """.formatted(newPhone, BIRTHDAY)))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.errorCode").value("USER_ACCOUNT_NOT_FOUND"));
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE"));
 
             assertEquals(originalPhone, jdbcTemplate.queryForObject(
                     "SELECT phone_number FROM tb_person WHERE id = ?", String.class, personId));
             assertEquals(0, countRows("tb_user_account", "person_id", personId));
-            assertEquals(0, countRows("tb_person", "id", personId, "password IS NOT NULL"));
         } finally {
             cleanupPeople(cleanupPersonIds);
         }
@@ -237,9 +229,7 @@ class UserAccountLifecycleIntegrationTest {
         admin.setName("Lifecycle Admin " + UUID.randomUUID());
         admin.setPhoneNumber(phone);
         admin.setBirthdayDate(BIRTHDAY);
-        admin.setPassword(passwordEncoder.encode("123456"));
         admin.setActive(true);
-        admin.addRole(roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow());
         Person savedAdmin = personRepository.saveAndFlush(admin);
         cleanupPersonIds.add(savedAdmin.getId());
         createAccount(savedAdmin, phone, "123456", "ROLE_ADMIN");
@@ -288,20 +278,6 @@ class UserAccountLifecycleIntegrationTest {
         );
     }
 
-    private List<String> personRoles(long personId) {
-        return jdbcTemplate.queryForList(
-                """
-                SELECT r.authority
-                FROM tb_person_role pr
-                JOIN tb_role r ON r.id = pr.role_id
-                WHERE pr.person_id = ?
-                ORDER BY r.authority
-                """,
-                String.class,
-                personId
-        );
-    }
-
     private int countRows(String tableName, String columnName, Object value) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
@@ -328,9 +304,7 @@ class UserAccountLifecycleIntegrationTest {
                     "DELETE FROM tb_user_account_role WHERE user_account_id IN (SELECT id FROM tb_user_account WHERE person_id = ?)",
                     personId
             );
-            jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
-            jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
-            jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+            jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);            jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
         }
     }
 

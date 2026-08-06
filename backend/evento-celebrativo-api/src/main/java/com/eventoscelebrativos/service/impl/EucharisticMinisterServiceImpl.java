@@ -1,15 +1,16 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
+import com.eventoscelebrativos.dto.request.EucharisticMinisterUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.mapper.EucharisticMinisterMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.service.EucharisticMinisterService;
+import com.eventoscelebrativos.service.PersonAccountCoordinator;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
-import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,18 +20,18 @@ import java.util.List;
 public class EucharisticMinisterServiceImpl implements EucharisticMinisterService {
 
     private final EucharisticMinisterMapper eucharisticMinisterMapper;
-    private final UserAccountLifecycleService userAccountLifecycleService;
+    private final PersonAccountCoordinator personAccountCoordinator;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
 
     public EucharisticMinisterServiceImpl(
             EucharisticMinisterMapper eucharisticMinisterMapper,
-            UserAccountLifecycleService userAccountLifecycleService,
+            PersonAccountCoordinator personAccountCoordinator,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService
     ) {
         this.eucharisticMinisterMapper = eucharisticMinisterMapper;
-        this.userAccountLifecycleService = userAccountLifecycleService;
+        this.personAccountCoordinator = personAccountCoordinator;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
     }
@@ -40,8 +41,8 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
     @Transactional
     public EucharisticMinisterResponseDTO createEucharisticMinister(EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
         Person eucharisticMinister = eucharisticMinisterMapper.toEntity(eucharisticMinisterRequestDTO);
-        userAccountLifecycleService.applyCreationAccess(eucharisticMinister, eucharisticMinisterRequestDTO);
         Person saved = personMinistryCommandService.create(eucharisticMinister, MinistryType.EUCHARISTIC_MINISTER);
+        personAccountCoordinator.provisionAccess(saved, eucharisticMinisterRequestDTO);
         return eucharisticMinisterMapper.toDtoFromPerson(saved);
     }
 
@@ -64,13 +65,13 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
 
     @Override
     @Transactional
-    public EucharisticMinisterResponseDTO updateEucharisticMinisters(Long id, EucharisticMinisterRequestDTO eucharisticMinisterRequestDTO) {
+    public EucharisticMinisterResponseDTO updateEucharisticMinisters(Long id, EucharisticMinisterUpdateRequestDTO eucharisticMinisterUpdateRequestDTO) {
         if(id == null || id <= 0){
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        eucharisticMinisterUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.EUCHARISTIC_MINISTER, "Ministro de Eucaristia");
-        eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterRequestDTO, person);
-        userAccountLifecycleService.applyMinisterialUpdateAccess(person, eucharisticMinisterRequestDTO);
+        eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterUpdateRequestDTO, person);
 
         Person saved = personMinistryCommandService.save(person);
         return eucharisticMinisterMapper.toDtoFromPerson(saved);

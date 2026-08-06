@@ -106,9 +106,7 @@ class PublicLoginProxyIntegrationTest {
         person.setName("Public Login Proxy Person");
         person.setPhoneNumber(phone);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword(passwordEncoder.encode(rawPassword));
         person.setActive(true);
-        person.addRole(roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow());
         Person saved = personRepository.saveAndFlush(person);
 
         LocalDateTime now = LocalDateTime.now().withNano(0);

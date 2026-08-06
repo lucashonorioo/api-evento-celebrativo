@@ -105,8 +105,8 @@ class NotificationDeliveryServiceIntegrationTest {
         assertNull(notification.getReferenceType());
         assertNull(notification.getSourceType());
 
-        // 10 contas elegiveis de fixture (single-role) + o proprio sender.
-        assertEquals(11, response.getRecipientCount());
+        // As 15 contas de fixture (todas single-role desde a V18) + o proprio sender.
+        assertEquals(16, response.getRecipientCount());
         NotificationRecipient senderRecipient = notificationRecipientRepository
                 .findByNotificationIdAndUserAccountId(notification.getId(), sender.accountId())
                 .orElseThrow();
@@ -207,15 +207,17 @@ class NotificationDeliveryServiceIntegrationTest {
     @Test
     void shouldSendMinistryNotificationAndExcludeInactivePersonMinistry() {
         Fixture sender = createPersonWithAccount("Ministry Sender", List.of("ROLE_ADMIN"), true, true);
+        deactivatePersonMinistry(4L, MinistryType.READER);
         deactivatePersonMinistry(6L, MinistryType.READER);
 
         NotificationCreateResponseDTO response = notificationDeliveryService.sendAdministrativeNotification(
                 sender.accountId(),
                 request(NotificationAudience.MINISTRY, "Aviso Leitores", "Mensagem leitores", List.of(MinistryType.READER), null));
 
-        // fixture READER: contas 5 e 6; conta 6 desativada nesta chamada -> so a conta 5 permanece.
+        // fixture READER: contas 4, 5 e 6; 4 e 6 desativadas nesta chamada -> so a conta 5 permanece.
         assertEquals(1, response.getRecipientCount());
         assertTrue(notificationRecipientRepository.existsByNotificationIdAndUserAccountId(response.getNotificationId(), 5L));
+        assertFalse(notificationRecipientRepository.existsByNotificationIdAndUserAccountId(response.getNotificationId(), 4L));
         assertFalse(notificationRecipientRepository.existsByNotificationIdAndUserAccountId(response.getNotificationId(), 6L));
         List<MinistryType> ministryTypes = notificationTargetMinistryRepository.findMinistryTypesByNotificationId(response.getNotificationId());
         assertEquals(List.of(MinistryType.READER), ministryTypes);
@@ -231,8 +233,8 @@ class NotificationDeliveryServiceIntegrationTest {
                 request(NotificationAudience.MINISTRY, "Aviso Sobreposto", "Mensagem sobreposta",
                         List.of(MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER), null));
 
-        // READER: 5,6 | EUCHARISTIC_MINISTER: 11,12 e agora tambem 5 (sobreposicao) -> uniao = {5,6,11,12} = 4.
-        assertEquals(4, response.getRecipientCount());
+        // READER: 4,5,6 | EUCHARISTIC_MINISTER: 10,11,12 e agora tambem 5 (sobreposicao) -> uniao = {4,5,6,10,11,12} = 6.
+        assertEquals(6, response.getRecipientCount());
         long rowsForAccount5 = notificationRecipientRepository
                 .findByNotificationIdAndUserAccountId(response.getNotificationId(), 5L)
                 .stream().count();
@@ -242,6 +244,7 @@ class NotificationDeliveryServiceIntegrationTest {
     @Test
     void shouldRejectMinistrySendWhenAnySelectedTypeHasNoEligibleRecipient() {
         Fixture sender = createPersonWithAccount("Ministry Empty Sender", List.of("ROLE_ADMIN"), true, true);
+        deactivatePersonMinistry(4L, MinistryType.READER);
         deactivatePersonMinistry(5L, MinistryType.READER);
         deactivatePersonMinistry(6L, MinistryType.READER);
 
@@ -324,22 +327,18 @@ class NotificationDeliveryServiceIntegrationTest {
     }
 
     @Test
-    void shouldRejectDirectSendWhenAccountHasZeroOrMultipleRoles() {
+    void shouldRejectDirectSendWhenAccountHasZeroRoles() {
+        // Uma conta com mais de uma role deixou de ser um estado representavel desde a V18
+        // (UNIQUE(user_account_id) em tb_user_account_role); zero roles continua sendo o unico
+        // estado USER_ACCOUNT_ROLE_INVALID que pode ser fisicamente montado neste teste.
         Fixture sender = createPersonWithAccount("Direct Invalid Sender 5", List.of("ROLE_ADMIN"), true, true);
         Fixture noRoles = createPersonWithAccount("No Roles Person", List.of(), true, true);
-        Fixture twoRoles = createPersonWithAccount("Two Roles Person", List.of("ROLE_ADMIN", "ROLE_OPERATOR"), true, true);
 
         NotificationInvalidRecipientsException exceptionNoRoles = assertThrows(NotificationInvalidRecipientsException.class, () ->
                 notificationDeliveryService.sendAdministrativeNotification(
                         sender.accountId(),
                         request(NotificationAudience.DIRECT, "T", "M", null, List.of(noRoles.personId()))));
         assertEquals(InvalidRecipientReason.USER_ACCOUNT_ROLE_INVALID, exceptionNoRoles.getInvalidRecipients().get(0).getReason());
-
-        NotificationInvalidRecipientsException exceptionTwoRoles = assertThrows(NotificationInvalidRecipientsException.class, () ->
-                notificationDeliveryService.sendAdministrativeNotification(
-                        sender.accountId(),
-                        request(NotificationAudience.DIRECT, "T", "M", null, List.of(twoRoles.personId()))));
-        assertEquals(InvalidRecipientReason.USER_ACCOUNT_ROLE_INVALID, exceptionTwoRoles.getInvalidRecipients().get(0).getReason());
     }
 
     @Test
@@ -450,6 +449,7 @@ class NotificationDeliveryServiceIntegrationTest {
 
     @Test
     void shouldSendSystemMinistryNotificationUsingSameEligibilityRulesAsAdmin() {
+        deactivatePersonMinistry(7L, MinistryType.MINISTER_OF_THE_WORD);
         deactivatePersonMinistry(9L, MinistryType.MINISTER_OF_THE_WORD);
 
         NotificationCreateResponseDTO response = notificationDeliveryService.sendSystemNotification(

@@ -7,11 +7,15 @@ import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
+import com.eventoscelebrativos.model.UserAccount;
+import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
+import com.eventoscelebrativos.repository.UserAccountRepository;
+import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -28,7 +32,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,6 +79,12 @@ class CurrentUserProfileIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private UserAccountRepository userAccountRepository;
+
+    @Autowired
+    private UserAccountRoleRepository userAccountRoleRepository;
 
     @Autowired
     private CelebrationEventRepository celebrationEventRepository;
@@ -152,20 +164,19 @@ class CurrentUserProfileIntegrationTest {
                     .andExpect(jsonPath("$.ministries[0]").value("READER"))
                     .andExpect(jsonPath("$.password").doesNotExist()));
 
-            Person updatedTarget = personRepository.findByIdWithRoles(targetId).orElseThrow();
+            Person updatedTarget = personRepository.findById(targetId).orElseThrow();
             assertEquals("New Name", updatedTarget.getName());
             assertEquals(newBirthday, updatedTarget.getBirthdayDate());
             assertEquals(targetPhone, updatedTarget.getPhoneNumber());
-            assertEquals("encoded-password", updatedTarget.getPassword());
-            assertTrue(updatedTarget.hasRole("ROLE_OPERATOR"));
+            assertEquals(Set.of("ROLE_OPERATOR"), roleAuthoritiesOfPerson(targetId));
             assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER)
                     .map(PersonMinistry::getActive).orElse(false));
             assertEquals(1, countAssignments(targetId));
 
-            Person unchangedOther = personRepository.findByIdWithRoles(otherId).orElseThrow();
+            Person unchangedOther = personRepository.findById(otherId).orElseThrow();
             assertTrue(unchangedOther.getName().startsWith("Other Person"));
             assertEquals(otherPhone, unchangedOther.getPhoneNumber());
-            assertTrue(unchangedOther.hasRole("ROLE_ADMIN"));
+            assertEquals(Set.of("ROLE_ADMIN"), roleAuthoritiesOfPerson(otherId));
         } finally {
             cleanupAssignments(eventId);
             cleanupPerson(targetId);
@@ -233,9 +244,20 @@ class CurrentUserProfileIntegrationTest {
         person.setName(name + " " + UUID.randomUUID());
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
-        person.addRole(roleRepository.findByAuthority(roleAuthority).orElseThrow());
-        return personRepository.saveAndFlush(person).getId();
+        Person saved = personRepository.saveAndFlush(person);
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        UserAccount account = userAccountRepository.saveAndFlush(
+                new UserAccount(saved, phoneNumber, "encoded-password", now, now));
+        userAccountRoleRepository.saveAndFlush(
+                new UserAccountRole(account, roleRepository.findByAuthority(roleAuthority).orElseThrow()));
+        return saved.getId();
+    }
+
+    private Set<String> roleAuthoritiesOfPerson(Long personId) {
+        return userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(personId))
+                .getOrDefault(personId, List.of())
+                .stream()
+                .collect(Collectors.toSet());
     }
 
     private void addMinistry(Long personId, MinistryType ministryType) {
@@ -285,7 +307,9 @@ class CurrentUserProfileIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
+        jdbcTemplate.update("DELETE FROM tb_user_account_role WHERE user_account_id IN "
+                + "(SELECT id FROM tb_user_account WHERE person_id = ?)", personId);
+        jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 

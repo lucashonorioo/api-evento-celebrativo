@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.service.MinisterOfTheWordService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -55,8 +56,8 @@ public class MinisterOfTheWordController {
     @Operation(summary = "Atualiza um ministro da Palavra")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
-    public ResponseEntity<MinisterOfTheWordResponseDTO> updateMinisterOfTheWord(@PathVariable Long id, @Valid @RequestBody MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO){
-        MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.updateMinisterOfTheWord(id, ministerOfTheWordRequestDTO);
+    public ResponseEntity<MinisterOfTheWordResponseDTO> updateMinisterOfTheWord(@PathVariable Long id, @Valid @RequestBody MinisterOfTheWordUpdateRequestDTO ministerOfTheWordUpdateRequestDTO){
+        MinisterOfTheWordResponseDTO ministerOfTheWordResponseDTO = ministerOfTheWordService.updateMinisterOfTheWord(id, ministerOfTheWordUpdateRequestDTO);
         return ResponseEntity.ok().body(ministerOfTheWordResponseDTO);
     }
 

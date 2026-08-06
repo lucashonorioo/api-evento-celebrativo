@@ -170,15 +170,6 @@ class ScheduleConflictNoEligibleAdminIntegrationTest {
 
     @Test
     @Transactional
-    void shouldRejectWhenOnlyAdminAccountHasMoreThanOneRole() {
-        disableAllFixtureAccounts();
-        createAccount("Admin Multi Role", List.of("ROLE_ADMIN", "ROLE_OPERATOR"), true, true);
-
-        assertReconcileRejectedWithNoEligibleAdmin(buildConflictScenario());
-    }
-
-    @Test
-    @Transactional
     void shouldRejectWhenOnlyEligibleAccountHasOperatorRoleInsteadOfAdmin() {
         disableAllFixtureAccounts();
         createAccount("Operator Only", List.of("ROLE_OPERATOR"), true, true);

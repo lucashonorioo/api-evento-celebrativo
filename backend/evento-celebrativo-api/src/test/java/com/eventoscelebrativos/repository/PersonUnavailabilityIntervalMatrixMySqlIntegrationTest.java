@@ -125,7 +125,6 @@ class PersonUnavailabilityIntervalMatrixMySqlIntegrationTest {
         person = new Person();
         person.setName("Interval Matrix Person");
         person.setPhoneNumber(uniquePhoneNumber());
-        person.setPassword("encoded-password");
         person = personRepository.saveAndFlush(person);
 
         // Evento de referencia: 19h00 as 20h00 do dia 2026-09-10.

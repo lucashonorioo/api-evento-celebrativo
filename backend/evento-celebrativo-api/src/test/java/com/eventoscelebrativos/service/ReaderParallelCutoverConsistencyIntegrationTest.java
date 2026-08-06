@@ -208,7 +208,7 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
                 .with(user("admin").roles("ADMIN"))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(readerPayload(name, phoneNumber)));
+                .content(readerUpdatePayload(name, phoneNumber)));
     }
 
     private org.springframework.test.web.servlet.ResultActions deleteReader(Long readerId) throws Exception {
@@ -422,7 +422,10 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", readerId);
         jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", readerId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", readerId);
+        jdbcTemplate.update(
+                "DELETE FROM tb_user_account_role WHERE user_account_id IN (SELECT id FROM tb_user_account WHERE person_id = ?)",
+                readerId);
+        jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", readerId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", readerId);
     }
 
@@ -433,6 +436,16 @@ class ReaderParallelCutoverConsistencyIntegrationTest {
                   "phoneNumber": "%s",
                   "birthdayDate": "%s",
                   "password": "123456"
+                }
+                """.formatted(name, phoneNumber, BIRTHDAY);
+    }
+
+    private String readerUpdatePayload(String name, String phoneNumber) {
+        return """
+                {
+                  "name": "%s",
+                  "phoneNumber": "%s",
+                  "birthdayDate": "%s"
                 }
                 """.formatted(name, phoneNumber, BIRTHDAY);
     }

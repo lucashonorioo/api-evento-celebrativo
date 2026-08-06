@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
+import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.service.ReaderService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -55,8 +56,8 @@ public class ReaderController {
     @Operation(summary = "Atualiza um leitor")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
-    public ResponseEntity<ReaderResponseDTO> updateReader(@PathVariable Long id, @Valid @RequestBody ReaderRequestDTO readerRequestDTO){
-        ReaderResponseDTO readerResponseDTO = readerService.updateReader(id, readerRequestDTO);
+    public ResponseEntity<ReaderResponseDTO> updateReader(@PathVariable Long id, @Valid @RequestBody ReaderUpdateRequestDTO readerUpdateRequestDTO){
+        ReaderResponseDTO readerResponseDTO = readerService.updateReader(id, readerUpdateRequestDTO);
         return ResponseEntity.ok().body(readerResponseDTO);
     }
 

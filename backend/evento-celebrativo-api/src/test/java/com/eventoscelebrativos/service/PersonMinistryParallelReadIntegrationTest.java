@@ -179,7 +179,6 @@ class PersonMinistryParallelReadIntegrationTest {
         person.setName(name);
         person.setPhoneNumber(phoneNumber + UUID.randomUUID().toString().replace("-", "").substring(0, 4));
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
         Person saved = personRepository.saveAndFlush(person);
         personMinistryRepository.flush();
         return saved;

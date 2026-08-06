@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
+import com.eventoscelebrativos.dto.request.PriestUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
@@ -8,20 +9,15 @@ import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
-import com.eventoscelebrativos.model.Role;
-import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.service.impl.PriestServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,10 +32,7 @@ class PriestServiceImplTest {
     private PriestMapper mapper;
 
     @Mock
-    private RoleRepository roleRepository;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
+    private PersonAccountCoordinator personAccountCoordinator;
 
     @Mock
     private PersonMinistryCommandService personMinistryCommandService;
@@ -47,53 +40,43 @@ class PriestServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
-    @Mock
-    private UserAccountLifecycleService userAccountLifecycleService;
-
     @InjectMocks
     private PriestServiceImpl service;
 
     @Test
-    void shouldCreatePriestWithEncryptedPasswordAndOperatorRole() {
+    void shouldCreatePriestAndProvisionAccessAfterPersisting() {
         PriestRequestDTO request = request();
-        Person entity = priest(null, "raw-password");
-        Role operatorRole = new Role(1L, "ROLE_OPERATOR");
-        Person saved = priest(1L, "encoded-password");
+        Person entity = priest(null);
+        Person saved = priest(1L);
         PriestResponseDTO response = response(1L);
 
         when(mapper.toEntity(request)).thenReturn(entity);
-        doAnswer(invocation -> {
-            entity.setPassword("encoded-password");
-            entity.addRole(operatorRole);
-            return null;
-        }).when(userAccountLifecycleService).applyCreationAccess(entity, request);
-        when(personMinistryCommandService.create(any(Person.class), eq(MinistryType.PRIEST))).thenReturn(saved);
+        when(personMinistryCommandService.create(entity, MinistryType.PRIEST)).thenReturn(saved);
         when(mapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.createPriest(request));
 
-        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
-        verify(personMinistryCommandService).create(captor.capture(), eq(MinistryType.PRIEST));
-        assertEquals("encoded-password", captor.getValue().getPassword());
-        assertNotEquals("raw-password", captor.getValue().getPassword());
-        assertTrue(captor.getValue().hasRole("ROLE_OPERATOR"));
+        verify(personMinistryCommandService).create(entity, MinistryType.PRIEST);
+        verify(personAccountCoordinator).provisionAccess(saved, request);
     }
 
     @Test
-    void shouldThrowResourceNotFoundWhenOperatorRoleDoesNotExist() {
+    void shouldPropagateProvisioningFailureAfterPersonAlreadyCreated() {
         PriestRequestDTO request = request();
-        Person entity = priest(null, "raw-password");
+        Person entity = priest(null);
+        Person saved = priest(1L);
         when(mapper.toEntity(request)).thenReturn(entity);
+        when(personMinistryCommandService.create(entity, MinistryType.PRIEST)).thenReturn(saved);
         doThrow(new ResourceNotFoundException("Perfil de acesso", "ROLE_OPERATOR"))
-                .when(userAccountLifecycleService).applyCreationAccess(entity, request);
+                .when(personAccountCoordinator).provisionAccess(saved, request);
 
         assertThrows(ResourceNotFoundException.class, () -> service.createPriest(request));
-        verify(personMinistryCommandService, never()).create(any(), any());
+        verify(personMinistryCommandService).create(entity, MinistryType.PRIEST);
     }
 
     @Test
     void shouldFindPriestByIdWhenExists() {
-        Person entity = priest(1L, "encoded-password");
+        Person entity = priest(1L);
         PriestResponseDTO response = response(1L);
         when(personMinistryCommandService.requireActiveMinistryPerson(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
@@ -112,19 +95,16 @@ class PriestServiceImplTest {
 
     @Test
     void shouldUpdateAndDeletePriest() {
-        Person entity = priest(1L, "old-password");
+        Person entity = priest(1L);
         PriestResponseDTO response = response(1L);
-        PriestRequestDTO request = request();
+        PriestUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
-        doAnswer(invocation -> {
-            entity.setPassword("encoded-password");
-            return null;
-        }).when(userAccountLifecycleService).applyMinisterialUpdateAccess(entity, request);
         when(personMinistryCommandService.save(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updatePriest(1L, request));
-        assertEquals("encoded-password", entity.getPassword());
+        verify(mapper).updatePriestFromDto(request, entity);
+        verifyNoInteractions(personAccountCoordinator);
 
         service.deletePriestById(1L);
         verify(personMinistryCommandService).removeMinistry(1L, MinistryType.PRIEST, ENTITY_LABEL);
@@ -132,8 +112,8 @@ class PriestServiceImplTest {
 
     @Test
     void shouldListPriestsUsingPersonMinistryWithoutCallingLegacyRepository() {
-        Person priest = priest(1L, "encoded-password");
-        Person readerWithPriestMinistry = reader(2L, "encoded-password");
+        Person priest = priest(1L);
+        Person readerWithPriestMinistry = reader(2L);
         List<Person> people = List.of(priest, readerWithPriestMinistry);
         List<PriestResponseDTO> responses = List.of(response(1L), response(2L));
 
@@ -149,8 +129,8 @@ class PriestServiceImplTest {
 
     @Test
     void shouldPreservePriestOrderReturnedByPersonMinistryReadService() {
-        Person readerWithPriestMinistry = reader(2L, "encoded-password");
-        Person priest = priest(1L, "encoded-password");
+        Person readerWithPriestMinistry = reader(2L);
+        Person priest = priest(1L);
         List<Person> people = List.of(readerWithPriestMinistry, priest);
         List<PriestResponseDTO> responses = List.of(response(2L), response(1L));
 
@@ -178,7 +158,7 @@ class PriestServiceImplTest {
     void shouldThrowWhenUpdatingOrDeletingMissingPriest() {
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(99L, MinistryType.PRIEST, ENTITY_LABEL))
                 .thenThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L));
-        assertThrows(ResourceNotFoundException.class, () -> service.updatePriest(99L, request()));
+        assertThrows(ResourceNotFoundException.class, () -> service.updatePriest(99L, updateRequest()));
 
         doThrow(new ResourceNotFoundException(ENTITY_LABEL, 99L))
                 .when(personMinistryCommandService).removeMinistry(99L, MinistryType.PRIEST, ENTITY_LABEL);
@@ -197,13 +177,16 @@ class PriestServiceImplTest {
         return new PriestRequestDTO("Priest", "34999999995", BIRTHDAY, "raw-password");
     }
 
-    private Person priest(Long id, String password) {
+    private PriestUpdateRequestDTO updateRequest() {
+        return new PriestUpdateRequestDTO("Priest", "34999999995", BIRTHDAY);
+    }
+
+    private Person priest(Long id) {
         Person priest = new Person();
         priest.setId(id);
         priest.setName("Priest");
         priest.setPhoneNumber("34999999995");
         priest.setBirthdayDate(BIRTHDAY);
-        priest.setPassword(password);
         return priest;
     }
 
@@ -211,13 +194,12 @@ class PriestServiceImplTest {
         return new PriestResponseDTO(id, "Priest", "34999999995", BIRTHDAY);
     }
 
-    private Person reader(Long id, String password) {
+    private Person reader(Long id) {
         Person reader = new Person();
         reader.setId(id);
         reader.setName("Reader");
         reader.setPhoneNumber("34999999991");
         reader.setBirthdayDate(BIRTHDAY);
-        reader.setPassword(password);
         return reader;
     }
 }

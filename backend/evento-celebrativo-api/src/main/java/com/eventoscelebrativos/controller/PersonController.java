@@ -152,7 +152,7 @@ public class PersonController {
 
     @Operation(
             summary = "Altera a propria senha usando a conta autenticada.",
-            description = "Usa o accountId/personId do Bearer JWT, nunca parametros externos. Valida a senha atual contra UserAccount.passwordHash, atualiza o legado sincronizado e invalida tokens antigos via token_version."
+            description = "Usa o accountId/personId do Bearer JWT, nunca parametros externos. Valida a senha atual contra UserAccount.passwordHash, atualiza somente UserAccount.passwordHash e invalida tokens antigos via token_version."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Senha alterada com sucesso"),
@@ -295,7 +295,7 @@ public class PersonController {
 
     @Operation(
             summary = "Redefine administrativamente a senha de outra conta.",
-            description = "Nao pode ser usado para a propria conta. Atualiza UserAccount e legado com o mesmo hash e invalida tokens antigos via token_version."
+            description = "Nao pode ser usado para a propria conta. Atualiza somente UserAccount.passwordHash e invalida tokens antigos via token_version."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Senha redefinida com sucesso"),

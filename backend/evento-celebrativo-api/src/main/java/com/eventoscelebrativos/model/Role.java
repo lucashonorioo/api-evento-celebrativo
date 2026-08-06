@@ -3,9 +3,7 @@ package com.eventoscelebrativos.model;
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 
 @Entity
 @Table(name = "tb_role")
@@ -15,9 +13,6 @@ public class Role implements GrantedAuthority {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String authority;
-
-    @ManyToMany(mappedBy = "roles")
-    private Set<Person> people = new HashSet<>();
 
     public Role(){
 
@@ -55,9 +50,5 @@ public class Role implements GrantedAuthority {
 
     public void setAuthority(String authority) {
         this.authority = authority;
-    }
-
-    public Set<Person> getPeople() {
-        return people;
     }
 }

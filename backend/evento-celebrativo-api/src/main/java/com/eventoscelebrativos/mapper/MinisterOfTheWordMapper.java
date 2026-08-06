@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.MinisterOfTheWordRequestDTO;
+import com.eventoscelebrativos.dto.request.MinisterOfTheWordUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinisterOfTheWordResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
@@ -13,8 +14,6 @@ import java.util.List;
 public interface MinisterOfTheWordMapper {
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
     Person toEntity(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO);
 
     default MinisterOfTheWordResponseDTO toDtoFromPerson(Person person) {
@@ -33,7 +32,5 @@ public interface MinisterOfTheWordMapper {
     }
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "password", ignore = true)
-    @Mapping(target = "roles", ignore = true)
-    void updateMinisterOfTheWordFromDto(MinisterOfTheWordRequestDTO ministerOfTheWordRequestDTO, @MappingTarget Person person);
+    void updateMinisterOfTheWordFromDto(MinisterOfTheWordUpdateRequestDTO ministerOfTheWordUpdateRequestDTO, @MappingTarget Person person);
 }

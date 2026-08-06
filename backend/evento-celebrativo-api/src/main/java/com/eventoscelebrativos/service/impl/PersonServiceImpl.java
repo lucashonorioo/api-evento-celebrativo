@@ -23,6 +23,7 @@ import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -65,6 +66,7 @@ public class PersonServiceImpl implements PersonService {
     private final EventAssignmentRepository eventAssignmentRepository;
     private final EventParticipationResponseService eventParticipationResponseService;
     private final UserAccountLifecycleService userAccountLifecycleService;
+    private final UserAccountRoleRepository userAccountRoleRepository;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -75,7 +77,8 @@ public class PersonServiceImpl implements PersonService {
             PersonMinistryCommandService personMinistryCommandService,
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
-            UserAccountLifecycleService userAccountLifecycleService
+            UserAccountLifecycleService userAccountLifecycleService,
+            UserAccountRoleRepository userAccountRoleRepository
     ) {
         this.personRepository = personRepository;
         this.personAdminMapper = personAdminMapper;
@@ -86,6 +89,7 @@ public class PersonServiceImpl implements PersonService {
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.userAccountLifecycleService = userAccountLifecycleService;
+        this.userAccountRoleRepository = userAccountRoleRepository;
     }
 
     @Override
@@ -118,15 +122,17 @@ public class PersonServiceImpl implements PersonService {
         }
 
         List<Long> ids = idPage.getContent();
-        Map<Long, Person> peopleById = personRepository.findAllByIdInWithRoles(ids).stream()
+        Map<Long, Person> peopleById = personRepository.findAllByIdIn(ids).stream()
                 .collect(Collectors.toMap(Person::getId, Function.identity()));
         Map<Long, Set<MinistryType>> activeMinistriesById = personMinistryReadService.findActiveMinistriesByPersonIds(ids);
+        Map<Long, List<String>> rolesById = userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(ids);
 
         List<PersonAdminResponseDTO> content = ids.stream()
                 .map(peopleById::get)
                 .map(person -> {
                     PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
                     dto.setMinistries(sortedMinistries(activeMinistriesById.getOrDefault(person.getId(), Set.of())));
+                    dto.setRoles(sortedRoles(rolesById.getOrDefault(person.getId(), List.of())));
                     return dto;
                 })
                 .toList();
@@ -138,10 +144,11 @@ public class PersonServiceImpl implements PersonService {
     @Transactional(readOnly = true)
     public PersonAdminResponseDTO findPersonById(Long id) {
         validateId(id);
-        Person person = personRepository.findByIdWithRoles(id)
+        Person person = personRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
         PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
         dto.setMinistries(sortedMinistries(activeMinistriesForPerson(id)));
+        dto.setRoles(sortedRoles(rolesForPerson(id)));
         return dto;
     }
 
@@ -157,7 +164,7 @@ public class PersonServiceImpl implements PersonService {
                 dto.getName(),
                 dto.getPhoneNumber(),
                 sortedMinistries(activeMinistriesForPerson(savedPerson.getId())),
-                dto.getRoles()
+                sortedRoles(rolesForPerson(savedPerson.getId()))
         );
     }
 
@@ -295,6 +302,7 @@ public class PersonServiceImpl implements PersonService {
     private CurrentUserProfileResponseDTO toCurrentUserProfileDTO(Person person) {
         CurrentUserProfileResponseDTO dto = currentUserProfileMapper.toDto(person);
         dto.setMinistries(sortedMinistries(activeMinistriesForPerson(person.getId())));
+        dto.setRoles(sortedRoles(rolesForPerson(person.getId())));
         return dto;
     }
 
@@ -320,6 +328,19 @@ public class PersonServiceImpl implements PersonService {
         return personMinistryReadService
                 .findActiveMinistriesByPersonIds(List.of(personId))
                 .getOrDefault(personId, Set.of());
+    }
+
+    private List<String> rolesForPerson(Long personId) {
+        return userAccountRoleRepository
+                .findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(personId))
+                .getOrDefault(personId, List.of());
+    }
+
+    private List<String> sortedRoles(List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return List.of();
+        }
+        return roles.stream().sorted().toList();
     }
 
     private Set<MinistryType> parseDesiredMinistries(List<String> rawMinistries) {

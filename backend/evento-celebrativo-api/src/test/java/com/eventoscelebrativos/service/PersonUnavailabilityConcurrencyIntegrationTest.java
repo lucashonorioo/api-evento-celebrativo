@@ -25,7 +25,6 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
-import com.eventoscelebrativos.repository.RoleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -160,9 +159,6 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
     private PersonRepository personRepository;
 
     @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
@@ -210,7 +206,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
     @Test
     void shouldNotPersistTwoOverlappingUnavailabilitiesCreatedConcurrently() throws Exception {
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Overlap Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Overlap Person", phone);
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 1);
@@ -234,7 +230,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
     @Test
     void shouldNotPersistDuplicateRowsWhenExactSamePeriodCreatedConcurrently() throws Exception {
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Duplicate Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Duplicate Person", phone);
         cleanupPersonIdA = person.getId();
 
         LocalDate base = LocalDate.of(2026, 10, 10);
@@ -258,8 +254,8 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
     void shouldAllowDifferentPeopleToCreateUnavailabilitiesConcurrently() throws Exception {
         String phoneA = uniquePhoneNumber();
         String phoneB = uniquePhoneNumber();
-        Person personA = savePersonWithRole("Concurrent Independent Person A", phoneA, "ROLE_OPERATOR");
-        Person personB = savePersonWithRole("Concurrent Independent Person B", phoneB, "ROLE_OPERATOR");
+        Person personA = savePerson("Concurrent Independent Person A", phoneA);
+        Person personB = savePerson("Concurrent Independent Person B", phoneB);
         cleanupPersonIdA = personA.getId();
         cleanupPersonIdB = personB.getId();
 
@@ -289,7 +285,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // evento e futuro, nao em andamento) e ambos passam a coexistir. Portanto a indisponibilidade
         // deve ter sucesso em qualquer ordem; apenas o assignment pode ou nao existir ao final.
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Invariant Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Invariant Person", phone);
         cleanupPersonIdA = person.getId();
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
 
@@ -363,7 +359,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // comeca vazia), entao a mesma logica de "assignment futuro nao bloqueia indisponibilidade
         // criada depois" se aplica.
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Scale Update Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Scale Update Person", phone);
         cleanupPersonIdA = person.getId();
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
 
@@ -430,7 +426,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // (updateEvent) nunca valida disponibilidade das pessoas ja atribuidas: as duas operacoes
         // concorrentes devem concluir com sucesso, e o conflito resultante passa a ser derivado.
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent Date Change Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent Date Change Person", phone);
         cleanupPersonIdA = person.getId();
 
         LocalDate originalDate = LocalDate.of(2026, 11, 1);
@@ -481,7 +477,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // bloqueante. Portanto, as duas operacoes concorrentes abaixo devem concluir com sucesso,
         // independentemente da ordem, preservando assignment, participacao e a nova indisponibilidade.
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Concurrent EndAt Change Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Concurrent EndAt Change Person", phone);
         cleanupPersonIdA = person.getId();
 
         LocalDate eventDate = LocalDate.of(2026, 10, 20);
@@ -560,7 +556,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         // Ordem estritamente deterministica (mesma justificativa do teste anterior, sequencia inversa):
         // o assignment comita integralmente antes de a pessoa criar a indisponibilidade futura.
         String phone = uniquePhoneNumber();
-        Person person = savePersonWithRole("Deterministic Assignment Wins Person", phone, "ROLE_OPERATOR");
+        Person person = savePerson("Deterministic Assignment Wins Person", phone);
         cleanupPersonIdA = person.getId();
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
 
@@ -654,13 +650,11 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         }
     }
 
-    private Person savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
+    private Person savePerson(String name, String phoneNumber) {
         Person person = new Person();
         person.setName(name);
         person.setPhoneNumber(phoneNumber);
         person.setBirthdayDate(BIRTHDAY);
-        person.setPassword("encoded-password");
-        person.addRole(roleRepository.findByAuthority(roleAuthority).orElseThrow());
         return personRepository.saveAndFlush(person);
     }
 
@@ -670,9 +664,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         }
         jdbcTemplate.update("DELETE FROM tb_person_unavailability WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_event_assignment WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person_role WHERE person_id = ?", personId);
-        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE person_id = ?", personId);        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
     }
 
     private LocalDateTime dayStart(LocalDate date) {

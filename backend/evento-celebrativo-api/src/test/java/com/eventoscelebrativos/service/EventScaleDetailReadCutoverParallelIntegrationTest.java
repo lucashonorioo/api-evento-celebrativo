@@ -224,8 +224,8 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date, password)
-                VALUES (?, ?, '1990-01-10', 'encoded-password')
+                INSERT INTO tb_person(name, phone_number, birthday_date)
+                VALUES (?, ?, '1990-01-10')
                 """,
                 name + " " + UUID.randomUUID(),
                 phoneNumber

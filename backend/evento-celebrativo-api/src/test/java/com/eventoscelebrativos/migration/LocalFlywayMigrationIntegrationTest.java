@@ -42,7 +42,9 @@ class LocalFlywayMigrationIntegrationTest {
         assertSuccessfulVersionedMigration("11");
         assertSuccessfulScript("R__load_local_demo_data.sql");
         assertTableDoesNotExist("tb_event_person");
+        assertTableDoesNotExist("tb_person_role");
         assertColumnDoesNotExist("tb_person", "person_type");
+        assertColumnDoesNotExist("tb_person", "password");
 
         assertEquals(2, countRows("tb_role"));
         assertEquals(1, countRows("tb_role", "id", 1L, "authority", "ROLE_OPERATOR"));
@@ -62,7 +64,6 @@ class LocalFlywayMigrationIntegrationTest {
         assertEventRange(2L, LocalDateTime.of(2025, 7, 12, 19, 30), LocalDateTime.of(2025, 7, 12, 20, 30));
         assertEventRange(3L, LocalDateTime.of(2025, 7, 20, 8, 0), LocalDateTime.of(2025, 7, 20, 9, 0));
 
-        assertEquals(20, countRows("tb_person_role"));
         assertEquals(3, countRows("tb_event_location"));
         assertEquals(15, countPeopleWithFilledParallelColumns());
         assertPersonMinistryFixtures();
@@ -76,7 +77,6 @@ class LocalFlywayMigrationIntegrationTest {
         int peopleBefore = countRows("tb_person");
         int locationsBefore = countRows("tb_location");
         int eventsBefore = countRows("tb_celebration_event");
-        int personRolesBefore = countRows("tb_person_role");
         int eventLocationsBefore = countRows("tb_event_location");
         int personMinistriesBefore = countRows("tb_person_ministry");
         int userAccountsBefore = countRows("tb_user_account");
@@ -90,7 +90,6 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(peopleBefore, countRows("tb_person"));
         assertEquals(locationsBefore, countRows("tb_location"));
         assertEquals(eventsBefore, countRows("tb_celebration_event"));
-        assertEquals(personRolesBefore, countRows("tb_person_role"));
         assertEquals(eventLocationsBefore, countRows("tb_event_location"));
         assertEquals(personMinistriesBefore, countRows("tb_person_ministry"));
         assertEquals(userAccountsBefore, countRows("tb_user_account"));
@@ -147,9 +146,8 @@ class LocalFlywayMigrationIntegrationTest {
 
     private void assertUserAccountFixturesMirrorPersonFixtures() {
         assertEquals(15, countRows("tb_user_account"));
-        assertEquals(20, countRows("tb_user_account_role"));
+        assertEquals(15, countRows("tb_user_account_role"));
         assertEquals(0, countUsernameMismatches());
-        assertEquals(0, countPasswordHashMismatches());
         assertEquals(15, countAccountsEnabled());
     }
 
@@ -160,19 +158,6 @@ class LocalFlywayMigrationIntegrationTest {
                 FROM tb_person p
                 JOIN tb_user_account ua ON ua.person_id = p.id
                 WHERE ua.username <> p.phone_number
-                """,
-                Integer.class
-        );
-        return count == null ? 0 : count;
-    }
-
-    private int countPasswordHashMismatches() {
-        Integer count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM tb_person p
-                JOIN tb_user_account ua ON ua.person_id = p.id
-                WHERE ua.password_hash <> p.password
                 """,
                 Integer.class
         );

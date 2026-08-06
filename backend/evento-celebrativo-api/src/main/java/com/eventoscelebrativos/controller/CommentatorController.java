@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
+import com.eventoscelebrativos.dto.request.CommentatorUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -55,8 +56,8 @@ public class CommentatorController {
     @Operation(summary = "Atualiza um comentarista")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     @PutMapping(value = "/{id}")
-    public ResponseEntity<CommentatorResponseDTO> updateCommentator(@PathVariable Long id, @Valid @RequestBody CommentatorRequestDTO commentatorRequestDTO){
-        CommentatorResponseDTO commentatorResponseDTO = commentatorService.updateCommentator(id, commentatorRequestDTO);
+    public ResponseEntity<CommentatorResponseDTO> updateCommentator(@PathVariable Long id, @Valid @RequestBody CommentatorUpdateRequestDTO commentatorUpdateRequestDTO){
+        CommentatorResponseDTO commentatorResponseDTO = commentatorService.updateCommentator(id, commentatorUpdateRequestDTO);
         return ResponseEntity.ok().body(commentatorResponseDTO);
     }
 

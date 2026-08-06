@@ -211,9 +211,7 @@ class ScheduleConflictConcurrencyMySqlIntegrationTest {
             jdbcTemplate.update("DELETE FROM tb_person_unavailability");
             jdbcTemplate.update("DELETE FROM tb_person_ministry");
             jdbcTemplate.update("DELETE FROM tb_user_account_role");
-            jdbcTemplate.update("DELETE FROM tb_user_account");
-            jdbcTemplate.update("DELETE FROM tb_person_role");
-            jdbcTemplate.update("DELETE FROM tb_person");
+            jdbcTemplate.update("DELETE FROM tb_user_account");            jdbcTemplate.update("DELETE FROM tb_person");
             jdbcTemplate.update("DELETE FROM tb_location");
         });
     }
