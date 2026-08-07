@@ -61,21 +61,62 @@
       }
     </div>
 
-    <div class="reader-management__field">
-      <label for="password">Senha</label>
-      <input
-        id="password"
-        type="password"
-        formControlName="password"
-        autocomplete="new-password"
-        [attr.aria-invalid]="fieldErrorMessage('password') !== null"
-        [attr.aria-describedby]="fieldErrorMessage('password') !== null ? 'password-error' : null"
-      />
+    @if (!isEditing) {
+      <fieldset class="reader-management__access">
+        <legend>Acesso ao aplicativo</legend>
 
-      @if (fieldErrorMessage('password'); as message) {
-        <p id="password-error" class="reader-management__field-error">{{ message }}</p>
-      }
-    </div>
+        <div class="reader-management__checkbox-field">
+          <input id="createAccess" type="checkbox" formControlName="createAccess" />
+          <label for="createAccess">Criar acesso ao aplicativo</label>
+        </div>
+
+        <p class="reader-management__hint">
+          Uma pessoa pode participar das celebracoes mesmo sem possuir acesso ao aplicativo.
+        </p>
+
+        @if (showAccessFields()) {
+          <div class="reader-management__field">
+            <label for="password">Senha</label>
+            <input
+              id="password"
+              type="password"
+              formControlName="password"
+              autocomplete="new-password"
+              [attr.aria-invalid]="fieldErrorMessage('password') !== null"
+              [attr.aria-describedby]="
+                fieldErrorMessage('password') !== null ? 'password-error' : null
+              "
+            />
+
+            @if (fieldErrorMessage('password'); as message) {
+              <p id="password-error" class="reader-management__field-error">{{ message }}</p>
+            }
+          </div>
+
+          <div class="reader-management__field">
+            <label for="confirmPassword">Confirmar senha</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              formControlName="confirmPassword"
+              autocomplete="new-password"
+              [attr.aria-invalid]="fieldErrorMessage('confirmPassword') !== null"
+              [attr.aria-describedby]="
+                fieldErrorMessage('confirmPassword') !== null ? 'confirmPassword-error' : null
+              "
+            />
+
+            @if (fieldErrorMessage('confirmPassword'); as message) {
+              <p id="confirmPassword-error" class="reader-management__field-error">
+                {{ message }}
+              </p>
+            }
+          </div>
+
+          <p class="reader-management__hint">O acesso sera criado com o perfil Operador.</p>
+        }
+      </fieldset>
+    }
 
     <div class="reader-management__actions">
       <button class="reader-management__button" type="submit" [disabled]="isSaving()">

@@ -4,8 +4,9 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
 import {
-  EucharisticMinisterRequest,
+  EucharisticMinisterCreateRequest,
   EucharisticMinisterResponse,
+  EucharisticMinisterUpdateRequest,
 } from './eucharistic-minister.models';
 
 @Injectable({
@@ -20,14 +21,17 @@ export class EucharisticMinisterService {
     );
   }
 
-  create(request: EucharisticMinisterRequest): Observable<EucharisticMinisterResponse> {
+  create(request: EucharisticMinisterCreateRequest): Observable<EucharisticMinisterResponse> {
     return this.http.post<EucharisticMinisterResponse>(
       `${API_BASE_URL}/ministrosDeEucaristia`,
       request,
     );
   }
 
-  update(id: number, request: EucharisticMinisterRequest): Observable<EucharisticMinisterResponse> {
+  update(
+    id: number,
+    request: EucharisticMinisterUpdateRequest,
+  ): Observable<EucharisticMinisterResponse> {
     return this.http.put<EucharisticMinisterResponse>(
       `${API_BASE_URL}/ministrosDeEucaristia/${id}`,
       request,

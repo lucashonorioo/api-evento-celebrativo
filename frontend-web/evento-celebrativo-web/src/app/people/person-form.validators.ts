@@ -28,5 +28,10 @@ export function personPhoneNumberValidators(): ValidatorFn[] {
 }
 
 export function personPasswordValidators(): ValidatorFn[] {
-  return [Validators.required, Validators.minLength(PERSON_PASSWORD_MIN_LENGTH)];
+  return [Validators.required, Validators.minLength(PERSON_PASSWORD_MIN_LENGTH), notBlankValidator];
+}
+
+export function matchesControlValidator(controlToMatch: AbstractControl): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null =>
+    control.value === controlToMatch.value ? null : { passwordMismatch: true };
 }

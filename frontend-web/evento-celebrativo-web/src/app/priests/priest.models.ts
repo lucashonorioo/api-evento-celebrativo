@@ -1,3 +1,8 @@
+import {
+  PersonMinisterialCreateRequest,
+  PersonMinisterialUpdateRequest,
+} from '../people/person-ministerial-access.models';
+
 export interface PriestResponse {
   id: number;
   name: string;
@@ -5,9 +10,5 @@ export interface PriestResponse {
   birthdayDate: string | null;
 }
 
-export interface PriestRequest {
-  name: string;
-  phoneNumber: string;
-  birthdayDate: string;
-  password: string;
-}
+export type PriestCreateRequest = PersonMinisterialCreateRequest;
+export type PriestUpdateRequest = PersonMinisterialUpdateRequest;

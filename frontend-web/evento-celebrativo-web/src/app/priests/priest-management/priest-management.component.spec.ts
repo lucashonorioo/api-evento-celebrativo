@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
-import { PriestRequest, PriestResponse } from '../priest.models';
+import { PriestCreateRequest, PriestResponse, PriestUpdateRequest } from '../priest.models';
 import { PriestService } from '../priest.service';
 import { PriestManagementComponent } from './priest-management.component';
 
@@ -14,22 +14,35 @@ describe('PriestManagementComponent', () => {
   const priests: PriestResponse[] = [
     {
       id: 98765,
-      name: 'Padre Joao',
-      phoneNumber: '34999999995',
-      birthdayDate: '1991-02-11',
+      name: 'Joao Padre',
+      phoneNumber: '34999999992',
+      birthdayDate: '1961-02-11',
     },
     {
       id: 54321,
-      name: 'Padre Pedro',
-      phoneNumber: '34999999996',
-      birthdayDate: '1989-05-20',
+      name: 'Pedro Padre',
+      phoneNumber: '34999999993',
+      birthdayDate: '1959-05-20',
     },
   ];
-  const request: PriestRequest = {
-    name: 'Padre Antonio',
-    phoneNumber: '34999999997',
-    birthdayDate: '1995-03-15',
+  const createRequestWithoutAccess: PriestCreateRequest = {
+    name: 'Marcos Padre',
+    phoneNumber: '34999999994',
+    birthdayDate: '1965-03-15',
+    createAccess: false,
+  };
+  const createRequestWithAccess: PriestCreateRequest = {
+    name: 'Marcos Padre',
+    phoneNumber: '34999999994',
+    birthdayDate: '1965-03-15',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: PriestUpdateRequest = {
+    name: 'Marcos Padre',
+    phoneNumber: '34999999994',
+    birthdayDate: '1965-03-15',
   };
 
   async function setup(response = of(priests)): Promise<void> {
@@ -43,17 +56,17 @@ describe('PriestManagementComponent', () => {
     priestService.create.and.returnValue(
       of({
         id: 111,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
       }),
     );
     priestService.update.and.returnValue(
       of({
         id: 98765,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: updateRequest.name,
+        phoneNumber: updateRequest.phoneNumber,
+        birthdayDate: updateRequest.birthdayDate,
       }),
     );
     priestService.delete.and.returnValue(of(undefined));
@@ -87,7 +100,7 @@ describe('PriestManagementComponent', () => {
     expect(priestService.findAll).toHaveBeenCalledOnceWith();
   });
 
-  it('should render title and form fields', async () => {
+  it('should render title and cadastral form fields', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -99,7 +112,6 @@ describe('PriestManagementComponent', () => {
     expect(fixture.nativeElement.querySelector('#name')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#phoneNumber')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#birthdayDate')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
   });
 
   it('should show loading while priests are pending', async () => {
@@ -122,10 +134,10 @@ describe('PriestManagementComponent', () => {
 
     const text = textContent();
 
-    expect(text).toContain('Padre Joao');
-    expect(text).toContain('Padre Pedro');
-    expect(text).toContain('34999999995');
-    expect(text).toContain('1991-02-11');
+    expect(text).toContain('Joao Padre');
+    expect(text).toContain('Pedro Padre');
+    expect(text).toContain('34999999992');
+    expect(text).toContain('1961-02-11');
   });
 
   it('should show an empty state', async () => {
@@ -151,101 +163,228 @@ describe('PriestManagementComponent', () => {
     fixture.detectChanges();
 
     expect(priestService.findAll).toHaveBeenCalledTimes(2);
-    expect(textContent()).toContain('Padre Joao');
+    expect(textContent()).toContain('Joao Padre');
   });
 
-  it('should not submit invalid forms and should mark fields as touched', async () => {
-    await setup();
+  describe('creation without access', () => {
+    it('should start with createAccess unchecked and access fields hidden', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      fixture.detectChanges();
 
-    expect(priestService.create).not.toHaveBeenCalled();
-    expect(component.form.controls.name.touched).toBeTrue();
-    expect(component.form.controls.phoneNumber.touched).toBeTrue();
-    expect(component.form.controls.birthdayDate.touched).toBeTrue();
-    expect(component.form.controls.password.touched).toBeTrue();
-    expect(textContent()).toContain('Informe o nome do padre.');
-    expect(textContent()).toContain('Informe o telefone.');
-    expect(textContent()).toContain('Informe a data de nascimento.');
-    expect(textContent()).toContain('Informe a senha.');
-  });
-
-  it('should reject blank name and invalid phone, birthday, and password', async () => {
-    await setup();
-
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '   ',
-      phoneNumber: '123',
-      birthdayDate: '2999-01-01',
-      password: '123',
+      expect(component.form.controls.createAccess.value).toBeFalse();
+      expect(component.showAccessFields()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
     });
-    clickButton('Cadastrar');
-    fixture.detectChanges();
 
-    expect(priestService.create).not.toHaveBeenCalled();
-    expect(textContent()).toContain('Informe o nome do padre.');
-    expect(textContent()).toContain('Informe um telefone com 11 digitos.');
-    expect(textContent()).toContain('Informe uma data de nascimento no passado.');
-    expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
-  });
+    it('should not submit invalid forms and should mark cadastral fields as touched', async () => {
+      await setup();
 
-  it('should create priests with the expected payload', async () => {
-    await setup();
+      fixture.detectChanges();
+      clickButton('Cadastrar');
+      fixture.detectChanges();
 
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      expect(priestService.create).not.toHaveBeenCalled();
+      expect(component.form.controls.name.touched).toBeTrue();
+      expect(component.form.controls.phoneNumber.touched).toBeTrue();
+      expect(component.form.controls.birthdayDate.touched).toBeTrue();
+      expect(textContent()).toContain('Informe o nome do padre.');
+      expect(textContent()).toContain('Informe o telefone.');
+      expect(textContent()).toContain('Informe a data de nascimento.');
+    });
 
-    expect(priestService.create).toHaveBeenCalledOnceWith(request);
-    expect(textContent()).toContain('Padre cadastrado com sucesso.');
-    expect(textContent()).toContain('Padre Antonio');
-    expect(component.form.getRawValue()).toEqual({
-      name: '',
-      phoneNumber: '',
-      birthdayDate: '',
-      password: '',
+    it('should reject blank name and invalid phone and birthday', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '   ',
+        phoneNumber: '123',
+        birthdayDate: '2999-01-01',
+      });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe o nome do padre.');
+      expect(textContent()).toContain('Informe um telefone com 11 digitos.');
+      expect(textContent()).toContain('Informe uma data de nascimento no passado.');
+    });
+
+    it('should create priests without access using the expected payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
+      expect(textContent()).toContain('Padre cadastrado com sucesso.');
+      expect(component.form.controls.createAccess.value).toBeFalse();
+    });
+
+    it('should trim textual values before submitting', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '  Marcos Padre  ',
+        phoneNumber: '34999999994',
+        birthdayDate: '1965-03-15',
+      });
+      clickButton('Cadastrar');
+
+      expect(priestService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
+    });
+
+    it('should expose saving state while creating and prevent duplicate saves', async () => {
+      const pendingSave = new Subject<PriestResponse>();
+      await setup();
+      priestService.create.and.returnValue(pendingSave);
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      clickButton('Cadastrar');
+
+      expect(component.isSaving()).toBeTrue();
+      expect(priestService.create).toHaveBeenCalledTimes(1);
+
+      pendingSave.next({
+        id: 111,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
+      });
+      pendingSave.complete();
     });
   });
 
-  it('should trim textual values before submitting', async () => {
-    await setup();
+  describe('creation with access', () => {
+    it('should show password and confirm password fields and require them once checked', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '  Padre Antonio  ',
-      phoneNumber: '34999999997',
-      birthdayDate: '1995-03-15',
-      password: '123456',
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+
+      expect(component.showAccessFields()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).not.toBeNull();
+
+      fillCadastralFields(createRequestWithAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe a senha.');
+      expect(textContent()).toContain('Confirme a senha.');
     });
-    clickButton('Cadastrar');
 
-    expect(priestService.create).toHaveBeenCalledOnceWith(request);
+    it('should reject mismatched passwords', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '654321' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('As senhas informadas nao coincidem.');
+    });
+
+    it('should reject a password shorter than the minimum length', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123', confirmPassword: '123' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
+    });
+
+    it('should reject a password made only of spaces', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '      ', confirmPassword: '      ' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).not.toHaveBeenCalled();
+    });
+
+    it('should create priests with access sending ROLE_OPERATOR and never ROLE_ADMIN', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).toHaveBeenCalledOnceWith(createRequestWithAccess);
+      expect(textContent()).not.toContain('ROLE_ADMIN');
+      expect(fixture.nativeElement.querySelector('select')).toBeNull();
+    });
+
+    it('should not expose confirmPassword to the request payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      const sentRequest = priestService.create.calls.mostRecent().args[0] as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(sentRequest['confirmPassword']).toBeUndefined();
+    });
   });
 
-  it('should expose saving state while creating and prevent duplicate saves', async () => {
-    const pendingSave = new Subject<PriestResponse>();
-    await setup();
-    priestService.create.and.returnValue(pendingSave);
+  describe('unchecking access after filling credentials', () => {
+    it('should clear password fields, lift validators and submit without access', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    clickButton('Cadastrar');
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
 
-    expect(component.isSaving()).toBeTrue();
-    expect(priestService.create).toHaveBeenCalledTimes(1);
+      setCheckbox('createAccess', false);
+      fixture.detectChanges();
 
-    pendingSave.next({
-      id: 111,
-      name: request.name,
-      phoneNumber: request.phoneNumber,
-      birthdayDate: request.birthdayDate,
+      expect(component.showAccessFields()).toBeFalse();
+      expect(component.form.controls.password.value).toBe('');
+      expect(component.form.controls.confirmPassword.value).toBe('');
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(priestService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
     });
-    pendingSave.complete();
   });
 
   it('should show friendly create validation and permission errors', async () => {
@@ -256,11 +395,12 @@ describe('PriestManagementComponent', () => {
     );
 
     fixture.detectChanges();
-    fillForm(request);
+    fillCadastralFields(createRequestWithoutAccess);
     clickButton('Cadastrar');
     fixture.detectChanges();
 
     expect(textContent()).toContain('Verifique os dados informados e tente novamente.');
+    expect(component.form.controls.name.value).toBe(createRequestWithoutAccess.name);
 
     clickButton('Cadastrar');
     fixture.detectChanges();
@@ -268,7 +408,50 @@ describe('PriestManagementComponent', () => {
     expect(textContent()).toContain('Voce nao possui permissao para realizar esta operacao.');
   });
 
-  it('should enter edit mode without exposing an existing password and update priests', async () => {
+  it('should show a friendly message when the phone number is already registered', async () => {
+    await setup();
+    priestService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'PERSON_PHONE_NUMBER_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithoutAccess);
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma pessoa cadastrada com este telefone.');
+  });
+
+  it('should show a friendly message when the access account username already exists', async () => {
+    await setup();
+    priestService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'USER_ACCOUNT_USERNAME_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithAccess);
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma conta de acesso utilizando este telefone.');
+  });
+
+  it('should enter edit mode without exposing access fields and update priests with cadastral data only', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -278,43 +461,95 @@ describe('PriestManagementComponent', () => {
     expect(textContent()).toContain('Editar padre');
     expect(component.editingPriestId()).toBe(98765);
     expect(component.form.getRawValue()).toEqual({
-      name: 'Padre Joao',
-      phoneNumber: '34999999995',
-      birthdayDate: '1991-02-11',
+      name: 'Joao Padre',
+      phoneNumber: '34999999992',
+      birthdayDate: '1961-02-11',
+      createAccess: false,
       password: '',
+      confirmPassword: '',
     });
-    expect(textContent()).not.toContain('123456');
+    expect(fixture.nativeElement.querySelector('#createAccess')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
 
-    fillForm(request);
+    component.form.patchValue({
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    });
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
-    expect(priestService.update).toHaveBeenCalledOnceWith(98765, request);
+    expect(priestService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
     expect(component.editingPriestId()).toBeNull();
     expect(textContent()).toContain('Padre atualizado com sucesso.');
-    expect(textContent()).toContain('Padre Antonio');
   });
 
-  it('should require a new password when editing', async () => {
+  it('should not require a password when editing', async () => {
     await setup();
 
     fixture.detectChanges();
     clickButton('Editar');
     fixture.detectChanges();
     component.form.patchValue({
-      name: request.name,
-      phoneNumber: request.phoneNumber,
-      birthdayDate: request.birthdayDate,
-      password: '',
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
     });
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
-    expect(priestService.update).not.toHaveBeenCalled();
-    expect(textContent()).toContain('Informe a senha.');
+    expect(priestService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
   });
 
-  it('should cancel editing without calling the backend', async () => {
+  it('should show a friendly message when the account fields are rejected on update', async () => {
+    await setup();
+    priestService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { errorCode: 'ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Nao foi possivel atualizar os dados da pessoa porque foram enviados campos de acesso indevidos.',
+    );
+  });
+
+  it('should show a friendly message on concurrent update conflicts without retrying automatically', async () => {
+    await setup();
+    priestService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'CONCURRENT_UPDATE_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Os dados foram alterados simultaneamente. Atualize as informacoes e tente novamente.',
+    );
+    expect(priestService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('should cancel editing without calling the backend and restore the initial creation state', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -326,6 +561,9 @@ describe('PriestManagementComponent', () => {
     expect(priestService.update).not.toHaveBeenCalled();
     expect(component.editingPriestId()).toBeNull();
     expect(textContent()).toContain('Cadastrar padre');
+    expect(component.form.controls.createAccess.value).toBeFalse();
+    expect(component.form.controls.password.value).toBe('');
+    expect(component.form.controls.confirmPassword.value).toBe('');
   });
 
   it('should handle update not found and generic errors', async () => {
@@ -338,7 +576,6 @@ describe('PriestManagementComponent', () => {
     fixture.detectChanges();
     clickButton('Editar');
     fixture.detectChanges();
-    fillForm(request);
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
@@ -359,7 +596,7 @@ describe('PriestManagementComponent', () => {
     fixture.detectChanges();
 
     expect(textContent()).toContain('Deseja realmente excluir este padre?');
-    expect(textContent()).toContain('Padre Joao');
+    expect(textContent()).toContain('Joao Padre');
 
     clickButton('Cancelar');
     fixture.detectChanges();
@@ -379,7 +616,7 @@ describe('PriestManagementComponent', () => {
 
     expect(priestService.delete).toHaveBeenCalledOnceWith(98765);
     expect(textContent()).toContain('Padre excluido com sucesso.');
-    expect(textContent()).not.toContain('Padre Joao');
+    expect(textContent()).not.toContain('Joao Padre');
   });
 
   it('should prevent duplicate delete calls while deleting', async () => {
@@ -416,7 +653,7 @@ describe('PriestManagementComponent', () => {
     expect(textContent()).toContain(
       'Nao e possivel excluir este padre porque ele esta vinculado a eventos.',
     );
-    expect(textContent()).toContain('Padre Joao');
+    expect(textContent()).toContain('Joao Padre');
 
     clickButton('Confirmar exclusao');
     fixture.detectChanges();
@@ -434,6 +671,10 @@ describe('PriestManagementComponent', () => {
     await setup();
 
     fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+    fixture.detectChanges();
 
     const text = textContent();
 
@@ -447,8 +688,24 @@ describe('PriestManagementComponent', () => {
     expect(text).not.toContain('null');
   });
 
-  function fillForm(value: PriestRequest): void {
-    component.form.setValue(value);
+  function fillCadastralFields(value: {
+    name: string;
+    phoneNumber: string;
+    birthdayDate: string;
+  }): void {
+    component.form.patchValue({
+      name: value.name,
+      phoneNumber: value.phoneNumber,
+      birthdayDate: value.birthdayDate,
+    });
+  }
+
+  function setCheckbox(id: string, checked: boolean): void {
+    const checkbox = (fixture.nativeElement as HTMLElement).querySelector(
+      `#${id}`,
+    ) as HTMLInputElement;
+    checkbox.checked = checked;
+    checkbox.dispatchEvent(new Event('change'));
   }
 
   function clickButton(label: string): void {

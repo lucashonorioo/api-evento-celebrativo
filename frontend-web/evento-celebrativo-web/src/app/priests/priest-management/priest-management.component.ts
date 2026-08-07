@@ -1,16 +1,22 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 
-import { normalizePersonManagementRequest } from '../../people/person-form.helpers';
 import {
+  buildPersonMinisterialCreateRequest,
+  buildPersonMinisterialUpdateRequest,
+} from '../../people/person-form.helpers';
+import {
+  matchesControlValidator,
   notBlankValidator,
   pastDateValidator,
   personPasswordValidators,
   personPhoneNumberValidators,
 } from '../../people/person-form.validators';
 import {
+  PersonManagementControlName,
   PersonManagementLabels,
   createdSuccessMessageFor,
   deleteErrorMessageFor,
@@ -20,7 +26,7 @@ import {
   saveErrorMessageFor,
   updatedSuccessMessageFor,
 } from '../../people/person-management-messages';
-import { PriestRequest, PriestResponse } from '../priest.models';
+import { PriestCreateRequest, PriestResponse, PriestUpdateRequest } from '../priest.models';
 import { PriestService } from '../priest.service';
 
 const PRIEST_LABELS: PersonManagementLabels = {
@@ -42,12 +48,15 @@ const PRIEST_LABELS: PersonManagementLabels = {
 export class PriestManagementComponent implements OnInit {
   private readonly formBuilder = inject(NonNullableFormBuilder);
   private readonly priestService = inject(PriestService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly form = this.formBuilder.group({
     name: ['', [Validators.required, notBlankValidator]],
     phoneNumber: ['', personPhoneNumberValidators()],
     birthdayDate: ['', [Validators.required, pastDateValidator]],
-    password: ['', personPasswordValidators()],
+    createAccess: [false],
+    password: [''],
+    confirmPassword: [''],
   });
   readonly priests = signal<PriestResponse[]>([]);
   readonly isLoading = signal(false);
@@ -57,9 +66,24 @@ export class PriestManagementComponent implements OnInit {
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   readonly pendingDeletion = signal<PriestResponse | null>(null);
+  readonly showAccessFields = signal(false);
 
   get isEditing(): boolean {
     return this.editingPriestId() !== null;
+  }
+
+  constructor() {
+    this.form.controls.createAccess.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((createAccess) => this.applyAccessValidators(createAccess));
+
+    this.form.controls.password.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.form.controls.createAccess.value) {
+          this.form.controls.confirmPassword.updateValueAndValidity({ onlySelf: true });
+        }
+      });
   }
 
   ngOnInit(): void {
@@ -96,7 +120,6 @@ export class PriestManagementComponent implements OnInit {
       return;
     }
 
-    const request = this.priestRequest();
     const editingPriestId = this.editingPriestId();
 
     this.setSaving(true);
@@ -104,8 +127,8 @@ export class PriestManagementComponent implements OnInit {
 
     const operation =
       editingPriestId === null
-        ? this.priestService.create(request)
-        : this.priestService.update(editingPriestId, request);
+        ? this.priestService.create(this.createRequest())
+        : this.priestService.update(editingPriestId, this.updateRequest());
 
     operation.pipe(finalize(() => this.setSaving(false))).subscribe({
       next: (priest) => {
@@ -141,7 +164,9 @@ export class PriestManagementComponent implements OnInit {
       name: priest.name,
       phoneNumber: priest.phoneNumber ?? '',
       birthdayDate: priest.birthdayDate ?? '',
+      createAccess: false,
       password: '',
+      confirmPassword: '',
     });
     this.form.markAsPristine();
     this.form.markAsUntouched();
@@ -198,12 +223,39 @@ export class PriestManagementComponent implements OnInit {
       });
   }
 
-  fieldErrorMessage(controlName: keyof PriestRequest): string | null {
+  fieldErrorMessage(controlName: PersonManagementControlName): string | null {
     return fieldErrorMessageFor(this.form.controls[controlName], controlName, PRIEST_LABELS);
   }
 
-  private priestRequest(): PriestRequest {
-    return normalizePersonManagementRequest(this.form.getRawValue());
+  private createRequest(): PriestCreateRequest {
+    return buildPersonMinisterialCreateRequest(this.form.getRawValue());
+  }
+
+  private updateRequest(): PriestUpdateRequest {
+    return buildPersonMinisterialUpdateRequest(this.form.getRawValue());
+  }
+
+  private applyAccessValidators(createAccess: boolean): void {
+    this.showAccessFields.set(createAccess);
+
+    const passwordControl = this.form.controls.password;
+    const confirmPasswordControl = this.form.controls.confirmPassword;
+
+    if (createAccess) {
+      passwordControl.setValidators(personPasswordValidators());
+      confirmPasswordControl.setValidators([
+        Validators.required,
+        matchesControlValidator(passwordControl),
+      ]);
+    } else {
+      passwordControl.clearValidators();
+      confirmPasswordControl.clearValidators();
+      passwordControl.setValue('');
+      confirmPasswordControl.setValue('');
+    }
+
+    passwordControl.updateValueAndValidity();
+    confirmPasswordControl.updateValueAndValidity();
   }
 
   private resetForm(): void {
@@ -212,7 +264,9 @@ export class PriestManagementComponent implements OnInit {
       name: '',
       phoneNumber: '',
       birthdayDate: '',
+      createAccess: false,
       password: '',
+      confirmPassword: '',
     });
   }
 

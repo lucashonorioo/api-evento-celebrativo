@@ -1,3 +1,8 @@
+import {
+  PersonMinisterialCreateRequest,
+  PersonMinisterialUpdateRequest,
+} from '../people/person-ministerial-access.models';
+
 export interface CommentatorResponse {
   id: number;
   name: string;
@@ -5,9 +10,5 @@ export interface CommentatorResponse {
   birthdayDate: string | null;
 }
 
-export interface CommentatorRequest {
-  name: string;
-  phoneNumber: string;
-  birthdayDate: string;
-  password: string;
-}
+export type CommentatorCreateRequest = PersonMinisterialCreateRequest;
+export type CommentatorUpdateRequest = PersonMinisterialUpdateRequest;

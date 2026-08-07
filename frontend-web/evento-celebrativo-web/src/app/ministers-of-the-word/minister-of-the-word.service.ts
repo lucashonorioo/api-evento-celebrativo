@@ -4,8 +4,9 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
 import {
-  MinisterOfTheWordRequest,
+  MinisterOfTheWordCreateRequest,
   MinisterOfTheWordResponse,
+  MinisterOfTheWordUpdateRequest,
 } from './minister-of-the-word.models';
 
 @Injectable({
@@ -18,7 +19,7 @@ export class MinisterOfTheWordService {
     return this.http.get<MinisterOfTheWordResponse[]>(`${API_BASE_URL}/ministrosDaPalavra`);
   }
 
-  create(request: MinisterOfTheWordRequest): Observable<MinisterOfTheWordResponse> {
+  create(request: MinisterOfTheWordCreateRequest): Observable<MinisterOfTheWordResponse> {
     return this.http.post<MinisterOfTheWordResponse>(
       `${API_BASE_URL}/ministrosDaPalavra`,
       request,
@@ -27,7 +28,7 @@ export class MinisterOfTheWordService {
 
   update(
     id: number,
-    request: MinisterOfTheWordRequest,
+    request: MinisterOfTheWordUpdateRequest,
   ): Observable<MinisterOfTheWordResponse> {
     return this.http.put<MinisterOfTheWordResponse>(
       `${API_BASE_URL}/ministrosDaPalavra/${id}`,

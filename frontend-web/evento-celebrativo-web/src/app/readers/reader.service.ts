@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
-import { ReaderRequest, ReaderResponse } from './reader.models';
+import { ReaderCreateRequest, ReaderResponse, ReaderUpdateRequest } from './reader.models';
 
 @Injectable({
   providedIn: 'root',
@@ -15,11 +15,11 @@ export class ReaderService {
     return this.http.get<ReaderResponse[]>(`${API_BASE_URL}/leitores`);
   }
 
-  create(request: ReaderRequest): Observable<ReaderResponse> {
+  create(request: ReaderCreateRequest): Observable<ReaderResponse> {
     return this.http.post<ReaderResponse>(`${API_BASE_URL}/leitores`, request);
   }
 
-  update(id: number, request: ReaderRequest): Observable<ReaderResponse> {
+  update(id: number, request: ReaderUpdateRequest): Observable<ReaderResponse> {
     return this.http.put<ReaderResponse>(`${API_BASE_URL}/leitores/${id}`, request);
   }
 

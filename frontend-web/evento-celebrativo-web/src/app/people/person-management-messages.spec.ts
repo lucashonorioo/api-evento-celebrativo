@@ -42,6 +42,17 @@ describe('person management messages', () => {
       'Informe a data de nascimento.',
     );
     expect(fieldErrorMessageFor(control, 'password', labels)).toBe('Informe a senha.');
+    expect(fieldErrorMessageFor(control, 'confirmPassword', labels)).toBe('Confirme a senha.');
+  });
+
+  it('should build a password mismatch message for confirmPassword', () => {
+    const control = new FormControl('');
+    control.setErrors({ passwordMismatch: true });
+    control.markAsTouched();
+
+    expect(fieldErrorMessageFor(control, 'confirmPassword', labels)).toBe(
+      'As senhas informadas nao coincidem.',
+    );
   });
 
   it('should build friendly save error messages', () => {
@@ -57,6 +68,59 @@ describe('person management messages', () => {
     expect(saveErrorMessageFor(new HttpErrorResponse({ status: 500 }), labels)).toBe(
       'Nao foi possivel concluir a operacao. Tente novamente.',
     );
+  });
+
+  it('should build friendly save error messages from known backend error codes', () => {
+    expect(
+      saveErrorMessageFor(
+        new HttpErrorResponse({
+          status: 409,
+          error: { errorCode: 'PERSON_PHONE_NUMBER_CONFLICT' },
+        }),
+        labels,
+      ),
+    ).toBe('Ja existe uma pessoa cadastrada com este telefone.');
+
+    expect(
+      saveErrorMessageFor(
+        new HttpErrorResponse({
+          status: 409,
+          error: { errorCode: 'USER_ACCOUNT_USERNAME_CONFLICT' },
+        }),
+        labels,
+      ),
+    ).toBe('Ja existe uma conta de acesso utilizando este telefone.');
+
+    expect(
+      saveErrorMessageFor(
+        new HttpErrorResponse({
+          status: 400,
+          error: { errorCode: 'ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE' },
+        }),
+        labels,
+      ),
+    ).toBe(
+      'Nao foi possivel atualizar os dados da pessoa porque foram enviados campos de acesso indevidos.',
+    );
+
+    expect(
+      saveErrorMessageFor(
+        new HttpErrorResponse({
+          status: 409,
+          error: { errorCode: 'CONCURRENT_UPDATE_CONFLICT' },
+        }),
+        labels,
+      ),
+    ).toBe('Os dados foram alterados simultaneamente. Atualize as informacoes e tente novamente.');
+  });
+
+  it('should fall back to status-based messages for unknown error codes', () => {
+    expect(
+      saveErrorMessageFor(
+        new HttpErrorResponse({ status: 400, error: { errorCode: 'SOME_UNKNOWN_CODE' } }),
+        labels,
+      ),
+    ).toBe('Verifique os dados informados e tente novamente.');
   });
 
   it('should build friendly delete error messages', () => {

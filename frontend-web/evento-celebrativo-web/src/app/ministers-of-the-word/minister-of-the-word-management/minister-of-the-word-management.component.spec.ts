@@ -3,8 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import {
-  MinisterOfTheWordRequest,
+  MinisterOfTheWordCreateRequest,
   MinisterOfTheWordResponse,
+  MinisterOfTheWordUpdateRequest,
 } from '../minister-of-the-word.models';
 import { MinisterOfTheWordService } from '../minister-of-the-word.service';
 import { MinisterOfTheWordManagementComponent } from './minister-of-the-word-management.component';
@@ -28,11 +29,24 @@ describe('MinisterOfTheWordManagementComponent', () => {
       birthdayDate: '1989-05-20',
     },
   ];
-  const request: MinisterOfTheWordRequest = {
+  const createRequestWithoutAccess: MinisterOfTheWordCreateRequest = {
     name: 'Ana Ministra da Palavra',
     phoneNumber: '34999999997',
     birthdayDate: '1995-03-15',
+    createAccess: false,
+  };
+  const createRequestWithAccess: MinisterOfTheWordCreateRequest = {
+    name: 'Ana Ministra da Palavra',
+    phoneNumber: '34999999997',
+    birthdayDate: '1995-03-15',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: MinisterOfTheWordUpdateRequest = {
+    name: 'Ana Ministra da Palavra',
+    phoneNumber: '34999999997',
+    birthdayDate: '1995-03-15',
   };
 
   async function setup(response = of(ministers)): Promise<void> {
@@ -44,17 +58,17 @@ describe('MinisterOfTheWordManagementComponent', () => {
     ministerOfTheWordService.create.and.returnValue(
       of({
         id: 111,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
       }),
     );
     ministerOfTheWordService.update.and.returnValue(
       of({
         id: 98765,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: updateRequest.name,
+        phoneNumber: updateRequest.phoneNumber,
+        birthdayDate: updateRequest.birthdayDate,
       }),
     );
     ministerOfTheWordService.delete.and.returnValue(of(undefined));
@@ -88,7 +102,7 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(ministerOfTheWordService.findAll).toHaveBeenCalledOnceWith();
   });
 
-  it('should render title and form fields', async () => {
+  it('should render title and cadastral form fields', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -100,7 +114,6 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(fixture.nativeElement.querySelector('#name')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#phoneNumber')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#birthdayDate')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
   });
 
   it('should show loading while ministers are pending', async () => {
@@ -157,98 +170,230 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(textContent()).toContain('Maria Ministra da Palavra');
   });
 
-  it('should not submit invalid forms and should mark fields as touched', async () => {
-    await setup();
+  describe('creation without access', () => {
+    it('should start with createAccess unchecked and access fields hidden', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      fixture.detectChanges();
 
-    expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
-    expect(component.form.controls.name.touched).toBeTrue();
-    expect(component.form.controls.phoneNumber.touched).toBeTrue();
-    expect(component.form.controls.birthdayDate.touched).toBeTrue();
-    expect(component.form.controls.password.touched).toBeTrue();
-    expect(textContent()).toContain('Informe o nome do ministro da Palavra.');
-    expect(textContent()).toContain('Informe o telefone.');
-    expect(textContent()).toContain('Informe a data de nascimento.');
-    expect(textContent()).toContain('Informe a senha.');
+      expect(component.form.controls.createAccess.value).toBeFalse();
+      expect(component.showAccessFields()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
+    });
+
+    it('should not submit invalid forms and should mark cadastral fields as touched', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+      expect(component.form.controls.name.touched).toBeTrue();
+      expect(component.form.controls.phoneNumber.touched).toBeTrue();
+      expect(component.form.controls.birthdayDate.touched).toBeTrue();
+      expect(textContent()).toContain('Informe o nome do ministro da Palavra.');
+      expect(textContent()).toContain('Informe o telefone.');
+      expect(textContent()).toContain('Informe a data de nascimento.');
+    });
+
+    it('should reject blank name and invalid phone and birthday', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '   ',
+        phoneNumber: '123',
+        birthdayDate: '2999-01-01',
+      });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe o nome do ministro da Palavra.');
+      expect(textContent()).toContain('Informe um telefone com 11 digitos.');
+      expect(textContent()).toContain('Informe uma data de nascimento no passado.');
+    });
+
+    it('should create ministers without access using the expected payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(
+        createRequestWithoutAccess,
+      );
+      expect(textContent()).toContain('Ministro da Palavra cadastrado com sucesso.');
+      expect(component.form.controls.createAccess.value).toBeFalse();
+    });
+
+    it('should trim textual values before submitting', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '  Ana Ministra da Palavra  ',
+        phoneNumber: '34999999997',
+        birthdayDate: '1995-03-15',
+      });
+      clickButton('Cadastrar');
+
+      expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(
+        createRequestWithoutAccess,
+      );
+    });
+
+    it('should expose saving state while creating and prevent duplicate saves', async () => {
+      const pendingSave = new Subject<MinisterOfTheWordResponse>();
+      await setup();
+      ministerOfTheWordService.create.and.returnValue(pendingSave);
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      clickButton('Cadastrar');
+
+      expect(component.isSaving()).toBeTrue();
+      expect(ministerOfTheWordService.create).toHaveBeenCalledTimes(1);
+
+      pendingSave.next({
+        id: 111,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
+      });
+      pendingSave.complete();
+    });
   });
 
-  it('should reject blank name and invalid phone, birthday, and password', async () => {
-    await setup();
+  describe('creation with access', () => {
+    it('should show password and confirm password fields and require them once checked', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '   ',
-      phoneNumber: '123',
-      birthdayDate: '2999-01-01',
-      password: '123',
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+
+      expect(component.showAccessFields()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).not.toBeNull();
+
+      fillCadastralFields(createRequestWithAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe a senha.');
+      expect(textContent()).toContain('Confirme a senha.');
     });
-    clickButton('Cadastrar');
-    fixture.detectChanges();
 
-    expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
-    expect(textContent()).toContain('Informe o nome do ministro da Palavra.');
-    expect(textContent()).toContain('Informe um telefone com 11 digitos.');
-    expect(textContent()).toContain('Informe uma data de nascimento no passado.');
-    expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
+    it('should reject mismatched passwords', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '654321' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('As senhas informadas nao coincidem.');
+    });
+
+    it('should reject a password shorter than the minimum length', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123', confirmPassword: '123' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
+    });
+
+    it('should reject a password made only of spaces', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '      ', confirmPassword: '      ' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).not.toHaveBeenCalled();
+    });
+
+    it('should create ministers with access sending ROLE_OPERATOR and never ROLE_ADMIN', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(createRequestWithAccess);
+      expect(textContent()).not.toContain('ROLE_ADMIN');
+      expect(fixture.nativeElement.querySelector('select')).toBeNull();
+    });
+
+    it('should not expose confirmPassword to the request payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      const sentRequest = ministerOfTheWordService.create.calls
+        .mostRecent()
+        .args[0] as unknown as Record<string, unknown>;
+      expect(sentRequest['confirmPassword']).toBeUndefined();
+    });
   });
 
-  it('should create ministers with the expected payload', async () => {
-    await setup();
+  describe('unchecking access after filling credentials', () => {
+    it('should clear password fields, lift validators and submit without access', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
 
-    expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(request);
-    expect(textContent()).toContain('Ministro da Palavra cadastrado com sucesso.');
-    expect(textContent()).toContain('Ana Ministra da Palavra');
-    expect(component.form.getRawValue()).toEqual({
-      name: '',
-      phoneNumber: '',
-      birthdayDate: '',
-      password: '',
+      setCheckbox('createAccess', false);
+      fixture.detectChanges();
+
+      expect(component.showAccessFields()).toBeFalse();
+      expect(component.form.controls.password.value).toBe('');
+      expect(component.form.controls.confirmPassword.value).toBe('');
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(
+        createRequestWithoutAccess,
+      );
     });
-  });
-
-  it('should trim textual values before submitting', async () => {
-    await setup();
-
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '  Ana Ministra da Palavra  ',
-      phoneNumber: '34999999997',
-      birthdayDate: '1995-03-15',
-      password: '123456',
-    });
-    clickButton('Cadastrar');
-
-    expect(ministerOfTheWordService.create).toHaveBeenCalledOnceWith(request);
-  });
-
-  it('should expose saving state while creating and prevent duplicate saves', async () => {
-    const pendingSave = new Subject<MinisterOfTheWordResponse>();
-    await setup();
-    ministerOfTheWordService.create.and.returnValue(pendingSave);
-
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    clickButton('Cadastrar');
-
-    expect(component.isSaving()).toBeTrue();
-    expect(ministerOfTheWordService.create).toHaveBeenCalledTimes(1);
-
-    pendingSave.next({
-      id: 111,
-      name: request.name,
-      phoneNumber: request.phoneNumber,
-      birthdayDate: request.birthdayDate,
-    });
-    pendingSave.complete();
   });
 
   it('should show friendly create validation and permission errors', async () => {
@@ -259,11 +404,12 @@ describe('MinisterOfTheWordManagementComponent', () => {
     );
 
     fixture.detectChanges();
-    fillForm(request);
+    fillCadastralFields(createRequestWithoutAccess);
     clickButton('Cadastrar');
     fixture.detectChanges();
 
     expect(textContent()).toContain('Verifique os dados informados e tente novamente.');
+    expect(component.form.controls.name.value).toBe(createRequestWithoutAccess.name);
 
     clickButton('Cadastrar');
     fixture.detectChanges();
@@ -271,7 +417,50 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(textContent()).toContain('Voce nao possui permissao para realizar esta operacao.');
   });
 
-  it('should enter edit mode without exposing an existing password and update ministers', async () => {
+  it('should show a friendly message when the phone number is already registered', async () => {
+    await setup();
+    ministerOfTheWordService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'PERSON_PHONE_NUMBER_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithoutAccess);
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma pessoa cadastrada com este telefone.');
+  });
+
+  it('should show a friendly message when the access account username already exists', async () => {
+    await setup();
+    ministerOfTheWordService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'USER_ACCOUNT_USERNAME_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithAccess);
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma conta de acesso utilizando este telefone.');
+  });
+
+  it('should enter edit mode without exposing access fields and update ministers with cadastral data only', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -284,40 +473,92 @@ describe('MinisterOfTheWordManagementComponent', () => {
       name: 'Maria Ministra da Palavra',
       phoneNumber: '34999999995',
       birthdayDate: '1991-02-11',
+      createAccess: false,
       password: '',
+      confirmPassword: '',
     });
-    expect(textContent()).not.toContain('123456');
+    expect(fixture.nativeElement.querySelector('#createAccess')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
 
-    fillForm(request);
+    component.form.patchValue({
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    });
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
-    expect(ministerOfTheWordService.update).toHaveBeenCalledOnceWith(98765, request);
+    expect(ministerOfTheWordService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
     expect(component.editingMinisterId()).toBeNull();
     expect(textContent()).toContain('Ministro da Palavra atualizado com sucesso.');
-    expect(textContent()).toContain('Ana Ministra da Palavra');
   });
 
-  it('should require a new password when editing', async () => {
+  it('should not require a password when editing', async () => {
     await setup();
 
     fixture.detectChanges();
     clickButton('Editar');
     fixture.detectChanges();
     component.form.patchValue({
-      name: request.name,
-      phoneNumber: request.phoneNumber,
-      birthdayDate: request.birthdayDate,
-      password: '',
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
     });
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
-    expect(ministerOfTheWordService.update).not.toHaveBeenCalled();
-    expect(textContent()).toContain('Informe a senha.');
+    expect(ministerOfTheWordService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
   });
 
-  it('should cancel editing without calling the backend', async () => {
+  it('should show a friendly message when the account fields are rejected on update', async () => {
+    await setup();
+    ministerOfTheWordService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { errorCode: 'ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Nao foi possivel atualizar os dados da pessoa porque foram enviados campos de acesso indevidos.',
+    );
+  });
+
+  it('should show a friendly message on concurrent update conflicts without retrying automatically', async () => {
+    await setup();
+    ministerOfTheWordService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'CONCURRENT_UPDATE_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Os dados foram alterados simultaneamente. Atualize as informacoes e tente novamente.',
+    );
+    expect(ministerOfTheWordService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('should cancel editing without calling the backend and restore the initial creation state', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -329,6 +570,9 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(ministerOfTheWordService.update).not.toHaveBeenCalled();
     expect(component.editingMinisterId()).toBeNull();
     expect(textContent()).toContain('Cadastrar ministro da Palavra');
+    expect(component.form.controls.createAccess.value).toBeFalse();
+    expect(component.form.controls.password.value).toBe('');
+    expect(component.form.controls.confirmPassword.value).toBe('');
   });
 
   it('should handle update not found and generic errors', async () => {
@@ -341,7 +585,6 @@ describe('MinisterOfTheWordManagementComponent', () => {
     fixture.detectChanges();
     clickButton('Editar');
     fixture.detectChanges();
-    fillForm(request);
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
@@ -437,6 +680,10 @@ describe('MinisterOfTheWordManagementComponent', () => {
     await setup();
 
     fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+    fixture.detectChanges();
 
     const text = textContent();
 
@@ -450,8 +697,24 @@ describe('MinisterOfTheWordManagementComponent', () => {
     expect(text).not.toContain('null');
   });
 
-  function fillForm(value: MinisterOfTheWordRequest): void {
-    component.form.setValue(value);
+  function fillCadastralFields(value: {
+    name: string;
+    phoneNumber: string;
+    birthdayDate: string;
+  }): void {
+    component.form.patchValue({
+      name: value.name,
+      phoneNumber: value.phoneNumber,
+      birthdayDate: value.birthdayDate,
+    });
+  }
+
+  function setCheckbox(id: string, checked: boolean): void {
+    const checkbox = (fixture.nativeElement as HTMLElement).querySelector(
+      `#${id}`,
+    ) as HTMLInputElement;
+    checkbox.checked = checked;
+    checkbox.dispatchEvent(new Event('change'));
   }
 
   function clickButton(label: string): void {
