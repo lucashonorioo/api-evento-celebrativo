@@ -3,8 +3,10 @@ package com.eventoscelebrativos.exception.handler;
 import com.eventoscelebrativos.exception.error.ErrorResponse;
 import com.eventoscelebrativos.exception.error.MultipleAssignmentsForPersonInEventErrorResponse;
 import com.eventoscelebrativos.exception.error.NotificationInvalidRecipientsErrorResponse;
+import com.eventoscelebrativos.exception.error.PersonHasActiveAssignmentsErrorResponse;
 import com.eventoscelebrativos.exception.exceptions.*;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -35,6 +37,21 @@ public class GlobalExceptionHandler {
                 ex.getEventId(),
                 ex.getPersonId(),
                 ex.getConflictingAssignmentTypes()
+        );
+        return new ResponseEntity<>(errorResponse, ex.getStatus());
+    }
+
+    @ExceptionHandler(PersonHasActiveAssignmentsException.class)
+    public ResponseEntity<PersonHasActiveAssignmentsErrorResponse> handlePersonHasActiveAssignments(
+            PersonHasActiveAssignmentsException ex, WebRequest webRequest
+    ) {
+        PersonHasActiveAssignmentsErrorResponse errorResponse = new PersonHasActiveAssignmentsErrorResponse(
+                Instant.now(),
+                ex.getStatus().value(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                webRequest.getDescription(false),
+                ex.getAssignments()
         );
         return new ResponseEntity<>(errorResponse, ex.getStatus());
     }
@@ -103,6 +120,32 @@ public class GlobalExceptionHandler {
                 status.value(),
                 e.getMessage(),
                 e.getErrorCode(),
+                webRequest.getDescription(false)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    /**
+     * Fallback generico para deadlock/timeout de lock pessimista transitorio (ex.: contencao real de
+     * linha ja existente sob PESSIMISTIC_WRITE, coberta em NotificationConcurrencyMySqlIntegrationTest).
+     * Traduz a excecao crua do Spring/JDBC em um erro de dominio estavel, em vez de deixar vazar como
+     * 500; o cliente perdedor pode tentar novamente com seguranca.
+     * <p>
+     * Nao e mais o caminho normal de conflito de telefone/username: {@link PersonPhoneNumberConflictException}
+     * e o conflito de username em {@code UserAccount} (via {@link LifecycleConflictException} com
+     * codigo {@code USER_ACCOUNT_USERNAME_CONFLICT}) sao lancados explicitamente a partir da traducao
+     * de {@link org.springframework.dao.DataIntegrityViolationException} no flush do service
+     * (ver {@code PersonCadastralUpdateServiceImpl} e {@code PersonAccountCoordinatorImpl}), sem
+     * depender de deadlock de gap lock do InnoDB.
+     */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handlePessimisticLockingFailure(PessimisticLockingFailureException e, WebRequest webRequest) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        ErrorResponse errorResponse = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                "Conflito de concorrência ao atualizar o recurso. Tente novamente.",
+                "CONCURRENT_UPDATE_CONFLICT",
                 webRequest.getDescription(false)
         );
         return ResponseEntity.status(status).body(errorResponse);

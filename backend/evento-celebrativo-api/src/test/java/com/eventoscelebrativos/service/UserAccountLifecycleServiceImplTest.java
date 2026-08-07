@@ -7,10 +7,12 @@ import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
+import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
@@ -41,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -231,7 +234,7 @@ class UserAccountLifecycleServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
         when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
-        when(eventAssignmentRepository.existsActiveOrFutureAssignmentByPersonId(1L, CURRENT_SECOND)).thenReturn(false);
+        when(eventAssignmentRepository.findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND)).thenReturn(List.of());
 
         service.updatePersonActive(1L, activeRequest(false));
 
@@ -260,7 +263,7 @@ class UserAccountLifecycleServiceImplTest {
         assertEquals("SELF_PERSON_DEACTIVATION_NOT_ALLOWED", exception.getErrorCode());
         assertTrue(person.isActive());
         assertEquals(0L, account.getTokenVersion());
-        verify(eventAssignmentRepository, never()).existsActiveOrFutureAssignmentByPersonId(1L, CURRENT_SECOND);
+        verify(eventAssignmentRepository, never()).findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND);
         verify(personRepository, never()).save(any());
         verify(userAccountRepository, never()).save(any());
     }
@@ -279,7 +282,7 @@ class UserAccountLifecycleServiceImplTest {
 
         assertFalse(person.isActive());
         assertEquals(4L, account.getTokenVersion());
-        verify(eventAssignmentRepository, never()).existsActiveOrFutureAssignmentByPersonId(1L, CURRENT_SECOND);
+        verify(eventAssignmentRepository, never()).findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND);
         verify(personRepository, never()).save(any());
         verify(userAccountRepository, never()).save(any());
     }
@@ -298,7 +301,7 @@ class UserAccountLifecycleServiceImplTest {
         assertTrue(person.isActive());
         assertFalse(account.isEnabled());
         assertEquals(5L, account.getTokenVersion());
-        verify(eventAssignmentRepository, never()).existsActiveOrFutureAssignmentByPersonId(1L, CURRENT_SECOND);
+        verify(eventAssignmentRepository, never()).findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND);
         verify(personRepository).save(person);
         verify(userAccountRepository, never()).save(any());
     }
@@ -311,14 +314,24 @@ class UserAccountLifecycleServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
         when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
-        when(eventAssignmentRepository.existsActiveOrFutureAssignmentByPersonId(1L, CURRENT_SECOND)).thenReturn(true);
+        PersonUnavailabilityAssignmentConflictProjection conflict = mock(PersonUnavailabilityAssignmentConflictProjection.class);
+        when(conflict.getEventId()).thenReturn(50L);
+        when(conflict.getEventName()).thenReturn("Missa das 10h");
+        when(conflict.getStartAt()).thenReturn(CURRENT_SECOND.plusDays(1));
+        when(conflict.getEndAt()).thenReturn(CURRENT_SECOND.plusDays(1).plusHours(1));
+        when(conflict.getAssignmentType()).thenReturn("READER");
+        when(eventAssignmentRepository.findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND))
+                .thenReturn(List.of(conflict));
 
-        LifecycleConflictException exception = assertThrows(
-                LifecycleConflictException.class,
+        PersonHasActiveAssignmentsException exception = assertThrows(
+                PersonHasActiveAssignmentsException.class,
                 () -> service.updatePersonActive(1L, activeRequest(false))
         );
 
         assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", exception.getErrorCode());
+        assertEquals(1, exception.getAssignments().size());
+        assertEquals(50L, exception.getAssignments().get(0).getEventId());
+        assertEquals("READER", exception.getAssignments().get(0).getAssignmentType());
         assertTrue(person.isActive());
         assertEquals(0L, account.getTokenVersion());
         verify(personRepository, never()).save(any());

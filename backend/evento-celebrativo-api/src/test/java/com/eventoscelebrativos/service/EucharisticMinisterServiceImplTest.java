@@ -41,6 +41,9 @@ class EucharisticMinisterServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private EucharisticMinisterServiceImpl service;
 
@@ -101,7 +104,7 @@ class EucharisticMinisterServiceImplTest {
         EucharisticMinisterUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
-        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateEucharisticMinisters(1L, request));
         verify(mapper).updateEucharisticMinisterFromDto(request, entity);

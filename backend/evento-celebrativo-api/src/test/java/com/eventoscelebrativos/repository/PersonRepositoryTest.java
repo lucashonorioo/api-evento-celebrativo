@@ -6,10 +6,16 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
+import com.eventoscelebrativos.service.PersonMinistryReadService;
+import com.eventoscelebrativos.service.impl.PersonMinistryReadServiceImpl;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
@@ -17,10 +23,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
+@Import(PersonMinistryReadServiceImpl.class)
 class PersonRepositoryTest {
 
     @Autowired
@@ -36,6 +46,12 @@ class PersonRepositoryTest {
     private UserAccountRoleRepository userAccountRoleRepository;
 
     @Autowired
+    private PersonMinistryReadService personMinistryReadService;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
+
+    @Autowired
     private TestEntityManager entityManager;
 
     @Test
@@ -45,6 +61,9 @@ class PersonRepositoryTest {
 
         Page<Long> result = personRepository.findAdminPageIds(
                 "AAA User Same",
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -65,6 +84,9 @@ class PersonRepositoryTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -79,6 +101,9 @@ class PersonRepositoryTest {
         Page<Long> result = personRepository.findAdminPageIds(
                 null,
                 "000005",
+                null,
+                null,
+                null,
                 null,
                 null,
                 PageRequest.of(0, 10)
@@ -99,6 +124,9 @@ class PersonRepositoryTest {
                 null,
                 MinistryType.READER,
                 null,
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -116,6 +144,9 @@ class PersonRepositoryTest {
                 null,
                 null,
                 "ROLE_ADMIN",
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -137,6 +168,9 @@ class PersonRepositoryTest {
                 "00010",
                 MinistryType.READER,
                 "ROLE_ADMIN",
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -153,6 +187,9 @@ class PersonRepositoryTest {
                 null,
                 null,
                 "ROLE_OPERATOR",
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -181,11 +218,120 @@ class PersonRepositoryTest {
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
                 PageRequest.of(0, 10)
         );
 
         assertEquals(1, result.getTotalElements());
         assertEquals(person.getId(), result.getContent().get(0));
+    }
+
+    @Test
+    void shouldFilterPeopleByPersonActive() {
+        Person active = savePersonWithoutAccount("Active Filter Person", "34970100001");
+        Person inactive = savePersonWithoutAccount("Inactive Filter Person", "34970100002");
+        Person managedInactive = personRepository.findById(inactive.getId()).orElseThrow();
+        managedInactive.setActive(false);
+        personRepository.saveAndFlush(managedInactive);
+        entityManager.clear();
+
+        Page<Long> activeResult = personRepository.findAdminPageIds(
+                "Filter Person", null, null, null, true, null, null, PageRequest.of(0, 10));
+        Page<Long> inactiveResult = personRepository.findAdminPageIds(
+                "Filter Person", null, null, null, false, null, null, PageRequest.of(0, 10));
+
+        assertTrue(activeResult.getContent().contains(active.getId()));
+        assertFalse(activeResult.getContent().contains(inactive.getId()));
+        assertTrue(inactiveResult.getContent().contains(inactive.getId()));
+        assertFalse(inactiveResult.getContent().contains(active.getId()));
+    }
+
+    @Test
+    void shouldFilterPeopleByAccountExists() {
+        Person withAccount = savePersonWithRole("Account Exists Person", "34970100003", operatorRole());
+        Person withoutAccount = savePersonWithoutAccount("Account Missing Person", "34970100004");
+
+        Page<Long> withAccountResult = personRepository.findAdminPageIds(
+                "Account", null, null, null, null, true, null, PageRequest.of(0, 10));
+        Page<Long> withoutAccountResult = personRepository.findAdminPageIds(
+                "Account", null, null, null, null, false, null, PageRequest.of(0, 10));
+
+        assertTrue(withAccountResult.getContent().contains(withAccount.getId()));
+        assertFalse(withAccountResult.getContent().contains(withoutAccount.getId()));
+        assertTrue(withoutAccountResult.getContent().contains(withoutAccount.getId()));
+        assertFalse(withoutAccountResult.getContent().contains(withAccount.getId()));
+    }
+
+    @Test
+    void shouldFilterPeopleByAccountEnabled() {
+        Person enabledAccountPerson = savePersonWithRole("Enabled Account Person", "34970100005", operatorRole());
+        Person disabledAccountPerson = savePersonWithRole("Disabled Account Person", "34970100006", operatorRole());
+        UserAccount disabledAccount = userAccountRepository.findByPersonId(disabledAccountPerson.getId()).orElseThrow();
+        disabledAccount.disable(LocalDateTime.now().withNano(0));
+        userAccountRepository.save(disabledAccount);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<Long> enabledResult = personRepository.findAdminPageIds(
+                "Account Person", null, null, null, null, null, true, PageRequest.of(0, 10));
+        Page<Long> disabledResult = personRepository.findAdminPageIds(
+                "Account Person", null, null, null, null, null, false, PageRequest.of(0, 10));
+
+        assertTrue(enabledResult.getContent().contains(enabledAccountPerson.getId()));
+        assertFalse(enabledResult.getContent().contains(disabledAccountPerson.getId()));
+        assertTrue(disabledResult.getContent().contains(disabledAccountPerson.getId()));
+        assertFalse(disabledResult.getContent().contains(enabledAccountPerson.getId()));
+    }
+
+    @Test
+    void shouldUseConstantNumberOfQueriesRegardlessOfPageItemCount() {
+        long smallBatchQueries = runFullAdminListingPipeline("NPlusOne Small Batch", 2, "34971000");
+        long largeBatchQueries = runFullAdminListingPipeline("NPlusOne Large Batch", 9, "34972000");
+
+        assertTrue(smallBatchQueries > 0, "A contagem de statements deveria refletir consultas reais, nao um falso positivo de 0");
+        assertEquals(smallBatchQueries, largeBatchQueries,
+                "A quantidade de consultas SQL deve ser constante independentemente do numero de itens na pagina");
+    }
+
+    /**
+     * entityManager.clear() antes da medicao (apos o setup de cada lote) esvazia o contexto de
+     * persistencia para que as consultas medidas nao sejam satisfeitas pelo cache de primeiro nivel;
+     * statistics.clear() reseta o contador do Hibernate para isolar a medicao de cada lote entre as
+     * duas chamadas sequenciais desta mesma instancia de SessionFactory.
+     */
+    private long runFullAdminListingPipeline(String namePrefix, int personCount, String phonePrefix) {
+        entityManager.clear();
+        IntStream.rangeClosed(1, personCount).forEach(i -> {
+            Person person = savePersonWithRole(namePrefix + " " + i, phonePrefix + String.format("%03d", i), operatorRole());
+            entityManager.persist(new PersonMinistry(person, MinistryType.READER));
+            entityManager.flush();
+        });
+        entityManager.clear();
+
+        Statistics statistics = hibernateStatistics();
+        statistics.clear();
+
+        Page<Long> idPage = personRepository.findAdminPageIds(
+                namePrefix, null, null, null, null, null, null, PageRequest.of(0, personCount + 5));
+        List<Long> ids = idPage.getContent();
+        assertEquals(personCount, ids.size());
+
+        Map<Long, Person> peopleById = personRepository.findAllByIdIn(ids).stream()
+                .collect(Collectors.toMap(Person::getId, Function.identity()));
+        assertEquals(personCount, peopleById.size());
+        personMinistryReadService.findActiveMinistriesByPersonIds(ids);
+        userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(ids);
+        userAccountRepository.findAccountStatesByPersonIdInGroupedByPerson(ids);
+
+        return statistics.getPrepareStatementCount();
+    }
+
+    private Statistics hibernateStatistics() {
+        SessionFactory sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
+        sessionFactory.getStatistics().setStatisticsEnabled(true);
+        return sessionFactory.getStatistics();
     }
 
     private Person savePersonWithRole(String name, String phoneNumber, Role role) {

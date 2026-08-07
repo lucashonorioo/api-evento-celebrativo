@@ -1,7 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
-import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -140,12 +140,15 @@ class PersonLifecycleAssignmentBoundaryIntegrationTest {
         Long eventId = createEventWithAssignment(person, CURRENT_SECOND.minusMinutes(30), CURRENT_SECOND.plusMinutes(30));
         createParticipation(eventId, person);
 
-        LifecycleConflictException exception = assertThrows(
-                LifecycleConflictException.class,
+        PersonHasActiveAssignmentsException exception = assertThrows(
+                PersonHasActiveAssignmentsException.class,
                 () -> userAccountLifecycleService.updatePersonActive(person.getId(), activeRequest(false))
         );
 
         assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", exception.getErrorCode());
+        assertEquals(1, exception.getAssignments().size());
+        assertEquals(eventId, exception.getAssignments().get(0).getEventId());
+        assertEquals("READER", exception.getAssignments().get(0).getAssignmentType());
         assertTrue(personRepository.findById(person.getId()).orElseThrow().isActive());
         assertEquals(1L, countRows("tb_event_assignment", "event_id", eventId));
         assertEquals(1L, countRows("tb_event_participation_response", "event_id", eventId));
@@ -156,12 +159,14 @@ class PersonLifecycleAssignmentBoundaryIntegrationTest {
         Person person = createPerson();
         Long eventId = createEventWithAssignment(person, CURRENT_SECOND.plusHours(1), CURRENT_SECOND.plusHours(2));
 
-        LifecycleConflictException exception = assertThrows(
-                LifecycleConflictException.class,
+        PersonHasActiveAssignmentsException exception = assertThrows(
+                PersonHasActiveAssignmentsException.class,
                 () -> userAccountLifecycleService.updatePersonActive(person.getId(), activeRequest(false))
         );
 
         assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", exception.getErrorCode());
+        assertEquals(1, exception.getAssignments().size());
+        assertEquals(eventId, exception.getAssignments().get(0).getEventId());
         assertTrue(personRepository.findById(person.getId()).orElseThrow().isActive());
         assertEquals(1L, countRows("tb_event_assignment", "event_id", eventId));
     }
@@ -173,12 +178,15 @@ class PersonLifecycleAssignmentBoundaryIntegrationTest {
         Long futureEventId = createEventWithAssignment(person, CURRENT_SECOND.plusDays(1), CURRENT_SECOND.plusDays(1).plusHours(1));
         createParticipation(futureEventId, person);
 
-        LifecycleConflictException exception = assertThrows(
-                LifecycleConflictException.class,
+        PersonHasActiveAssignmentsException exception = assertThrows(
+                PersonHasActiveAssignmentsException.class,
                 () -> userAccountLifecycleService.updatePersonActive(person.getId(), activeRequest(false))
         );
 
         assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", exception.getErrorCode());
+        assertEquals(2, exception.getAssignments().size());
+        assertEquals(inProgressEventId, exception.getAssignments().get(0).getEventId());
+        assertEquals(futureEventId, exception.getAssignments().get(1).getEventId());
         assertTrue(personRepository.findById(person.getId()).orElseThrow().isActive());
         assertEquals(2L, countRows("tb_event_assignment", "person_id", person.getId()));
         assertEquals(1L, countRows("tb_event_participation_response", "person_id", person.getId()));

@@ -40,9 +40,6 @@ class PersonMinistryCommandServiceImplTest {
     @Mock
     private EventAssignmentRepository eventAssignmentRepository;
 
-    @Mock
-    private PersonAccountCoordinator personAccountCoordinator;
-
     @InjectMocks
     private PersonMinistryCommandServiceImpl service;
 
@@ -59,7 +56,6 @@ class PersonMinistryCommandServiceImplTest {
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
         assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
-        verifyNoInteractions(personAccountCoordinator);
     }
 
     @Test
@@ -157,16 +153,6 @@ class PersonMinistryCommandServiceImplTest {
         assertThrows(BusinessException.class, () -> service.requireActiveMinistryPersonForUpdate(null, MinistryType.READER, ENTITY_LABEL));
         assertThrows(BusinessException.class, () -> service.requireActiveMinistryPersonForUpdate(0L, MinistryType.READER, ENTITY_LABEL));
         verifyNoInteractions(personRepository);
-    }
-
-    @Test
-    void shouldDelegateSaveToPersonRepository() {
-        Person reader = reader(1L);
-        when(personRepository.save(reader)).thenReturn(reader);
-
-        assertSame(reader, service.save(reader));
-        verify(personRepository).save(reader);
-        verify(personAccountCoordinator).synchronizeAccountAfterPersonUpdate(reader);
     }
 
     @Test

@@ -14,6 +14,7 @@ import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.PasswordPolicy;
 import com.eventoscelebrativos.service.PersonAccessProvisioningPlan;
 import com.eventoscelebrativos.service.PersonAccountCoordinator;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class PersonAccountCoordinatorImpl implements PersonAccountCoordinator {
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private static final String ROLE_OPERATOR = "ROLE_OPERATOR";
     private static final Set<String> ALLOWED_ROLES = Set.of(ROLE_ADMIN, ROLE_OPERATOR);
+    private static final String USERNAME_UNIQUE_CONSTRAINT = "uk_tb_user_account_username";
 
     private final UserAccountRepository userAccountRepository;
     private final UserAccountRoleRepository userAccountRoleRepository;
@@ -102,7 +104,7 @@ public class PersonAccountCoordinatorImpl implements PersonAccountCoordinator {
 
         String passwordHash = passwordEncoder.encode(plan.rawPassword());
         LocalDateTime now = currentSecond();
-        UserAccount account = userAccountRepository.save(
+        UserAccount account = saveOrTranslateUsernameConflict(
                 new UserAccount(person, person.getPhoneNumber(), passwordHash, now, now));
         userAccountRoleRepository.save(new UserAccountRole(account, role));
     }
@@ -124,15 +126,43 @@ public class PersonAccountCoordinatorImpl implements PersonAccountCoordinator {
         account.incrementTokenVersion();
         account.setUsername(person.getPhoneNumber());
         account.setUpdatedAt(currentSecond());
-        userAccountRepository.save(account);
+        saveOrTranslateUsernameConflict(account);
     }
 
     private void validateUsernameAvailable(String username, Long currentAccountId) {
-        userAccountRepository.findByUsernameForUpdate(username)
+        userAccountRepository.findByUsername(username)
                 .filter(account -> currentAccountId == null || !account.getId().equals(currentAccountId))
                 .ifPresent(account -> {
                     throw conflict("Username ja esta associado a outra conta.", "USER_ACCOUNT_USERNAME_CONFLICT");
                 });
+    }
+
+    /**
+     * Flush explicito: garante que a constraint {@code uk_tb_user_account_username} seja verificada
+     * aqui dentro do try/catch, em vez de vazar apenas no commit da transacao. E a garantia final
+     * contra a corrida entre a checagem amigavel acima (nao bloqueante, sem lock) e o commit de outra
+     * transacao concorrente disputando o mesmo username novo - cenario que antes dependia de deadlock
+     * de gap lock do InnoDB (SELECT ... FOR UPDATE sobre um valor ainda inexistente) para ser
+     * detectado.
+     */
+    private UserAccount saveOrTranslateUsernameConflict(UserAccount account) {
+        try {
+            return userAccountRepository.saveAndFlush(account);
+        } catch (DataIntegrityViolationException e) {
+            String rootCauseMessage = rootCauseMessage(e);
+            if (rootCauseMessage != null && rootCauseMessage.toLowerCase().contains(USERNAME_UNIQUE_CONSTRAINT)) {
+                throw conflict("Username ja esta associado a outra conta.", "USER_ACCOUNT_USERNAME_CONFLICT");
+            }
+            throw e;
+        }
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current.getMessage();
     }
 
     private Role requireRoleWithAdminMutex(String roleName) {

@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.dto.request.CelebrationEventScaleRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.Location;
 import com.eventoscelebrativos.model.MinistryType;
@@ -198,8 +199,8 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
             Exception deactivationException = deactivation.get(30, TimeUnit.SECONDS);
 
             assertEquals(null, scaleException);
-            assertInstanceOf(LifecycleConflictException.class, deactivationException);
-            assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", ((LifecycleConflictException) deactivationException).getErrorCode());
+            assertInstanceOf(PersonHasActiveAssignmentsException.class, deactivationException);
+            assertEquals("PERSON_HAS_ACTIVE_ASSIGNMENTS", ((PersonHasActiveAssignmentsException) deactivationException).getErrorCode());
             assertTrue(personRepository.findById(personId).orElseThrow().isActive());
             assertEquals(1, countAssignments(eventId));
         } finally {

@@ -10,7 +10,6 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.service.PersonAccountCoordinator;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryDiff;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
@@ -28,18 +27,15 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final PersonRepository personRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
-    private final PersonAccountCoordinator personAccountCoordinator;
 
     public PersonMinistryCommandServiceImpl(
             PersonRepository personRepository,
             PersonMinistryRepository personMinistryRepository,
-            EventAssignmentRepository eventAssignmentRepository,
-            PersonAccountCoordinator personAccountCoordinator
+            EventAssignmentRepository eventAssignmentRepository
     ) {
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
-        this.personAccountCoordinator = personAccountCoordinator;
     }
 
     @Override
@@ -78,14 +74,6 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
                 .filter(pm -> Boolean.TRUE.equals(pm.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         return person;
-    }
-
-    @Override
-    @Transactional
-    public Person save(Person person) {
-        Person saved = personRepository.save(person);
-        personAccountCoordinator.synchronizeAccountAfterPersonUpdate(saved);
-        return saved;
     }
 
     @Override

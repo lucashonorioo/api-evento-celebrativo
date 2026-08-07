@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.AdminPasswordResetRequestDTO;
 import com.eventoscelebrativos.dto.request.ParticipationResponseRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
+import com.eventoscelebrativos.dto.request.PersonAdminUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
@@ -167,7 +168,15 @@ public class PersonController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Lista pessoas para administracao de usuarios")
+    @Operation(
+            summary = "Lista pessoas para administracao de usuarios",
+            description = "Contrato administrativo ampliado: cada item traz birthdayDate, personActive, accountExists, "
+                    + "accountEnabled e username, alem dos campos ja existentes (id, name, phoneNumber, ministries, roles). "
+                    + "Pessoa sem conta: accountExists=false, accountEnabled=null, username=null, roles=[]. "
+                    + "Filtros novos: personActive, accountExists, accountEnabled. Quando accountExists estiver ausente, "
+                    + "informar accountEnabled ou role implica accountExists=true. accountExists=false combinado com "
+                    + "accountEnabled ou role retorna 400 PERSON_ADMIN_FILTERS_INVALID."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pessoas listadas com sucesso"),
             @ApiResponse(responseCode = "400", description = "Filtros ou paginacao invalidos"),
@@ -183,6 +192,12 @@ public class PersonController {
             @RequestParam(required = false) String ministry,
             @Parameter(description = "Perfil de acesso: ROLE_ADMIN ou ROLE_OPERATOR")
             @RequestParam(required = false) String role,
+            @Parameter(description = "true: somente pessoas ativas. false: somente pessoas inativas.")
+            @RequestParam(required = false) Boolean personActive,
+            @Parameter(description = "true: somente pessoas com conta. false: somente pessoas sem conta.")
+            @RequestParam(required = false) Boolean accountExists,
+            @Parameter(description = "true: somente contas existentes e habilitadas. false: somente contas existentes e desabilitadas.")
+            @RequestParam(required = false) Boolean accountEnabled,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
@@ -191,13 +206,21 @@ public class PersonController {
                 phoneNumber,
                 ministry,
                 role,
+                personActive,
+                accountExists,
+                accountEnabled,
                 page,
                 size
         );
         return ResponseEntity.ok(people);
     }
 
-    @Operation(summary = "Busca uma pessoa por ID para administracao de usuarios")
+    @Operation(
+            summary = "Busca uma pessoa por ID para administracao de usuarios",
+            description = "Retorna o contrato administrativo ampliado (mesmo formato da listagem), evitando que o "
+                    + "frontend precise combinar este endpoint com GET /pessoas/{id}/conta apenas para montar o estado "
+                    + "inicial da pagina administrativa."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pessoa encontrada"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
@@ -208,6 +231,33 @@ public class PersonController {
     @GetMapping(value = "/{id}")
     public ResponseEntity<PersonAdminResponseDTO> findPersonById(@PathVariable Long id) {
         PersonAdminResponseDTO responseDTO = personService.findPersonById(id);
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(
+            summary = "Atualiza dados cadastrais de uma pessoa (administrativo).",
+            description = "Aceita somente name, phoneNumber e birthdayDate. Qualquer outro campo no corpo - inclusive "
+                    + "password, createAccess, accessRole, role, roles, ministries, active, personActive, accountEnabled, "
+                    + "enabled, username, accountId, tokenVersion, passwordHash, account, ou campo desconhecido - e "
+                    + "rejeitado mesmo quando enviado como null, vazio ou false. Quando o telefone muda de fato e a "
+                    + "pessoa possui conta, o username e sincronizado e o tokenVersion e incrementado uma unica vez, "
+                    + "invalidando tokens antigos."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pessoa atualizada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados invalidos ou campo nao permitido informado"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Telefone ja associado a outra pessoa")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}")
+    public ResponseEntity<PersonAdminResponseDTO> updatePersonAdmin(
+            @PathVariable Long id,
+            @Valid @RequestBody PersonAdminUpdateRequestDTO requestDTO
+    ) {
+        PersonAdminResponseDTO responseDTO = personService.updatePersonAdmin(id, requestDTO);
         return ResponseEntity.ok(responseDTO);
     }
 
@@ -273,7 +323,11 @@ public class PersonController {
 
     @Operation(
             summary = "Ativa ou desativa pessoa sem alterar enabled da conta.",
-            description = "Desativacao invalida tokens quando ha conta, bloqueia assignments em andamento ou futuros e preserva historico, participacoes, ministerios e escalas existentes."
+            description = "Desativacao invalida tokens quando ha conta, bloqueia assignments em andamento ou futuros e preserva historico, participacoes, ministerios e escalas existentes. "
+                    + "Quando bloqueada por PERSON_HAS_ACTIVE_ASSIGNMENTS, a resposta 409 traz o corpo padrao de erro "
+                    + "(timestamp, status, error, errorCode, path) acrescido do campo assignments: lista de "
+                    + "{eventId, eventName, startAt, endAt, assignmentType} dos assignments com evento ainda nao encerrado "
+                    + "(endAt > agora), ordenada por startAt, eventId e assignmentType. Nao inclui dados de outras pessoas."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Status atualizado com sucesso"),
@@ -281,7 +335,7 @@ public class PersonController {
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
-            @ApiResponse(responseCode = "409", description = "Self-deactivation, ultimo administrador ou assignments ativos")
+            @ApiResponse(responseCode = "409", description = "Self-deactivation, ultimo administrador ou assignments ativos (PERSON_HAS_ACTIVE_ASSIGNMENTS traz o campo assignments)")
     })
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PutMapping(value = "/{id}/status")
