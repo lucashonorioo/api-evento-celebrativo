@@ -25,8 +25,6 @@ public interface PersonMinistryCommandService {
      */
     Person requireActiveMinistryPersonForUpdate(Long personId, MinistryType ministryType, String entityLabel);
 
-    Person save(Person person);
-
     void removeMinistry(Long personId, MinistryType ministryType, String entityLabel);
 
     /**

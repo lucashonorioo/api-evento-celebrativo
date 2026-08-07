@@ -7,6 +7,7 @@ import com.eventoscelebrativos.mapper.ReaderMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.service.PersonAccountCoordinator;
+import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.ReaderService;
@@ -25,17 +26,20 @@ public class ReaderServiceImpl implements ReaderService {
     private final PersonAccountCoordinator personAccountCoordinator;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
+    private final PersonCadastralUpdateService personCadastralUpdateService;
 
     public ReaderServiceImpl(
             ReaderMapper readerMapper,
             PersonAccountCoordinator personAccountCoordinator,
             PersonMinistryCommandService personMinistryCommandService,
-            PersonMinistryReadService personMinistryReadService
+            PersonMinistryReadService personMinistryReadService,
+            PersonCadastralUpdateService personCadastralUpdateService
     ) {
         this.readerMapper = readerMapper;
         this.personAccountCoordinator = personAccountCoordinator;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
+        this.personCadastralUpdateService = personCadastralUpdateService;
     }
 
 
@@ -75,7 +79,7 @@ public class ReaderServiceImpl implements ReaderService {
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.READER, ENTITY_LABEL);
         readerMapper.updateReaderFromDto(readerUpdateRequestDTO, person);
 
-        Person saved = personMinistryCommandService.save(person);
+        Person saved = personCadastralUpdateService.updateCadastral(person);
         return readerMapper.toDtoFromPerson(saved);
     }
 

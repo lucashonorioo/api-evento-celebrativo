@@ -145,13 +145,20 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             @Param("currentSecond") LocalDateTime currentSecond
     );
 
+    /**
+     * Assignments ativos ou futuros (endAt > currentSecond) de uma pessoa, com os dados do evento
+     * necessarios para a resposta estruturada de {@link com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException}.
+     * Consulta unica (sem exists seguido de detalhe): lista vazia significa ausencia de bloqueio.
+     */
     @Query("""
-            SELECT CASE WHEN COUNT(a) > 0 THEN TRUE ELSE FALSE END
+            SELECT a.event.id AS eventId, a.event.nameMassOrEvent AS eventName, a.event.startAt AS startAt,
+                   a.event.endAt AS endAt, a.assignmentType AS assignmentType
             FROM EventAssignment a
             WHERE a.person.id = :personId
               AND a.event.endAt > :currentSecond
+            ORDER BY a.event.startAt ASC, a.event.id ASC, a.assignmentType ASC
             """)
-    boolean existsActiveOrFutureAssignmentByPersonId(
+    List<PersonUnavailabilityAssignmentConflictProjection> findActiveOrFutureAssignmentsByPersonId(
             @Param("personId") Long personId,
             @Param("currentSecond") LocalDateTime currentSecond
     );

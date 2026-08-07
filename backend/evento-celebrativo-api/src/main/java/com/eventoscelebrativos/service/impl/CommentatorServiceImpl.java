@@ -9,6 +9,7 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.service.CommentatorService;
 import com.eventoscelebrativos.service.PersonAccountCoordinator;
+import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import org.springframework.stereotype.Service;
@@ -25,17 +26,20 @@ public class CommentatorServiceImpl implements CommentatorService {
     private final PersonAccountCoordinator personAccountCoordinator;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
+    private final PersonCadastralUpdateService personCadastralUpdateService;
 
     public CommentatorServiceImpl(
             CommentatorMapper commentatorMapper,
             PersonAccountCoordinator personAccountCoordinator,
             PersonMinistryCommandService personMinistryCommandService,
-            PersonMinistryReadService personMinistryReadService
+            PersonMinistryReadService personMinistryReadService,
+            PersonCadastralUpdateService personCadastralUpdateService
     ) {
         this.commentatorMapper = commentatorMapper;
         this.personAccountCoordinator = personAccountCoordinator;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
+        this.personCadastralUpdateService = personCadastralUpdateService;
     }
 
     @Override
@@ -74,7 +78,7 @@ public class CommentatorServiceImpl implements CommentatorService {
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
         commentatorMapper.updateCommentatorFromDto(commentatorUpdateRequestDTO, person);
 
-        Person saved = personMinistryCommandService.save(person);
+        Person saved = personCadastralUpdateService.updateCadastral(person);
         return commentatorMapper.toDtoFromPerson(saved);
     }
 

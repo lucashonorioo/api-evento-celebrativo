@@ -13,15 +13,18 @@ import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.PasswordPolicy;
 import com.eventoscelebrativos.service.PersonAccessProvisioningPlan;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.lang.reflect.Field;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -176,14 +179,14 @@ class PersonAccountCoordinatorImplTest {
         Person person = person(1L, "34999999991", true);
         Role operatorRole = new Role(1L, "ROLE_OPERATOR");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
-        when(userAccountRepository.findByUsernameForUpdate("34999999991")).thenReturn(Optional.empty());
+        when(userAccountRepository.findByUsername("34999999991")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("senha123")).thenReturn("encoded-hash");
-        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userAccountRepository.saveAndFlush(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         coordinator.provisionAccess(person, request(true, "senha123", null));
 
         ArgumentCaptor<UserAccount> accountCaptor = ArgumentCaptor.forClass(UserAccount.class);
-        verify(userAccountRepository).save(accountCaptor.capture());
+        verify(userAccountRepository).saveAndFlush(accountCaptor.capture());
         UserAccount created = accountCaptor.getValue();
         assertEquals("34999999991", created.getUsername());
         assertEquals("encoded-hash", created.getPasswordHash());
@@ -200,9 +203,9 @@ class PersonAccountCoordinatorImplTest {
         Person person = person(1L, "34999999991", true);
         Role adminRole = new Role(2L, "ROLE_ADMIN");
         when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(adminRole));
-        when(userAccountRepository.findByUsernameForUpdate("34999999991")).thenReturn(Optional.empty());
+        when(userAccountRepository.findByUsername("34999999991")).thenReturn(Optional.empty());
         when(passwordEncoder.encode("senha123")).thenReturn("encoded-hash");
-        when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userAccountRepository.saveAndFlush(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         coordinator.provisionAccess(person, request(true, "senha123", "ROLE_ADMIN"));
 
@@ -216,13 +219,13 @@ class PersonAccountCoordinatorImplTest {
         Role operatorRole = new Role(1L, "ROLE_OPERATOR");
         when(roleRepository.findByAuthority("ROLE_OPERATOR")).thenReturn(Optional.of(operatorRole));
         UserAccount other = new UserAccount(person(2L, "34999999991", true), "34999999991", "hash", LocalDateTime.now(), LocalDateTime.now());
-        when(userAccountRepository.findByUsernameForUpdate("34999999991")).thenReturn(Optional.of(other));
+        when(userAccountRepository.findByUsername("34999999991")).thenReturn(Optional.of(other));
 
         LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
                 () -> coordinator.provisionAccess(person, request(true, "senha123", null)));
 
         assertEquals("USER_ACCOUNT_USERNAME_CONFLICT", exception.getErrorCode());
-        verify(userAccountRepository, never()).save(any());
+        verify(userAccountRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -251,7 +254,7 @@ class PersonAccountCoordinatorImplTest {
 
         coordinator.synchronizeAccountAfterPersonUpdate(person);
 
-        verify(userAccountRepository, never()).save(any());
+        verify(userAccountRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -263,7 +266,7 @@ class PersonAccountCoordinatorImplTest {
         coordinator.synchronizeAccountAfterPersonUpdate(person);
 
         assertEquals(0L, existing.getTokenVersion());
-        verify(userAccountRepository, never()).save(any());
+        verify(userAccountRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -271,14 +274,14 @@ class PersonAccountCoordinatorImplTest {
         Person person = person(1L, "34999999992", true);
         UserAccount existing = existingAccount(person, 10L, "34999999991");
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
-        when(userAccountRepository.findByUsernameForUpdate("34999999992")).thenReturn(Optional.empty());
-        when(userAccountRepository.save(existing)).thenReturn(existing);
+        when(userAccountRepository.findByUsername("34999999992")).thenReturn(Optional.empty());
+        when(userAccountRepository.saveAndFlush(existing)).thenReturn(existing);
 
         coordinator.synchronizeAccountAfterPersonUpdate(person);
 
         assertEquals("34999999992", existing.getUsername());
         assertEquals(1L, existing.getTokenVersion());
-        verify(userAccountRepository).save(existing);
+        verify(userAccountRepository).saveAndFlush(existing);
     }
 
     @Test
@@ -287,13 +290,57 @@ class PersonAccountCoordinatorImplTest {
         UserAccount existing = existingAccount(person, 10L, "34999999991");
         UserAccount other = existingAccount(person(2L, "34999999992", true), 20L, "34999999992");
         when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
-        when(userAccountRepository.findByUsernameForUpdate("34999999992")).thenReturn(Optional.of(other));
+        when(userAccountRepository.findByUsername("34999999992")).thenReturn(Optional.of(other));
 
         LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
                 () -> coordinator.synchronizeAccountAfterPersonUpdate(person));
 
         assertEquals("USER_ACCOUNT_USERNAME_CONFLICT", exception.getErrorCode());
-        verify(userAccountRepository, never()).save(any());
+        verify(userAccountRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * Simula a corrida real que antes dependia de deadlock de gap lock do InnoDB: a checagem
+     * amigavel (sem lock) nao encontra conflito porque a outra transacao concorrente ainda nao
+     * commitou, mas o flush explicito colide com a constraint uk_tb_user_account_username quando a
+     * outra transacao vence a corrida primeiro.
+     */
+    @Test
+    void shouldTranslateUniqueConstraintViolationOnFlushToUsernameConflict() {
+        Person person = person(1L, "34999999992", true);
+        UserAccount existing = existingAccount(person, 10L, "34999999991");
+        when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
+        when(userAccountRepository.findByUsername("34999999992")).thenReturn(Optional.empty());
+        when(userAccountRepository.saveAndFlush(existing)).thenThrow(usernameConstraintViolation());
+
+        LifecycleConflictException exception = assertThrows(LifecycleConflictException.class,
+                () -> coordinator.synchronizeAccountAfterPersonUpdate(person));
+
+        assertEquals("USER_ACCOUNT_USERNAME_CONFLICT", exception.getErrorCode());
+    }
+
+    @Test
+    void shouldRethrowUnrelatedDataIntegrityViolationOnFlush() {
+        Person person = person(1L, "34999999992", true);
+        UserAccount existing = existingAccount(person, 10L, "34999999991");
+        DataIntegrityViolationException unrelated = new DataIntegrityViolationException("unrelated constraint");
+        when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(existing));
+        when(userAccountRepository.findByUsername("34999999992")).thenReturn(Optional.empty());
+        when(userAccountRepository.saveAndFlush(existing)).thenThrow(unrelated);
+
+        DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
+                () -> coordinator.synchronizeAccountAfterPersonUpdate(person));
+
+        assertEquals(unrelated, thrown);
+    }
+
+    private DataIntegrityViolationException usernameConstraintViolation() {
+        SQLIntegrityConstraintViolationException sqlException = new SQLIntegrityConstraintViolationException(
+                "Duplicate entry '34999999992' for key 'tb_user_account.uk_tb_user_account_username'"
+        );
+        ConstraintViolationException hibernateException = new ConstraintViolationException(
+                "could not execute statement", sqlException, "uk_tb_user_account_username");
+        return new DataIntegrityViolationException("could not execute statement", hibernateException);
     }
 
     private PersonAccessRequest request(Boolean createAccess, String password, String accessRole) {

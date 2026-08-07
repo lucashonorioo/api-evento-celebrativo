@@ -40,6 +40,9 @@ class ReaderServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private ReaderServiceImpl service;
 
@@ -155,7 +158,7 @@ class ReaderServiceImplTest {
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
-        when(personMinistryCommandService.save(entity)).thenReturn(saved);
+        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));

@@ -7,6 +7,7 @@ import com.eventoscelebrativos.mapper.PriestMapper;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.service.PersonAccountCoordinator;
+import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PriestService;
@@ -25,17 +26,20 @@ public class PriestServiceImpl implements PriestService {
     private final PersonAccountCoordinator personAccountCoordinator;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
+    private final PersonCadastralUpdateService personCadastralUpdateService;
 
     public PriestServiceImpl(
             PriestMapper priestMapper,
             PersonAccountCoordinator personAccountCoordinator,
             PersonMinistryCommandService personMinistryCommandService,
-            PersonMinistryReadService personMinistryReadService
+            PersonMinistryReadService personMinistryReadService,
+            PersonCadastralUpdateService personCadastralUpdateService
     ) {
         this.priestMapper = priestMapper;
         this.personAccountCoordinator = personAccountCoordinator;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
+        this.personCadastralUpdateService = personCadastralUpdateService;
     }
 
 
@@ -75,7 +79,7 @@ public class PriestServiceImpl implements PriestService {
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.PRIEST, ENTITY_LABEL);
         priestMapper.updatePriestFromDto(priestUpdateRequestDTO, person);
 
-        Person saved = personMinistryCommandService.save(person);
+        Person saved = personCadastralUpdateService.updateCadastral(person);
         return priestMapper.toDtoFromPerson(saved);
     }
 

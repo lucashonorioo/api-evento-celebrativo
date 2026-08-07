@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.WebRequest;
@@ -78,6 +80,28 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertEquals("UNAVAILABILITY_OVERLAP", response.getBody().getErrorCode());
+    }
+
+    /**
+     * Prova o fallback generico do handler para deadlock/timeout de lock pessimista transitorio (ex.:
+     * contencao real de linha ja existente sob PESSIMISTIC_WRITE). Sem este handler, a excecao
+     * vazava como 500 cru em vez de um erro de dominio estavel.
+     * <p>
+     * Nao cobre mais o conflito de Person.phoneNumber/UserAccount.username: esse cenario, antes
+     * dependente de deadlock genuino por gap lock do InnoDB (SELECT ... FOR UPDATE sobre um valor
+     * unico ainda inexistente), agora e resolvido sem lock pessimista sobre o valor novo e sem
+     * depender de deadlock - ver PersonPhoneNumberContentionConcurrencyMySqlIntegrationTest.
+     */
+    @Test
+    void shouldConvertPessimisticLockingFailureToStableConcurrentUpdateConflict() {
+        lenient().when(webRequest.getDescription(false)).thenReturn("uri=/pessoas/1");
+        PessimisticLockingFailureException exception = new CannotAcquireLockException(
+                "could not execute statement", new RuntimeException("Deadlock found when trying to get lock"));
+
+        ResponseEntity<ErrorResponse> response = handler.handlePessimisticLockingFailure(exception, webRequest);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals("CONCURRENT_UPDATE_CONFLICT", response.getBody().getErrorCode());
     }
 
     private DataIntegrityViolationException eventAssignmentConstraintViolation() {

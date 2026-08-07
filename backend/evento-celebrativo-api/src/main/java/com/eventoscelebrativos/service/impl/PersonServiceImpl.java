@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
+import com.eventoscelebrativos.dto.request.PersonAdminUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
@@ -23,9 +24,11 @@ import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
+import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
@@ -67,6 +70,8 @@ public class PersonServiceImpl implements PersonService {
     private final EventParticipationResponseService eventParticipationResponseService;
     private final UserAccountLifecycleService userAccountLifecycleService;
     private final UserAccountRoleRepository userAccountRoleRepository;
+    private final UserAccountRepository userAccountRepository;
+    private final PersonCadastralUpdateService personCadastralUpdateService;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -78,7 +83,9 @@ public class PersonServiceImpl implements PersonService {
             EventAssignmentRepository eventAssignmentRepository,
             EventParticipationResponseService eventParticipationResponseService,
             UserAccountLifecycleService userAccountLifecycleService,
-            UserAccountRoleRepository userAccountRoleRepository
+            UserAccountRoleRepository userAccountRoleRepository,
+            UserAccountRepository userAccountRepository,
+            PersonCadastralUpdateService personCadastralUpdateService
     ) {
         this.personRepository = personRepository;
         this.personAdminMapper = personAdminMapper;
@@ -90,6 +97,8 @@ public class PersonServiceImpl implements PersonService {
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.userAccountLifecycleService = userAccountLifecycleService;
         this.userAccountRoleRepository = userAccountRoleRepository;
+        this.userAccountRepository = userAccountRepository;
+        this.personCadastralUpdateService = personCadastralUpdateService;
     }
 
     @Override
@@ -99,6 +108,9 @@ public class PersonServiceImpl implements PersonService {
             String phoneNumber,
             String ministry,
             String role,
+            Boolean personActive,
+            Boolean accountExists,
+            Boolean accountEnabled,
             int page,
             int size
     ) {
@@ -106,6 +118,7 @@ public class PersonServiceImpl implements PersonService {
         String normalizedPhoneNumber = normalizeOptionalFilter(phoneNumber);
         MinistryType ministryType = normalizeMinistryFilter(ministry);
         String normalizedRole = normalizeRoleFilter(role);
+        validateAccountFilterCombination(accountExists, accountEnabled, normalizedRole);
         validatePage(page, size);
 
         PageRequest pageable = PageRequest.of(page, size);
@@ -114,6 +127,9 @@ public class PersonServiceImpl implements PersonService {
                 normalizedPhoneNumber,
                 ministryType,
                 normalizedRole,
+                personActive,
+                accountExists,
+                accountEnabled,
                 pageable
         );
 
@@ -126,15 +142,17 @@ public class PersonServiceImpl implements PersonService {
                 .collect(Collectors.toMap(Person::getId, Function.identity()));
         Map<Long, Set<MinistryType>> activeMinistriesById = personMinistryReadService.findActiveMinistriesByPersonIds(ids);
         Map<Long, List<String>> rolesById = userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(ids);
+        Map<Long, UserAccountRepository.AccountState> accountStatesById =
+                userAccountRepository.findAccountStatesByPersonIdInGroupedByPerson(ids);
 
         List<PersonAdminResponseDTO> content = ids.stream()
                 .map(peopleById::get)
-                .map(person -> {
-                    PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
-                    dto.setMinistries(sortedMinistries(activeMinistriesById.getOrDefault(person.getId(), Set.of())));
-                    dto.setRoles(sortedRoles(rolesById.getOrDefault(person.getId(), List.of())));
-                    return dto;
-                })
+                .map(person -> toAdminResponseDTO(
+                        person,
+                        activeMinistriesById.getOrDefault(person.getId(), Set.of()),
+                        rolesById.getOrDefault(person.getId(), List.of()),
+                        accountStatesById.get(person.getId())
+                ))
                 .toList();
 
         return new PageImpl<>(content, pageable, idPage.getTotalElements());
@@ -146,10 +164,62 @@ public class PersonServiceImpl implements PersonService {
         validateId(id);
         Person person = personRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
+        return toAdminResponseDTO(
+                person,
+                activeMinistriesForPerson(id),
+                rolesForPerson(id),
+                accountStateForPerson(id)
+        );
+    }
+
+    @Override
+    @Transactional
+    public PersonAdminResponseDTO updatePersonAdmin(Long id, PersonAdminUpdateRequestDTO requestDTO) {
+        validateId(id);
+        if (requestDTO == null) {
+            throw new BadRequestException("Os dados de atualização são obrigatórios");
+        }
+        requestDTO.rejectForbiddenFields();
+        Person person = personRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
+        person.setName(requestDTO.getName());
+        person.setPhoneNumber(requestDTO.getPhoneNumber());
+        person.setBirthdayDate(requestDTO.getBirthdayDate());
+        Person saved = personCadastralUpdateService.updateCadastral(person);
+        return toAdminResponseDTO(
+                saved,
+                activeMinistriesForPerson(saved.getId()),
+                rolesForPerson(saved.getId()),
+                accountStateForPerson(saved.getId())
+        );
+    }
+
+    private PersonAdminResponseDTO toAdminResponseDTO(
+            Person person,
+            Set<MinistryType> ministries,
+            List<String> roles,
+            UserAccountRepository.AccountState accountState
+    ) {
         PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
-        dto.setMinistries(sortedMinistries(activeMinistriesForPerson(id)));
-        dto.setRoles(sortedRoles(rolesForPerson(id)));
+        dto.setMinistries(sortedMinistries(ministries));
+        dto.setRoles(sortedRoles(roles));
+        dto.setAccountExists(accountState != null);
+        dto.setAccountEnabled(accountState == null ? null : accountState.isEnabled());
+        dto.setUsername(accountState == null ? null : accountState.getUsername());
         return dto;
+    }
+
+    private UserAccountRepository.AccountState accountStateForPerson(Long personId) {
+        return userAccountRepository.findAccountStatesByPersonIdInGroupedByPerson(List.of(personId)).get(personId);
+    }
+
+    private void validateAccountFilterCombination(Boolean accountExists, Boolean accountEnabled, String role) {
+        if (Boolean.FALSE.equals(accountExists) && (accountEnabled != null || role != null)) {
+            throw new BadRequestException(
+                    "accountExists=false não pode ser combinado com accountEnabled ou role",
+                    "PERSON_ADMIN_FILTERS_INVALID"
+            );
+        }
     }
 
     @Override
@@ -199,10 +269,11 @@ public class PersonServiceImpl implements PersonService {
     @Override
     @Transactional
     public CurrentUserProfileResponseDTO updateCurrentUserProfile(Long personId, CurrentUserProfileUpdateRequestDTO requestDTO) {
-        Person person = findAuthenticatedPerson(personId);
+        Person person = personRepository.findByIdForUpdate(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         person.setName(normalizeRequiredName(requestDTO.getName()));
         person.setBirthdayDate(requestDTO.getBirthdayDate());
-        Person savedPerson = personRepository.save(person);
+        Person savedPerson = personCadastralUpdateService.updateCadastral(person);
         return toCurrentUserProfileDTO(savedPerson);
     }
 

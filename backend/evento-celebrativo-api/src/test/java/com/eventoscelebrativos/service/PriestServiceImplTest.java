@@ -40,6 +40,9 @@ class PriestServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private PriestServiceImpl service;
 
@@ -100,7 +103,7 @@ class PriestServiceImplTest {
         PriestUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
-        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updatePriest(1L, request));
         verify(mapper).updatePriestFromDto(request, entity);

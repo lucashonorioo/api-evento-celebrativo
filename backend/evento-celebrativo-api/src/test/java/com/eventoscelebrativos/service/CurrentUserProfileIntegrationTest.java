@@ -195,7 +195,7 @@ class CurrentUserProfileIntegrationTest {
 
             doThrow(new DataIntegrityViolationException("simulated persistence failure"))
                     .when(personRepository)
-                    .save(argThat(person -> person != null && finalTargetId.equals(person.getId())));
+                    .saveAndFlush(argThat(person -> person != null && finalTargetId.equals(person.getId())));
 
             withAuthenticatedUser(finalTargetId, targetPhone, "OPERATOR", () -> mockMvc.perform(put("/pessoas/me")
                             .contentType(MediaType.APPLICATION_JSON)

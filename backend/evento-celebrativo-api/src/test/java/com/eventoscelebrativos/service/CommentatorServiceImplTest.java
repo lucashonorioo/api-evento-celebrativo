@@ -40,6 +40,9 @@ class CommentatorServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private CommentatorServiceImpl service;
 
@@ -99,7 +102,7 @@ class CommentatorServiceImplTest {
         CommentatorResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
-        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         CommentatorUpdateRequestDTO request = updateRequest();
         assertSame(response, service.updateCommentator(1L, request));

@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.dto.request.CurrentUserProfileUpdateRequestDTO;
+import com.eventoscelebrativos.dto.request.PersonAdminUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
@@ -89,6 +90,12 @@ class PersonServiceImplTest {
     @Mock
     private AuthenticatedUserResolver authenticatedUserResolver;
 
+    @Mock
+    private com.eventoscelebrativos.repository.UserAccountRepository userAccountRepository;
+
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private PersonServiceImpl service;
 
@@ -98,7 +105,7 @@ class PersonServiceImplTest {
         Person first = person(2L, "Alice", "34911111111");
         Person second = person(1L, "Alice", "34922222222");
 
-        when(personRepository.findAdminPageIds("Ali", "349", MinistryType.READER, "ROLE_ADMIN", pageable))
+        when(personRepository.findAdminPageIds("Ali", "349", MinistryType.READER, "ROLE_ADMIN", null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(2L, 1L), pageable, 2));
         when(personRepository.findAllByIdIn(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
@@ -107,7 +114,7 @@ class PersonServiceImplTest {
         when(personAdminMapper.toDto(first)).thenReturn(adminResponse(2L, "Alice", "ROLE_ADMIN"));
         when(personAdminMapper.toDto(second)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople(" Ali ", " 349 ", "reader", "ROLE_ADMIN", 0, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople(" Ali ", " 349 ", "reader", "ROLE_ADMIN", null, null, null, 0, 10);
 
         assertEquals(2, result.getTotalElements());
         assertEquals(2L, result.getContent().get(0).getId());
@@ -122,7 +129,7 @@ class PersonServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         Person person = person(1L, "Alice", "34911111111");
 
-        when(personRepository.findAdminPageIds(null, null, null, null, pageable))
+        when(personRepository.findAdminPageIds(null, null, null, null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(1L), pageable, 1));
         when(personRepository.findAllByIdIn(List.of(1L)))
                 .thenReturn(List.of(person));
@@ -130,7 +137,7 @@ class PersonServiceImplTest {
                 .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, null, null, 0, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, null, null, null, null, null, 0, 10);
 
         assertEquals(
                 List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
@@ -141,10 +148,10 @@ class PersonServiceImplTest {
     @Test
     void shouldReturnEmptyPageWithoutLoadingRolesWhenNoPeopleMatch() {
         PageRequest pageable = PageRequest.of(1, 10);
-        when(personRepository.findAdminPageIds(null, null, null, null, pageable))
+        when(personRepository.findAdminPageIds(null, null, null, null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople("", " ", null, "", 1, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople("", " ", null, "", null, null, null, 1, 10);
 
         assertTrue(result.getContent().isEmpty());
         assertEquals(0, result.getTotalElements());
@@ -155,16 +162,28 @@ class PersonServiceImplTest {
     void shouldThrowBadRequestWhenFiltersOrPaginationAreInvalid() {
         assertAll(
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, "invalid", null, 0, 10)),
+                        () -> service.findPeople(null, null, "invalid", null, null, null, null, 0, 10)),
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, null, "ROLE_UNKNOWN", 0, 10)),
+                        () -> service.findPeople(null, null, null, "ROLE_UNKNOWN", null, null, null, 0, 10)),
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, null, null, -1, 10)),
+                        () -> service.findPeople(null, null, null, null, null, null, null, -1, 10)),
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, null, null, 0, 0)),
+                        () -> service.findPeople(null, null, null, null, null, null, null, 0, 0)),
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, null, null, 0, 101))
+                        () -> service.findPeople(null, null, null, null, null, null, null, 0, 101))
         );
+    }
+
+    @Test
+    void shouldRejectAccountExistsFalseCombinedWithAccountEnabled() {
+        assertThrows(BadRequestException.class,
+                () -> service.findPeople(null, null, null, null, null, false, true, 0, 10));
+    }
+
+    @Test
+    void shouldRejectAccountExistsFalseCombinedWithRole() {
+        assertThrows(BadRequestException.class,
+                () -> service.findPeople(null, null, null, "ROLE_ADMIN", null, false, null, 0, 10));
     }
 
     @ParameterizedTest
@@ -172,13 +191,13 @@ class PersonServiceImplTest {
     void shouldFilterPeopleByEachOfTheFiveMinistryTypes(MinistryType ministryType) {
         PageRequest pageable = PageRequest.of(0, 10);
         String filterValue = ministryType.name().toLowerCase();
-        when(personRepository.findAdminPageIds(null, null, ministryType, null, pageable))
+        when(personRepository.findAdminPageIds(null, null, ministryType, null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, filterValue, null, 0, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, filterValue, null, null, null, null, 0, 10);
 
         assertEquals(0, result.getTotalElements());
-        verify(personRepository).findAdminPageIds(null, null, ministryType, null, pageable);
+        verify(personRepository).findAdminPageIds(null, null, ministryType, null, null, null, null, pageable);
     }
 
     @Test
@@ -567,8 +586,8 @@ class PersonServiceImplTest {
         Person person = person(10L, "Old Name", "34999999999");
         LocalDate newBirthday = LocalDate.of(1992, 3, 15);
 
-        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(personRepository.save(person)).thenReturn(person);
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
+        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
@@ -589,8 +608,8 @@ class PersonServiceImplTest {
     @Test
     void shouldTrimNameBeforePersistingOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
-        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(personRepository.save(person)).thenReturn(person);
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
+        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
                 10L, "New Name", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
@@ -608,8 +627,8 @@ class PersonServiceImplTest {
     void shouldKeepProtectedFieldsUnchangedWhenUpdatingCurrentUserProfile() {
         Person person = person(10L, "Old Name", "34999999999");
 
-        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(personRepository.save(person)).thenReturn(person);
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
+        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
@@ -622,7 +641,7 @@ class PersonServiceImplTest {
         );
 
         ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
-        verify(personRepository).save(captor.capture());
+        verify(personCadastralUpdateService).updateCadastral(captor.capture());
         Person saved = captor.getValue();
         assertEquals(10L, saved.getId());
         assertEquals("34999999999", saved.getPhoneNumber());
@@ -631,44 +650,44 @@ class PersonServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenAuthenticatedPersonDoesNotExistOnUpdate() {
-        when(personRepository.findById(99L)).thenReturn(Optional.empty());
+        when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.updateCurrentUserProfile(
                 99L,
                 new CurrentUserProfileUpdateRequestDTO("Name", LocalDate.of(1990, 1, 1))
         ));
-        verify(personRepository, never()).save(any());
+        verifyNoInteractions(personCadastralUpdateService);
     }
 
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsBlankOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
-        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
                 10L,
                 new CurrentUserProfileUpdateRequestDTO("", person.getBirthdayDate())
         ));
-        verify(personRepository, never()).save(any());
+        verifyNoInteractions(personCadastralUpdateService);
     }
 
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsOnlySpacesOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
-        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
                 10L,
                 new CurrentUserProfileUpdateRequestDTO("   ", person.getBirthdayDate())
         ));
-        verify(personRepository, never()).save(any());
+        verifyNoInteractions(personCadastralUpdateService);
     }
 
     @Test
     void shouldUpdateOnlyAuthenticatedPersonNotAnotherPerson() {
         Person authenticatedPerson = person(10L, "Old Name", "34999999999");
-        when(personRepository.findById(10L)).thenReturn(Optional.of(authenticatedPerson));
-        when(personRepository.save(authenticatedPerson)).thenReturn(authenticatedPerson);
+        when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(authenticatedPerson));
+        when(personCadastralUpdateService.updateCadastral(authenticatedPerson)).thenReturn(authenticatedPerson);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(authenticatedPerson)).thenReturn(currentProfileResponse(
                 10L, "New Name", "34999999999", authenticatedPerson.getBirthdayDate(), List.of("ROLE_OPERATOR")
@@ -679,9 +698,62 @@ class PersonServiceImplTest {
                 new CurrentUserProfileUpdateRequestDTO("New Name", authenticatedPerson.getBirthdayDate())
         );
 
-        verify(personRepository, never()).findById(argThat(id -> !Long.valueOf(10L).equals(id)));
-        verify(personRepository, times(1)).save(any());
-        verify(personRepository).save(authenticatedPerson);
+        verify(personRepository, never()).findByIdForUpdate(argThat(id -> !Long.valueOf(10L).equals(id)));
+        verify(personCadastralUpdateService, times(1)).updateCadastral(any());
+        verify(personCadastralUpdateService).updateCadastral(authenticatedPerson);
+    }
+
+    @Test
+    void shouldUpdatePersonAdminWithNamePhoneAndBirthday() {
+        Person person = person(1L, "Old Name", "34999999991");
+        Person saved = person(1L, "New Name", "34999999992");
+        PersonAdminUpdateRequestDTO requestDTO = new PersonAdminUpdateRequestDTO("New Name", "34999999992", LocalDate.of(1985, 6, 15));
+
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(saved);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L))).thenReturn(Map.of());
+        when(personAdminMapper.toDto(saved)).thenReturn(adminResponse(1L, "New Name", "ROLE_OPERATOR"));
+
+        PersonAdminResponseDTO response = service.updatePersonAdmin(1L, requestDTO);
+
+        assertEquals("New Name", response.getName());
+        assertEquals("New Name", person.getName());
+        assertEquals("34999999992", person.getPhoneNumber());
+        assertEquals(LocalDate.of(1985, 6, 15), person.getBirthdayDate());
+        verify(personCadastralUpdateService).updateCadastral(person);
+    }
+
+    @Test
+    void shouldRejectForbiddenFieldsBeforeLockingPersonOnAdminUpdate() {
+        PersonAdminUpdateRequestDTO requestDTO = mock(PersonAdminUpdateRequestDTO.class);
+        doThrow(new BadRequestException("Campo nao permitido", "PERSON_ADMIN_UPDATE_FIELDS_INVALID"))
+                .when(requestDTO).rejectForbiddenFields();
+
+        BadRequestException exception = assertThrows(BadRequestException.class,
+                () -> service.updatePersonAdmin(1L, requestDTO));
+
+        assertEquals("PERSON_ADMIN_UPDATE_FIELDS_INVALID", exception.getErrorCode());
+        verifyNoInteractions(personRepository, personCadastralUpdateService);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenAdminUpdatingMissingPerson() {
+        PersonAdminUpdateRequestDTO requestDTO = new PersonAdminUpdateRequestDTO("Name", "34999999992", LocalDate.of(1985, 6, 15));
+        when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.updatePersonAdmin(99L, requestDTO));
+        verifyNoInteractions(personCadastralUpdateService);
+    }
+
+    @Test
+    void shouldThrowBusinessExceptionWhenAdminUpdateIdIsInvalid() {
+        PersonAdminUpdateRequestDTO requestDTO = new PersonAdminUpdateRequestDTO("Name", "34999999992", LocalDate.of(1985, 6, 15));
+        assertAll(
+                () -> assertThrows(BusinessException.class, () -> service.updatePersonAdmin(null, requestDTO)),
+                () -> assertThrows(BusinessException.class, () -> service.updatePersonAdmin(0L, requestDTO)),
+                () -> assertThrows(BusinessException.class, () -> service.updatePersonAdmin(-1L, requestDTO))
+        );
+        verifyNoInteractions(personRepository, personCadastralUpdateService);
     }
 
     @Test
@@ -1057,7 +1129,12 @@ class PersonServiceImplTest {
                 id,
                 name,
                 "3499999999" + id,
+                LocalDate.of(1990, 1, 10),
+                true,
                 List.of(),
+                true,
+                true,
+                "3499999999" + id,
                 List.of(role)
         );
     }

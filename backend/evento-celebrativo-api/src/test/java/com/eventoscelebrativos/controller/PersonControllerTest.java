@@ -69,7 +69,7 @@ class PersonControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void shouldListPeopleWhenUserIsAdmin() throws Exception {
-        when(personService.findPeople("Alice", null, "reader", "ROLE_ADMIN", 0, 10))
+        when(personService.findPeople("Alice", null, "reader", "ROLE_ADMIN", null, null, null, 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(adminResponse(1L, "Alice", List.of(MinistryType.READER), List.of("ROLE_ADMIN", "ROLE_OPERATOR"))),
                         PageRequest.of(0, 10),
@@ -96,8 +96,65 @@ class PersonControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void shouldListPeopleWithNewAdministrativeFilters() throws Exception {
+        when(personService.findPeople(null, null, null, "ROLE_ADMIN", true, true, false, 0, 10))
+                .thenReturn(new PageImpl<>(
+                        List.of(adminResponse(1L, "Alice", List.of(), List.of("ROLE_ADMIN"))),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        mockMvc.perform(get("/pessoas")
+                        .param("role", "ROLE_ADMIN")
+                        .param("personActive", "true")
+                        .param("accountExists", "true")
+                        .param("accountEnabled", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].accountExists").value(true))
+                .andExpect(jsonPath("$.content[0].accountEnabled").value(true))
+                .andExpect(jsonPath("$.content[0].username").value("34999999991"))
+                .andExpect(jsonPath("$.content[0].personActive").value(true))
+                .andExpect(jsonPath("$.content[0].birthdayDate").value("1990-01-10"));
+
+        verify(personService).findPeople(null, null, null, "ROLE_ADMIN", true, true, false, 0, 10);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnBadRequestWhenAccountExistsFalseCombinedWithAccountEnabled() throws Exception {
+        when(personService.findPeople(null, null, null, null, null, false, true, 0, 10))
+                .thenThrow(new BadRequestException(
+                        "accountExists=false não pode ser combinado com accountEnabled ou role",
+                        "PERSON_ADMIN_FILTERS_INVALID"));
+
+        mockMvc.perform(get("/pessoas")
+                        .param("accountExists", "false")
+                        .param("accountEnabled", "true"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("PERSON_ADMIN_FILTERS_INVALID"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldFindPersonByIdWithAccountFieldsForPersonWithoutAccount() throws Exception {
+        PersonAdminResponseDTO responseDTO = new PersonAdminResponseDTO(
+                2L, "No Account", "34999999992", LocalDate.of(1991, 2, 11), true,
+                List.of(), false, null, null, List.of());
+        when(personService.findPersonById(2L)).thenReturn(responseDTO);
+
+        mockMvc.perform(get("/pessoas/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountExists").value(false))
+                .andExpect(jsonPath("$.accountEnabled").doesNotExist())
+                .andExpect(jsonPath("$.username").doesNotExist())
+                .andExpect(jsonPath("$.roles").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldListPersonWithNoActiveMinistriesReturningEmptyList() throws Exception {
-        when(personService.findPeople(null, null, null, null, 0, 10))
+        when(personService.findPeople(null, null, null, null, null, null, null, 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(adminResponse(1L, "Alice", List.of(), List.of("ROLE_OPERATOR"))),
                         PageRequest.of(0, 10),
@@ -113,7 +170,7 @@ class PersonControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void shouldListPersonWithSeveralMinistriesSortedDeterministically() throws Exception {
-        when(personService.findPeople(null, null, null, null, 0, 10))
+        when(personService.findPeople(null, null, null, null, null, null, null, 0, 10))
                 .thenReturn(new PageImpl<>(
                         List.of(adminResponse(
                                 1L,
@@ -138,13 +195,13 @@ class PersonControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldFilterPeopleByEachMinistryType(MinistryType ministryType) throws Exception {
         String filterValue = ministryType.name().toLowerCase();
-        when(personService.findPeople(null, null, filterValue, null, 0, 10))
+        when(personService.findPeople(null, null, filterValue, null, null, null, null, 0, 10))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
 
         mockMvc.perform(get("/pessoas").param("ministry", filterValue))
                 .andExpect(status().isOk());
 
-        verify(personService).findPeople(null, null, filterValue, null, 0, 10);
+        verify(personService).findPeople(null, null, filterValue, null, null, null, null, 0, 10);
     }
 
     @Test
@@ -322,7 +379,7 @@ class PersonControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void shouldReturnBadRequestWhenListFilterIsInvalid() throws Exception {
-        when(personService.findPeople(null, null, "invalid", null, 0, 10))
+        when(personService.findPeople(null, null, "invalid", null, null, null, null, 0, 10))
                 .thenThrow(new BadRequestException("Ministerio invalido"));
 
         mockMvc.perform(get("/pessoas")
@@ -1246,7 +1303,12 @@ class PersonControllerTest {
                 id,
                 name,
                 "3499999999" + id,
+                LocalDate.of(1990, 1, 10),
+                true,
                 ministries,
+                true,
+                true,
+                "3499999999" + id,
                 roles
         );
     }

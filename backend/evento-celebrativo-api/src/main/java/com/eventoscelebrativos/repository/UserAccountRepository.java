@@ -3,16 +3,21 @@ package com.eventoscelebrativos.repository;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.UserAccount;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Repository
 public interface UserAccountRepository extends JpaRepository<UserAccount, Long> {
@@ -23,6 +28,20 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     @Query("SELECT ua FROM UserAccount ua WHERE ua.person.id = :personId")
     Optional<UserAccount> findByPersonIdWithRoles(@Param("personId") Long personId);
 
+    /**
+     * FlushMode COMMIT: evita que o Hibernate faca auto-flush da mutacao pendente de username (a
+     * propria conta cujo username esta sendo alterado) antes desta consulta, o que faria a constraint
+     * unica disparar como DataIntegrityViolationException generica antes da checagem amigavel
+     * explicita em {@link com.eventoscelebrativos.service.PersonAccountCoordinator}.
+     * <p>
+     * Deliberadamente NAO usa lock pessimista: um {@code SELECT ... FOR UPDATE} sobre um username que
+     * ainda pode nao pertencer a ninguem tomaria um gap lock do InnoDB, o que pode gerar deadlock
+     * genuino quando duas contas disputam o mesmo username novo simultaneamente. A garantia final de
+     * unicidade fica a cargo da constraint {@code uk_tb_user_account_username}, verificada no flush
+     * explicito do service - esta consulta serve apenas para retornar um erro amigavel no caso comum
+     * (sem concorrencia real).
+     */
+    @QueryHints(@QueryHint(name = "org.hibernate.flushMode", value = "COMMIT"))
     Optional<UserAccount> findByUsername(String username);
 
     boolean existsByPersonId(Long personId);
@@ -109,6 +128,28 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
             """)
     List<EligibleMinistryAccount> findEligibleAccountsByMinistryTypes(
             @Param("ministryTypes") Collection<MinistryType> ministryTypes);
+
+    /**
+     * Estado de conta (username, enabled) por personId, em uma unica consulta em lote. Pessoa sem
+     * conta simplesmente nao aparece no mapa resultante - usada pela listagem/detalhe administrativos
+     * de pessoas para expor accountExists/accountEnabled/username sem N+1.
+     */
+    @Query("SELECT ua.person.id AS personId, ua.username AS username, ua.enabled AS enabled "
+            + "FROM UserAccount ua WHERE ua.person.id IN :personIds")
+    List<AccountState> findAccountStatesByPersonIdIn(@Param("personIds") Collection<Long> personIds);
+
+    default Map<Long, AccountState> findAccountStatesByPersonIdInGroupedByPerson(Collection<Long> personIds) {
+        return findAccountStatesByPersonIdIn(personIds).stream()
+                .collect(Collectors.toMap(AccountState::getPersonId, Function.identity()));
+    }
+
+    interface AccountState {
+        Long getPersonId();
+
+        String getUsername();
+
+        boolean isEnabled();
+    }
 
     interface EligibleAccount {
         Long getAccountId();

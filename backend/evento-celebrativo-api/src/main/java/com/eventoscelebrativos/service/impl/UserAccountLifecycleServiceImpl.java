@@ -5,14 +5,17 @@ import com.eventoscelebrativos.dto.request.PersonActiveRequestDTO;
 import com.eventoscelebrativos.dto.request.SelfPasswordChangeRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
+import com.eventoscelebrativos.dto.response.PersonAssignmentConflictDTO;
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
+import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
@@ -169,8 +172,13 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
             return;
         }
         if (!desiredActive) {
-            if (eventAssignmentRepository.existsActiveOrFutureAssignmentByPersonId(personId, currentSecond)) {
-                throw conflict("Pessoa possui escala em andamento ou futura.", "PERSON_HAS_ACTIVE_ASSIGNMENTS");
+            List<PersonUnavailabilityAssignmentConflictProjection> activeAssignments =
+                    eventAssignmentRepository.findActiveOrFutureAssignmentsByPersonId(personId, currentSecond);
+            if (!activeAssignments.isEmpty()) {
+                throw new PersonHasActiveAssignmentsException(activeAssignments.stream()
+                        .map(a -> new PersonAssignmentConflictDTO(
+                                a.getEventId(), a.getEventName(), a.getStartAt(), a.getEndAt(), a.getAssignmentType()))
+                        .toList());
             }
             if (accountOptional.filter(account -> isEffectiveAdmin(account, person)).isPresent()) {
                 validateAnotherEffectiveAdministratorExists();

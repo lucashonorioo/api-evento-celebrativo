@@ -41,6 +41,9 @@ class MinisterOfTheWordServiceImplTest {
     @Mock
     private PersonMinistryReadService personMinistryReadService;
 
+    @Mock
+    private PersonCadastralUpdateService personCadastralUpdateService;
+
     @InjectMocks
     private MinisterOfTheWordServiceImpl service;
 
@@ -101,7 +104,7 @@ class MinisterOfTheWordServiceImplTest {
         MinisterOfTheWordUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL)).thenReturn(entity);
-        when(personMinistryCommandService.save(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateMinisterOfTheWord(1L, request));
         verify(mapper).updateMinisterOfTheWordFromDto(request, entity);
