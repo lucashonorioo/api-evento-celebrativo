@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { ReaderRequest, ReaderResponse } from './reader.models';
+import { ReaderCreateRequest, ReaderResponse, ReaderUpdateRequest } from './reader.models';
 import { ReaderService } from './reader.service';
 
 describe('ReaderService', () => {
@@ -14,15 +14,28 @@ describe('ReaderService', () => {
     {
       id: 1,
       name: 'Maria Leitora',
-      phoneNumber: '34999999991',
-      birthdayDate: '1990-01-10',
+      phoneNumber: '34999999992',
+      birthdayDate: '1991-02-11',
     },
   ];
-  const readerRequest: ReaderRequest = {
+  const createRequestWithoutAccess: ReaderCreateRequest = {
     name: 'Maria Leitora',
-    phoneNumber: '34999999991',
-    birthdayDate: '1990-01-10',
+    phoneNumber: '34999999992',
+    birthdayDate: '1991-02-11',
+    createAccess: false,
+  };
+  const createRequestWithAccess: ReaderCreateRequest = {
+    name: 'Maria Leitora',
+    phoneNumber: '34999999992',
+    birthdayDate: '1991-02-11',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: ReaderUpdateRequest = {
+    name: 'Maria Leitora',
+    phoneNumber: '34999999992',
+    birthdayDate: '1991-02-11',
   };
 
   beforeEach(() => {
@@ -82,43 +95,74 @@ describe('ReaderService', () => {
     );
   });
 
-  it('should create a reader without adding authorization manually', () => {
+  it('should create a reader without access, sending createAccess=false and no credentials', () => {
     const createdReader: ReaderResponse = {
       id: 2,
-      name: readerRequest.name,
-      phoneNumber: readerRequest.phoneNumber,
-      birthdayDate: readerRequest.birthdayDate,
+      name: createRequestWithoutAccess.name,
+      phoneNumber: createRequestWithoutAccess.phoneNumber,
+      birthdayDate: createRequestWithoutAccess.birthdayDate,
     };
 
-    service.create(readerRequest).subscribe((response) => {
+    service.create(createRequestWithoutAccess).subscribe((response) => {
       expect(response).toEqual(createdReader);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/leitores`);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual(readerRequest);
+    expect(request.request.body).toEqual(createRequestWithoutAccess);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(createdReader);
   });
 
-  it('should update a reader without adding authorization manually', () => {
-    const updatedReader: ReaderResponse = {
-      id: 1,
-      name: readerRequest.name,
-      phoneNumber: readerRequest.phoneNumber,
-      birthdayDate: readerRequest.birthdayDate,
+  it('should create a reader with access, sending createAccess=true, password and ROLE_OPERATOR', () => {
+    const createdReader: ReaderResponse = {
+      id: 2,
+      name: createRequestWithAccess.name,
+      phoneNumber: createRequestWithAccess.phoneNumber,
+      birthdayDate: createRequestWithAccess.birthdayDate,
     };
 
-    service.update(1, readerRequest).subscribe((response) => {
+    service.create(createRequestWithAccess).subscribe((response) => {
+      expect(response).toEqual(createdReader);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/leitores`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(createRequestWithAccess);
+    expect(request.request.body.accessRole).toBe('ROLE_OPERATOR');
+    expect(request.request.body.confirmPassword).toBeUndefined();
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(createdReader);
+  });
+
+  it('should update a reader sending only cadastral fields, without account fields', () => {
+    const updatedReader: ReaderResponse = {
+      id: 1,
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    };
+
+    service.update(1, updateRequest).subscribe((response) => {
       expect(response).toEqual(updatedReader);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/leitores/1`);
 
     expect(request.request.method).toBe('PUT');
-    expect(request.request.body).toEqual(readerRequest);
+    expect(request.request.body).toEqual(updateRequest);
+    expect(Object.keys(request.request.body)).toEqual(['name', 'phoneNumber', 'birthdayDate']);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.createAccess).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(updatedReader);
@@ -139,8 +183,23 @@ describe('ReaderService', () => {
   });
 
   [400, 403, 404, 409].forEach((status) => {
-    it(`should propagate ${status} errors when creating readers`, (done) => {
-      service.create(readerRequest).subscribe({
+    it(`should propagate ${status} errors when creating readers without access`, (done) => {
+      service.create(createRequestWithoutAccess).subscribe({
+        next: () => {
+          fail('Expected create request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/leitores`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
+
+    it(`should propagate ${status} errors when creating readers with access`, (done) => {
+      service.create(createRequestWithAccess).subscribe({
         next: () => {
           fail('Expected create request to fail');
         },
@@ -155,7 +214,7 @@ describe('ReaderService', () => {
     });
 
     it(`should propagate ${status} errors when updating readers`, (done) => {
-      service.update(1, readerRequest).subscribe({
+      service.update(1, updateRequest).subscribe({
         next: () => {
           fail('Expected update request to fail');
         },

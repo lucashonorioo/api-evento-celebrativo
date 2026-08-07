@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { PriestRequest, PriestResponse } from './priest.models';
+import { PriestCreateRequest, PriestResponse, PriestUpdateRequest } from './priest.models';
 import { PriestService } from './priest.service';
 
 describe('PriestService', () => {
@@ -13,16 +13,29 @@ describe('PriestService', () => {
   const priests: PriestResponse[] = [
     {
       id: 1,
-      name: 'Padre João',
-      phoneNumber: '34999999993',
-      birthdayDate: '1980-03-12',
+      name: 'Joao Padre',
+      phoneNumber: '34999999992',
+      birthdayDate: '1961-02-11',
     },
   ];
-  const priestRequest: PriestRequest = {
-    name: 'Padre Joao',
-    phoneNumber: '34999999993',
-    birthdayDate: '1980-03-12',
+  const createRequestWithoutAccess: PriestCreateRequest = {
+    name: 'Joao Padre',
+    phoneNumber: '34999999992',
+    birthdayDate: '1961-02-11',
+    createAccess: false,
+  };
+  const createRequestWithAccess: PriestCreateRequest = {
+    name: 'Joao Padre',
+    phoneNumber: '34999999992',
+    birthdayDate: '1961-02-11',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: PriestUpdateRequest = {
+    name: 'Joao Padre',
+    phoneNumber: '34999999992',
+    birthdayDate: '1961-02-11',
   };
 
   beforeEach(() => {
@@ -82,43 +95,74 @@ describe('PriestService', () => {
     );
   });
 
-  it('should create a priest without adding authorization manually', () => {
+  it('should create a priest without access, sending createAccess=false and no credentials', () => {
     const createdPriest: PriestResponse = {
       id: 2,
-      name: priestRequest.name,
-      phoneNumber: priestRequest.phoneNumber,
-      birthdayDate: priestRequest.birthdayDate,
+      name: createRequestWithoutAccess.name,
+      phoneNumber: createRequestWithoutAccess.phoneNumber,
+      birthdayDate: createRequestWithoutAccess.birthdayDate,
     };
 
-    service.create(priestRequest).subscribe((response) => {
+    service.create(createRequestWithoutAccess).subscribe((response) => {
       expect(response).toEqual(createdPriest);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/padres`);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual(priestRequest);
+    expect(request.request.body).toEqual(createRequestWithoutAccess);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(createdPriest);
   });
 
-  it('should update a priest without adding authorization manually', () => {
-    const updatedPriest: PriestResponse = {
-      id: 1,
-      name: priestRequest.name,
-      phoneNumber: priestRequest.phoneNumber,
-      birthdayDate: priestRequest.birthdayDate,
+  it('should create a priest with access, sending createAccess=true, password and ROLE_OPERATOR', () => {
+    const createdPriest: PriestResponse = {
+      id: 2,
+      name: createRequestWithAccess.name,
+      phoneNumber: createRequestWithAccess.phoneNumber,
+      birthdayDate: createRequestWithAccess.birthdayDate,
     };
 
-    service.update(1, priestRequest).subscribe((response) => {
+    service.create(createRequestWithAccess).subscribe((response) => {
+      expect(response).toEqual(createdPriest);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/padres`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(createRequestWithAccess);
+    expect(request.request.body.accessRole).toBe('ROLE_OPERATOR');
+    expect(request.request.body.confirmPassword).toBeUndefined();
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(createdPriest);
+  });
+
+  it('should update a priest sending only cadastral fields, without account fields', () => {
+    const updatedPriest: PriestResponse = {
+      id: 1,
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    };
+
+    service.update(1, updateRequest).subscribe((response) => {
       expect(response).toEqual(updatedPriest);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/padres/1`);
 
     expect(request.request.method).toBe('PUT');
-    expect(request.request.body).toEqual(priestRequest);
+    expect(request.request.body).toEqual(updateRequest);
+    expect(Object.keys(request.request.body)).toEqual(['name', 'phoneNumber', 'birthdayDate']);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.createAccess).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(updatedPriest);
@@ -139,8 +183,23 @@ describe('PriestService', () => {
   });
 
   [400, 403, 404, 409].forEach((status) => {
-    it(`should propagate ${status} errors when creating priests`, (done) => {
-      service.create(priestRequest).subscribe({
+    it(`should propagate ${status} errors when creating priests without access`, (done) => {
+      service.create(createRequestWithoutAccess).subscribe({
+        next: () => {
+          fail('Expected create request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/padres`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
+
+    it(`should propagate ${status} errors when creating priests with access`, (done) => {
+      service.create(createRequestWithAccess).subscribe({
         next: () => {
           fail('Expected create request to fail');
         },
@@ -155,7 +214,7 @@ describe('PriestService', () => {
     });
 
     it(`should propagate ${status} errors when updating priests`, (done) => {
-      service.update(1, priestRequest).subscribe({
+      service.update(1, updateRequest).subscribe({
         next: () => {
           fail('Expected update request to fail');
         },

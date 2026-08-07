@@ -1,7 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { AbstractControl } from '@angular/forms';
 
-export type PersonManagementControlName = 'name' | 'phoneNumber' | 'birthdayDate' | 'password';
+export type PersonManagementControlName =
+  | 'name'
+  | 'phoneNumber'
+  | 'birthdayDate'
+  | 'password'
+  | 'confirmPassword';
 
 export interface PersonManagementLabels {
   singular: string;
@@ -10,6 +15,19 @@ export interface PersonManagementLabels {
   pluralWithArticle: string;
   demonstrativeSingular: string;
 }
+
+interface ApiErrorBody {
+  errorCode?: string;
+}
+
+const ERROR_CODE_MESSAGES: Readonly<Record<string, string>> = {
+  PERSON_PHONE_NUMBER_CONFLICT: 'Ja existe uma pessoa cadastrada com este telefone.',
+  USER_ACCOUNT_USERNAME_CONFLICT: 'Ja existe uma conta de acesso utilizando este telefone.',
+  ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE:
+    'Nao foi possivel atualizar os dados da pessoa porque foram enviados campos de acesso indevidos.',
+  CONCURRENT_UPDATE_CONFLICT:
+    'Os dados foram alterados simultaneamente. Atualize as informacoes e tente novamente.',
+};
 
 export function loadingErrorMessageFor(labels: PersonManagementLabels): string {
   return `Nao foi possivel carregar ${labels.pluralWithArticle}. Tente novamente.`;
@@ -55,13 +73,20 @@ export function fieldErrorMessageFor(
     return 'Informe uma senha com pelo menos 6 caracteres.';
   }
 
+  if (controlName === 'confirmPassword' && control.hasError('passwordMismatch')) {
+    return 'As senhas informadas nao coincidem.';
+  }
+
   return null;
 }
 
-export function saveErrorMessageFor(
-  error: unknown,
-  labels: PersonManagementLabels,
-): string {
+export function saveErrorMessageFor(error: unknown, labels: PersonManagementLabels): string {
+  const errorCodeMessage = messageForErrorCode(error);
+
+  if (errorCodeMessage) {
+    return errorCodeMessage;
+  }
+
   if (error instanceof HttpErrorResponse) {
     if (error.status === 400) {
       return 'Verifique os dados informados e tente novamente.';
@@ -100,6 +125,17 @@ export function deleteErrorMessageFor(
   return 'Nao foi possivel concluir a operacao. Tente novamente.';
 }
 
+function messageForErrorCode(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse)) {
+    return null;
+  }
+
+  const body = error.error as ApiErrorBody | null;
+  const errorCode = body && typeof body === 'object' ? body.errorCode : undefined;
+
+  return errorCode ? (ERROR_CODE_MESSAGES[errorCode] ?? null) : null;
+}
+
 function requiredFieldMessageFor(
   controlName: PersonManagementControlName,
   labels: PersonManagementLabels,
@@ -114,6 +150,10 @@ function requiredFieldMessageFor(
 
   if (controlName === 'birthdayDate') {
     return 'Informe a data de nascimento.';
+  }
+
+  if (controlName === 'confirmPassword') {
+    return 'Confirme a senha.';
   }
 
   return 'Informe a senha.';

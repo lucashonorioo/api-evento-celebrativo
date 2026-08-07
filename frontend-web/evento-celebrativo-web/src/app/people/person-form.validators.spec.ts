@@ -1,6 +1,7 @@
 import { FormControl } from '@angular/forms';
 
 import {
+  matchesControlValidator,
   notBlankValidator,
   pastDateValidator,
   personPasswordValidators,
@@ -36,6 +37,25 @@ describe('person form validators', () => {
 
     control.setValue('12345');
     expect(control.hasError('minlength')).toBeTrue();
+
+    control.setValue('123456');
+    expect(control.valid).toBeTrue();
+  });
+
+  it('should reject a password made only of spaces', () => {
+    const control = new FormControl('', personPasswordValidators());
+
+    control.setValue('      ');
+
+    expect(control.hasError('blank')).toBeTrue();
+  });
+
+  it('should validate that a control matches another control value', () => {
+    const password = new FormControl('123456');
+    const control = new FormControl('', matchesControlValidator(password));
+
+    control.setValue('654321');
+    expect(control.hasError('passwordMismatch')).toBeTrue();
 
     control.setValue('123456');
     expect(control.valid).toBeTrue();

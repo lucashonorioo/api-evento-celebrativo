@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ReaderRequest, ReaderResponse } from '../reader.models';
+import { ReaderCreateRequest, ReaderResponse, ReaderUpdateRequest } from '../reader.models';
 import { ReaderService } from '../reader.service';
 import { ReaderManagementComponent } from './reader-management.component';
 
@@ -15,21 +15,34 @@ describe('ReaderManagementComponent', () => {
     {
       id: 98765,
       name: 'Maria Leitora',
-      phoneNumber: '34999999991',
-      birthdayDate: '1990-01-10',
+      phoneNumber: '34999999992',
+      birthdayDate: '1991-02-11',
     },
     {
       id: 54321,
       name: 'Joao Leitor',
-      phoneNumber: '34999999992',
-      birthdayDate: '1988-05-20',
+      phoneNumber: '34999999993',
+      birthdayDate: '1989-05-20',
     },
   ];
-  const request: ReaderRequest = {
+  const createRequestWithoutAccess: ReaderCreateRequest = {
     name: 'Ana Leitora',
-    phoneNumber: '34999999993',
+    phoneNumber: '34999999994',
     birthdayDate: '1995-03-15',
+    createAccess: false,
+  };
+  const createRequestWithAccess: ReaderCreateRequest = {
+    name: 'Ana Leitora',
+    phoneNumber: '34999999994',
+    birthdayDate: '1995-03-15',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: ReaderUpdateRequest = {
+    name: 'Ana Leitora',
+    phoneNumber: '34999999994',
+    birthdayDate: '1995-03-15',
   };
 
   async function setup(response = of(readers)): Promise<void> {
@@ -43,17 +56,17 @@ describe('ReaderManagementComponent', () => {
     readerService.create.and.returnValue(
       of({
         id: 111,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
       }),
     );
     readerService.update.and.returnValue(
       of({
         id: 98765,
-        name: request.name,
-        phoneNumber: request.phoneNumber,
-        birthdayDate: request.birthdayDate,
+        name: updateRequest.name,
+        phoneNumber: updateRequest.phoneNumber,
+        birthdayDate: updateRequest.birthdayDate,
       }),
     );
     readerService.delete.and.returnValue(of(undefined));
@@ -87,7 +100,7 @@ describe('ReaderManagementComponent', () => {
     expect(readerService.findAll).toHaveBeenCalledOnceWith();
   });
 
-  it('should render title and form fields', async () => {
+  it('should render title and cadastral form fields', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -99,7 +112,6 @@ describe('ReaderManagementComponent', () => {
     expect(fixture.nativeElement.querySelector('#name')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#phoneNumber')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('#birthdayDate')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
   });
 
   it('should show loading while readers are pending', async () => {
@@ -124,8 +136,8 @@ describe('ReaderManagementComponent', () => {
 
     expect(text).toContain('Maria Leitora');
     expect(text).toContain('Joao Leitor');
-    expect(text).toContain('34999999991');
-    expect(text).toContain('1990-01-10');
+    expect(text).toContain('34999999992');
+    expect(text).toContain('1991-02-11');
   });
 
   it('should show an empty state', async () => {
@@ -154,98 +166,225 @@ describe('ReaderManagementComponent', () => {
     expect(textContent()).toContain('Maria Leitora');
   });
 
-  it('should not submit invalid forms and should mark fields as touched', async () => {
-    await setup();
+  describe('creation without access', () => {
+    it('should start with createAccess unchecked and access fields hidden', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      fixture.detectChanges();
 
-    expect(readerService.create).not.toHaveBeenCalled();
-    expect(component.form.controls.name.touched).toBeTrue();
-    expect(component.form.controls.phoneNumber.touched).toBeTrue();
-    expect(component.form.controls.birthdayDate.touched).toBeTrue();
-    expect(component.form.controls.password.touched).toBeTrue();
-    expect(textContent()).toContain('Informe o nome do leitor.');
-    expect(textContent()).toContain('Informe o telefone.');
-    expect(textContent()).toContain('Informe a data de nascimento.');
-    expect(textContent()).toContain('Informe a senha.');
+      expect(component.form.controls.createAccess.value).toBeFalse();
+      expect(component.showAccessFields()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
+    });
+
+    it('should not submit invalid forms and should mark cadastral fields as touched', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+      expect(component.form.controls.name.touched).toBeTrue();
+      expect(component.form.controls.phoneNumber.touched).toBeTrue();
+      expect(component.form.controls.birthdayDate.touched).toBeTrue();
+      expect(textContent()).toContain('Informe o nome do leitor.');
+      expect(textContent()).toContain('Informe o telefone.');
+      expect(textContent()).toContain('Informe a data de nascimento.');
+    });
+
+    it('should reject blank name and invalid phone and birthday', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '   ',
+        phoneNumber: '123',
+        birthdayDate: '2999-01-01',
+      });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe o nome do leitor.');
+      expect(textContent()).toContain('Informe um telefone com 11 digitos.');
+      expect(textContent()).toContain('Informe uma data de nascimento no passado.');
+    });
+
+    it('should create readers without access using the expected payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
+      expect(textContent()).toContain('Leitor cadastrado com sucesso.');
+      expect(component.form.controls.createAccess.value).toBeFalse();
+    });
+
+    it('should trim textual values before submitting', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      component.form.patchValue({
+        name: '  Ana Leitora  ',
+        phoneNumber: '34999999994',
+        birthdayDate: '1995-03-15',
+      });
+      clickButton('Cadastrar');
+
+      expect(readerService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
+    });
+
+    it('should expose saving state while creating and prevent duplicate saves', async () => {
+      const pendingSave = new Subject<ReaderResponse>();
+      await setup();
+      readerService.create.and.returnValue(pendingSave);
+
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      clickButton('Cadastrar');
+
+      expect(component.isSaving()).toBeTrue();
+      expect(readerService.create).toHaveBeenCalledTimes(1);
+
+      pendingSave.next({
+        id: 111,
+        name: createRequestWithoutAccess.name,
+        phoneNumber: createRequestWithoutAccess.phoneNumber,
+        birthdayDate: createRequestWithoutAccess.birthdayDate,
+      });
+      pendingSave.complete();
+    });
   });
 
-  it('should reject blank name and invalid phone, birthday, and password', async () => {
-    await setup();
+  describe('creation with access', () => {
+    it('should show password and confirm password fields and require them once checked', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '   ',
-      phoneNumber: '123',
-      birthdayDate: '2999-01-01',
-      password: '123',
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+
+      expect(component.showAccessFields()).toBeTrue();
+      expect(fixture.nativeElement.querySelector('#password')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('#confirmPassword')).not.toBeNull();
+
+      fillCadastralFields(createRequestWithAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe a senha.');
+      expect(textContent()).toContain('Confirme a senha.');
     });
-    clickButton('Cadastrar');
-    fixture.detectChanges();
 
-    expect(readerService.create).not.toHaveBeenCalled();
-    expect(textContent()).toContain('Informe o nome do leitor.');
-    expect(textContent()).toContain('Informe um telefone com 11 digitos.');
-    expect(textContent()).toContain('Informe uma data de nascimento no passado.');
-    expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
+    it('should reject mismatched passwords', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '654321' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('As senhas informadas nao coincidem.');
+    });
+
+    it('should reject a password shorter than the minimum length', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123', confirmPassword: '123' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+      expect(textContent()).toContain('Informe uma senha com pelo menos 6 caracteres.');
+    });
+
+    it('should reject a password made only of spaces', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '      ', confirmPassword: '      ' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).not.toHaveBeenCalled();
+    });
+
+    it('should create readers with access sending ROLE_OPERATOR and never ROLE_ADMIN', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).toHaveBeenCalledOnceWith(createRequestWithAccess);
+      expect(textContent()).not.toContain('ROLE_ADMIN');
+      expect(fixture.nativeElement.querySelector('select')).toBeNull();
+    });
+
+    it('should not expose confirmPassword to the request payload', async () => {
+      await setup();
+
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      fillCadastralFields(createRequestWithAccess);
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      const sentRequest = readerService.create.calls.mostRecent().args[0] as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(sentRequest['confirmPassword']).toBeUndefined();
+    });
   });
 
-  it('should create readers with the expected payload', async () => {
-    await setup();
+  describe('unchecking access after filling credentials', () => {
+    it('should clear password fields, lift validators and submit without access', async () => {
+      await setup();
 
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    fixture.detectChanges();
+      fixture.detectChanges();
+      setCheckbox('createAccess', true);
+      fixture.detectChanges();
+      component.form.patchValue({ password: '123456', confirmPassword: '123456' });
 
-    expect(readerService.create).toHaveBeenCalledOnceWith(request);
-    expect(textContent()).toContain('Leitor cadastrado com sucesso.');
-    expect(textContent()).toContain('Ana Leitora');
-    expect(component.form.getRawValue()).toEqual({
-      name: '',
-      phoneNumber: '',
-      birthdayDate: '',
-      password: '',
+      setCheckbox('createAccess', false);
+      fixture.detectChanges();
+
+      expect(component.showAccessFields()).toBeFalse();
+      expect(component.form.controls.password.value).toBe('');
+      expect(component.form.controls.confirmPassword.value).toBe('');
+      expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+
+      fillCadastralFields(createRequestWithoutAccess);
+      clickButton('Cadastrar');
+      fixture.detectChanges();
+
+      expect(readerService.create).toHaveBeenCalledOnceWith(createRequestWithoutAccess);
     });
-  });
-
-  it('should trim textual values before submitting', async () => {
-    await setup();
-
-    fixture.detectChanges();
-    component.form.setValue({
-      name: '  Ana Leitora  ',
-      phoneNumber: '34999999993',
-      birthdayDate: '1995-03-15',
-      password: '123456',
-    });
-    clickButton('Cadastrar');
-
-    expect(readerService.create).toHaveBeenCalledOnceWith(request);
-  });
-
-  it('should expose saving state while creating and prevent duplicate saves', async () => {
-    const pendingSave = new Subject<ReaderResponse>();
-    await setup();
-    readerService.create.and.returnValue(pendingSave);
-
-    fixture.detectChanges();
-    fillForm(request);
-    clickButton('Cadastrar');
-    clickButton('Cadastrar');
-
-    expect(component.isSaving()).toBeTrue();
-    expect(readerService.create).toHaveBeenCalledTimes(1);
-
-    pendingSave.next({
-      id: 111,
-      name: request.name,
-      phoneNumber: request.phoneNumber,
-      birthdayDate: request.birthdayDate,
-    });
-    pendingSave.complete();
   });
 
   it('should show friendly create validation and permission errors', async () => {
@@ -256,11 +395,12 @@ describe('ReaderManagementComponent', () => {
     );
 
     fixture.detectChanges();
-    fillForm(request);
+    fillCadastralFields(createRequestWithoutAccess);
     clickButton('Cadastrar');
     fixture.detectChanges();
 
     expect(textContent()).toContain('Verifique os dados informados e tente novamente.');
+    expect(component.form.controls.name.value).toBe(createRequestWithoutAccess.name);
 
     clickButton('Cadastrar');
     fixture.detectChanges();
@@ -268,7 +408,50 @@ describe('ReaderManagementComponent', () => {
     expect(textContent()).toContain('Voce nao possui permissao para realizar esta operacao.');
   });
 
-  it('should enter edit mode and update readers', async () => {
+  it('should show a friendly message when the phone number is already registered', async () => {
+    await setup();
+    readerService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'PERSON_PHONE_NUMBER_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithoutAccess);
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma pessoa cadastrada com este telefone.');
+  });
+
+  it('should show a friendly message when the access account username already exists', async () => {
+    await setup();
+    readerService.create.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'USER_ACCOUNT_USERNAME_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    fillCadastralFields(createRequestWithAccess);
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
+    clickButton('Cadastrar');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain('Ja existe uma conta de acesso utilizando este telefone.');
+  });
+
+  it('should enter edit mode without exposing access fields and update readers with cadastral data only', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -279,22 +462,94 @@ describe('ReaderManagementComponent', () => {
     expect(component.editingReaderId()).toBe(98765);
     expect(component.form.getRawValue()).toEqual({
       name: 'Maria Leitora',
-      phoneNumber: '34999999991',
-      birthdayDate: '1990-01-10',
+      phoneNumber: '34999999992',
+      birthdayDate: '1991-02-11',
+      createAccess: false,
       password: '',
+      confirmPassword: '',
     });
+    expect(fixture.nativeElement.querySelector('#createAccess')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#password')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#confirmPassword')).toBeNull();
 
-    fillForm(request);
+    component.form.patchValue({
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    });
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
-    expect(readerService.update).toHaveBeenCalledOnceWith(98765, request);
+    expect(readerService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
     expect(component.editingReaderId()).toBeNull();
     expect(textContent()).toContain('Leitor atualizado com sucesso.');
-    expect(textContent()).toContain('Ana Leitora');
   });
 
-  it('should cancel editing without calling the backend', async () => {
+  it('should not require a password when editing', async () => {
+    await setup();
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    component.form.patchValue({
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    });
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(readerService.update).toHaveBeenCalledOnceWith(98765, updateRequest);
+  });
+
+  it('should show a friendly message when the account fields are rejected on update', async () => {
+    await setup();
+    readerService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { errorCode: 'ACCOUNT_FIELDS_NOT_ALLOWED_ON_PERSON_UPDATE' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Nao foi possivel atualizar os dados da pessoa porque foram enviados campos de acesso indevidos.',
+    );
+  });
+
+  it('should show a friendly message on concurrent update conflicts without retrying automatically', async () => {
+    await setup();
+    readerService.update.and.returnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { errorCode: 'CONCURRENT_UPDATE_CONFLICT' },
+          }),
+      ),
+    );
+
+    fixture.detectChanges();
+    clickButton('Editar');
+    fixture.detectChanges();
+    clickButton('Salvar alteracoes');
+    fixture.detectChanges();
+
+    expect(textContent()).toContain(
+      'Os dados foram alterados simultaneamente. Atualize as informacoes e tente novamente.',
+    );
+    expect(readerService.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('should cancel editing without calling the backend and restore the initial creation state', async () => {
     await setup();
 
     fixture.detectChanges();
@@ -306,6 +561,9 @@ describe('ReaderManagementComponent', () => {
     expect(readerService.update).not.toHaveBeenCalled();
     expect(component.editingReaderId()).toBeNull();
     expect(textContent()).toContain('Cadastrar leitor');
+    expect(component.form.controls.createAccess.value).toBeFalse();
+    expect(component.form.controls.password.value).toBe('');
+    expect(component.form.controls.confirmPassword.value).toBe('');
   });
 
   it('should handle update not found and generic errors', async () => {
@@ -318,7 +576,6 @@ describe('ReaderManagementComponent', () => {
     fixture.detectChanges();
     clickButton('Editar');
     fixture.detectChanges();
-    fillForm(request);
     clickButton('Salvar alteracoes');
     fixture.detectChanges();
 
@@ -410,15 +667,20 @@ describe('ReaderManagementComponent', () => {
     expect(readerService.findAll).toHaveBeenCalledTimes(2);
   });
 
-  it('should not expose identifiers, JSON, tokens, or unknown data', async () => {
+  it('should not expose identifiers, passwords, JSON, tokens, or unknown data', async () => {
     await setup();
 
+    fixture.detectChanges();
+    setCheckbox('createAccess', true);
+    fixture.detectChanges();
+    component.form.patchValue({ password: '123456', confirmPassword: '123456' });
     fixture.detectChanges();
 
     const text = textContent();
 
     expect(text).not.toContain('98765');
     expect(text).not.toContain('54321');
+    expect(text).not.toContain('123456');
     expect(text).not.toContain('{');
     expect(text).not.toContain('access_token');
     expect(text).not.toContain('Bearer');
@@ -426,8 +688,24 @@ describe('ReaderManagementComponent', () => {
     expect(text).not.toContain('null');
   });
 
-  function fillForm(value: ReaderRequest): void {
-    component.form.setValue(value);
+  function fillCadastralFields(value: {
+    name: string;
+    phoneNumber: string;
+    birthdayDate: string;
+  }): void {
+    component.form.patchValue({
+      name: value.name,
+      phoneNumber: value.phoneNumber,
+      birthdayDate: value.birthdayDate,
+    });
+  }
+
+  function setCheckbox(id: string, checked: boolean): void {
+    const checkbox = (fixture.nativeElement as HTMLElement).querySelector(
+      `#${id}`,
+    ) as HTMLInputElement;
+    checkbox.checked = checked;
+    checkbox.dispatchEvent(new Event('change'));
   }
 
   function clickButton(label: string): void {

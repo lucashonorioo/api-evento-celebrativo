@@ -1,3 +1,8 @@
+import {
+  PersonMinisterialCreateRequest,
+  PersonMinisterialUpdateRequest,
+} from '../people/person-ministerial-access.models';
+
 export interface EucharisticMinisterResponse {
   id: number;
   name: string;
@@ -5,9 +10,5 @@ export interface EucharisticMinisterResponse {
   birthdayDate: string | null;
 }
 
-export interface EucharisticMinisterRequest {
-  name: string;
-  phoneNumber: string;
-  birthdayDate: string;
-  password: string;
-}
+export type EucharisticMinisterCreateRequest = PersonMinisterialCreateRequest;
+export type EucharisticMinisterUpdateRequest = PersonMinisterialUpdateRequest;

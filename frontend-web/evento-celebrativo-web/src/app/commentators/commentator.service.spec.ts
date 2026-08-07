@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
-import { CommentatorRequest, CommentatorResponse } from './commentator.models';
+import { CommentatorCreateRequest, CommentatorResponse, CommentatorUpdateRequest } from './commentator.models';
 import { CommentatorService } from './commentator.service';
 
 describe('CommentatorService', () => {
@@ -18,11 +18,24 @@ describe('CommentatorService', () => {
       birthdayDate: '1991-02-11',
     },
   ];
-  const commentatorRequest: CommentatorRequest = {
+  const createRequestWithoutAccess: CommentatorCreateRequest = {
     name: 'Maria Comentarista',
     phoneNumber: '34999999992',
     birthdayDate: '1991-02-11',
+    createAccess: false,
+  };
+  const createRequestWithAccess: CommentatorCreateRequest = {
+    name: 'Maria Comentarista',
+    phoneNumber: '34999999992',
+    birthdayDate: '1991-02-11',
+    createAccess: true,
     password: '123456',
+    accessRole: 'ROLE_OPERATOR',
+  };
+  const updateRequest: CommentatorUpdateRequest = {
+    name: 'Maria Comentarista',
+    phoneNumber: '34999999992',
+    birthdayDate: '1991-02-11',
   };
 
   beforeEach(() => {
@@ -82,43 +95,74 @@ describe('CommentatorService', () => {
     );
   });
 
-  it('should create a commentator without adding authorization manually', () => {
+  it('should create a commentator without access, sending createAccess=false and no credentials', () => {
     const createdCommentator: CommentatorResponse = {
       id: 2,
-      name: commentatorRequest.name,
-      phoneNumber: commentatorRequest.phoneNumber,
-      birthdayDate: commentatorRequest.birthdayDate,
+      name: createRequestWithoutAccess.name,
+      phoneNumber: createRequestWithoutAccess.phoneNumber,
+      birthdayDate: createRequestWithoutAccess.birthdayDate,
     };
 
-    service.create(commentatorRequest).subscribe((response) => {
+    service.create(createRequestWithoutAccess).subscribe((response) => {
       expect(response).toEqual(createdCommentator);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/comentaristas`);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual(commentatorRequest);
+    expect(request.request.body).toEqual(createRequestWithoutAccess);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(createdCommentator);
   });
 
-  it('should update a commentator without adding authorization manually', () => {
-    const updatedCommentator: CommentatorResponse = {
-      id: 1,
-      name: commentatorRequest.name,
-      phoneNumber: commentatorRequest.phoneNumber,
-      birthdayDate: commentatorRequest.birthdayDate,
+  it('should create a commentator with access, sending createAccess=true, password and ROLE_OPERATOR', () => {
+    const createdCommentator: CommentatorResponse = {
+      id: 2,
+      name: createRequestWithAccess.name,
+      phoneNumber: createRequestWithAccess.phoneNumber,
+      birthdayDate: createRequestWithAccess.birthdayDate,
     };
 
-    service.update(1, commentatorRequest).subscribe((response) => {
+    service.create(createRequestWithAccess).subscribe((response) => {
+      expect(response).toEqual(createdCommentator);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/comentaristas`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(createRequestWithAccess);
+    expect(request.request.body.accessRole).toBe('ROLE_OPERATOR');
+    expect(request.request.body.confirmPassword).toBeUndefined();
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+
+    request.flush(createdCommentator);
+  });
+
+  it('should update a commentator sending only cadastral fields, without account fields', () => {
+    const updatedCommentator: CommentatorResponse = {
+      id: 1,
+      name: updateRequest.name,
+      phoneNumber: updateRequest.phoneNumber,
+      birthdayDate: updateRequest.birthdayDate,
+    };
+
+    service.update(1, updateRequest).subscribe((response) => {
       expect(response).toEqual(updatedCommentator);
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/comentaristas/1`);
 
     expect(request.request.method).toBe('PUT');
-    expect(request.request.body).toEqual(commentatorRequest);
+    expect(request.request.body).toEqual(updateRequest);
+    expect(Object.keys(request.request.body)).toEqual(['name', 'phoneNumber', 'birthdayDate']);
+    expect(request.request.body.password).toBeUndefined();
+    expect(request.request.body.createAccess).toBeUndefined();
+    expect(request.request.body.accessRole).toBeUndefined();
+    expect(request.request.body.confirmPassword).toBeUndefined();
     expect(request.request.headers.has('Authorization')).toBeFalse();
 
     request.flush(updatedCommentator);
@@ -139,8 +183,23 @@ describe('CommentatorService', () => {
   });
 
   [400, 403, 404, 409].forEach((status) => {
-    it(`should propagate ${status} errors when creating commentators`, (done) => {
-      service.create(commentatorRequest).subscribe({
+    it(`should propagate ${status} errors when creating commentators without access`, (done) => {
+      service.create(createRequestWithoutAccess).subscribe({
+        next: () => {
+          fail('Expected create request to fail');
+        },
+        error: (error: unknown) => {
+          expect(error).toBeTruthy();
+          done();
+        },
+      });
+
+      const request = httpTestingController.expectOne(`${API_BASE_URL}/comentaristas`);
+      request.flush({ message: 'Error' }, { status, statusText: 'Error' });
+    });
+
+    it(`should propagate ${status} errors when creating commentators with access`, (done) => {
+      service.create(createRequestWithAccess).subscribe({
         next: () => {
           fail('Expected create request to fail');
         },
@@ -155,7 +214,7 @@ describe('CommentatorService', () => {
     });
 
     it(`should propagate ${status} errors when updating commentators`, (done) => {
-      service.update(1, commentatorRequest).subscribe({
+      service.update(1, updateRequest).subscribe({
         next: () => {
           fail('Expected update request to fail');
         },

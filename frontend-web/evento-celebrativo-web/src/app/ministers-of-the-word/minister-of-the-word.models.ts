@@ -1,3 +1,8 @@
+import {
+  PersonMinisterialCreateRequest,
+  PersonMinisterialUpdateRequest,
+} from '../people/person-ministerial-access.models';
+
 export interface MinisterOfTheWordResponse {
   id: number;
   name: string;
@@ -5,9 +10,5 @@ export interface MinisterOfTheWordResponse {
   birthdayDate: string | null;
 }
 
-export interface MinisterOfTheWordRequest {
-  name: string;
-  phoneNumber: string;
-  birthdayDate: string;
-  password: string;
-}
+export type MinisterOfTheWordCreateRequest = PersonMinisterialCreateRequest;
+export type MinisterOfTheWordUpdateRequest = PersonMinisterialUpdateRequest;
