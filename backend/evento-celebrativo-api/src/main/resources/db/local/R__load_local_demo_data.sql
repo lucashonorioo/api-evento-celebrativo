@@ -1,113 +1,463 @@
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Luana Odinson', '34989374748', '1988-05-21');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Miguel Souza', '34962165544', '1995-02-18');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Helena Oliveira', '34991564562', '1999-09-06');
+-- Repeatable migration (Flyway reaplica automaticamente sempre que o checksum deste arquivo
+-- muda). Um banco local ja pode ter a versao anterior deste seed aplicada, entao toda insercao
+-- abaixo precisa ser guardada por "WHERE NOT EXISTS" usando uma chave natural do fixture
+-- (phone_number, username, nomes de evento/local, pares (event_id, person_id)/(event_id,
+-- location_id)) em vez de assumir que o script roda uma unica vez. Isso evita duplicar Person,
+-- PersonMinistry, UserAccount, UserAccountRole, eventos, locations e assignments quando o
+-- Flyway reexecuta o script inteiro em um banco ja populado.
 
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Alice Lima', '34983246978', '1989-08-24');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Arthur Costa', '34978956324', '2005-03-24');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Heloísa Ribeiro', '34998632145', '1986-10-17');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Luana Odinson', '34989374748', '1988-05-21' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34989374748');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Miguel Souza', '34962165544', '1995-02-18' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34962165544');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Helena Oliveira', '34991564562', '1999-09-06' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991564562');
 
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Davi Gomes', '34963284523', '2003-06-02');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Laura Alves', '34998563215', '2006-07-11');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Bernardo Ferreira', '34936984562', '1982-12-08');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Alice Lima', '34983246978', '1989-08-24' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34983246978');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Arthur Costa', '34978956324', '2005-03-24' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34978956324');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Heloísa Ribeiro', '34998632145', '1986-10-17' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34998632145');
 
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Mariana Ferraz', '34989374749', '1988-05-21');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Carlos Silva', '34991234567', '1975-11-10');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Fernanda Souza', '34987654321', '1992-03-25');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Davi Gomes', '34963284523', '2003-06-02' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34963284523');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Laura Alves', '34998563215', '2006-07-11' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34998563215');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Bernardo Ferreira', '34936984562', '1982-12-08' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34936984562');
 
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Padre Miguel', '34988776655', '1968-07-14');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Padre Paulo', '34999887766', '1980-01-08');
-INSERT INTO tb_person(name, phone_number, birthday_date) VALUES ('Padre Roberto', '34981112233', '1972-09-03');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Mariana Ferraz', '34989374749', '1988-05-21' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34989374749');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Carlos Silva', '34991234567', '1975-11-10' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991234567');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Fernanda Souza', '34987654321', '1992-03-25' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34987654321');
 
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (1, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (2, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (3, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (4, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (5, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (6, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (7, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (8, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (9, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (10, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (11, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (12, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (13, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (14, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) VALUES (15, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Padre Miguel', '34988776655', '1968-07-14' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34988776655');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Padre Paulo', '34999887766', '1980-01-08' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34999887766');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Padre Roberto', '34981112233', '1972-09-03' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34981112233');
+
+-- Pessoas novas: cobrem o cenario "accountExists=false" / role=null de cada ministry no
+-- frontend. Nunca recebem tb_user_account nem tb_user_account_role.
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Camila Martins', '34991110001', '1990-04-12' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110001');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Gabriel Santos', '34991110002', '1993-11-08' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110002');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Rafael Moreira', '34991110003', '1985-02-27' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110003');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Juliana Mendes', '34991110004', '1998-06-15' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110004');
+INSERT INTO tb_person (name, phone_number, birthday_date)
+SELECT 'Padre Antônio', '34991110005', '1965-09-30' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110005');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34989374748'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34962165544'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991564562'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34983246978'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34978956324'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34998632145'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34963284523'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34998563215'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34936984562'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34989374749'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991234567'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34987654321'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34988776655'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34999887766'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34981112233'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
+
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991110001'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991110002'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991110003'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991110004'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
+INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM tb_person p
+WHERE p.phone_number = '34991110005'
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
 
 -- tb_user_account/tb_user_account_role sao a unica fonte de credenciais/autorizacao (Person nao
--- carrega mais password nem roles desde V18). As 5 contas que antes tinham ROLE_OPERATOR e
--- ROLE_ADMIN simultaneamente (invariante violado - conta com mais de uma role e tratada como
--- inconsistente e tem login/bearer rejeitados) foram normalizadas para ROLE_OPERATOR: decisao
--- explicita e conservadora, ja que person 14 (Padre Paulo) preserva um fixture limpo com
--- ROLE_ADMIN isolado para cenarios administrativos.
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (1, '34989374748', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (2, '34962165544', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (3, '34991564562', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (4, '34983246978', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (5, '34978956324', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (6, '34998632145', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (7, '34963284523', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (8, '34998563215', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (9, '34936984562', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (10, '34989374749', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (11, '34991234567', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (12, '34987654321', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (13, '34988776655', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (14, '34999887766', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
-INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at) VALUES (15, '34981112233', '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0));
+-- carrega mais password nem roles desde V18). Cada conta recebe exatamente uma role, escolhida
+-- por ministry apenas como exemplo de fixture para o frontend testar admin/operator/sem-conta -
+-- isso NAO expressa nenhuma regra de dominio ligando Ministry a Role. Cinco pessoas (uma por
+-- ministry) permanecem sem tb_user_account para cobrir accountExists=false.
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34989374748'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34962165544'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34991564562'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34983246978'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34978956324'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34998632145'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34963284523'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34998563215'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34936984562'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34989374749'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34991234567'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34987654321'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34988776655'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34999887766'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
+INSERT INTO tb_user_account (person_id, username, password_hash, enabled, created_at, updated_at)
+SELECT p.id, p.phone_number, '$2a$10$BZEayVp6X1Ry93e44/Rnze0hpK5J3ThbAdUm2OzH.GSWjA4zmtGHW', TRUE, CURRENT_TIMESTAMP(0), CURRENT_TIMESTAMP(0)
+FROM tb_person p
+WHERE p.phone_number = '34981112233'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id);
 
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (1, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (2, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (3, 1);
+-- Role final desejada por conta (1 admin + 2 operator por ministry). O INSERT so dispara na
+-- primeira vez que a conta existe sem role (banco limpo); os UPDATE de promocao logo abaixo sao
+-- o mecanismo que garante o mesmo resultado quando o banco ja tinha a role antiga aplicada por
+-- uma execucao anterior deste repeatable.
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_ADMIN'
+WHERE p.phone_number = '34989374748'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34962165544'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34991564562'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_ADMIN'
+WHERE p.phone_number = '34983246978'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34978956324'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34998632145'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_ADMIN'
+WHERE p.phone_number = '34963284523'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34998563215'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34936984562'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_ADMIN'
+WHERE p.phone_number = '34989374749'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34991234567'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34987654321'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34988776655'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_ADMIN'
+WHERE p.phone_number = '34999887766'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
+INSERT INTO tb_user_account_role (user_account_id, role_id)
+SELECT ua.id, r.id
+FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id JOIN tb_role r ON r.authority = 'ROLE_OPERATOR'
+WHERE p.phone_number = '34981112233'
+  AND NOT EXISTS (SELECT 1 FROM tb_user_account_role uar WHERE uar.user_account_id = ua.id);
 
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (4, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (5, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (6, 1);
+-- Promocao ROLE_OPERATOR -> ROLE_ADMIN das 4 contas indicadas. Padre Paulo ja e ROLE_ADMIN e nao
+-- entra aqui. UPDATE e naturalmente idempotente (reaplicar so mantem ROLE_ADMIN) e e o unico
+-- passo que garante o resultado final em um banco onde a role antiga ja tinha sido inserida por
+-- uma execucao anterior deste repeatable.
+UPDATE tb_user_account_role
+SET role_id = (SELECT id FROM tb_role WHERE authority = 'ROLE_ADMIN')
+WHERE user_account_id = (
+    SELECT ua.id FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id WHERE p.phone_number = '34989374748'
+);
+UPDATE tb_user_account_role
+SET role_id = (SELECT id FROM tb_role WHERE authority = 'ROLE_ADMIN')
+WHERE user_account_id = (
+    SELECT ua.id FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id WHERE p.phone_number = '34983246978'
+);
+UPDATE tb_user_account_role
+SET role_id = (SELECT id FROM tb_role WHERE authority = 'ROLE_ADMIN')
+WHERE user_account_id = (
+    SELECT ua.id FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id WHERE p.phone_number = '34963284523'
+);
+UPDATE tb_user_account_role
+SET role_id = (SELECT id FROM tb_role WHERE authority = 'ROLE_ADMIN')
+WHERE user_account_id = (
+    SELECT ua.id FROM tb_user_account ua JOIN tb_person p ON p.id = ua.person_id WHERE p.phone_number = '34989374749'
+);
 
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (7, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (8, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (9, 1);
+INSERT INTO tb_location (church_name, address)
+SELECT 'Igreja Matriz Nossa Senhora do Rosário', 'Praça Rui Barbosa, Centro, Ibiá - MG' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_location WHERE church_name = 'Igreja Matriz Nossa Senhora do Rosário');
+INSERT INTO tb_location (church_name, address)
+SELECT 'Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_location WHERE church_name = 'Paróquia São Sebastião');
+INSERT INTO tb_location (church_name, address)
+SELECT 'Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG' FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_location WHERE church_name = 'Santuário de Santo Antônio');
 
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (10, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (11, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (12, 1);
+INSERT INTO tb_celebration_event (name_mass_or_event, start_at, end_at, mass_or_celebration)
+SELECT 'Missa de Domingo da manhã', '2025-07-13 10:00:00', '2025-07-13 11:00:00', TRUE FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_celebration_event WHERE name_mass_or_event = 'Missa de Domingo da manhã' AND start_at = '2025-07-13 10:00:00');
+INSERT INTO tb_celebration_event (name_mass_or_event, start_at, end_at, mass_or_celebration)
+SELECT 'Celebração da Palavra de Sábado', '2025-07-12 19:30:00', '2025-07-12 20:30:00', FALSE FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_celebration_event WHERE name_mass_or_event = 'Celebração da Palavra de Sábado' AND start_at = '2025-07-12 19:30:00');
+INSERT INTO tb_celebration_event (name_mass_or_event, start_at, end_at, mass_or_celebration)
+SELECT 'Missa de Ação de Graças', '2025-07-20 08:00:00', '2025-07-20 09:00:00', TRUE FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_celebration_event WHERE name_mass_or_event = 'Missa de Ação de Graças' AND start_at = '2025-07-20 08:00:00');
 
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (13, 1);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (14, 2);
-INSERT INTO tb_user_account_role (user_account_id, role_id) VALUES (15, 1);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 13, 'PRIEST', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 13);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 10, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 10);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 11, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 11);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 4, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 4);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 5, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 5);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 1, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 1);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 1, 7, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 1 AND person_id = 7);
 
-INSERT INTO tb_location(church_name, address) VALUES ('Igreja Matriz Nossa Senhora do Rosário', 'Praça Rui Barbosa, Centro, Ibiá - MG');
-INSERT INTO tb_location(church_name, address) VALUES ('Paróquia São Sebastião', 'Rua São Sebastião, 123, Bairro Bela Vista, Ibiá - MG');
-INSERT INTO tb_location(church_name, address) VALUES ('Santuário de Santo Antônio', 'Avenida Padre João Rodrigues, 456, Bairro Centro, Ibiá - MG');
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 7, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 7);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 8, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 8);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 4, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 4);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 6, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 6);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 10, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 10);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 12, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 12);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 2, 2, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 2 AND person_id = 2);
 
-INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Missa de Domingo da manhã', '2025-07-13 10:00:00', '2025-07-13 11:00:00', TRUE);
-INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Celebração da Palavra de Sábado', '2025-07-12 19:30:00', '2025-07-12 20:30:00', FALSE);
-INSERT INTO tb_celebration_event(name_mass_or_event, start_at, end_at, mass_or_celebration) VALUES ('Missa de Ação de Graças', '2025-07-20 08:00:00', '2025-07-20 09:00:00', TRUE);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 14, 'PRIEST', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 14);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 11, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 11);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 12, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 12);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 5, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 5);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 6, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 6);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 3, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 3);
+INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at)
+SELECT 3, 9, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6) FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_assignment WHERE event_id = 3 AND person_id = 9);
 
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 13, 'PRIEST', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 10, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 11, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 4, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 5, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 1, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (1, 7, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 7, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 8, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 4, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 6, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 10, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 12, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (2, 2, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 14, 'PRIEST', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 11, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 12, 'EUCHARISTIC_MINISTER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 5, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 6, 'READER', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 3, 'COMMENTATOR', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-INSERT INTO tb_event_assignment (event_id, person_id, assignment_type, created_at, updated_at) VALUES (3, 9, 'MINISTER_OF_THE_WORD', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
-
-INSERT INTO tb_event_location (event_id, location_id) VALUES (1, 1);
-INSERT INTO tb_event_location (event_id, location_id) VALUES (2, 2);
-INSERT INTO tb_event_location (event_id, location_id) VALUES (3, 3);
+INSERT INTO tb_event_location (event_id, location_id)
+SELECT 1, 1 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_location WHERE event_id = 1 AND location_id = 1);
+INSERT INTO tb_event_location (event_id, location_id)
+SELECT 2, 2 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_location WHERE event_id = 2 AND location_id = 2);
+INSERT INTO tb_event_location (event_id, location_id)
+SELECT 3, 3 FROM dual
+WHERE NOT EXISTS (SELECT 1 FROM tb_event_location WHERE event_id = 3 AND location_id = 3);

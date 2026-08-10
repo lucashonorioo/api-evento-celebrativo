@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -20,6 +21,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 @ActiveProfiles("local")
 class LocalFlywayMigrationIntegrationTest {
+
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final String ROLE_OPERATOR = "ROLE_OPERATOR";
+
+    private record MinistryDistribution(String ministryType, String admin, List<String> operators, String withoutAccount) {
+    }
+
+    private static final List<MinistryDistribution> MINISTRY_DISTRIBUTIONS = List.of(
+            new MinistryDistribution("COMMENTATOR", "Luana Odinson", List.of("Miguel Souza", "Helena Oliveira"), "Camila Martins"),
+            new MinistryDistribution("READER", "Alice Lima", List.of("Arthur Costa", "Heloísa Ribeiro"), "Gabriel Santos"),
+            new MinistryDistribution("MINISTER_OF_THE_WORD", "Davi Gomes", List.of("Laura Alves", "Bernardo Ferreira"), "Rafael Moreira"),
+            new MinistryDistribution("EUCHARISTIC_MINISTER", "Mariana Ferraz", List.of("Carlos Silva", "Fernanda Souza"), "Juliana Mendes"),
+            new MinistryDistribution("PRIEST", "Padre Paulo", List.of("Padre Miguel", "Padre Roberto"), "Padre Antônio")
+    );
 
     @Autowired
     private Flyway flyway;
@@ -50,7 +65,7 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(1, countRows("tb_role", "id", 1L, "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "id", 2L, "authority", "ROLE_ADMIN"));
 
-        assertEquals(15, countRows("tb_person"));
+        assertEquals(20, countRows("tb_person"));
         assertEquals(3, countRows("tb_location"));
         assertEquals(3, countRows("tb_celebration_event"));
 
@@ -65,10 +80,12 @@ class LocalFlywayMigrationIntegrationTest {
         assertEventRange(3L, LocalDateTime.of(2025, 7, 20, 8, 0), LocalDateTime.of(2025, 7, 20, 9, 0));
 
         assertEquals(3, countRows("tb_event_location"));
-        assertEquals(15, countPeopleWithFilledParallelColumns());
+        assertEquals(20, countPeopleWithFilledParallelColumns());
         assertPersonMinistryFixtures();
         assertEventAssignmentFixtures();
         assertUserAccountFixturesMirrorPersonFixtures();
+        assertMinistryRoleMatrix();
+        assertNominalRoleAssignments();
     }
 
     @Test
@@ -134,8 +151,8 @@ class LocalFlywayMigrationIntegrationTest {
     }
 
     private void assertPersonMinistryFixtures() {
-        assertEquals(15, countRows("tb_person_ministry"));
-        assertEquals(15, countActivePersonMinistries());
+        assertEquals(20, countRows("tb_person_ministry"));
+        assertEquals(20, countActivePersonMinistries());
         assertEquals(0, countDuplicatedPersonMinistries());
     }
 
@@ -149,6 +166,150 @@ class LocalFlywayMigrationIntegrationTest {
         assertEquals(15, countRows("tb_user_account_role"));
         assertEquals(0, countUsernameMismatches());
         assertEquals(15, countAccountsEnabled());
+        assertEquals(5, countAccountsWithRole(ROLE_ADMIN));
+        assertEquals(10, countAccountsWithRole(ROLE_OPERATOR));
+        assertEquals(0, countAccountsWithMoreThanOneRole());
+        assertEquals(0, countPersonsWithMoreThanOneAccount());
+        assertEquals(5, countPersonsWithoutAccount());
+    }
+
+    private void assertMinistryRoleMatrix() {
+        for (MinistryDistribution distribution : MINISTRY_DISTRIBUTIONS) {
+            assertEquals(1, countPeopleWithMinistryAndRole(distribution.ministryType(), ROLE_ADMIN),
+                    "expected exactly 1 ROLE_ADMIN for " + distribution.ministryType());
+            assertEquals(2, countPeopleWithMinistryAndRole(distribution.ministryType(), ROLE_OPERATOR),
+                    "expected exactly 2 ROLE_OPERATOR for " + distribution.ministryType());
+            assertEquals(1, countPeopleWithMinistryAndNoAccount(distribution.ministryType()),
+                    "expected exactly 1 person without account for " + distribution.ministryType());
+        }
+    }
+
+    private void assertNominalRoleAssignments() {
+        for (MinistryDistribution distribution : MINISTRY_DISTRIBUTIONS) {
+            assertEquals(ROLE_ADMIN, personRole(distribution.admin()));
+            for (String operator : distribution.operators()) {
+                assertEquals(ROLE_OPERATOR, personRole(operator));
+            }
+            assertEquals(0, countAccountsForPersonName(distribution.withoutAccount()));
+        }
+    }
+
+    private String personRole(String personName) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT r.authority
+                FROM tb_person p
+                JOIN tb_user_account ua ON ua.person_id = p.id
+                JOIN tb_user_account_role uar ON uar.user_account_id = ua.id
+                JOIN tb_role r ON r.id = uar.role_id
+                WHERE p.name = ?
+                """,
+                String.class,
+                personName
+        );
+    }
+
+    private int countAccountsForPersonName(String personName) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person p
+                JOIN tb_user_account ua ON ua.person_id = p.id
+                WHERE p.name = ?
+                """,
+                Integer.class,
+                personName
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPeopleWithMinistryAndRole(String ministryType, String authority) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person_ministry pm
+                JOIN tb_user_account ua ON ua.person_id = pm.person_id
+                JOIN tb_user_account_role uar ON uar.user_account_id = ua.id
+                JOIN tb_role r ON r.id = uar.role_id
+                WHERE pm.ministry_type = ? AND r.authority = ?
+                """,
+                Integer.class,
+                ministryType,
+                authority
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPeopleWithMinistryAndNoAccount(String ministryType) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person_ministry pm
+                WHERE pm.ministry_type = ?
+                  AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = pm.person_id)
+                """,
+                Integer.class,
+                ministryType
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countAccountsWithRole(String authority) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_user_account_role uar
+                JOIN tb_role r ON r.id = uar.role_id
+                WHERE r.authority = ?
+                """,
+                Integer.class,
+                authority
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countAccountsWithMoreThanOneRole() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT user_account_id
+                    FROM tb_user_account_role
+                    GROUP BY user_account_id
+                    HAVING COUNT(*) > 1
+                ) duplicated
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPersonsWithMoreThanOneAccount() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT person_id
+                    FROM tb_user_account
+                    GROUP BY person_id
+                    HAVING COUNT(*) > 1
+                ) duplicated
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int countPersonsWithoutAccount() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM tb_person p
+                WHERE NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = p.id)
+                """,
+                Integer.class
+        );
+        return count == null ? 0 : count;
     }
 
     private int countUsernameMismatches() {
