@@ -48,7 +48,8 @@
   gap: 0.75rem;
 }
 
-.admin-users__filter-actions {
+.admin-users__filter-actions,
+.admin-users__field-hint {
   grid-column: 1 / -1;
 }
 
@@ -89,7 +90,10 @@
 .admin-users__feedback,
 .admin-users__empty-state,
 .admin-users__status,
-.admin-users__hint {
+.admin-users__hint,
+.admin-users__field-hint,
+.admin-users__list-header p,
+.admin-users__confirmation p {
   margin: 0;
   color: var(--color-text-muted);
   line-height: 1.5;
@@ -127,13 +131,6 @@
   margin: 0 0 0.3rem;
   color: var(--color-text);
   font-size: 1.25rem;
-}
-
-.admin-users__list-header p,
-.admin-users__confirmation p {
-  margin: 0;
-  color: var(--color-text-muted);
-  line-height: 1.5;
 }
 
 .admin-users__table-wrapper {

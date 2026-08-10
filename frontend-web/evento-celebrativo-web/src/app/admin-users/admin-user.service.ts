@@ -11,6 +11,7 @@ import {
   PersonMinistriesResponse,
   PersonMinistriesUpdateRequest,
   PersonRoleUpdateRequest,
+  PersonRoleUpdateResponse,
   UserRole,
 } from './admin-user.models';
 
@@ -30,10 +31,10 @@ export class AdminUserService {
     return this.http.get<PersonAdmin>(`${API_BASE_URL}/pessoas/${id}`);
   }
 
-  updateRole(id: number, role: UserRole): Observable<PersonAdmin> {
+  updateRole(id: number, role: UserRole): Observable<PersonRoleUpdateResponse> {
     const request: PersonRoleUpdateRequest = { role };
 
-    return this.http.put<PersonAdmin>(`${API_BASE_URL}/pessoas/${id}/roles`, request);
+    return this.http.put<PersonRoleUpdateResponse>(`${API_BASE_URL}/pessoas/${id}/roles`, request);
   }
 
   findMinistries(id: number): Observable<PersonMinistriesResponse> {
@@ -56,6 +57,9 @@ export class AdminUserService {
     params = appendTrimmedParam(params, 'phoneNumber', filters.phoneNumber);
     params = appendTrimmedParam(params, 'ministry', filters.ministry);
     params = appendTrimmedParam(params, 'role', filters.role);
+    params = appendBooleanParam(params, 'personActive', filters.personActive);
+    params = appendBooleanParam(params, 'accountExists', filters.accountExists);
+    params = appendBooleanParam(params, 'accountEnabled', filters.accountEnabled);
 
     return params;
   }
@@ -69,4 +73,12 @@ function appendTrimmedParam(
   const trimmedValue = value?.trim();
 
   return trimmedValue ? params.set(key, trimmedValue) : params;
+}
+
+function appendBooleanParam(
+  params: HttpParams,
+  key: string,
+  value: boolean | undefined,
+): HttpParams {
+  return value === undefined ? params : params.set(key, String(value));
 }

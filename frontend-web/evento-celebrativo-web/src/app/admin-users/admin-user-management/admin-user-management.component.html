@@ -32,13 +32,54 @@
 
     <div class="admin-users__field">
       <label for="user-role">Perfil de acesso</label>
-      <select id="user-role" formControlName="role">
+      <select
+        id="user-role"
+        formControlName="role"
+        [attr.aria-describedby]="isAccountFilterConstrained() ? 'account-filters-hint' : null"
+      >
         <option value="">Todos</option>
         @for (option of roleOptions; track option.value) {
           <option [value]="option.value">{{ option.label }}</option>
         }
       </select>
     </div>
+
+    <div class="admin-users__field">
+      <label for="user-person-active">Status da pessoa</label>
+      <select id="user-person-active" formControlName="personActive">
+        @for (option of personActiveOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="admin-users__field">
+      <label for="user-account-exists">Conta de acesso</label>
+      <select id="user-account-exists" formControlName="accountExists">
+        @for (option of accountExistsOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="admin-users__field">
+      <label for="user-account-enabled">Status da conta</label>
+      <select
+        id="user-account-enabled"
+        formControlName="accountEnabled"
+        [attr.aria-describedby]="isAccountFilterConstrained() ? 'account-filters-hint' : null"
+      >
+        @for (option of accountEnabledOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </div>
+
+    @if (isAccountFilterConstrained()) {
+      <p id="account-filters-hint" class="admin-users__field-hint">
+        Perfil e status da conta não se aplicam a pessoas sem conta de acesso.
+      </p>
+    }
 
     <div class="admin-users__filter-actions">
       <button class="admin-users__button" type="submit" [disabled]="isLoading()">Filtrar</button>
@@ -96,7 +137,9 @@
               <th scope="col">Nome</th>
               <th scope="col">Telefone</th>
               <th scope="col">Ministérios</th>
-              <th scope="col">Perfil de acesso atual</th>
+              <th scope="col">Status da pessoa</th>
+              <th scope="col">Acesso ao sistema</th>
+              <th scope="col">Perfil de acesso</th>
               <th scope="col">Ações</th>
             </tr>
           </thead>
@@ -110,7 +153,16 @@
                 <td data-label="Nome">{{ person.name }}</td>
                 <td data-label="Telefone">{{ formatPhone(person.phoneNumber) }}</td>
                 <td data-label="Ministérios">{{ ministriesLabel(person.ministries) }}</td>
-                <td data-label="Perfil de acesso atual">{{ rolesLabel(person.roles) }}</td>
+                <td data-label="Status da pessoa">{{ personStatusLabel(person) }}</td>
+                <td data-label="Acesso ao sistema">
+                  {{ accountStatusLabel(person) }}
+                  @if (showsInactiveWithEnabledAccountHint(person)) {
+                    <p class="admin-users__hint">
+                      A conta está habilitada, mas a pessoa inativa não pode acessar o aplicativo.
+                    </p>
+                  }
+                </td>
+                <td data-label="Perfil de acesso">{{ accessProfileLabel(person) }}</td>
                 <td data-label="Ações" class="admin-users__confirmation-actions">
                   <button
                     #roleChangeButton
@@ -139,7 +191,7 @@
 
               @if (isRoleChangeOpen(person)) {
                 <tr class="admin-users__details-row">
-                  <td colspan="5">
+                  <td colspan="7">
                     <section
                       [id]="roleChangePanelId(person)"
                       class="admin-users__confirmation"
@@ -227,7 +279,7 @@
 
               @if (isMinistriesChangeOpen(person)) {
                 <tr class="admin-users__details-row">
-                  <td colspan="5">
+                  <td colspan="7">
                     <section
                       [id]="ministriesPanelId(person)"
                       class="admin-users__confirmation"
