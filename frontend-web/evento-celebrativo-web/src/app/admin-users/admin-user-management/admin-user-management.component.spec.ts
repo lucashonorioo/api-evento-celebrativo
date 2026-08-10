@@ -6,7 +6,12 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
-import { PersonAdmin, PersonAdminPage, PersonMinistriesResponse } from '../admin-user.models';
+import {
+  PersonAdmin,
+  PersonAdminPage,
+  PersonMinistriesResponse,
+  PersonRoleUpdateResponse,
+} from '../admin-user.models';
 import { AdminUserService } from '../admin-user.service';
 import { AdminUserManagementComponent } from './admin-user-management.component';
 
@@ -52,6 +57,40 @@ describe('AdminUserManagementComponent', () => {
 
     harness = await RouterTestingHarness.create(url);
     component = harness.routeDebugElement?.componentInstance as AdminUserManagementComponent;
+  }
+
+  async function configureWithFindAllError(
+    error: HttpErrorResponse,
+    username = '34999999999',
+  ): Promise<void> {
+    adminUserService = jasmine.createSpyObj<AdminUserService>('AdminUserService', [
+      'findAll',
+      'findById',
+      'updateRole',
+      'findMinistries',
+      'updateMinistries',
+    ]);
+    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
+      'getUsername',
+    ]);
+    adminUserService.findAll.and.returnValue(throwError(() => error));
+    authSessionService.getUsername.and.returnValue(username);
+
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([{ path: 'admin/usuarios', component: AdminUserManagementComponent }]),
+        { provide: AdminUserService, useValue: adminUserService },
+        { provide: AuthSessionService, useValue: authSessionService },
+      ],
+    }).compileComponents();
+  }
+
+  async function setupWithFindAllError(
+    error: HttpErrorResponse,
+    username = '34999999999',
+  ): Promise<void> {
+    await configureWithFindAllError(error, username);
+    harness = await RouterTestingHarness.create('/admin/usuarios');
   }
 
   afterEach(() => {
@@ -112,30 +151,21 @@ describe('AdminUserManagementComponent', () => {
     expect(textContent()).toContain('Nenhuma pessoa foi encontrada com os filtros informados.');
   });
 
+  it('should treat personActive=false as an active filter for the empty state message', async () => {
+    await setup(pageResponse({ content: [], totalElements: 0, totalPages: 0, empty: true }));
+
+    setSelectValue('#user-person-active', 'false');
+    submitFilters();
+
+    expect(textContent()).toContain('Nenhuma pessoa foi encontrada com os filtros informados.');
+  });
+
   it('should show an error and retry loading', async () => {
-    adminUserService = jasmine.createSpyObj<AdminUserService>('AdminUserService', [
-      'findAll',
-      'findById',
-      'updateRole',
-      'findMinistries',
-      'updateMinistries',
-    ]);
-    authSessionService = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', [
-      'getUsername',
-    ]);
+    await configureWithFindAllError(new HttpErrorResponse({ status: 403 }));
     adminUserService.findAll.and.returnValues(
       throwError(() => new HttpErrorResponse({ status: 403 })),
       of(pageResponse()),
     );
-    authSessionService.getUsername.and.returnValue('34999999999');
-
-    await TestBed.configureTestingModule({
-      providers: [
-        provideRouter([{ path: 'admin/usuarios', component: AdminUserManagementComponent }]),
-        { provide: AdminUserService, useValue: adminUserService },
-        { provide: AuthSessionService, useValue: authSessionService },
-      ],
-    }).compileComponents();
 
     harness = await RouterTestingHarness.create('/admin/usuarios');
 
@@ -145,6 +175,26 @@ describe('AdminUserManagementComponent', () => {
 
     expect(adminUserService.findAll).toHaveBeenCalledTimes(2);
     expect(textContent()).toContain('Maria Silva');
+  });
+
+  describe('list error handling', () => {
+    it('should show a friendly message for PERSON_ADMIN_FILTERS_INVALID', async () => {
+      await setupWithFindAllError(
+        new HttpErrorResponse({ status: 400, error: { errorCode: 'PERSON_ADMIN_FILTERS_INVALID' } }),
+      );
+
+      expect(textContent()).toContain(
+        'Os filtros de conta informados são incompatíveis. Revise os filtros e tente novamente.',
+      );
+    });
+
+    it('should show a generic message for an unrecognized 400 error', async () => {
+      await setupWithFindAllError(
+        new HttpErrorResponse({ status: 400, error: { errorCode: 'OUTRO_ERRO' } }),
+      );
+
+      expect(textContent()).toContain('Não foi possível aplicar os filtros informados.');
+    });
   });
 
   it('should apply filters explicitly with the official ministry value and return to the first page', async () => {
@@ -161,8 +211,168 @@ describe('AdminUserManagementComponent', () => {
       phoneNumber: '3499',
       ministry: 'MINISTER_OF_THE_WORD',
       role: 'ROLE_ADMIN',
+      personActive: undefined,
+      accountExists: undefined,
+      accountEnabled: undefined,
       page: 0,
       size: 10,
+    });
+  });
+
+  describe('boolean filters', () => {
+    it('should apply the personActive filter', async () => {
+      await setup();
+
+      setSelectValue('#user-person-active', 'true');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ personActive: true, page: 0 }),
+      );
+    });
+
+    it('should apply the accountExists filter', async () => {
+      await setup();
+
+      setSelectValue('#user-account-exists', 'true');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ accountExists: true, page: 0 }),
+      );
+    });
+
+    it('should apply the accountEnabled filter', async () => {
+      await setup();
+
+      setSelectValue('#user-account-enabled', 'true');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ accountEnabled: true, page: 0 }),
+      );
+    });
+
+    it('should return to page 0 when applying a boolean filter', async () => {
+      await setup(
+        pageResponse({ number: 2, totalPages: 3, totalElements: 25, first: false, last: false }),
+        '34000000000',
+        '/admin/usuarios?page=2',
+      );
+      adminUserService.findAll.and.returnValue(of(pageResponse({ number: 0 })));
+
+      setSelectValue('#user-person-active', 'true');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ personActive: true, page: 0 }),
+      );
+    });
+
+    it('should treat personActive=false as an active filter', async () => {
+      await setup();
+
+      setSelectValue('#user-person-active', 'false');
+      submitFilters();
+
+      expect(component.activeFilters().personActive).toBeFalse();
+      expect(component.hasActiveFilters()).toBeTrue();
+    });
+
+    it('should treat accountExists=false as an active filter', async () => {
+      await setup();
+
+      setSelectValue('#user-account-exists', 'false');
+      submitFilters();
+
+      expect(component.activeFilters().accountExists).toBeFalse();
+      expect(component.hasActiveFilters()).toBeTrue();
+    });
+
+    it('should treat accountEnabled=false as an active filter', async () => {
+      await setup();
+
+      setSelectValue('#user-account-enabled', 'false');
+      submitFilters();
+
+      expect(component.activeFilters().accountEnabled).toBeFalse();
+      expect(component.hasActiveFilters()).toBeTrue();
+    });
+
+    it('should send role without forcing accountExists when accountExists is not explicitly set', async () => {
+      await setup();
+
+      setSelectValue('#user-role', 'ROLE_ADMIN');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ role: 'ROLE_ADMIN', accountExists: undefined }),
+      );
+    });
+
+    it('should send accountEnabled without forcing accountExists when accountExists is not explicitly set', async () => {
+      await setup();
+
+      setSelectValue('#user-account-enabled', 'true');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ accountEnabled: true, accountExists: undefined }),
+      );
+    });
+  });
+
+  describe('accountExists=false constraint', () => {
+    it('should clear and disable role and accountEnabled when accountExists is set to "Sem conta"', async () => {
+      await setup();
+
+      setSelectValue('#user-role', 'ROLE_ADMIN');
+      setSelectValue('#user-account-enabled', 'true');
+      setSelectValue('#user-account-exists', 'false');
+
+      expect((query('#user-role') as HTMLSelectElement).value).toBe('');
+      expect((query('#user-role') as HTMLSelectElement).disabled).toBeTrue();
+      expect((query('#user-account-enabled') as HTMLSelectElement).value).toBe('');
+      expect((query('#user-account-enabled') as HTMLSelectElement).disabled).toBeTrue();
+    });
+
+    it('should re-enable role and accountEnabled without restoring previous values when leaving "Sem conta"', async () => {
+      await setup();
+
+      setSelectValue('#user-role', 'ROLE_ADMIN');
+      setSelectValue('#user-account-enabled', 'true');
+      setSelectValue('#user-account-exists', 'false');
+      setSelectValue('#user-account-exists', '');
+
+      expect((query('#user-role') as HTMLSelectElement).disabled).toBeFalse();
+      expect((query('#user-account-enabled') as HTMLSelectElement).disabled).toBeFalse();
+      expect((query('#user-role') as HTMLSelectElement).value).toBe('');
+      expect((query('#user-account-enabled') as HTMLSelectElement).value).toBe('');
+    });
+
+    it('should not send role or accountEnabled when accountExists is "Sem conta"', async () => {
+      await setup();
+
+      setSelectValue('#user-role', 'ROLE_ADMIN');
+      setSelectValue('#user-account-enabled', 'true');
+      setSelectValue('#user-account-exists', 'false');
+      submitFilters();
+
+      expect(adminUserService.findAll).toHaveBeenCalledWith(
+        jasmine.objectContaining({ accountExists: false, role: undefined, accountEnabled: undefined }),
+      );
+    });
+
+    it('should show an accessible hint when account filters are constrained', async () => {
+      await setup();
+
+      expect(textContent()).not.toContain('Perfil e status da conta não se aplicam');
+
+      setSelectValue('#user-account-exists', 'false');
+
+      expect(textContent()).toContain(
+        'Perfil e status da conta não se aplicam a pessoas sem conta de acesso.',
+      );
     });
   });
 
@@ -170,10 +380,16 @@ describe('AdminUserManagementComponent', () => {
     await setup();
 
     setInputValue('#user-name', 'Maria');
+    setSelectValue('#user-person-active', 'true');
+    setSelectValue('#user-account-exists', 'false');
     clickButton('Limpar filtros');
 
     expect(adminUserService.findAll).toHaveBeenCalledWith({ page: 0, size: 10 });
     expect((query('#user-name') as HTMLInputElement).value).toBe('');
+    expect((query('#user-person-active') as HTMLSelectElement).value).toBe('');
+    expect((query('#user-account-exists') as HTMLSelectElement).value).toBe('');
+    expect((query('#user-role') as HTMLSelectElement).disabled).toBeFalse();
+    expect((query('#user-account-enabled') as HTMLSelectElement).disabled).toBeFalse();
   });
 
   it('should navigate through pages', async () => {
@@ -229,6 +445,118 @@ describe('AdminUserManagementComponent', () => {
     expect(cells[2]).toBe('Leitor, Comentarista, Ministro da Palavra');
   });
 
+  describe('person and account display', () => {
+    it('should show "Ativa" for an active person and "Inativa" for an inactive one', async () => {
+      await setup(
+        pageResponse({
+          content: [
+            person({ id: 1, personActive: true }),
+            person({ id: 2, name: 'João Souza', personActive: false }),
+          ],
+          totalElements: 2,
+        }),
+      );
+
+      const cells = queryAll('[data-label="Status da pessoa"]').map((cell) =>
+        cell.textContent?.trim(),
+      );
+
+      expect(cells[0]).toBe('Ativa');
+      expect(cells[1]).toBe('Inativa');
+    });
+
+    it('should show "Sem conta de acesso" when the person has no account', async () => {
+      await setup(
+        pageResponse({
+          content: [person({ accountExists: false, accountEnabled: null, username: null, roles: [] })],
+        }),
+      );
+
+      expect(query('[data-label="Acesso ao sistema"]').textContent).toContain('Sem conta de acesso');
+      expect(query('[data-label="Acesso ao sistema"]').textContent).not.toContain('Desabilitada');
+    });
+
+    it('should show "Conta habilitada" when the account exists and is enabled', async () => {
+      await setup(
+        pageResponse({ content: [person({ accountExists: true, accountEnabled: true })] }),
+      );
+
+      expect(query('[data-label="Acesso ao sistema"]').textContent).toContain('Conta habilitada');
+    });
+
+    it('should show "Conta desabilitada" when the account exists and is disabled', async () => {
+      await setup(
+        pageResponse({ content: [person({ accountExists: true, accountEnabled: false })] }),
+      );
+
+      expect(query('[data-label="Acesso ao sistema"]').textContent).toContain('Conta desabilitada');
+    });
+
+    it('should show a neutral message defensively when accountExists=true and accountEnabled=null', async () => {
+      await setup(
+        pageResponse({ content: [person({ accountExists: true, accountEnabled: null })] }),
+      );
+
+      expect(query('[data-label="Acesso ao sistema"]').textContent).toContain(
+        'Status da conta indisponível',
+      );
+    });
+
+    it('should never default a person without an account to the operator profile', async () => {
+      await setup(
+        pageResponse({
+          content: [
+            person({ accountExists: false, accountEnabled: null, username: null, roles: [] }),
+          ],
+        }),
+      );
+
+      const profileText = query('[data-label="Perfil de acesso"]').textContent?.trim();
+
+      expect(profileText).toBe('Sem conta de acesso');
+      expect(profileText).not.toContain('Operador');
+    });
+
+    it('should show "Administrador" for an admin account', async () => {
+      await setup(
+        pageResponse({ content: [person({ accountExists: true, roles: ['ROLE_ADMIN'] })] }),
+      );
+
+      expect(query('[data-label="Perfil de acesso"]').textContent?.trim()).toBe('Administrador');
+    });
+
+    it('should show "Operador" for an operator account', async () => {
+      await setup(
+        pageResponse({ content: [person({ accountExists: true, roles: ['ROLE_OPERATOR'] })] }),
+      );
+
+      expect(query('[data-label="Perfil de acesso"]').textContent?.trim()).toBe('Operador');
+    });
+
+    it('should show a neutral profile message when the account exists but roles is empty', async () => {
+      await setup(pageResponse({ content: [person({ accountExists: true, roles: [] })] }));
+
+      const profileText = query('[data-label="Perfil de acesso"]').textContent?.trim();
+
+      expect(profileText).toBe('Perfil de acesso indisponível');
+      expect(profileText).not.toContain('Operador');
+    });
+
+    it('should keep personActive and accountEnabled independent for an inactive person with an enabled account', async () => {
+      await setup(
+        pageResponse({
+          content: [person({ personActive: false, accountExists: true, accountEnabled: true })],
+        }),
+      );
+
+      expect(query('[data-label="Status da pessoa"]').textContent?.trim()).toBe('Inativa');
+      expect(query('[data-label="Acesso ao sistema"]').textContent).toContain('Conta habilitada');
+      expect(textContent()).toContain(
+        'A conta está habilitada, mas a pessoa inativa não pode acessar o aplicativo.',
+      );
+    });
+  });
+
   it('should render the role change panel immediately after the selected person', async () => {
     await setup();
 
@@ -280,6 +608,7 @@ describe('AdminUserManagementComponent', () => {
             id: 2,
             name: 'João Souza',
             phoneNumber: '34888888888',
+            username: '34888888888',
             ministries: ['PRIEST'],
             roles: ['ROLE_OPERATOR'],
           }),
@@ -334,7 +663,7 @@ describe('AdminUserManagementComponent', () => {
 
   it('should update a role, prevent duplicate submissions and reload the current page', async () => {
     await setup();
-    const updateRoleResponse = new Subject<PersonAdmin>();
+    const updateRoleResponse = new Subject<PersonRoleUpdateResponse>();
     adminUserService.updateRole.and.returnValue(updateRoleResponse.asObservable());
 
     clickButton('Alterar perfil');
@@ -344,7 +673,7 @@ describe('AdminUserManagementComponent', () => {
 
     expect(adminUserService.updateRole).toHaveBeenCalledOnceWith(1, 'ROLE_OPERATOR');
 
-    updateRoleResponse.next(person({ roles: ['ROLE_OPERATOR'] }));
+    updateRoleResponse.next(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] }));
     updateRoleResponse.complete();
     harness.detectChanges();
 
@@ -376,7 +705,7 @@ describe('AdminUserManagementComponent', () => {
         }),
       ),
     );
-    adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+    adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] })));
 
     setInputValue('#user-name', ' Maria ');
     setSelectValue('#user-role', 'ROLE_ADMIN');
@@ -412,7 +741,7 @@ describe('AdminUserManagementComponent', () => {
       ),
       of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
     );
-    adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+    adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] })));
 
     clickButton('Alterar perfil');
     selectRole('ROLE_OPERATOR');
@@ -439,61 +768,150 @@ describe('AdminUserManagementComponent', () => {
     expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
   });
 
-  it('should show friendly 409 messages and preserve the item after errors', async () => {
-    await setup();
-    adminUserService.updateRole.and.returnValues(
-      throwError(
-        () =>
-          new HttpErrorResponse({
-            status: 409,
-            error: { error: 'Voce nao pode remover o seu proprio perfil administrativo.' },
-          }),
-      ),
-      throwError(
-        () =>
-          new HttpErrorResponse({
-            status: 409,
-            error: {
-              error: 'O ultimo administrador do sistema nao pode ter seu perfil alterado.',
-            },
-          }),
-      ),
-      throwError(() => new HttpErrorResponse({ status: 409, error: { error: 'Outra regra' } })),
-    );
+  describe('role update conflict error codes', () => {
+    it('should show a friendly message for SELF_ADMIN_DEMOTION_NOT_ALLOWED', async () => {
+      await setup();
+      adminUserService.updateRole.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({
+              status: 409,
+              error: {
+                errorCode: 'SELF_ADMIN_DEMOTION_NOT_ALLOWED',
+                error: 'texto totalmente diferente do historicamente usado',
+              },
+            }),
+        ),
+      );
 
-    clickButton('Alterar perfil');
-    selectRole('ROLE_OPERATOR');
-    clickButton('Salvar perfil');
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
 
-    expect(textContent()).toContain('Você não pode remover o seu próprio perfil administrativo.');
-    expect(textContent()).toContain('Maria Silva');
+      expect(textContent()).toContain('Você não pode remover o seu próprio perfil administrativo.');
+      expect(textContent()).toContain('Maria Silva');
+    });
 
-    component.selectRole('ROLE_OPERATOR');
-    component.confirmRoleChange();
-    harness.detectChanges();
+    it('should show a friendly message for LAST_ACTIVE_ADMIN_REQUIRED', async () => {
+      await setup();
+      adminUserService.updateRole.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({ status: 409, error: { errorCode: 'LAST_ACTIVE_ADMIN_REQUIRED' } }),
+        ),
+      );
 
-    expect(textContent()).toContain(
-      'Não é possível remover o perfil do último administrador do sistema.',
-    );
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
 
-    component.selectRole('ROLE_OPERATOR');
-    component.confirmRoleChange();
-    harness.detectChanges();
+      expect(textContent()).toContain(
+        'Não é possível remover o perfil do último administrador efetivo do sistema.',
+      );
+    });
 
-    expect(textContent()).toContain(
-      'Não foi possível alterar o perfil devido a uma regra administrativa.',
-    );
+    it('should show a friendly message for USER_ACCOUNT_NOT_FOUND', async () => {
+      await setup();
+      adminUserService.updateRole.and.returnValue(
+        throwError(
+          () => new HttpErrorResponse({ status: 409, error: { errorCode: 'USER_ACCOUNT_NOT_FOUND' } }),
+        ),
+      );
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+
+      expect(textContent()).toContain('Esta pessoa não possui conta de acesso.');
+    });
+
+    it('should show a friendly message for USER_ACCOUNT_ROLE_INVALID', async () => {
+      await setup();
+      adminUserService.updateRole.and.returnValue(
+        throwError(
+          () =>
+            new HttpErrorResponse({ status: 409, error: { errorCode: 'USER_ACCOUNT_ROLE_INVALID' } }),
+        ),
+      );
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+
+      expect(textContent()).toContain('O perfil de acesso configurado para esta conta é inválido.');
+    });
+
+    it('should show a generic message for an unrecognized 409 conflict', async () => {
+      await setup();
+      adminUserService.updateRole.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 409, error: { errorCode: 'OUTRA_REGRA' } })),
+      );
+
+      clickButton('Alterar perfil');
+      selectRole('ROLE_OPERATOR');
+      clickButton('Salvar perfil');
+
+      expect(textContent()).toContain(
+        'Não foi possível alterar o perfil devido a uma regra administrativa.',
+      );
+    });
   });
 
-  it('should visually block self-demotion for the authenticated administrator', async () => {
-    await setup(pageResponse(), '34999999999');
+  describe('self admin identification', () => {
+    it('should visually block self-demotion for the authenticated administrator', async () => {
+      await setup(pageResponse(), '34999999999');
 
-    clickButton('Alterar perfil');
+      clickButton('Alterar perfil');
 
-    const operatorInput = query('input[value="ROLE_OPERATOR"]') as HTMLInputElement;
+      const operatorInput = query('input[value="ROLE_OPERATOR"]') as HTMLInputElement;
 
-    expect(operatorInput.disabled).toBeTrue();
-    expect(textContent()).toContain('O próprio perfil administrativo não pode ser removido.');
+      expect(operatorInput.disabled).toBeTrue();
+      expect(textContent()).toContain('O próprio perfil administrativo não pode ser removido.');
+    });
+
+    it('should identify the authenticated administrator using the consolidated username, not phoneNumber', async () => {
+      await setup(
+        pageResponse({
+          content: [
+            person({
+              username: '34999999999',
+              phoneNumber: '34888888888',
+              accountExists: true,
+              roles: ['ROLE_ADMIN'],
+            }),
+          ],
+        }),
+        '34999999999',
+      );
+
+      clickButton('Alterar perfil');
+
+      const operatorInput = query('input[value="ROLE_OPERATOR"]') as HTMLInputElement;
+
+      expect(operatorInput.disabled).toBeTrue();
+    });
+
+    it('should not treat a matching phoneNumber as self admin when the username differs', async () => {
+      await setup(
+        pageResponse({
+          content: [
+            person({
+              username: '34888888888',
+              phoneNumber: '34999999999',
+              accountExists: true,
+              roles: ['ROLE_ADMIN'],
+            }),
+          ],
+        }),
+        '34999999999',
+      );
+
+      clickButton('Alterar perfil');
+
+      const operatorInput = query('input[value="ROLE_OPERATOR"]') as HTMLInputElement;
+
+      expect(operatorInput.disabled).toBeFalse();
+    });
   });
 
   it('should not expose sensitive fields', async () => {
@@ -847,11 +1265,121 @@ describe('AdminUserManagementComponent', () => {
       );
     });
 
+    it('should restore personActive=true from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?personActive=true');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ personActive: true }),
+      );
+      expect((query('#user-person-active') as HTMLSelectElement).value).toBe('true');
+    });
+
+    it('should restore personActive=false from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?personActive=false');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ personActive: false }),
+      );
+      expect((query('#user-person-active') as HTMLSelectElement).value).toBe('false');
+    });
+
+    it('should restore accountExists=true from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?accountExists=true');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ accountExists: true }),
+      );
+      expect((query('#user-account-exists') as HTMLSelectElement).value).toBe('true');
+    });
+
+    it('should restore accountExists=false from the URL and disable role/accountEnabled', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?accountExists=false');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ accountExists: false }),
+      );
+      expect((query('#user-account-exists') as HTMLSelectElement).value).toBe('false');
+      expect((query('#user-role') as HTMLSelectElement).disabled).toBeTrue();
+      expect((query('#user-account-enabled') as HTMLSelectElement).disabled).toBeTrue();
+    });
+
+    it('should restore accountEnabled=true from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?accountEnabled=true');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ accountEnabled: true }),
+      );
+      expect((query('#user-account-enabled') as HTMLSelectElement).value).toBe('true');
+    });
+
+    it('should restore accountEnabled=false from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?accountEnabled=false');
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ accountEnabled: false }),
+      );
+      expect((query('#user-account-enabled') as HTMLSelectElement).value).toBe('false');
+    });
+
+    it('should ignore invalid boolean values from the URL', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?personActive=1&accountExists=FALSE&accountEnabled=abc',
+      );
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
+      expect(location.path()).toBe('/admin/usuarios');
+    });
+
+    it('should remove role from the URL when combined with accountExists=false', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?accountExists=false&role=ROLE_ADMIN',
+      );
+      await harness.fixture.whenStable();
+
+      const calledFilters = adminUserService.findAll.calls.mostRecent().args[0];
+
+      expect(calledFilters.accountExists).toBeFalse();
+      expect(calledFilters.role).toBeUndefined();
+      expect(location.path()).toBe('/admin/usuarios?accountExists=false');
+    });
+
+    it('should remove accountEnabled from the URL when combined with accountExists=false', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?accountExists=false&accountEnabled=true',
+      );
+      await harness.fixture.whenStable();
+
+      const calledFilters = adminUserService.findAll.calls.mostRecent().args[0];
+
+      expect(calledFilters.accountExists).toBeFalse();
+      expect(calledFilters.accountEnabled).toBeUndefined();
+      expect(location.path()).toBe('/admin/usuarios?accountExists=false');
+    });
+
+    it('should normalize the URL before the request and execute a single GET', async () => {
+      await setup(
+        pageResponse(),
+        '34000000000',
+        '/admin/usuarios?accountExists=false&role=ROLE_ADMIN&accountEnabled=true',
+      );
+      await harness.fixture.whenStable();
+
+      expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
+      expect(location.path()).toBe('/admin/usuarios?accountExists=false');
+    });
+
     it('should restore the complete combination of filters from the URL', async () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&page=1',
+        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&personActive=true&accountExists=true&accountEnabled=true&page=1',
       );
 
       expect(adminUserService.findAll).toHaveBeenCalledOnceWith({
@@ -859,6 +1387,9 @@ describe('AdminUserManagementComponent', () => {
         phoneNumber: '34999999999',
         ministry: 'PRIEST',
         role: 'ROLE_OPERATOR',
+        personActive: true,
+        accountExists: true,
+        accountEnabled: true,
         page: 1,
         size: 10,
       });
@@ -970,7 +1501,7 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?name=Maria&phoneNumber=34999999999&ministry=READER&role=ROLE_ADMIN&page=1',
+        '/admin/usuarios?name=Maria&phoneNumber=34999999999&ministry=READER&role=ROLE_ADMIN&personActive=true&accountExists=true&accountEnabled=true&page=1',
       );
       await harness.fixture.whenStable();
 
@@ -1201,7 +1732,7 @@ describe('AdminUserManagementComponent', () => {
         ),
         of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
       );
-      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+      adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] })));
 
       clickButton('Alterar perfil');
       selectRole('ROLE_OPERATOR');
@@ -1230,7 +1761,7 @@ describe('AdminUserManagementComponent', () => {
         ),
         of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
       );
-      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+      adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] })));
 
       clickButton('Alterar perfil');
       selectRole('ROLE_OPERATOR');
@@ -1250,7 +1781,7 @@ describe('AdminUserManagementComponent', () => {
       );
       await harness.fixture.whenStable();
       navigateSpy.calls.reset();
-      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_ADMIN'] })));
+      adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_ADMIN'] })));
 
       clickButton('Alterar perfil');
       selectRole('ROLE_OPERATOR');
@@ -1292,7 +1823,7 @@ describe('AdminUserManagementComponent', () => {
       adminUserService.findAll.and.returnValue(
         of(pageResponse({ content: [], number: 0, totalPages: 0, totalElements: 0, empty: true })),
       );
-      adminUserService.updateRole.and.returnValue(of(person({ roles: ['ROLE_OPERATOR'] })));
+      adminUserService.updateRole.and.returnValue(of(roleUpdateResponse({ roles: ['ROLE_OPERATOR'] })));
 
       clickButton('Alterar perfil');
       selectRole('ROLE_OPERATOR');
@@ -1448,6 +1979,24 @@ describe('AdminUserManagementComponent', () => {
   }
 
   function person(overrides: Partial<PersonAdmin> = {}): PersonAdmin {
+    return {
+      id: 1,
+      name: 'Maria Silva',
+      phoneNumber: '34999999999',
+      birthdayDate: '1988-04-16',
+      personActive: true,
+      ministries: ['READER'],
+      accountExists: true,
+      accountEnabled: true,
+      username: '34999999999',
+      roles: ['ROLE_ADMIN'],
+      ...overrides,
+    };
+  }
+
+  function roleUpdateResponse(
+    overrides: Partial<PersonRoleUpdateResponse> = {},
+  ): PersonRoleUpdateResponse {
     return {
       id: 1,
       name: 'Maria Silva',

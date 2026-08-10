@@ -13,6 +13,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
+import { apiErrorCode } from '../../api-error.utils';
 import { AuthSessionService } from '../../auth-session.service';
 import {
   MinistryType,
@@ -25,7 +26,18 @@ import {
 import { AdminUserService } from '../admin-user.service';
 
 const DEFAULT_PAGE_SIZE = 10;
-const QUERY_PARAM_KEYS = ['name', 'phoneNumber', 'ministry', 'role', 'page'] as const;
+const QUERY_PARAM_KEYS = [
+  'name',
+  'phoneNumber',
+  'ministry',
+  'role',
+  'personActive',
+  'accountExists',
+  'accountEnabled',
+  'page',
+] as const;
+
+type BooleanFilterValue = '' | 'true' | 'false';
 
 interface MinistryTypeOption {
   readonly value: MinistryType;
@@ -34,6 +46,11 @@ interface MinistryTypeOption {
 
 interface UserRoleOption {
   readonly value: UserRole;
+  readonly label: string;
+}
+
+interface BooleanFilterOption {
+  readonly value: BooleanFilterValue;
   readonly label: string;
 }
 
@@ -87,6 +104,9 @@ export class AdminUserManagementComponent implements OnInit {
     phoneNumber: [''],
     ministry: ['' as MinistryType | ''],
     role: ['' as UserRole | ''],
+    personActive: ['' as BooleanFilterValue],
+    accountExists: ['' as BooleanFilterValue],
+    accountEnabled: ['' as BooleanFilterValue],
   });
 
   readonly ministryTypeOptions: readonly MinistryTypeOption[] = [
@@ -99,6 +119,21 @@ export class AdminUserManagementComponent implements OnInit {
   readonly roleOptions: readonly UserRoleOption[] = [
     { value: 'ROLE_ADMIN', label: 'Administrador' },
     { value: 'ROLE_OPERATOR', label: 'Operador' },
+  ];
+  readonly personActiveOptions: readonly BooleanFilterOption[] = [
+    { value: '', label: 'Todos' },
+    { value: 'true', label: 'Ativas' },
+    { value: 'false', label: 'Inativas' },
+  ];
+  readonly accountExistsOptions: readonly BooleanFilterOption[] = [
+    { value: '', label: 'Todas' },
+    { value: 'true', label: 'Com conta' },
+    { value: 'false', label: 'Sem conta' },
+  ];
+  readonly accountEnabledOptions: readonly BooleanFilterOption[] = [
+    { value: '', label: 'Todas' },
+    { value: 'true', label: 'Habilitadas' },
+    { value: 'false', label: 'Desabilitadas' },
   ];
 
   readonly people = signal<PersonAdmin[]>([]);
@@ -192,6 +227,10 @@ export class AdminUserManagementComponent implements OnInit {
         this.focusMinistriesPanel(result.personId);
       });
 
+    this.filtersForm.controls.accountExists.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => this.applyAccountExistsConstraint(value));
+
     const restoredFilters = this.restoreFiltersFromQueryParams();
     this.loadPage(restoredFilters.page, restoredFilters);
   }
@@ -213,8 +252,16 @@ export class AdminUserManagementComponent implements OnInit {
       phoneNumber: '',
       ministry: '',
       role: '',
+      personActive: '',
+      accountExists: '',
+      accountEnabled: '',
     });
+    this.applyAccountExistsConstraint('');
     this.loadPage(0, emptyFilters());
+  }
+
+  isAccountFilterConstrained(): boolean {
+    return this.filtersForm.controls.accountExists.value === 'false';
   }
 
   retry(): void {
@@ -401,7 +448,55 @@ export class AdminUserManagementComponent implements OnInit {
   hasActiveFilters(): boolean {
     const filters = this.activeFilters();
 
-    return Boolean(filters.name || filters.phoneNumber || filters.ministry || filters.role);
+    return (
+      Boolean(filters.name) ||
+      Boolean(filters.phoneNumber) ||
+      Boolean(filters.ministry) ||
+      Boolean(filters.role) ||
+      filters.personActive !== undefined ||
+      filters.accountExists !== undefined ||
+      filters.accountEnabled !== undefined
+    );
+  }
+
+  personStatusLabel(person: PersonAdmin): string {
+    return person.personActive ? 'Ativa' : 'Inativa';
+  }
+
+  accountStatusLabel(person: PersonAdmin): string {
+    if (!person.accountExists) {
+      return 'Sem conta de acesso';
+    }
+
+    if (person.accountEnabled === true) {
+      return 'Conta habilitada';
+    }
+
+    if (person.accountEnabled === false) {
+      return 'Conta desabilitada';
+    }
+
+    return 'Status da conta indisponível';
+  }
+
+  accessProfileLabel(person: PersonAdmin): string {
+    if (!person.accountExists) {
+      return 'Sem conta de acesso';
+    }
+
+    if (person.roles.includes('ROLE_ADMIN')) {
+      return 'Administrador';
+    }
+
+    if (person.roles.includes('ROLE_OPERATOR')) {
+      return 'Operador';
+    }
+
+    return 'Perfil de acesso indisponível';
+  }
+
+  showsInactiveWithEnabledAccountHint(person: PersonAdmin): boolean {
+    return !person.personActive && person.accountExists && person.accountEnabled === true;
   }
 
   isConfirmDisabled(person: PersonAdmin): boolean {
@@ -416,7 +511,12 @@ export class AdminUserManagementComponent implements OnInit {
   }
 
   isSelfAdmin(person: PersonAdmin): boolean {
-    return person.phoneNumber === this.authenticatedUsername && person.roles.includes('ROLE_ADMIN');
+    return (
+      person.accountExists &&
+      person.username !== null &&
+      person.username === this.authenticatedUsername &&
+      person.roles.includes('ROLE_ADMIN')
+    );
   }
 
   isSelfAdminDemotionOption(person: PersonAdmin, role: UserRole): boolean {
@@ -473,6 +573,9 @@ export class AdminUserManagementComponent implements OnInit {
       phoneNumber: filters.phoneNumber ?? null,
       ministry: filters.ministry ?? null,
       role: filters.role ?? null,
+      personActive: booleanToQueryParam(filters.personActive),
+      accountExists: booleanToQueryParam(filters.accountExists),
+      accountEnabled: booleanToQueryParam(filters.accountEnabled),
       page: filters.page === 0 ? null : String(filters.page),
     };
 
@@ -498,8 +601,16 @@ export class AdminUserManagementComponent implements OnInit {
     const ministryParam = queryParamMap.get('ministry');
     const roleParam = queryParamMap.get('role');
     const ministry = isMinistryType(ministryParam) ? ministryParam : undefined;
-    const role = isUserRole(roleParam) ? roleParam : undefined;
+    let role = isUserRole(roleParam) ? roleParam : undefined;
+    const personActive = parseBooleanParam(queryParamMap.get('personActive'));
+    const accountExists = parseBooleanParam(queryParamMap.get('accountExists'));
+    let accountEnabled = parseBooleanParam(queryParamMap.get('accountEnabled'));
     const page = validPageOrDefault(queryParamMap.get('page'));
+
+    if (accountExists === false) {
+      role = undefined;
+      accountEnabled = undefined;
+    }
 
     this.filtersForm.patchValue(
       {
@@ -507,18 +618,39 @@ export class AdminUserManagementComponent implements OnInit {
         phoneNumber: phoneNumber ?? '',
         ministry: ministry ?? '',
         role: role ?? '',
+        personActive: booleanToFilterValue(personActive),
+        accountExists: booleanToFilterValue(accountExists),
+        accountEnabled: booleanToFilterValue(accountEnabled),
       },
       { emitEvent: false },
     );
+    this.applyAccountExistsConstraint(booleanToFilterValue(accountExists));
 
     return {
       ...(name !== undefined ? { name } : {}),
       ...(phoneNumber !== undefined ? { phoneNumber } : {}),
       ...(ministry !== undefined ? { ministry } : {}),
       ...(role !== undefined ? { role } : {}),
+      ...(personActive !== undefined ? { personActive } : {}),
+      ...(accountExists !== undefined ? { accountExists } : {}),
+      ...(accountEnabled !== undefined ? { accountEnabled } : {}),
       page,
       size: DEFAULT_PAGE_SIZE,
     };
+  }
+
+  private applyAccountExistsConstraint(value: BooleanFilterValue): void {
+    const isWithoutAccount = value === 'false';
+
+    if (isWithoutAccount) {
+      this.filtersForm.patchValue({ role: '', accountEnabled: '' }, { emitEvent: false });
+      this.filtersForm.controls.role.disable({ emitEvent: false });
+      this.filtersForm.controls.accountEnabled.disable({ emitEvent: false });
+      return;
+    }
+
+    this.filtersForm.controls.role.enable({ emitEvent: false });
+    this.filtersForm.controls.accountEnabled.enable({ emitEvent: false });
   }
 
   private reloadCurrentPage(clearErrorMessage = true): void {
@@ -533,6 +665,9 @@ export class AdminUserManagementComponent implements OnInit {
       phoneNumber: trimmedOrUndefined(value.phoneNumber),
       ministry: value.ministry || undefined,
       role: value.role || undefined,
+      personActive: filterValueToBoolean(value.personActive),
+      accountExists: filterValueToBoolean(value.accountExists),
+      accountEnabled: filterValueToBoolean(value.accountEnabled),
       page,
       size: DEFAULT_PAGE_SIZE,
     };
@@ -644,9 +779,53 @@ function validPageOrDefault(value: string | null): number {
   return Number(value);
 }
 
+function parseBooleanParam(value: string | null): boolean | undefined {
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return undefined;
+}
+
+function booleanToFilterValue(value: boolean | undefined): BooleanFilterValue {
+  if (value === true) {
+    return 'true';
+  }
+
+  if (value === false) {
+    return 'false';
+  }
+
+  return '';
+}
+
+function filterValueToBoolean(value: BooleanFilterValue): boolean | undefined {
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return undefined;
+}
+
+function booleanToQueryParam(value: boolean | undefined): string | null {
+  return value === undefined ? null : String(value);
+}
+
 function listErrorMessageFor(error: unknown): string {
   if (error instanceof HttpErrorResponse) {
     if (error.status === 400) {
+      if (apiErrorCode(error.error) === 'PERSON_ADMIN_FILTERS_INVALID') {
+        return 'Os filtros de conta informados são incompatíveis. Revise os filtros e tente novamente.';
+      }
+
       return 'Não foi possível aplicar os filtros informados.';
     }
 
@@ -673,7 +852,7 @@ function roleUpdateErrorMessageFor(error: unknown): string {
     }
 
     if (error.status === 409) {
-      return conflictMessageFor(error.error);
+      return roleConflictMessageFor(apiErrorCode(error.error));
     }
   }
 
@@ -720,30 +899,17 @@ function ministriesUpdateErrorMessageFor(error: unknown): string {
   return 'Não foi possível atualizar os ministérios. Tente novamente.';
 }
 
-function conflictMessageFor(value: unknown): string {
-  const message = extractMessage(value);
-
-  if (message === 'Voce nao pode remover o seu proprio perfil administrativo.') {
-    return 'Você não pode remover o seu próprio perfil administrativo.';
+function roleConflictMessageFor(errorCode: string | null): string {
+  switch (errorCode) {
+    case 'SELF_ADMIN_DEMOTION_NOT_ALLOWED':
+      return 'Você não pode remover o seu próprio perfil administrativo.';
+    case 'LAST_ACTIVE_ADMIN_REQUIRED':
+      return 'Não é possível remover o perfil do último administrador efetivo do sistema.';
+    case 'USER_ACCOUNT_NOT_FOUND':
+      return 'Esta pessoa não possui conta de acesso.';
+    case 'USER_ACCOUNT_ROLE_INVALID':
+      return 'O perfil de acesso configurado para esta conta é inválido.';
+    default:
+      return 'Não foi possível alterar o perfil devido a uma regra administrativa.';
   }
-
-  if (message === 'O ultimo administrador do sistema nao pode ter seu perfil alterado.') {
-    return 'Não é possível remover o perfil do último administrador do sistema.';
-  }
-
-  return 'Não foi possível alterar o perfil devido a uma regra administrativa.';
-}
-
-function extractMessage(value: unknown): string | null {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  const message = (value as Record<string, unknown>)['error'];
-
-  return typeof message === 'string' ? message : null;
 }

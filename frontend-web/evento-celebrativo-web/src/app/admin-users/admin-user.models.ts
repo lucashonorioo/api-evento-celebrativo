@@ -11,7 +11,12 @@ export interface PersonAdmin {
   readonly id: number;
   readonly name: string;
   readonly phoneNumber: string;
+  readonly birthdayDate: string;
+  readonly personActive: boolean;
   readonly ministries: MinistryType[];
+  readonly accountExists: boolean;
+  readonly accountEnabled: boolean | null;
+  readonly username: string | null;
   readonly roles: UserRole[];
 }
 
@@ -20,12 +25,23 @@ export interface PersonAdminFilters {
   readonly phoneNumber?: string;
   readonly ministry?: MinistryType;
   readonly role?: UserRole;
+  readonly personActive?: boolean;
+  readonly accountExists?: boolean;
+  readonly accountEnabled?: boolean;
   readonly page: number;
   readonly size: number;
 }
 
 export interface PersonRoleUpdateRequest {
   readonly role: UserRole;
+}
+
+export interface PersonRoleUpdateResponse {
+  readonly id: number;
+  readonly name: string;
+  readonly phoneNumber: string;
+  readonly ministries: MinistryType[];
+  readonly roles: UserRole[];
 }
 
 export interface PersonAdminPage {
