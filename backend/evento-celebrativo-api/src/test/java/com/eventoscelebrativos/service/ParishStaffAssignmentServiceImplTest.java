@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.response.ParishStaffTeamResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonParishResponsibilitiesResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ParishActivePastorAlreadyExistsException;
+import com.eventoscelebrativos.exception.exceptions.ParishStaffIntegrityViolationException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.MinistryType;
@@ -108,7 +109,7 @@ class ParishStaffAssignmentServiceImplTest {
         mockParishProfileLock();
         Person person = inactivePerson(1L);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
 
         LifecycleConflictException exception = assertThrows(
@@ -122,7 +123,7 @@ class ParishStaffAssignmentServiceImplTest {
         mockParishProfileLock();
         Person person = activePerson(1L, "Padre Sem Ministerio");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST)).thenReturn(Optional.empty());
 
@@ -137,7 +138,7 @@ class ParishStaffAssignmentServiceImplTest {
         PersonMinistry inactivePriest = activePriestMinistry(person);
         inactivePriest.setActive(false);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST)).thenReturn(Optional.of(inactivePriest));
 
@@ -149,12 +150,12 @@ class ParishStaffAssignmentServiceImplTest {
         mockParishProfileLock();
         Person person = activePerson(1L, "Padre Miguel");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
-        when(parishStaffAssignmentRepository.findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
-                .thenReturn(Optional.empty());
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of());
 
         service.grantPastor(1L);
 
@@ -166,15 +167,15 @@ class ParishStaffAssignmentServiceImplTest {
         mockParishProfileLock();
         Person person = activePerson(2L, "Padre Paulo");
         when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(2L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(2L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
         when(personMinistryRepository.findByPersonIdAndMinistryType(2L, MinistryType.PRIEST))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
 
         Person otherPastor = activePerson(1L, "Padre Miguel");
         ParishStaffAssignment currentPastor = new ParishStaffAssignment(otherPastor, ParishResponsibilityType.PASTOR);
-        when(parishStaffAssignmentRepository.findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
-                .thenReturn(Optional.of(currentPastor));
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of(currentPastor));
 
         assertThrows(ParishActivePastorAlreadyExistsException.class, () -> service.grantPastor(2L));
         verify(parishStaffAssignmentRepository, never()).save(any());
@@ -189,16 +190,17 @@ class ParishStaffAssignmentServiceImplTest {
         setUpdatedAt(existing, originalUpdatedAt);
 
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of(existing));
 
         service.grantPastor(1L);
 
         assertEquals(originalUpdatedAt, existing.getUpdatedAt());
         verify(parishStaffAssignmentRepository, never()).save(any());
-        verify(parishStaffAssignmentRepository, never()).findFirstByResponsibilityAndActiveTrue(any());
     }
 
     @Test
@@ -209,12 +211,12 @@ class ParishStaffAssignmentServiceImplTest {
         existing.deactivate();
 
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
-        when(parishStaffAssignmentRepository.findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
-                .thenReturn(Optional.empty());
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of());
 
         service.grantPastor(1L);
 
@@ -227,20 +229,41 @@ class ParishStaffAssignmentServiceImplTest {
         mockParishProfileLock();
         Person person = activePerson(1L, "Padre Miguel");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
-        when(parishStaffAssignmentRepository.findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
-                .thenReturn(Optional.empty());
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of());
 
         service.grantPastor(1L);
 
         InOrder inOrder = inOrder(parishProfileRepository, personRepository, parishStaffAssignmentRepository);
         inOrder.verify(parishProfileRepository).findByIdForUpdate(ParishProfile.SINGLETON_ID);
         inOrder.verify(personRepository).findByIdForUpdate(1L);
-        inOrder.verify(parishStaffAssignmentRepository).findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR);
+        inOrder.verify(parishStaffAssignmentRepository).findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR);
         inOrder.verify(parishStaffAssignmentRepository).save(any());
+    }
+
+    @Test
+    void shouldThrowIntegrityViolationWhenGrantingPastorWithMultipleActivePastorsAlready() {
+        mockParishProfileLock();
+        Person person = activePerson(1L, "Padre A");
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
+                .thenReturn(Optional.empty());
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+                .thenReturn(Optional.of(activePriestMinistry(person)));
+
+        Person personA = activePerson(1L, "Padre A");
+        Person personB = activePerson(2L, "Padre B");
+        ParishStaffAssignment corruptedA = new ParishStaffAssignment(personA, ParishResponsibilityType.PASTOR);
+        ParishStaffAssignment corruptedB = new ParishStaffAssignment(personB, ParishResponsibilityType.PASTOR);
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of(corruptedA, corruptedB));
+
+        assertThrows(ParishStaffIntegrityViolationException.class, () -> service.grantPastor(1L));
+        verify(parishStaffAssignmentRepository, never()).save(any());
     }
 
     // ---- revokePastor ----
@@ -251,7 +274,7 @@ class ParishStaffAssignmentServiceImplTest {
         Person person = activePerson(1L, "Padre Miguel");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         ParishStaffAssignment existing = new ParishStaffAssignment(person, ParishResponsibilityType.PASTOR);
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
 
         service.revokePastor(1L);
@@ -264,7 +287,7 @@ class ParishStaffAssignmentServiceImplTest {
     void shouldBeIdempotentWhenRevokingPastorNeverGranted() {
         mockParishProfileLock();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(activePerson(1L, "Pessoa")));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
 
         service.revokePastor(1L);
@@ -282,7 +305,7 @@ class ParishStaffAssignmentServiceImplTest {
         setUpdatedAt(existing, originalUpdatedAt);
 
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PASTOR))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
 
         service.revokePastor(1L);
@@ -299,13 +322,29 @@ class ParishStaffAssignmentServiceImplTest {
         assertThrows(ResourceNotFoundException.class, () -> service.revokePastor(99L));
     }
 
+    @Test
+    void shouldAllowRevokingSpecificPersonWhenMultiplePastorsAreActive() {
+        mockParishProfileLock();
+        Person person = activePerson(1L, "Padre A");
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        ParishStaffAssignment existing = new ParishStaffAssignment(person, ParishResponsibilityType.PASTOR);
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
+                .thenReturn(Optional.of(existing));
+
+        service.revokePastor(1L);
+
+        assertFalse(existing.isActive());
+        verify(parishStaffAssignmentRepository).save(existing);
+        verify(parishStaffAssignmentRepository, never()).findByResponsibilityAndActiveTrue(any());
+    }
+
     // ---- grantSecretary / revokeSecretary ----
 
     @Test
     void shouldGrantSecretaryWithoutRequiringAccount() {
         Person person = activePerson(1L, "Secretaria Sem Conta");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.empty());
 
         service.grantSecretary(1L);
@@ -320,9 +359,9 @@ class ParishStaffAssignmentServiceImplTest {
         Person personB = activePerson(2L, "Secretaria B");
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(personA));
         when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(personB));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.empty());
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(2L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(2L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.empty());
 
         service.grantSecretary(1L);
@@ -349,7 +388,7 @@ class ParishStaffAssignmentServiceImplTest {
         setUpdatedAt(existing, originalUpdatedAt);
 
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.of(existing));
 
         service.grantSecretary(1L);
@@ -363,7 +402,7 @@ class ParishStaffAssignmentServiceImplTest {
         Person person = activePerson(1L, "Secretaria");
         ParishStaffAssignment existing = new ParishStaffAssignment(person, ParishResponsibilityType.PARISH_SECRETARY);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.of(existing));
 
         service.revokeSecretary(1L);
@@ -375,7 +414,7 @@ class ParishStaffAssignmentServiceImplTest {
     @Test
     void shouldBeIdempotentWhenRevokingSecretaryNeverGranted() {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(activePerson(1L, "Pessoa")));
-        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibilityForUpdate(1L, ParishResponsibilityType.PARISH_SECRETARY))
+        when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PARISH_SECRETARY))
                 .thenReturn(Optional.empty());
 
         service.revokeSecretary(1L);
@@ -413,6 +452,10 @@ class ParishStaffAssignmentServiceImplTest {
 
     @Test
     void shouldReturnCurrentTeamWithPastorAndOrderedSecretaries() {
+        Person pastorPerson = activePerson(1L, "Padre Miguel");
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of(new ParishStaffAssignment(pastorPerson, ParishResponsibilityType.PASTOR)));
+
         ParishStaffAssignmentRepository.ParishStaffMemberProjection pastorProjection =
                 projection(1L, "Padre Miguel");
         ParishStaffAssignmentRepository.ParishStaffMemberProjection secretaryA = projection(2L, "Ana");
@@ -434,6 +477,8 @@ class ParishStaffAssignmentServiceImplTest {
 
     @Test
     void shouldReturnNullPastorWhenNoneActive() {
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of());
         when(parishStaffAssignmentRepository.findActiveMembersByResponsibility(ParishResponsibilityType.PASTOR))
                 .thenReturn(List.of());
         when(parishStaffAssignmentRepository.findActiveMembersByResponsibility(ParishResponsibilityType.PARISH_SECRETARY))
@@ -443,6 +488,21 @@ class ParishStaffAssignmentServiceImplTest {
 
         assertNull(team.getPastor());
         assertTrue(team.getSecretaries().isEmpty());
+    }
+
+    @Test
+    void shouldThrowIntegrityViolationWhenFindCurrentTeamDetectsMultiplePastors() {
+        Person personA = activePerson(1L, "Padre A");
+        Person personB = activePerson(2L, "Padre B");
+        when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
+                .thenReturn(List.of(
+                        new ParishStaffAssignment(personA, ParishResponsibilityType.PASTOR),
+                        new ParishStaffAssignment(personB, ParishResponsibilityType.PASTOR)
+                ));
+
+        assertThrows(ParishStaffIntegrityViolationException.class, () -> service.findCurrentTeam());
+
+        verify(parishStaffAssignmentRepository, never()).findActiveMembersByResponsibility(any());
     }
 
     private ParishStaffAssignmentRepository.ParishStaffMemberProjection projection(Long personId, String name) {

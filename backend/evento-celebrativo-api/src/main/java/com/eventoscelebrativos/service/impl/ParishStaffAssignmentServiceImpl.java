@@ -7,6 +7,7 @@ import com.eventoscelebrativos.dto.response.PersonParishResponsibilitiesResponse
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ParishActivePastorAlreadyExistsException;
+import com.eventoscelebrativos.exception.exceptions.ParishStaffIntegrityViolationException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.MinistryType;
@@ -62,6 +63,12 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     @Override
     @Transactional(readOnly = true)
     public ParishStaffTeamResponseDTO findCurrentTeam() {
+        // Verificacao de integridade sobre a leitura crua (sem o filtro defensivo de Person.active da
+        // projecao publica): nunca escolher arbitrariamente um PASTOR quando mais de um esta ativo.
+        if (parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR).size() > 1) {
+            throw new ParishStaffIntegrityViolationException();
+        }
+
         ParishStaffMemberDTO pastor = parishStaffAssignmentRepository
                 .findActiveMembersByResponsibility(ParishResponsibilityType.PASTOR).stream()
                 .findFirst()
@@ -79,14 +86,15 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     public void grantPastor(Long personId) {
         validateId(personId);
 
-        // Lock order (mutações de PASTOR): ParishProfile(id=1) -> Person -> ParishStaffAssignment ->
-        // validação de PRIEST -> leitura/validação do PASTOR atual -> mutação.
+        // Lock order (mutações de PASTOR): ParishProfile(id=1) -> Person -> validação de PRIEST ->
+        // leitura/validação do estado global de PASTOR -> mutação. ParishStaffAssignment não possui
+        // lock proprio: a serializacao vem do ParishProfile(id=1) e do Person acima.
         parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)
                 .orElseThrow(() -> new ResourceNotFoundException("Perfil da paróquia", ParishProfile.SINGLETON_ID));
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         Optional<ParishStaffAssignment> existing = parishStaffAssignmentRepository
-                .findByPersonIdAndResponsibilityForUpdate(personId, ParishResponsibilityType.PASTOR);
+                .findByPersonIdAndResponsibility(personId, ParishResponsibilityType.PASTOR);
 
         if (!person.isActive()) {
             throw personInactive();
@@ -94,10 +102,19 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
         if (!hasActivePriestMinistry(personId)) {
             throw new PastorPriestMinistryRequiredException();
         }
-        if (existing.isPresent() && existing.get().isActive()) {
-            return;
+
+        // Estado global de PASTOR (independente de Person.active, para detectar corrupcao mesmo que
+        // ela tambem envolva uma Person inativa): 0 -> conceder; 1 e e a propria Person -> idempotente;
+        // 1 e e outra Person -> conflito; >1 -> banco corrompido, nao decidir arbitrariamente.
+        List<ParishStaffAssignment> activePastors = parishStaffAssignmentRepository
+                .findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR);
+        if (activePastors.size() > 1) {
+            throw new ParishStaffIntegrityViolationException();
         }
-        if (parishStaffAssignmentRepository.findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR).isPresent()) {
+        if (activePastors.size() == 1) {
+            if (activePastors.get(0).getPerson().getId().equals(personId)) {
+                return;
+            }
             throw new ParishActivePastorAlreadyExistsException();
         }
 
@@ -114,13 +131,16 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     public void revokePastor(Long personId) {
         validateId(personId);
 
-        // Mesmo lock order de grantPastor: ParishProfile(id=1) -> Person -> ParishStaffAssignment.
+        // Mesmo lock order de grantPastor. Deliberadamente SEM verificacao de integridade global:
+        // revokePastor precisa continuar funcionando como mecanismo de recuperacao administrativa
+        // mesmo com o banco corrompido (mais de um PASTOR ativo) - desativa especificamente a Person
+        // solicitada, sem tentar decidir ou reparar o restante automaticamente.
         parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)
                 .orElseThrow(() -> new ResourceNotFoundException("Perfil da paróquia", ParishProfile.SINGLETON_ID));
         personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         Optional<ParishStaffAssignment> existing = parishStaffAssignmentRepository
-                .findByPersonIdAndResponsibilityForUpdate(personId, ParishResponsibilityType.PASTOR);
+                .findByPersonIdAndResponsibility(personId, ParishResponsibilityType.PASTOR);
 
         if (existing.isEmpty() || !existing.get().isActive()) {
             return;
@@ -134,14 +154,15 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     public void grantSecretary(Long personId) {
         validateId(personId);
 
-        // Lock order (PARISH_SECRETARY): Person -> ParishStaffAssignment -> mutação.
+        // Lock order (PARISH_SECRETARY): Person -> mutação. Sem mutex institucional: Persons
+        // diferentes concedendo PARISH_SECRETARY simultaneamente nao devem serializar entre si.
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         if (!person.isActive()) {
             throw personInactive();
         }
         Optional<ParishStaffAssignment> existing = parishStaffAssignmentRepository
-                .findByPersonIdAndResponsibilityForUpdate(personId, ParishResponsibilityType.PARISH_SECRETARY);
+                .findByPersonIdAndResponsibility(personId, ParishResponsibilityType.PARISH_SECRETARY);
 
         if (existing.isPresent() && existing.get().isActive()) {
             return;
@@ -162,7 +183,7 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
         personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         Optional<ParishStaffAssignment> existing = parishStaffAssignmentRepository
-                .findByPersonIdAndResponsibilityForUpdate(personId, ParishResponsibilityType.PARISH_SECRETARY);
+                .findByPersonIdAndResponsibility(personId, ParishResponsibilityType.PARISH_SECRETARY);
 
         if (existing.isEmpty() || !existing.get().isActive()) {
             return;

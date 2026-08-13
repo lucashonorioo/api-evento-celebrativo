@@ -2,9 +2,7 @@ package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.ParishStaffAssignment;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,21 +13,16 @@ import java.util.Optional;
 @Repository
 public interface ParishStaffAssignmentRepository extends JpaRepository<ParishStaffAssignment, Long> {
 
-    Optional<ParishStaffAssignment> findByPersonIdAndResponsibility(Long personId, ParishResponsibilityType responsibility);
-
     /**
-     * Bloqueia a linha existente de Person + responsibility para grant/revoke idempotente. Sobre um
-     * par ainda inexistente nao ha o que bloquear (Optional vazio); a unicidade da primeira insercao
-     * fica a cargo de {@code uk_tb_parish_staff_assignment_person_responsibility} combinada com o lock
-     * de escopo mais amplo ja adquirido antes (Person para PARISH_SECRETARY, ParishProfile(id=1) para
-     * PASTOR).
+     * Sem lock proprio: grant/revoke serializam pelo lock de escopo mais amplo ja adquirido antes
+     * desta consulta (Person para PARISH_SECRETARY, ParishProfile(id=1) + Person para PASTOR). Um
+     * {@code SELECT ... FOR UPDATE} aqui seria redundante e, sobre uma linha ainda inexistente (par
+     * Person+responsibility nunca concedido), arriscaria gap/next-key locking no InnoDB entre Persons
+     * sem nenhuma relacao logica entre si (ex.: duas secretarias diferentes disputando um mutex que
+     * nao deveriam compartilhar). A unicidade final fica a cargo de
+     * {@code uk_tb_parish_staff_assignment_person_responsibility}.
      */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT a FROM ParishStaffAssignment a WHERE a.person.id = :personId AND a.responsibility = :responsibility")
-    Optional<ParishStaffAssignment> findByPersonIdAndResponsibilityForUpdate(
-            @Param("personId") Long personId,
-            @Param("responsibility") ParishResponsibilityType responsibility
-    );
+    Optional<ParishStaffAssignment> findByPersonIdAndResponsibility(Long personId, ParishResponsibilityType responsibility);
 
     List<ParishStaffAssignment> findByPersonIdOrderByResponsibilityAsc(Long personId);
 
@@ -40,11 +33,24 @@ public interface ParishStaffAssignmentRepository extends JpaRepository<ParishSta
     boolean existsByPersonIdAndResponsibilityAndActiveTrue(Long personId, ParishResponsibilityType responsibility);
 
     /**
-     * Leitura do PASTOR ativo atual. Deliberadamente sem lock proprio: usada apenas dentro do
-     * bloco critico ja serializado pelo mutex {@code ParishProfile(id=1)} (ver
-     * ParishStaffAssignmentServiceImpl), entao uma leitura simples e suficiente e consistente.
+     * Leitura crua de todos os ParishStaffAssignment ativos de uma responsibility, sem o filtro
+     * defensivo de {@code Person.active=true} usado em {@link #findActiveMembersByResponsibility}.
+     * Existe especificamente para deteccao de integridade (ex.: mais de um PASTOR ativo): se a
+     * verificacao dependesse apenas da projecao publica, um registro corrompido cuja Person tambem
+     * estivesse inativa passaria despercebido (o filtro simplesmente o esconderia). {@code JOIN FETCH}
+     * evita N+1 ao acessar {@code person} de cada resultado. Deliberadamente sem lock proprio: usada
+     * dentro do bloco critico ja serializado pelo mutex {@code ParishProfile(id=1)} (ver
+     * ParishStaffAssignmentServiceImpl) ou apenas para leitura diagnostica.
      */
-    Optional<ParishStaffAssignment> findFirstByResponsibilityAndActiveTrue(ParishResponsibilityType responsibility);
+    @Query("""
+            SELECT a FROM ParishStaffAssignment a
+            JOIN FETCH a.person
+            WHERE a.responsibility = :responsibility
+              AND a.active = TRUE
+            """)
+    List<ParishStaffAssignment> findByResponsibilityAndActiveTrue(
+            @Param("responsibility") ParishResponsibilityType responsibility
+    );
 
     /**
      * Projecao da equipe paroquial ativa atual (PASTOR e PARISH_SECRETARY), com join implicito em

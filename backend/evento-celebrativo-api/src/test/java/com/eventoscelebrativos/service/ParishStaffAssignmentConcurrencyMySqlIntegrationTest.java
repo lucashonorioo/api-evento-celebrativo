@@ -281,6 +281,54 @@ class ParishStaffAssignmentConcurrencyMySqlIntegrationTest {
         }
     }
 
+    @Test
+    void shouldAllowConcurrentGrantSecretaryForDifferentPersonsWithoutContention() throws Exception {
+        // Objetivo principal da remocao do PESSIMISTIC_WRITE em ParishStaffAssignment: duas Persons
+        // sem nenhuma relacao logica entre si concedendo PARISH_SECRETARY ao mesmo tempo NAO podem
+        // disputar um mutex institucional que nao deveriam compartilhar (grantSecretary nao adquire
+        // ParishProfile; cada lado serializa apenas pelo proprio lock de Person). Repete a disputa em
+        // varias rodadas, cada uma com Persons novas, para aumentar a chance de expor uma regressao.
+        int rounds = 3;
+        for (int round = 1; round <= rounds; round++) {
+            long personA = insertPerson("Secretaria Concorrente A r" + round);
+            long personB = insertPerson("Secretaria Concorrente B r" + round);
+
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch start = new CountDownLatch(1);
+
+                Future<Exception> resultA = executor.submit(grantSecretaryTask(personA, ready, start));
+                Future<Exception> resultB = executor.submit(grantSecretaryTask(personB, ready, start));
+
+                ready.await(5, TimeUnit.SECONDS);
+                start.countDown();
+                Exception exceptionA = resultA.get(20, TimeUnit.SECONDS);
+                Exception exceptionB = resultB.get(20, TimeUnit.SECONDS);
+
+                assertNull(exceptionA, "Rodada " + round + ": grant de A deveria ter sucesso, mas lancou " + exceptionA);
+                assertNull(exceptionB, "Rodada " + round + ": grant de B deveria ter sucesso, mas lancou " + exceptionB);
+
+                Boolean activeA = jdbcTemplate.queryForObject(
+                        "SELECT active FROM tb_parish_staff_assignment WHERE person_id = ? AND responsibility = 'PARISH_SECRETARY'",
+                        Boolean.class, personA);
+                Boolean activeB = jdbcTemplate.queryForObject(
+                        "SELECT active FROM tb_parish_staff_assignment WHERE person_id = ? AND responsibility = 'PARISH_SECRETARY'",
+                        Boolean.class, personB);
+                assertTrue(Boolean.TRUE.equals(activeA), "Rodada " + round + ": Person A deveria estar ativa como secretaria");
+                assertTrue(Boolean.TRUE.equals(activeB), "Rodada " + round + ": Person B deveria estar ativa como secretaria");
+            } finally {
+                executor.shutdownNow();
+            }
+        }
+
+        Integer totalActiveSecretaries = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_parish_staff_assignment WHERE responsibility = 'PARISH_SECRETARY' AND active = TRUE",
+                Integer.class);
+        assertEquals(2 * rounds, totalActiveSecretaries,
+                rounds + " rodadas x 2 pessoas = " + (2 * rounds) + " secretarios ativos, sem duplicacao nem perda");
+    }
+
     private Callable<Exception> grantPastorTask(long personId, CountDownLatch ready, CountDownLatch start) {
         return () -> {
             ready.countDown();

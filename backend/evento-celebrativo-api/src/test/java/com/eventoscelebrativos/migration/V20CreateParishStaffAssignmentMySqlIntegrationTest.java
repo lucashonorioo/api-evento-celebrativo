@@ -6,6 +6,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -103,7 +106,7 @@ class V20CreateParishStaffAssignmentMySqlIntegrationTest {
         migrateAll(dataSource, "20");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        assertThrows(Exception.class, () -> jdbcTemplate.update(
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_parish_staff_assignment (person_id, responsibility) VALUES (999999, 'PASTOR')"));
     }
 
@@ -116,7 +119,10 @@ class V20CreateParishStaffAssignmentMySqlIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO tb_parish_staff_assignment (person_id, responsibility) VALUES (?, 'PASTOR')", personId);
 
-        assertThrows(Exception.class, () -> jdbcTemplate.update(
+        // DuplicateKeyException e a traducao especifica do Spring para violacao de UNIQUE/PK no
+        // MySQL (subtipo de DataIntegrityViolationException), confirmada empiricamente contra
+        // MySQL 8.4 real.
+        assertThrows(DuplicateKeyException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_parish_staff_assignment (person_id, responsibility) VALUES (?, 'PASTOR')", personId));
     }
 
@@ -127,7 +133,12 @@ class V20CreateParishStaffAssignmentMySqlIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long personId = insertPerson(jdbcTemplate, "Pessoa Qualquer", "34988770002");
 
-        assertThrows(Exception.class, () -> jdbcTemplate.update(
+        // Confirmado empiricamente contra MySQL 8.4 real: violacao de CHECK constraint (erro MySQL
+        // 3819) NAO e traduzida para DataIntegrityViolationException pelo SQLErrorCodeSQLExceptionTranslator
+        // padrao do Spring (sql-error-codes.xml nao mapeia esse codigo para MySQL) - o Spring recai no
+        // fallback UncategorizedSQLException. Nao e uma classe interna do driver MySQL, e uma traducao
+        // estavel do proprio spring-jdbc.
+        assertThrows(UncategorizedSQLException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_parish_staff_assignment (person_id, responsibility) VALUES (?, 'DEACON')", personId));
     }
 
@@ -140,7 +151,8 @@ class V20CreateParishStaffAssignmentMySqlIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO tb_parish_staff_assignment (person_id, responsibility) VALUES (?, 'PASTOR')", personId);
 
-        assertThrows(Exception.class, () -> jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId));
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId));
         assertEquals(1, countRows(jdbcTemplate));
     }
 
