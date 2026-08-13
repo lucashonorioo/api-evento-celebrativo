@@ -41,7 +41,9 @@ public class ParishStaffAssignmentController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Equipe consultada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
-            @ApiResponse(responseCode = "403", description = "Usuario sem permissao")
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "500", description = "Inconsistencia detectada: mais de um PASTOR ativo "
+                    + "persistido (PARISH_STAFF_INTEGRITY_VIOLATION)")
     })
     @GetMapping
     public ResponseEntity<ParishStaffTeamResponseDTO> findCurrentTeam() {
@@ -61,7 +63,10 @@ public class ParishStaffAssignmentController {
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
             @ApiResponse(responseCode = "409", description = "Pessoa inativa (PERSON_INACTIVE), PRIEST ausente "
-                    + "(PASTOR_PRIEST_MINISTRY_REQUIRED) ou outro PASTOR ativo (PARISH_ACTIVE_PASTOR_ALREADY_EXISTS)")
+                    + "(PASTOR_PRIEST_MINISTRY_REQUIRED) ou outro PASTOR ativo (PARISH_ACTIVE_PASTOR_ALREADY_EXISTS)"),
+            @ApiResponse(responseCode = "500", description = "Inconsistencia detectada: mais de um PASTOR ativo ja "
+                    + "persistido (PARISH_STAFF_INTEGRITY_VIOLATION); use DELETE /pastor/{personId} para recuperacao "
+                    + "administrativa")
     })
     @PutMapping(value = "/pastor/{personId}")
     public ResponseEntity<Void> grantPastor(@PathVariable Long personId) {

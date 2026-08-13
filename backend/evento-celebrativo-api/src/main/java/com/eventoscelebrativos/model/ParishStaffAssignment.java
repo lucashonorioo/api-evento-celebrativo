@@ -86,24 +86,12 @@ public class ParishStaffAssignment {
         return person;
     }
 
-    public void setPerson(Person person) {
-        this.person = person;
-    }
-
     public ParishResponsibilityType getResponsibility() {
         return responsibility;
     }
 
-    public void setResponsibility(ParishResponsibilityType responsibility) {
-        this.responsibility = responsibility;
-    }
-
     public boolean isActive() {
         return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -262,6 +262,53 @@ class ParishStaffAssignmentIntegrationTest {
         assertEquals(1, rowCount);
     }
 
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldDetectMultipleActivePastorsAsIntegrityViolationAndAllowRecoveryViaRevoke() throws Exception {
+        long priestA = insertPerson("Padre Corrompido A", "35900000013", true);
+        long priestB = insertPerson("Padre Corrompido B", "35900000014", true);
+        insertActivePriestMinistry(priestA);
+        insertActivePriestMinistry(priestB);
+        // Corrupcao inserida deliberadamente por fora do service, bypassando o mutex de
+        // ParishProfile(id=1), para simular um estado impossivel ja persistido.
+        insertActivePastorAssignment(priestA);
+        insertActivePastorAssignment(priestB);
+
+        mockMvc.perform(get("/paroquia/equipe"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.errorCode").value("PARISH_STAFF_INTEGRITY_VIOLATION"))
+                .andExpect(jsonPath("$.error").value("Inconsistência detectada na configuração da equipe paroquial."));
+
+        long priestC = insertPerson("Padre Corrompido C", "35900000015", true);
+        insertActivePriestMinistry(priestC);
+        mockMvc.perform(put("/paroquia/equipe/pastor/" + priestC))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.errorCode").value("PARISH_STAFF_INTEGRITY_VIOLATION"));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_parish_staff_assignment WHERE person_id = ?", Integer.class, priestC));
+
+        // Recuperacao administrativa: revokePastor continua funcionando especificamente sobre a
+        // Person solicitada mesmo com o banco corrompido, sem tentar decidir automaticamente.
+        mockMvc.perform(delete("/paroquia/equipe/pastor/" + priestA))
+                .andExpect(status().isNoContent());
+
+        // Depois da recuperacao, com exatamente 1 PASTOR ativo restante, a leitura volta ao normal.
+        mockMvc.perform(get("/paroquia/equipe"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pastor.personId").value(priestB));
+
+        mockMvc.perform(delete("/paroquia/equipe/pastor/" + priestB))
+                .andExpect(status().isNoContent());
+    }
+
+    private void insertActivePastorAssignment(long personId) {
+        jdbcTemplate.update(
+                "INSERT INTO tb_parish_staff_assignment(person_id, responsibility, active, created_at, updated_at) "
+                        + "VALUES (?, 'PASTOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
+                personId);
+    }
+
     private long insertPerson(String name, String phoneNumber, boolean active) {
         jdbcTemplate.update(
                 "INSERT INTO tb_person(name, phone_number, active) VALUES (?, ?, ?)", name, phoneNumber, active);
