@@ -16,9 +16,11 @@ import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
+import com.eventoscelebrativos.dto.response.PersonParishResponsibilitiesResponseDTO;
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.ParishStaffAssignmentService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -48,17 +50,20 @@ public class PersonController {
     private final EventParticipationResponseService eventParticipationResponseService;
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final UserAccountLifecycleService userAccountLifecycleService;
+    private final ParishStaffAssignmentService parishStaffAssignmentService;
 
     public PersonController(
             PersonService personService,
             EventParticipationResponseService eventParticipationResponseService,
             AuthenticatedUserResolver authenticatedUserResolver,
-            UserAccountLifecycleService userAccountLifecycleService
+            UserAccountLifecycleService userAccountLifecycleService,
+            ParishStaffAssignmentService parishStaffAssignmentService
     ) {
         this.personService = personService;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.authenticatedUserResolver = authenticatedUserResolver;
         this.userAccountLifecycleService = userAccountLifecycleService;
+        this.parishStaffAssignmentService = parishStaffAssignmentService;
     }
 
     @Operation(summary = "Consulta o perfil da pessoa autenticada")
@@ -420,5 +425,23 @@ public class PersonController {
     ) {
         PersonMinistriesResponseDTO responseDTO = personService.updatePersonMinistries(id, requestDTO);
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(
+            summary = "Lista o historico de responsabilidades paroquiais institucionais de uma pessoa (PASTOR, PARISH_SECRETARY).",
+            description = "Inclui vinculos ativos e inativos para permitir visao administrativa/historica. Responsabilidade "
+                    + "paroquial e conceito separado de ministerio, conta de acesso e role: nao expoe telefone, birthdayDate, "
+                    + "username, accountId, role, password nem tokenVersion."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Responsabilidades listadas com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @GetMapping(value = "/{id}/responsabilidades-paroquiais")
+    public ResponseEntity<PersonParishResponsibilitiesResponseDTO> findPersonParishResponsibilities(@PathVariable Long id) {
+        return ResponseEntity.ok(parishStaffAssignmentService.findResponsibilitiesByPerson(id));
     }
 }

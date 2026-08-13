@@ -2,12 +2,15 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -27,15 +30,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final PersonRepository personRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
+    private final ParishStaffAssignmentRepository parishStaffAssignmentRepository;
 
     public PersonMinistryCommandServiceImpl(
             PersonRepository personRepository,
             PersonMinistryRepository personMinistryRepository,
-            EventAssignmentRepository eventAssignmentRepository
+            EventAssignmentRepository eventAssignmentRepository,
+            ParishStaffAssignmentRepository parishStaffAssignmentRepository
     ) {
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
+        this.parishStaffAssignmentRepository = parishStaffAssignmentRepository;
     }
 
     @Override
@@ -79,7 +85,10 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     @Override
     @Transactional
     public void removeMinistry(Long personId, MinistryType ministryType, String entityLabel) {
-        requireActiveMinistryPerson(personId, ministryType, entityLabel);
+        requireActiveMinistryPersonForUpdate(personId, ministryType, entityLabel);
+        if (ministryType == MinistryType.PRIEST) {
+            guardPastorRequiresActivePriest(personId);
+        }
         EventAssignmentType assignmentType = EventAssignmentType.valueOf(ministryType.name());
         if (eventAssignmentRepository.existsByPersonIdAndAssignmentType(personId, assignmentType)) {
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
@@ -99,13 +108,16 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (desiredMinistries == null) {
             throw new BusinessException("O conjunto de ministérios é obrigatório");
         }
-        Person person = personRepository.findById(personId)
+        Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
 
         List<PersonMinistry> existing = personMinistryRepository.findAllByPersonId(personId);
         PersonMinistryDiff diff = PersonMinistryDiff.compute(desiredMinistries, existing);
 
         validateNoAssignmentConflicts(personId, diff.toDeactivate());
+        if (diff.toDeactivate().stream().anyMatch(pm -> pm.getMinistryType() == MinistryType.PRIEST)) {
+            guardPastorRequiresActivePriest(personId);
+        }
 
         try {
             for (MinistryType type : diff.toAdd()) {
@@ -131,6 +143,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
                 diff.toDeactivate().stream().map(PersonMinistry::getMinistryType).collect(Collectors.toUnmodifiableSet()),
                 diff.unchanged()
         );
+    }
+
+    /**
+     * Preserva o invariante PASTOR ativo -> PRIEST ativo em qualquer caminho de escrita que possa
+     * desativar PRIEST (remocao individual e sincronizacao administrativa). Person ja deve estar
+     * bloqueada (forUpdate) antes desta checagem.
+     */
+    private void guardPastorRequiresActivePriest(Long personId) {
+        if (parishStaffAssignmentRepository.existsByPersonIdAndResponsibilityAndActiveTrue(
+                personId, ParishResponsibilityType.PASTOR)) {
+            throw new PastorPriestMinistryRequiredException();
+        }
     }
 
     private void validateNoAssignmentConflicts(Long personId, List<PersonMinistry> toDeactivate) {

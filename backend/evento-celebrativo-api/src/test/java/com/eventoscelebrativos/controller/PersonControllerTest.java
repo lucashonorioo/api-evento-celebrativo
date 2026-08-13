@@ -19,6 +19,7 @@ import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.ParishStaffAssignmentService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,9 @@ class PersonControllerTest {
 
     @MockitoBean
     private UserAccountLifecycleService userAccountLifecycleService;
+
+    @MockitoBean
+    private ParishStaffAssignmentService parishStaffAssignmentService;
 
     @Test
     @WithMockUser(roles = "ADMIN")

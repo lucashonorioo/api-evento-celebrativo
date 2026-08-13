@@ -10,6 +10,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -168,6 +169,24 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(parishProfilePayload()))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/pessoas/1/responsabilidades-paroquiais"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/paroquia/equipe"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/paroquia/equipe/secretarios/1"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/paroquia/equipe/secretarios/1"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -283,6 +302,24 @@ class EndpointSecurityTest {
         mockMvc.perform(put("/paroquia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(parishProfilePayload()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/pessoas/1/responsabilidades-paroquiais"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/paroquia/equipe"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/paroquia/equipe/secretarios/1"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/paroquia/equipe/secretarios/1"))
                 .andExpect(status().isForbidden());
     }
 
@@ -428,6 +465,24 @@ class EndpointSecurityTest {
 
         mockMvc.perform(get("/eventos/1/escala/participacoes"))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/pessoas/1/responsabilidades-paroquiais"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/paroquia/equipe"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(delete("/paroquia/equipe/pastor/13"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/paroquia/equipe/secretarios/1"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(delete("/paroquia/equipe/secretarios/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test

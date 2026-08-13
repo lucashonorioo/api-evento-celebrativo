@@ -8,12 +8,14 @@ import com.eventoscelebrativos.dto.request.UserAccountEnabledRequestDTO;
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveParishResponsibilitiesException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -47,6 +49,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,6 +82,9 @@ class UserAccountLifecycleServiceImplTest {
     private EventAssignmentRepository eventAssignmentRepository;
 
     @Mock
+    private ParishStaffAssignmentRepository parishStaffAssignmentRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -94,6 +100,7 @@ class UserAccountLifecycleServiceImplTest {
                 userAccountRoleRepository,
                 roleRepository,
                 eventAssignmentRepository,
+                parishStaffAssignmentRepository,
                 new PasswordPolicy(),
                 passwordEncoder,
                 authenticatedUserResolver,
@@ -336,6 +343,61 @@ class UserAccountLifecycleServiceImplTest {
         assertEquals(0L, account.getTokenVersion());
         verify(personRepository, never()).save(any());
         verify(userAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectPersonDeactivationWhenActiveParishResponsibilityExists() {
+        Person person = person(1L, "34999999991", true);
+        UserAccount account = account(10L, person, "34999999991", "hash", true, Set.of(role(1L, "ROLE_OPERATOR")));
+        when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(role(2L, "ROLE_ADMIN")));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
+        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
+        when(parishStaffAssignmentRepository.existsByPersonIdAndActiveTrue(1L)).thenReturn(true);
+
+        PersonHasActiveParishResponsibilitiesException exception = assertThrows(
+                PersonHasActiveParishResponsibilitiesException.class,
+                () -> service.updatePersonActive(1L, activeRequest(false))
+        );
+
+        assertEquals("PERSON_HAS_ACTIVE_PARISH_RESPONSIBILITIES", exception.getErrorCode());
+        assertTrue(person.isActive());
+        assertEquals(0L, account.getTokenVersion());
+        verify(eventAssignmentRepository, never()).findActiveOrFutureAssignmentsByPersonId(1L, CURRENT_SECOND);
+        verify(personRepository, never()).save(any());
+        verify(userAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldCheckParishResponsibilitiesBeforeActiveAssignmentsOnPersonDeactivation() {
+        Person person = person(1L, "34999999991", true);
+        UserAccount account = account(10L, person, "34999999991", "hash", true, Set.of(role(1L, "ROLE_OPERATOR")));
+        when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(role(2L, "ROLE_ADMIN")));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
+        when(authenticatedUserResolver.requireCurrentPersonId()).thenReturn(99L);
+        when(parishStaffAssignmentRepository.existsByPersonIdAndActiveTrue(1L)).thenReturn(true);
+
+        assertThrows(
+                PersonHasActiveParishResponsibilitiesException.class,
+                () -> service.updatePersonActive(1L, activeRequest(false))
+        );
+
+        verifyNoInteractions(eventAssignmentRepository);
+    }
+
+    @Test
+    void shouldNotCheckParishResponsibilitiesWhenReactivatingPerson() {
+        Person person = person(1L, "34999999991", false);
+        UserAccount account = account(10L, person, "34999999991", "hash", false, Set.of(role(1L, "ROLE_OPERATOR")));
+        when(roleRepository.findByAuthorityForUpdate("ROLE_ADMIN")).thenReturn(Optional.of(role(2L, "ROLE_ADMIN")));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
+        when(userAccountRepository.findByPersonIdForUpdate(1L)).thenReturn(Optional.of(account));
+
+        service.updatePersonActive(1L, activeRequest(true));
+
+        assertTrue(person.isActive());
+        verifyNoInteractions(parishStaffAssignmentRepository);
     }
 
     @Test
