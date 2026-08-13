@@ -60,6 +60,8 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/eventos/*/escala/participacoes").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/eventos/*/escala").authenticated()
 				.requestMatchers(HttpMethod.GET, "/eventos", "/eventos/{id}").permitAll()
+				.requestMatchers(HttpMethod.GET, "/paroquia").permitAll()
+				.requestMatchers(HttpMethod.PUT, "/paroquia").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas/me").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/me").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/me/conta/senha").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
