@@ -1,0 +1,29 @@
+-- Responsabilidade institucional paroquial (PASTOR, PARISH_SECRETARY) atribuida a uma Person,
+-- separada de PersonMinistry (classificacao ministerial), UserAccount (conta de acesso) e
+-- ParishProfile (perfil institucional singleton). Uma linha por combinacao Person + responsibility:
+-- desativacao (DELETE HTTP) nunca remove a linha fisicamente, apenas marca active=FALSE; reativacao
+-- (PUT HTTP) reutiliza a mesma linha. Sem parish_id: esta instalacao representa uma unica paroquia.
+CREATE TABLE tb_parish_staff_assignment (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    person_id BIGINT NOT NULL,
+    responsibility VARCHAR(50) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_tb_parish_staff_assignment PRIMARY KEY (id),
+    CONSTRAINT uk_tb_parish_staff_assignment_person_responsibility UNIQUE (person_id, responsibility),
+    CONSTRAINT chk_tb_parish_staff_assignment_responsibility CHECK (
+        responsibility IN ('PASTOR', 'PARISH_SECRETARY')
+    )
+);
+
+-- Suporta a leitura da equipe atual (responsibility + active) sem varrer a tabela inteira.
+CREATE INDEX idx_tb_parish_staff_assignment_responsibility_active
+    ON tb_parish_staff_assignment (responsibility, active);
+
+-- Sem ON DELETE CASCADE: Person nunca e excluida fisicamente no fluxo normal, e a desativacao de
+-- Person nao deve arrastar a exclusao fisica de historico de responsabilidades paroquiais.
+ALTER TABLE tb_parish_staff_assignment
+    ADD CONSTRAINT fk_tb_parish_staff_assignment_person
+    FOREIGN KEY (person_id)
+    REFERENCES tb_person (id);

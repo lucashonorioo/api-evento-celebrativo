@@ -10,6 +10,7 @@ import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException;
+import com.eventoscelebrativos.exception.exceptions.PersonHasActiveParishResponsibilitiesException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.Role;
@@ -17,6 +18,7 @@ import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -46,6 +48,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
     private final UserAccountRoleRepository userAccountRoleRepository;
     private final RoleRepository roleRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
+    private final ParishStaffAssignmentRepository parishStaffAssignmentRepository;
     private final PasswordPolicy passwordPolicy;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticatedUserResolver authenticatedUserResolver;
@@ -57,6 +60,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
             UserAccountRoleRepository userAccountRoleRepository,
             RoleRepository roleRepository,
             EventAssignmentRepository eventAssignmentRepository,
+            ParishStaffAssignmentRepository parishStaffAssignmentRepository,
             PasswordPolicy passwordPolicy,
             PasswordEncoder passwordEncoder,
             AuthenticatedUserResolver authenticatedUserResolver,
@@ -67,6 +71,7 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
         this.userAccountRoleRepository = userAccountRoleRepository;
         this.roleRepository = roleRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
+        this.parishStaffAssignmentRepository = parishStaffAssignmentRepository;
         this.passwordPolicy = passwordPolicy;
         this.passwordEncoder = passwordEncoder;
         this.authenticatedUserResolver = authenticatedUserResolver;
@@ -172,6 +177,9 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
             return;
         }
         if (!desiredActive) {
+            if (parishStaffAssignmentRepository.existsByPersonIdAndActiveTrue(personId)) {
+                throw new PersonHasActiveParishResponsibilitiesException();
+            }
             List<PersonUnavailabilityAssignmentConflictProjection> activeAssignments =
                     eventAssignmentRepository.findActiveOrFutureAssignmentsByPersonId(personId, currentSecond);
             if (!activeAssignments.isEmpty()) {
