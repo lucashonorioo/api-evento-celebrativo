@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -47,6 +48,21 @@ class EndpointSecurityTest {
                         .param("size", "10")
                         .param("sort", "[\"string\"]"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldAllowPublicParishProfileEndpointWithoutAuthentication() throws Exception {
+        // O estado (configurado ou nao) depende da ordem de execucao em relacao a outros testes que
+        // compartilham o mesmo contexto/banco (ex. ParishProfileIntegrationTest); o que importa aqui
+        // e que o acesso sem autenticacao nunca resulte em 401/403, provando que o endpoint e publico.
+        int responseStatus = mockMvc.perform(get("/paroquia"))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+        assertTrue(
+                responseStatus == 200 || responseStatus == 404,
+                "GET /paroquia deve ser publico (200 configurado ou 404 PARISH_PROFILE_NOT_CONFIGURED), nunca 401/403. Status recebido: " + responseStatus
+        );
     }
 
     @Test
@@ -146,6 +162,11 @@ class EndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/padres"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/paroquia")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(parishProfilePayload()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -257,6 +278,11 @@ class EndpointSecurityTest {
         mockMvc.perform(get("/pessoas/indisponibilidades")
                         .param("startAt", "2026-08-10T00:00:00")
                         .param("endAt", "2026-08-11T00:00:00"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/paroquia")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(parishProfilePayload()))
                 .andExpect(status().isForbidden());
     }
 
@@ -498,6 +524,15 @@ class EndpointSecurityTest {
                 {
                   "startAt": "2026-08-10T00:00:00",
                   "endAt": "2026-08-12T00:00:00"
+                }
+                """;
+    }
+
+    private String parishProfilePayload() {
+        return """
+                {
+                  "name": "Paróquia Teste Segurança",
+                  "diocese": "Diocese Teste"
                 }
                 """;
     }
