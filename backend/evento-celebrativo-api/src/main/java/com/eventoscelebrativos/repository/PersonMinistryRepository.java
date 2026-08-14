@@ -78,6 +78,16 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
             """)
     List<PersonMinistryStatusView> findAllMinistryStatusesByPersonIds(@Param("personIds") Collection<Long> personIds);
 
+    @Query("""
+            SELECT pm.ministryType
+            FROM PersonMinistry pm
+            WHERE pm.person.id = :personId
+              AND pm.active = TRUE
+              AND pm.coordinator = TRUE
+            ORDER BY pm.ministryType ASC
+            """)
+    List<MinistryType> findActiveCoordinatedMinistryTypesByPersonId(@Param("personId") Long personId);
+
     void deleteAllByPersonId(Long personId);
 
     /**

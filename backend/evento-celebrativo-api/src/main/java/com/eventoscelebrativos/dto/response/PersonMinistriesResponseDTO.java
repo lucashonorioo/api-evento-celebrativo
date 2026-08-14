@@ -8,13 +8,15 @@ public class PersonMinistriesResponseDTO {
 
     private Long id;
     private List<MinistryType> ministries;
+    private List<MinistryType> coordinatedMinistries;
 
     public PersonMinistriesResponseDTO() {
     }
 
-    public PersonMinistriesResponseDTO(Long id, List<MinistryType> ministries) {
+    public PersonMinistriesResponseDTO(Long id, List<MinistryType> ministries, List<MinistryType> coordinatedMinistries) {
         this.id = id;
         this.ministries = ministries;
+        this.coordinatedMinistries = coordinatedMinistries;
     }
 
     public Long getId() {
@@ -31,5 +33,13 @@ public class PersonMinistriesResponseDTO {
 
     public void setMinistries(List<MinistryType> ministries) {
         this.ministries = ministries;
+    }
+
+    public List<MinistryType> getCoordinatedMinistries() {
+        return coordinatedMinistries;
+    }
+
+    public void setCoordinatedMinistries(List<MinistryType> coordinatedMinistries) {
+        this.coordinatedMinistries = coordinatedMinistries;
     }
 }

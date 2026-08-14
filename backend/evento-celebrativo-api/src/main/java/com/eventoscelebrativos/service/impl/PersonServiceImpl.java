@@ -248,7 +248,8 @@ public class PersonServiceImpl implements PersonService {
         Set<MinistryType> activeMinistries = personMinistryReadService
                 .findActiveMinistriesByPersonIds(List.of(id))
                 .getOrDefault(id, Set.of());
-        return toMinistriesResponseDTO(id, activeMinistries);
+        Set<MinistryType> coordinatedMinistries = personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(id);
+        return toMinistriesResponseDTO(id, activeMinistries, coordinatedMinistries);
     }
 
     @Override
@@ -256,7 +257,9 @@ public class PersonServiceImpl implements PersonService {
     public PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO) {
         Set<MinistryType> desiredMinistries = parseDesiredMinistries(requestDTO.getMinistries());
         PersonMinistrySyncResult result = personMinistryCommandService.syncMinistries(id, desiredMinistries);
-        return toMinistriesResponseDTO(result.person().getId(), result.activeMinistries());
+        Set<MinistryType> coordinatedMinistries = personMinistryReadService
+                .findActiveCoordinatedMinistriesByPersonId(result.person().getId());
+        return toMinistriesResponseDTO(result.person().getId(), result.activeMinistries(), coordinatedMinistries);
     }
 
     @Override
@@ -384,8 +387,10 @@ public class PersonServiceImpl implements PersonService {
         return name.trim();
     }
 
-    private PersonMinistriesResponseDTO toMinistriesResponseDTO(Long id, Set<MinistryType> ministries) {
-        return new PersonMinistriesResponseDTO(id, sortedMinistries(ministries));
+    private PersonMinistriesResponseDTO toMinistriesResponseDTO(
+            Long id, Set<MinistryType> ministries, Set<MinistryType> coordinatedMinistries
+    ) {
+        return new PersonMinistriesResponseDTO(id, sortedMinistries(ministries), sortedMinistries(coordinatedMinistries));
     }
 
     private List<MinistryType> sortedMinistries(Set<MinistryType> ministries) {

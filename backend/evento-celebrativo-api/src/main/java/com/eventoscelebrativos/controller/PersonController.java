@@ -20,6 +20,7 @@ import com.eventoscelebrativos.dto.response.PersonParishResponsibilitiesResponse
 import com.eventoscelebrativos.dto.response.UserAccountLifecycleResponseDTO;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.MinistryCoordinationService;
 import com.eventoscelebrativos.service.ParishStaffAssignmentService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountLifecycleService;
@@ -51,18 +52,21 @@ public class PersonController {
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final UserAccountLifecycleService userAccountLifecycleService;
     private final ParishStaffAssignmentService parishStaffAssignmentService;
+    private final MinistryCoordinationService ministryCoordinationService;
 
     public PersonController(
             PersonService personService,
             EventParticipationResponseService eventParticipationResponseService,
             AuthenticatedUserResolver authenticatedUserResolver,
             UserAccountLifecycleService userAccountLifecycleService,
-            ParishStaffAssignmentService parishStaffAssignmentService
+            ParishStaffAssignmentService parishStaffAssignmentService,
+            MinistryCoordinationService ministryCoordinationService
     ) {
         this.personService = personService;
         this.eventParticipationResponseService = eventParticipationResponseService;
         this.authenticatedUserResolver = authenticatedUserResolver;
         this.userAccountLifecycleService = userAccountLifecycleService;
+        this.ministryCoordinationService = ministryCoordinationService;
         this.parishStaffAssignmentService = parishStaffAssignmentService;
     }
 
@@ -393,7 +397,11 @@ public class PersonController {
         return ResponseEntity.ok(responseDTO);
     }
 
-    @Operation(summary = "Lista os ministerios ativos de uma pessoa")
+    @Operation(
+            summary = "Lista os ministerios ativos de uma pessoa.",
+            description = "coordinatedMinistries e o subconjunto de ministries que a pessoa coordena atualmente "
+                    + "(PersonMinistry.active=true AND coordinator=true); nunca null, lista vazia quando nao ha coordenacao."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Ministerios listados com sucesso"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
@@ -407,7 +415,13 @@ public class PersonController {
         return ResponseEntity.ok(responseDTO);
     }
 
-    @Operation(summary = "Atualiza atomicamente o conjunto de ministerios de uma pessoa")
+    @Operation(
+            summary = "Atualiza atomicamente o conjunto de ministerios de uma pessoa.",
+            description = "Desativar um ministerio (ausente do conjunto desejado) remove sua coordenacao atomicamente. "
+                    + "Reativar um ministerio previamente desativado NAO restaura a coordenacao (precisa ser concedida "
+                    + "novamente via PUT /{id}/ministries/{ministryType}/coordinator). Um ministerio que permanece no "
+                    + "conjunto desejado (unchanged) preserva sua coordenacao como estava."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Ministerios atualizados com sucesso"),
             @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
@@ -425,6 +439,50 @@ public class PersonController {
     ) {
         PersonMinistriesResponseDTO responseDTO = personService.updatePersonMinistries(id, requestDTO);
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @Operation(
+            summary = "Concede ou reconfirma a coordenacao de um ministerio para uma pessoa.",
+            description = "Coordenacao pertence ao vinculo PersonMinistry (ministryType + coordinator), separada de Person, "
+                    + "UserAccount, UserAccountRole e ParishStaffAssignment. Exige PersonMinistry(ministryType).active=true "
+                    + "(409 MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY quando ausente ou inativo); nao cria o vinculo "
+                    + "ministerial implicitamente. Um ministerio pode ter 0..N coordenadores; uma pessoa pode coordenar "
+                    + "0..N ministerios. Nao exige UserAccount. Idempotente: se ja for coordenador, retorna sucesso sem "
+                    + "alterar updatedAt. Esta branch apenas persiste a responsabilidade; nao concede nenhuma autoridade "
+                    + "adicional ao coordenador."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Coordenacao concedida/reconfirmada com sucesso (ou ja concedida, idempotente)"),
+            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "409", description = "Vinculo ministerial inexistente ou inativo (MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY)")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PutMapping(value = "/{id}/ministries/{ministryType}/coordinator")
+    public ResponseEntity<Void> grantMinistryCoordinator(@PathVariable Long id, @PathVariable String ministryType) {
+        ministryCoordinationService.grantCoordinator(id, ministryType);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Remove a coordenacao de um ministerio de uma pessoa.",
+            description = "Nao desativa o vinculo ministerial nem remove nenhuma linha fisicamente. Idempotente: se a "
+                    + "pessoa ja nao for coordenadora (nunca foi ou ja foi removida), retorna sucesso sem alterar nada."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Coordenacao removida com sucesso (ou ja ausente, idempotente)"),
+            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
+            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+    })
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @DeleteMapping(value = "/{id}/ministries/{ministryType}/coordinator")
+    public ResponseEntity<Void> revokeMinistryCoordinator(@PathVariable Long id, @PathVariable String ministryType) {
+        ministryCoordinationService.revokeCoordinator(id, ministryType);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(

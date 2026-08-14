@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +24,9 @@ class EndpointSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void shouldAllowPublicEventEndpointsWithoutAuthentication() throws Exception {
@@ -133,6 +137,12 @@ class EndpointSecurityTest {
         mockMvc.perform(put("/pessoas/1/ministries")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ministriesPayload()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
@@ -272,6 +282,12 @@ class EndpointSecurityTest {
                         .content(ministriesPayload()))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/eventos/com-escala")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validEventWithScalePayload()))
@@ -321,6 +337,29 @@ class EndpointSecurityTest {
 
         mockMvc.perform(delete("/paroquia/equipe/secretarios/1"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockAuthenticatedUser(accountId = 4L, personId = 4L, username = "34983246978", authorities = {"ROLE_OPERATOR"})
+    void shouldRejectOperatorFromManagingMinistryCoordinationEvenWhenTheyCoordinateAMinistryThemselves() throws Exception {
+        // Person 4 (fixture) tem PersonMinistry(READER).active=true e conta ROLE_OPERATOR. Concede
+        // coordinator=true diretamente no banco para provar que possuir a responsabilidade de
+        // coordenacao nao desbloqueia autoridade administrativa nenhuma nesta branch.
+        jdbcTemplate.update(
+                "UPDATE tb_person_ministry SET coordinator = TRUE WHERE person_id = 4 AND ministry_type = 'READER'");
+        try {
+            mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                    .andExpect(status().isForbidden());
+
+            mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                    .andExpect(status().isForbidden());
+
+            mockMvc.perform(put("/pessoas/4/ministries/READER/coordinator"))
+                    .andExpect(status().isForbidden());
+        } finally {
+            jdbcTemplate.update(
+                    "UPDATE tb_person_ministry SET coordinator = FALSE WHERE person_id = 4 AND ministry_type = 'READER'");
+        }
     }
 
     @Test
@@ -443,6 +482,12 @@ class EndpointSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ministriesPayload()))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/eventos/com-escala")
                         .contentType(MediaType.APPLICATION_JSON)

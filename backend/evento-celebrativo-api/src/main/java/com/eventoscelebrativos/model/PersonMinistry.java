@@ -35,6 +35,15 @@ public class PersonMinistry {
     @Column(nullable = false)
     private Boolean active = true;
 
+    /**
+     * Responsabilidade de coordenacao do ministerio (conceito separado de active). Nunca true com
+     * active=false: {@link #deactivate()} sempre limpa a coordenacao, e {@link #activate()} (usado
+     * para reativacao) nunca a restaura - concessao exige comando administrativo explicito
+     * ({@code MinistryCoordinationService}).
+     */
+    @Column(nullable = false)
+    private Boolean coordinator = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -48,6 +57,7 @@ public class PersonMinistry {
         this.person = person;
         this.ministryType = ministryType;
         this.active = true;
+        this.coordinator = false;
     }
 
     @PrePersist
@@ -55,6 +65,9 @@ public class PersonMinistry {
         LocalDateTime now = LocalDateTime.now();
         if (active == null) {
             active = true;
+        }
+        if (coordinator == null) {
+            coordinator = false;
         }
         if (createdAt == null) {
             createdAt = now;
@@ -67,12 +80,34 @@ public class PersonMinistry {
         updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * Reativa o vinculo ministerial. A coordenacao NUNCA e restaurada automaticamente: precisa ser
+     * concedida novamente, explicitamente, por ADMIN.
+     */
     public void activate() {
         this.active = true;
+        this.coordinator = false;
     }
 
+    /**
+     * Desativa o vinculo ministerial. Limpa a coordenacao atomicamente, preservando o invariante
+     * estrutural coordinator -&gt; active em qualquer caminho de escrita que chame este metodo.
+     */
     public void deactivate() {
         this.active = false;
+        this.coordinator = false;
+    }
+
+    /**
+     * Concede a responsabilidade de coordenacao. So deve ser chamado sobre um vinculo ja ativo
+     * (validado pelo caller); nao ativa o ministerio implicitamente.
+     */
+    public void grantCoordination() {
+        this.coordinator = true;
+    }
+
+    public void revokeCoordination() {
+        this.coordinator = false;
     }
 
     public Long getId() {
@@ -105,6 +140,10 @@ public class PersonMinistry {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public Boolean getCoordinator() {
+        return coordinator;
     }
 
     public LocalDateTime getCreatedAt() {

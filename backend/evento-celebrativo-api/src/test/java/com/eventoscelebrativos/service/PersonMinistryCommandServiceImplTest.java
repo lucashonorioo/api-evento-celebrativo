@@ -181,6 +181,23 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldClearCoordinatorWhenRemovingMinistryThroughIndividualCrudFlow() {
+        Person reader = reader(1L);
+        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        coordinatedMinistry.grantCoordination();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+                .thenReturn(Optional.of(coordinatedMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(false);
+
+        service.removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
+
+        assertFalse(coordinatedMinistry.getActive());
+        assertFalse(coordinatedMinistry.getCoordinator());
+    }
+
+    @Test
     void shouldBlockRemovalWhenPersonHasEventAssignmentOfSameType() {
         Person reader = reader(1L);
         PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
@@ -320,6 +337,55 @@ class PersonMinistryCommandServiceImplTest {
         assertTrue(result.reactivated().isEmpty());
         assertTrue(result.deactivated().isEmpty());
         verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldPreserveCoordinatorOnUnchangedMinistryDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        coordinatedMinistry.grantCoordination();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(coordinatedMinistry));
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of(MinistryType.READER));
+
+        assertEquals(Set.of(MinistryType.READER), result.unchanged());
+        assertTrue(coordinatedMinistry.getCoordinator());
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldClearCoordinatorWhenMinistryIsDeactivatedDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        coordinatedMinistry.grantCoordination();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(coordinatedMinistry));
+        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+                .thenReturn(false);
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
+
+        assertEquals(Set.of(MinistryType.READER), result.deactivated());
+        assertFalse(coordinatedMinistry.getActive());
+        assertFalse(coordinatedMinistry.getCoordinator());
+        verify(personMinistryRepository).save(coordinatedMinistry);
+    }
+
+    @Test
+    void shouldNotRestoreCoordinatorWhenMinistryIsReactivatedDuringSync() {
+        Person reader = reader(1L);
+        PersonMinistry inactiveMinistry = new PersonMinistry(reader, MinistryType.READER);
+        inactiveMinistry.setActive(false);
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(inactiveMinistry));
+
+        PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of(MinistryType.READER));
+
+        assertEquals(Set.of(MinistryType.READER), result.reactivated());
+        assertTrue(inactiveMinistry.getActive());
+        assertFalse(inactiveMinistry.getCoordinator());
+        verify(personMinistryRepository).save(inactiveMinistry);
     }
 
     @Test

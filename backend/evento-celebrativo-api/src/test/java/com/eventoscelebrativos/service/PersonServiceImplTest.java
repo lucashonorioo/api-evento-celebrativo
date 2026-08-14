@@ -419,6 +419,32 @@ class PersonServiceImplTest {
     }
 
     @Test
+    void shouldIncludeCoordinatedMinistriesSubsetWhenFindingMinistries() {
+        when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L))
+                .thenReturn(Set.of(MinistryType.READER));
+
+        PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
+
+        assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
+        assertEquals(List.of(MinistryType.READER), response.getCoordinatedMinistries());
+    }
+
+    @Test
+    void shouldReturnEmptyCoordinatedMinistriesWhenPersonCoordinatesNothing() {
+        when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L)).thenReturn(Set.of());
+
+        PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
+
+        assertEquals(List.of(), response.getCoordinatedMinistries());
+    }
+
+    @Test
     void shouldThrowResourceNotFoundWhenFindingMinistriesOfMissingPerson() {
         when(personRepository.existsById(99L)).thenReturn(false);
 
@@ -457,6 +483,30 @@ class PersonServiceImplTest {
 
         assertEquals(1L, response.getId());
         assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
+    }
+
+    @Test
+    void shouldIncludeCoordinatedMinistriesAfterSync() {
+        Person person = person(1L, "Reader", "34999999991");
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person,
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                Set.of(MinistryType.COMMENTATOR),
+                Set.of(),
+                Set.of(),
+                Set.of(MinistryType.READER)
+        );
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)))
+                .thenReturn(result);
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L))
+                .thenReturn(Set.of(MinistryType.READER));
+
+        PersonMinistriesResponseDTO response = service.updatePersonMinistries(
+                1L,
+                new PersonMinistriesUpdateRequestDTO(List.of("READER", "COMMENTATOR"))
+        );
+
+        assertEquals(List.of(MinistryType.READER), response.getCoordinatedMinistries());
     }
 
     @Test

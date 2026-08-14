@@ -96,6 +96,19 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         return Collections.unmodifiableMap(result);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Set<MinistryType> findActiveCoordinatedMinistriesByPersonId(Long personId) {
+        if (personId == null) {
+            throw new BusinessException("Id de pessoa e obrigatorio");
+        }
+        List<MinistryType> coordinated = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(personId);
+        if (coordinated.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return Collections.unmodifiableSet(EnumSet.copyOf(coordinated));
+    }
+
     private void validateMinistryType(MinistryType ministryType) {
         if (ministryType == null) {
             throw new BusinessException("Funcao ministerial e obrigatoria");

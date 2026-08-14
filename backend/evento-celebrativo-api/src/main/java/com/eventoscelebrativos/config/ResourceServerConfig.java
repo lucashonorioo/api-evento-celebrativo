@@ -87,6 +87,8 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/roles").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.PUT, "/pessoas/*/ministries").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.PUT, "/pessoas/*/ministries/*/coordinator").hasAuthority("ROLE_ADMIN")
+				.requestMatchers(HttpMethod.DELETE, "/pessoas/*/ministries/*/coordinator").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/pessoas/*/responsabilidades-paroquiais").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.POST, "/notificacoes").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/notificacoes/nao-lidas/contagem").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")

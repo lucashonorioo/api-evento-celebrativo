@@ -65,7 +65,7 @@ class V20CreateParishStaffAssignmentIntegrationTest {
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(20, first.migrations.size());
+        assertEquals(21, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 

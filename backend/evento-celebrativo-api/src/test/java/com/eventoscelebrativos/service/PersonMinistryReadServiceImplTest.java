@@ -71,6 +71,25 @@ class PersonMinistryReadServiceImplTest {
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, null));
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, Pageable.unpaged()));
         assertThrows(BusinessException.class, () -> service.findActiveMinistriesByPersonIds(null));
+        assertThrows(BusinessException.class, () -> service.findActiveCoordinatedMinistriesByPersonId(null));
+    }
+
+    @Test
+    void shouldReturnEmptySetWhenPersonCoordinatesNothing() {
+        when(personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(1L)).thenReturn(List.of());
+
+        assertEquals(Set.of(), service.findActiveCoordinatedMinistriesByPersonId(1L));
+    }
+
+    @Test
+    void shouldReturnCoordinatedMinistriesForPerson() {
+        when(personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(1L))
+                .thenReturn(List.of(MinistryType.READER, MinistryType.COMMENTATOR));
+
+        assertEquals(
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                service.findActiveCoordinatedMinistriesByPersonId(1L)
+        );
     }
 
     private Person person(Long id) {

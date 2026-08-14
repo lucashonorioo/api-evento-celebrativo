@@ -17,4 +17,10 @@ public interface PersonMinistryReadService {
     List<Person> findAllActivePeopleByMinistry(MinistryType ministryType);
 
     Map<Long, Set<MinistryType>> findActiveMinistriesByPersonIds(Collection<Long> personIds);
+
+    /**
+     * Ministerios que a Person coordena atualmente: {@code PersonMinistry.active=true AND
+     * coordinator=true}. Subconjunto do resultado de {@link #findActiveMinistriesByPersonIds}.
+     */
+    Set<MinistryType> findActiveCoordinatedMinistriesByPersonId(Long personId);
 }
