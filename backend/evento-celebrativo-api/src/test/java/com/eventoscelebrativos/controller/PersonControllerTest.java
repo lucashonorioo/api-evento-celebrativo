@@ -19,6 +19,7 @@ import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.MinistryCoordinationService;
 import com.eventoscelebrativos.service.ParishStaffAssignmentService;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountLifecycleService;
@@ -69,6 +70,9 @@ class PersonControllerTest {
 
     @MockitoBean
     private ParishStaffAssignmentService parishStaffAssignmentService;
+
+    @MockitoBean
+    private MinistryCoordinationService ministryCoordinationService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -559,7 +563,7 @@ class PersonControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldFindPersonMinistriesWhenUserIsAdmin() throws Exception {
         when(personService.findPersonMinistries(1L))
-                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER, MinistryType.COMMENTATOR), List.of()));
 
         mockMvc.perform(get("/pessoas/1/ministries"))
                 .andExpect(status().isOk())
@@ -592,7 +596,7 @@ class PersonControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldUpdatePersonMinistriesWhenUserIsAdmin() throws Exception {
         when(personService.updatePersonMinistries(eq(1L), any()))
-                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER)));
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(MinistryType.READER), List.of()));
 
         mockMvc.perform(put("/pessoas/1/ministries")
                         .with(csrf())
@@ -611,7 +615,7 @@ class PersonControllerTest {
     @WithMockUser(roles = "ADMIN")
     void shouldAllowEmptyMinistriesListToRemoveAll() throws Exception {
         when(personService.updatePersonMinistries(eq(1L), any()))
-                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of()));
+                .thenReturn(new PersonMinistriesResponseDTO(1L, List.of(), List.of()));
 
         mockMvc.perform(put("/pessoas/1/ministries")
                         .with(csrf())

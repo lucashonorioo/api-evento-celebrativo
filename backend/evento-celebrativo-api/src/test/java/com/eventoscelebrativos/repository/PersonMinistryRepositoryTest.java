@@ -192,6 +192,86 @@ class PersonMinistryRepositoryTest {
                         && Boolean.FALSE.equals(row.getActive())));
     }
 
+    @Test
+    void shouldReturnMinistryTypeWhenActiveAndCoordinator() {
+        Person person = saveReader("Coordinator Person", "34971000201");
+        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        ministry.grantCoordination();
+        personMinistryRepository.saveAndFlush(ministry);
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+
+        assertEquals(List.of(MinistryType.READER), result);
+    }
+
+    @Test
+    void shouldNotReturnActiveMinistryThatIsNotCoordinated() {
+        Person person = saveReader("Active Non Coordinator Person", "34971000202");
+        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldNotReturnInactiveNonCoordinatedMinistry() {
+        Person person = saveReader("Inactive Non Coordinator Person", "34971000203");
+        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        ministry.setActive(false);
+        personMinistryRepository.saveAndFlush(ministry);
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldReturnAllActiveCoordinatedMinistryTypesOrderedByMinistryTypeAscending() {
+        Person person = saveReader("Multi Coordinator Person", "34971000204");
+
+        PersonMinistry reader = new PersonMinistry(person, MinistryType.READER);
+        reader.grantCoordination();
+        PersonMinistry priest = new PersonMinistry(person, MinistryType.PRIEST);
+        priest.grantCoordination();
+        PersonMinistry commentator = new PersonMinistry(person, MinistryType.COMMENTATOR);
+        commentator.grantCoordination();
+        PersonMinistry eucharisticMinister = new PersonMinistry(person, MinistryType.EUCHARISTIC_MINISTER);
+
+        personMinistryRepository.save(reader);
+        personMinistryRepository.save(priest);
+        personMinistryRepository.save(commentator);
+        personMinistryRepository.save(eucharisticMinister);
+        personMinistryRepository.flush();
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+
+        assertEquals(List.of(MinistryType.COMMENTATOR, MinistryType.PRIEST, MinistryType.READER), result);
+    }
+
+    @Test
+    void shouldNotReturnCoordinatedMinistryFromAnotherPerson() {
+        Person target = saveReader("Target Person", "34971000205");
+        Person other = saveReader("Other Coordinator Person", "34971000206");
+
+        PersonMinistry otherMinistry = new PersonMinistry(other, MinistryType.READER);
+        otherMinistry.grantCoordination();
+        personMinistryRepository.saveAndFlush(otherMinistry);
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(target.getId());
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenPersonHasNoCoordinatedMinistry() {
+        Person person = saveReader("No Ministry Person", "34971000207");
+
+        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+
+        assertTrue(result.isEmpty());
+    }
+
     private Person saveReader(String name, String phoneNumber) {
         Person reader = new Person();
         reader.setName(name);

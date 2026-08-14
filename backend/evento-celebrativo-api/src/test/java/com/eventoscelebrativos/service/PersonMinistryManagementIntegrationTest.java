@@ -36,6 +36,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -351,6 +352,184 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.password").doesNotExist())
                     .andExpect(jsonPath("$.roles").doesNotExist())
                     .andExpect(jsonPath("$.personType").doesNotExist());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldGrantAndRevokeCoordinatorViaHttpEndpoints() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Grant Revoke Person");
+            addMinistry(personId, MinistryType.READER, true);
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"))
+                    .andExpect(jsonPath("$.coordinatedMinistries.length()").value(1));
+
+            // idempotente
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(delete("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+
+            // idempotente
+            mockMvc.perform(delete("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldReturnConflictWhenGrantingCoordinatorOnInactiveMinistry() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Inactive Ministry Person");
+            addMinistry(personId, MinistryType.READER, false);
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY"));
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldReturnConflictWhenGrantingCoordinatorOnMissingMinistry() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Missing Ministry Person");
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value("MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY"));
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenGrantingCoordinatorForNonexistentPerson() throws Exception {
+        mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", 987654321L, "READER"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenMinistryTypeIsInvalid() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Invalid Ministry Person");
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "BISHOP"))
+                    .andExpect(status().isBadRequest());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldClearCoordinatedMinistriesFromResponseWhenSyncDeactivatesTheMinistry() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Sync Clears Person");
+            addMinistry(personId, MinistryType.READER, true);
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayload()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries").isEmpty())
+                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+
+            PersonMinistry deactivated = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+                    .orElseThrow();
+            assertFalse(deactivated.getActive());
+            assertFalse(deactivated.getCoordinator());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldNotRestoreCoordinatedMinistryAfterSyncReactivatesIt() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Sync Reactivate Person");
+            addMinistry(personId, MinistryType.READER, true);
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayload()))
+                    .andExpect(status().isOk());
+
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayload("READER")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldAllowMultipleCoordinatorsForTheSameMinistrySimultaneously() throws Exception {
+        Long personA = null;
+        Long personB = null;
+        try {
+            personA = savePerson("Coordinator Multi A");
+            personB = savePerson("Coordinator Multi B");
+            addMinistry(personA, MinistryType.READER, true);
+            addMinistry(personB, MinistryType.READER, true);
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personA, "READER"))
+                    .andExpect(status().isNoContent());
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personB, "READER"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personA))
+                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"));
+            mockMvc.perform(get("/pessoas/{id}/ministries", personB))
+                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"));
+        } finally {
+            cleanupPerson(personA);
+            cleanupPerson(personB);
+        }
+    }
+
+    @Test
+    void shouldAllowOnePersonToCoordinateMultipleMinistries() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Multi Ministry Person");
+            addMinistry(personId, MinistryType.READER, true);
+            addMinistry(personId, MinistryType.COMMENTATOR, true);
+
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+                    .andExpect(status().isNoContent());
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "COMMENTATOR"))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personId))
+                    .andExpect(jsonPath("$.coordinatedMinistries.length()").value(2));
         } finally {
             cleanupPerson(personId);
         }
