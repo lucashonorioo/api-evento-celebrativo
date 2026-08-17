@@ -272,6 +272,49 @@ class PersonMinistryRepositoryTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void shouldExistWhenPersonMinistryTypeActiveAndCoordinator() {
+        Person person = saveReader("Exists Coordinator Person", "34971000301");
+        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        ministry.grantCoordination();
+        personMinistryRepository.saveAndFlush(ministry);
+
+        assertTrue(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
+                person.getId(), MinistryType.READER));
+    }
+
+    @Test
+    void shouldNotExistWhenCoordinatorFalse() {
+        Person person = saveReader("Exists Non Coordinator Person", "34971000302");
+        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
+                person.getId(), MinistryType.READER));
+    }
+
+    @Test
+    void shouldNotExistForAnotherMinistryType() {
+        Person person = saveReader("Exists Other Ministry Person", "34971000303");
+        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        ministry.grantCoordination();
+        personMinistryRepository.saveAndFlush(ministry);
+
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
+                person.getId(), MinistryType.COMMENTATOR));
+    }
+
+    @Test
+    void shouldNotExistForAnotherPerson() {
+        Person target = saveReader("Exists Target Person", "34971000304");
+        Person other = saveReader("Exists Other Person", "34971000305");
+        PersonMinistry ministry = new PersonMinistry(other, MinistryType.READER);
+        ministry.grantCoordination();
+        personMinistryRepository.saveAndFlush(ministry);
+
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
+                target.getId(), MinistryType.READER));
+    }
+
     private Person saveReader(String name, String phoneNumber) {
         Person reader = new Person();
         reader.setName(name);
