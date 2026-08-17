@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.ParishProfileContactUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.ParishProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ParishProfileResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
@@ -268,5 +269,120 @@ class ParishProfileServiceImplTest {
                 "Paróquia São José", "Diocese de Uberlândia", null, null, null, null);
 
         assertThrows(ResourceNotFoundException.class, () -> parishProfileService.update(request));
+    }
+
+    // --- updateContact (PUT /paroquia/contato) ---
+
+    @Test
+    void updateContactShouldNormalizeAndPersistOnlyContactFieldsWithoutTouchingNameOrDiocese() {
+        ParishProfile profile = configuredProfile();
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.of(profile));
+        when(parishProfileRepository.save(profile)).thenReturn(profile);
+        when(parishProfileMapper.toDto(profile)).thenReturn(new ParishProfileResponseDTO());
+
+        ParishProfileContactUpdateRequestDTO request = new ParishProfileContactUpdateRequestDTO(
+                "  34999990000  ", "  secretaria@paroquia.org.br  ", "  Praça Central, 1  ",
+                "  Segunda a sexta, das 8h às 17h  ");
+        parishProfileService.updateContact(request);
+
+        assertEquals("Paróquia São José", profile.getName());
+        assertEquals("Diocese de Uberlândia", profile.getDiocese());
+        assertEquals("34999990000", profile.getInstitutionalPhone());
+        assertEquals("secretaria@paroquia.org.br", profile.getInstitutionalEmail());
+        assertEquals("Praça Central, 1", profile.getOfficeAddress());
+        assertEquals("Segunda a sexta, das 8h às 17h", profile.getOfficeHours());
+        verify(parishProfileRepository, times(1)).save(profile);
+    }
+
+    @Test
+    void updateContactShouldNormalizeBlankOptionalFieldsToNull() {
+        ParishProfile profile = configuredProfile();
+        profile.setInstitutionalPhone("34999990000");
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.of(profile));
+        when(parishProfileRepository.save(profile)).thenReturn(profile);
+        when(parishProfileMapper.toDto(profile)).thenReturn(new ParishProfileResponseDTO());
+
+        ParishProfileContactUpdateRequestDTO request = new ParishProfileContactUpdateRequestDTO(
+                "   ", "   ", "   ", "   ");
+        parishProfileService.updateContact(request);
+
+        assertEquals(null, profile.getInstitutionalPhone());
+        assertEquals(null, profile.getInstitutionalEmail());
+        assertEquals(null, profile.getOfficeAddress());
+        assertEquals(null, profile.getOfficeHours());
+    }
+
+    @Test
+    void updateContactShouldRejectInvalidInstitutionalEmail() {
+        ParishProfile profile = configuredProfile();
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.of(profile));
+
+        ParishProfileContactUpdateRequestDTO request = new ParishProfileContactUpdateRequestDTO(
+                null, "nao-e-um-email", null, null);
+
+        BadRequestException exception = assertThrows(BadRequestException.class,
+                () -> parishProfileService.updateContact(request));
+        assertEquals("BAD_REQUEST", exception.getErrorCode());
+        verify(parishProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void updateContactShouldUseLockedFinder() {
+        ParishProfile profile = configuredProfile();
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.of(profile));
+        when(parishProfileRepository.save(profile)).thenReturn(profile);
+        when(parishProfileMapper.toDto(profile)).thenReturn(new ParishProfileResponseDTO());
+
+        parishProfileService.updateContact(new ParishProfileContactUpdateRequestDTO(null, null, null, null));
+
+        verify(parishProfileRepository).findByIdForUpdate(eq(1L));
+        verify(parishProfileRepository, never()).findById(any());
+    }
+
+    @Test
+    void updateContactShouldThrowNotConfiguredExceptionWhenProfileIsNotConfigured() {
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID))
+                .thenReturn(Optional.of(unconfiguredProfile()));
+
+        ParishProfileContactUpdateRequestDTO request = new ParishProfileContactUpdateRequestDTO(
+                null, null, null, null);
+
+        assertThrows(ParishProfileNotConfiguredException.class, () -> parishProfileService.updateContact(request));
+        verify(parishProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void updateContactShouldNotMarkProfileAsConfigured() {
+        ParishProfile profile = configuredProfile();
+        profile.setConfigured(true);
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.of(profile));
+        when(parishProfileRepository.save(profile)).thenReturn(profile);
+        when(parishProfileMapper.toDto(profile)).thenReturn(new ParishProfileResponseDTO());
+
+        parishProfileService.updateContact(new ParishProfileContactUpdateRequestDTO(null, null, null, null));
+
+        assertTrue(profile.isConfigured());
+    }
+
+    @Test
+    void updateContactShouldThrowResourceNotFoundWhenSingletonRowIsMissing() {
+        when(parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)).thenReturn(Optional.empty());
+
+        ParishProfileContactUpdateRequestDTO request = new ParishProfileContactUpdateRequestDTO(
+                null, null, null, null);
+
+        assertThrows(ResourceNotFoundException.class, () -> parishProfileService.updateContact(request));
+    }
+
+    @Test
+    void contactRequestDtoShouldOnlyExposeAuthorizedFields() {
+        var declaredFields = ParishProfileContactUpdateRequestDTO.class.getDeclaredFields();
+        var fieldNames = new java.util.HashSet<String>();
+        for (var field : declaredFields) {
+            fieldNames.add(field.getName());
+        }
+        var expected = java.util.Set.of(
+                "institutionalPhone", "institutionalEmail", "officeAddress", "officeHours");
+        assertEquals(expected, fieldNames);
     }
 }

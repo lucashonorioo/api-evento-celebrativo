@@ -2,6 +2,7 @@ package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.dto.response.ParishProfileResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.ParishProfileNotConfiguredException;
+import com.eventoscelebrativos.service.ParishAuthorizationService;
 import com.eventoscelebrativos.service.ParishProfileService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,9 @@ class ParishProfileControllerTest {
 
     @MockitoBean
     private ParishProfileService parishProfileService;
+
+    @MockitoBean(name = "parishAuthorizationService")
+    private ParishAuthorizationService parishAuthorizationService;
 
     // Autorização real de "endpoint público sem autenticação" é coberta por EndpointSecurityTest
     // (contexto Spring completo, com o SecurityFilterChain real). Este slice test (@WebMvcTest) não
@@ -142,6 +146,117 @@ class ParishProfileControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
 
         verifyNoInteractions(parishProfileService);
+    }
+
+    // --- PUT /paroquia/contato ---
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldUpdateContactWhenAuthorizationServiceGrantsAccess() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+        when(parishProfileService.updateContact(any())).thenReturn(new ParishProfileResponseDTO(
+                "Paróquia São José", "Diocese de Uberlândia", "34999990000",
+                "secretaria@paroquia.org.br", "Praça Central, 1", "Segunda a sexta, das 8h às 17h"));
+
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validContactPayload()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.institutionalPhone").value("34999990000"))
+                .andExpect(jsonPath("$.name").value("Paróquia São José"));
+
+        verify(parishProfileService).updateContact(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldRejectContactUpdateWhenAuthorizationServiceDeniesAccess() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validContactPayload()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(parishProfileService);
+    }
+
+    @Test
+    void shouldRejectContactUpdateWithoutAuthentication() throws Exception {
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validContactPayload()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(parishProfileService);
+        verifyNoInteractions(parishAuthorizationService);
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldRejectContactUpdateWithUnknownFieldName() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "institutionalPhone": "34999990000",
+                                  "name": "Paróquia adulterada"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(parishProfileService);
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldRejectContactUpdateWithUnknownDioceseField() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "diocese": "Diocese adulterada"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST_BODY"));
+
+        verifyNoInteractions(parishProfileService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldReturnNotConfiguredWhenUpdatingContactBeforeInitialConfiguration() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+        when(parishProfileService.updateContact(any())).thenThrow(new ParishProfileNotConfiguredException());
+
+        mockMvc.perform(put("/paroquia/contato")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validContactPayload()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("PARISH_PROFILE_NOT_CONFIGURED"));
+    }
+
+    private String validContactPayload() {
+        return """
+                {
+                  "institutionalPhone": "34999990000",
+                  "institutionalEmail": "secretaria@paroquia.org.br",
+                  "officeAddress": "Praça Central, 1",
+                  "officeHours": "Segunda a sexta, das 8h às 17h"
+                }
+                """;
     }
 
     private String validUpdatePayload() {

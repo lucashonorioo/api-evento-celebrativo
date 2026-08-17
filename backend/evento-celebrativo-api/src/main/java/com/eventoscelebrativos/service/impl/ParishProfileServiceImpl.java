@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service.impl;
 
+import com.eventoscelebrativos.dto.request.ParishProfileContactUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.ParishProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ParishProfileResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
@@ -55,28 +56,61 @@ public class ParishProfileServiceImpl implements ParishProfileService {
 
         String name = normalizeRequired(requestDTO.getName(), "nome", MAX_NAME_LENGTH);
         String diocese = normalizeRequired(requestDTO.getDiocese(), "diocese", MAX_DIOCESE_LENGTH);
-        String institutionalPhone = normalizeOptional(
-                requestDTO.getInstitutionalPhone(), MAX_INSTITUTIONAL_PHONE_LENGTH, "telefone institucional");
-        String institutionalEmail = normalizeOptional(
-                requestDTO.getInstitutionalEmail(), MAX_INSTITUTIONAL_EMAIL_LENGTH, "e-mail institucional");
-        if (institutionalEmail != null && !EMAIL_PATTERN.matcher(institutionalEmail).matches()) {
-            throw new BadRequestException("O e-mail institucional informado é inválido");
-        }
-        String officeAddress = normalizeOptional(
-                requestDTO.getOfficeAddress(), MAX_OFFICE_ADDRESS_LENGTH, "endereço da secretaria");
-        String officeHours = normalizeOptional(
-                requestDTO.getOfficeHours(), MAX_OFFICE_HOURS_LENGTH, "horário de funcionamento");
+        applyContactFields(parishProfile, requestDTO.getInstitutionalPhone(), requestDTO.getInstitutionalEmail(),
+                requestDTO.getOfficeAddress(), requestDTO.getOfficeHours());
 
         parishProfile.setName(name);
         parishProfile.setDiocese(diocese);
-        parishProfile.setInstitutionalPhone(institutionalPhone);
-        parishProfile.setInstitutionalEmail(institutionalEmail);
-        parishProfile.setOfficeAddress(officeAddress);
-        parishProfile.setOfficeHours(officeHours);
         parishProfile.setConfigured(true);
 
         ParishProfile saved = parishProfileRepository.save(parishProfile);
         return parishProfileMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public ParishProfileResponseDTO updateContact(ParishProfileContactUpdateRequestDTO requestDTO) {
+        ParishProfile parishProfile = parishProfileRepository.findByIdForUpdate(ParishProfile.SINGLETON_ID)
+                .orElseThrow(() -> new ResourceNotFoundException("Perfil da paróquia", ParishProfile.SINGLETON_ID));
+        if (!parishProfile.isConfigured()) {
+            throw new ParishProfileNotConfiguredException();
+        }
+
+        applyContactFields(parishProfile, requestDTO.getInstitutionalPhone(), requestDTO.getInstitutionalEmail(),
+                requestDTO.getOfficeAddress(), requestDTO.getOfficeHours());
+
+        ParishProfile saved = parishProfileRepository.save(parishProfile);
+        return parishProfileMapper.toDto(saved);
+    }
+
+    /**
+     * Normalização compartilhada do subconjunto de contato entre {@link #update} (PUT /paroquia,
+     * ROLE_ADMIN) e {@link #updateContact} (PUT /paroquia/contato, ROLE_ADMIN ou secretaria ativa):
+     * os quatro campos nunca podem divergir de regra entre os dois caminhos de escrita.
+     */
+    private void applyContactFields(
+            ParishProfile parishProfile,
+            String rawInstitutionalPhone,
+            String rawInstitutionalEmail,
+            String rawOfficeAddress,
+            String rawOfficeHours
+    ) {
+        String institutionalPhone = normalizeOptional(
+                rawInstitutionalPhone, MAX_INSTITUTIONAL_PHONE_LENGTH, "telefone institucional");
+        String institutionalEmail = normalizeOptional(
+                rawInstitutionalEmail, MAX_INSTITUTIONAL_EMAIL_LENGTH, "e-mail institucional");
+        if (institutionalEmail != null && !EMAIL_PATTERN.matcher(institutionalEmail).matches()) {
+            throw new BadRequestException("O e-mail institucional informado é inválido");
+        }
+        String officeAddress = normalizeOptional(
+                rawOfficeAddress, MAX_OFFICE_ADDRESS_LENGTH, "endereço da secretaria");
+        String officeHours = normalizeOptional(
+                rawOfficeHours, MAX_OFFICE_HOURS_LENGTH, "horário de funcionamento");
+
+        parishProfile.setInstitutionalPhone(institutionalPhone);
+        parishProfile.setInstitutionalEmail(institutionalEmail);
+        parishProfile.setOfficeAddress(officeAddress);
+        parishProfile.setOfficeHours(officeHours);
     }
 
     private String normalizeRequired(String value, String fieldLabel, int maxLength) {

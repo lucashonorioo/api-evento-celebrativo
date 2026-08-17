@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.controller;
 
 import com.eventoscelebrativos.config.OpenApiConfig;
+import com.eventoscelebrativos.dto.request.ParishProfileContactUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.ParishProfileUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ParishProfileResponseDTO;
 import com.eventoscelebrativos.service.ParishProfileService;
@@ -53,5 +54,26 @@ public class ParishProfileController {
     @PutMapping
     public ResponseEntity<ParishProfileResponseDTO> update(@Valid @RequestBody ParishProfileUpdateRequestDTO requestDTO) {
         return ResponseEntity.ok(parishProfileService.update(requestDTO));
+    }
+
+    @Operation(summary = "Atualiza somente os dados de contato/atendimento da paróquia (telefone institucional, "
+            + "e-mail institucional, endereço da secretaria e horário de funcionamento). Não altera nome nem "
+            + "diocese, que continuam exclusivos de PUT /paroquia. Exige que o perfil já tenha sido configurado "
+            + "por ROLE_ADMIN; caso contrário retorna 404 (PARISH_PROFILE_NOT_CONFIGURED). Permitido para "
+            + "ROLE_ADMIN ou ROLE_OPERATOR com responsabilidade de secretaria paroquial ativa.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dados de contato atualizados com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou campo não permitido no contrato"),
+            @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
+            @ApiResponse(responseCode = "403", description = "Usuario sem permissao (exige ROLE_ADMIN ou secretaria paroquial ativa)"),
+            @ApiResponse(responseCode = "404", description = "Perfil institucional ainda não configurado (PARISH_PROFILE_NOT_CONFIGURED)")
+    })
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
+    @PutMapping("/contato")
+    public ResponseEntity<ParishProfileResponseDTO> updateContact(
+            @Valid @RequestBody ParishProfileContactUpdateRequestDTO requestDTO
+    ) {
+        return ResponseEntity.ok(parishProfileService.updateContact(requestDTO));
     }
 }

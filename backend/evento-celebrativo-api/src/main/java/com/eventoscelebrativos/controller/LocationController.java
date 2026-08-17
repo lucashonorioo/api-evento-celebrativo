@@ -28,8 +28,9 @@ public class LocationController {
         this.locationService = locationService;
     }
 
-    @Operation(summary = "Cria um local")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @Operation(summary = "Cria um local. Permitido para ROLE_ADMIN ou ROLE_OPERATOR com responsabilidade de "
+            + "secretaria paroquial ativa.")
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
     @PostMapping
     public ResponseEntity<LocationResponseDTO> criarLocal(@Valid @RequestBody LocationRequestDTO locationRequestDTO){
         LocationResponseDTO locationResponseDTO = locationService.createLocation(locationRequestDTO);
@@ -52,8 +53,9 @@ public class LocationController {
         return ResponseEntity.ok().body(locationResponseDTO);
     }
 
-    @Operation(summary = "Atualiza um local")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @Operation(summary = "Atualiza um local. Permitido para ROLE_ADMIN ou ROLE_OPERATOR com responsabilidade de "
+            + "secretaria paroquial ativa.")
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
     @PutMapping(value = "/{id}")
     public ResponseEntity<LocationResponseDTO> atualizarLocal(@PathVariable Long id, @Valid @RequestBody LocationRequestDTO locationRequestDTO){
         LocationResponseDTO locationResponseDTO = locationService.updateLocation(id, locationRequestDTO);

@@ -21,7 +21,9 @@ import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupporte
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.ParticipationStatus;
 import com.eventoscelebrativos.service.CelebrationEventService;
+import com.eventoscelebrativos.service.ParishAuthorizationService;
 import com.eventoscelebrativos.service.ScheduleUnavailabilityConflictService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -71,6 +73,18 @@ class CelebrationEventControllerTest {
 
     @MockitoBean
     private ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
+
+    @MockitoBean(name = "parishAuthorizationService")
+    private ParishAuthorizationService parishAuthorizationService;
+
+    // Este slice test mocka o service de negócio, não a resolução real de AuthenticatedUser; por
+    // isso o bean de autorização também é mockado. Default true reflete o contexto ADMIN da classe
+    // (@WithMockUser(roles = "ADMIN")); os testes que simulam ROLE_OPERATOR sem secretaria sobrescrevem
+    // para false.
+    @BeforeEach
+    void grantSecretaryOperationsByDefault() {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+    }
 
     @TestConfiguration
     @EnableMethodSecurity
@@ -281,6 +295,8 @@ class CelebrationEventControllerTest {
     @Test
     @WithMockUser(roles = "OPERATOR")
     void shouldReturnForbiddenWhenOperatorPostsCommonEvent() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
         mockMvc.perform(post("/eventos")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -293,6 +309,8 @@ class CelebrationEventControllerTest {
     @Test
     @WithMockUser(roles = "OPERATOR")
     void shouldReturnForbiddenWhenOperatorUpdatesCommonEvent() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
         mockMvc.perform(put("/eventos/1")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
