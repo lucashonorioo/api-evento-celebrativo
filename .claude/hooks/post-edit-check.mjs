@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { recordEngineeringEdit } from './engineering-review-gate.mjs';
 
 export function runDiffCheck(cwd) {
   try {
@@ -43,6 +44,7 @@ async function main() {
     for await (const chunk of process.stdin) input += chunk;
     const payload = JSON.parse(input || '{}');
     const cwd = String(payload.cwd || process.cwd());
+    recordEngineeringEdit(payload);
     const output = buildHookOutput(runDiffCheck(cwd));
     if (output) process.stdout.write(JSON.stringify(output));
   } catch (error) {

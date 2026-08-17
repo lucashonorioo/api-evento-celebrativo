@@ -7,41 +7,50 @@ description: Implemente features, correções ou refatorações focadas no front
 
 ## Preparação
 
-1. Leia o AGENTS da raiz e o AGENTS do frontend.
-2. Confirme o requisito e o estado atual no código.
-3. Consulte o backend ou OpenAPI para confirmar request, response, roles, paginação e erros.
-4. Localize rota, página, componente, serviço, model, guard/interceptor e testes.
-5. Quando a tarefa for ampla, use `codebase_explorer` para mapear a funcionalidade sem editar.
+1. Leia o `AGENTS.md` da raiz e o `AGENTS.md` do frontend.
+2. Confirme requisito, critérios de aceite e comportamento atual no código.
+3. Consulte backend, OpenAPI ou testes para confirmar request, response, roles, paginação e erros.
+4. Localize rota, página, componente, serviço, model, formulário, guard/interceptor, estilos e testes relacionados.
+5. Quando a tarefa for ampla, use exploração somente leitura para mapear a funcionalidade antes da implementação.
 
 ## Implementação
 
 1. Preserve standalone components e TypeScript estrito.
 2. Reutilize padrões e componentes existentes antes de criar novos.
-3. Separe apresentação, integração HTTP e estado quando houver responsabilidade real.
+3. Separe apresentação, integração HTTP, formulário e estado quando houver responsabilidade real.
 4. Use signals para estado local simples e RxJS para fluxos assíncronos.
 5. Modele requests e responses sem `any`.
 6. Trate loading, vazio, erro, permissão e sessão conforme necessário.
 7. Preserve guards, interceptor e autorização do backend.
 8. Garanta HTML semântico, teclado, foco, labels, contraste e responsividade básica.
-9. Não adicione dependências ou frameworks visuais sem necessidade aprovada.
+9. Evite subscriptions sem ciclo de vida controlado e trabalho custoso no template.
+10. Não adicione dependências, frameworks visuais ou estado global sem necessidade comprovada.
 
-## Testes
+## Testes e validação
 
 Atualize ou crie testes para serviços, componentes, formulários, guards, interceptors e regressões relevantes.
 
-Execute:
+Execute comandos específicos quando disponíveis e, conforme o risco:
 
 ```powershell
 npm test -- --watch=false
 npm run build
 ```
 
-Use comandos mais específicos antes da suíte completa quando disponível.
+Para mudança visual ou de interação, valide no navegador quando o ambiente permitir e registre a limitação quando não for possível.
 
-## Revisão
+## Gate de conclusão obrigatório
 
-Para mudança visual ou comportamental relevante, use `frontend_reviewer`. Para auth, token, HTML externo ou permissões, inclua `security_reviewer`.
+Depois da última alteração relevante de código:
+
+1. execute `validate-project`;
+2. execute `review-change` como revisão independente de engenharia;
+3. se o veredito for `CHANGES_REQUIRED`, corrija somente os achados relacionados à tarefa;
+4. repita validações afetadas e `review-change` depois de qualquer correção;
+5. conclua apenas com `PASS` ou `PASS WITH NOTES`.
+
+A revisão deve avaliar também arquitetura Angular, contrato real da API, estado de UI, tipagem, RxJS, acessibilidade e responsividade quando aplicáveis.
 
 ## Entrega
 
-Reporte arquivos, comportamento, validações, limitações visuais e riscos restantes.
+Reporte comportamento, arquivos relevantes, validações, acessibilidade/responsividade verificadas, veredito da revisão de engenharia, limitações visuais e riscos residuais.

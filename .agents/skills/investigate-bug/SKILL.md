@@ -11,28 +11,26 @@ Encontrar a causa raiz com evidência reproduzível antes de alterar código e p
 
 ## Workflow
 
-1. Leia os AGENTS aplicáveis e identifique a área afetada.
-2. Reúna a mensagem completa, stack trace, request, dados de entrada e comportamento esperado quando disponíveis.
+1. Leia os `AGENTS.md` aplicáveis e identifique a área afetada.
+2. Reúna mensagem completa, stack trace, request, dados de entrada e comportamento esperado quando disponíveis.
 3. Reproduza com o teste ou comando mais específico possível.
-4. Trace o fluxo real de execução e localize o primeiro ponto em que estado observado diverge do esperado.
+4. Trace o fluxo real e localize o primeiro ponto em que o estado observado diverge do esperado.
 5. Procure mudanças recentes e padrões equivalentes no projeto.
 6. Formule poucas hipóteses ordenadas por probabilidade e teste uma de cada vez.
-7. Não edite enquanto a causa raiz ainda estiver sustentada apenas por suposição.
+7. Não edite enquanto a causa raiz estiver sustentada apenas por suposição.
 8. Quando a causa estiver comprovada, implemente a menor correção coerente.
 9. Adicione teste de regressão sempre que viável.
 10. Execute validações específicas e depois amplas conforme o risco.
 
-## Delegação
+## Gate de conclusão obrigatório
 
-Em bugs complexos, use `codebase_explorer` para mapear o fluxo e um reviewer especializado para validar a hipótese. Não delegue escritas paralelas.
+Se a investigação resultar em alteração de código, teste, contrato, migration ou configuração executável:
+
+1. execute `validate-project` depois da correção;
+2. execute `review-change` depois da última alteração;
+3. trate `CHANGES_REQUIRED` antes de concluir;
+4. após qualquer ajuste motivado pela revisão, revalide e revise novamente.
 
 ## Saída esperada
 
-Informe:
-
-- sintomas e reprodução;
-- causa raiz e evidência;
-- correção aplicada;
-- teste de regressão;
-- comandos executados;
-- riscos ou incertezas restantes.
+Informe sintomas e reprodução, causa raiz e evidência, correção aplicada, teste de regressão, comandos executados, veredito da revisão de engenharia e riscos ou incertezas restantes.

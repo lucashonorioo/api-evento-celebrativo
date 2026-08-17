@@ -24,23 +24,33 @@ description: Implementa feature, correção ou refatoração focada no frontend 
 - Preserve guards, interceptor e autorização do backend.
 - Garanta HTML semântico, teclado, foco, labels, contraste e responsividade básica.
 - Evite subscriptions sem gerenciamento de ciclo de vida e trabalho custoso no template.
-- Não adicione dependências, frameworks visuais ou estado global sem necessidade aprovada.
+- Não adicione dependências, frameworks visuais ou estado global sem necessidade comprovada.
 
 ## Testes e validação
 
 Atualize ou crie testes para serviços, componentes, formulários, guards, interceptors e regressões relevantes.
 
-Execute:
+Execute comandos específicos quando disponíveis e, conforme o risco:
 
 ```powershell
 npm test -- --watch=false
 npm run build
 ```
 
-Use comandos mais específicos antes da suíte completa quando disponíveis. Para mudanças visuais ou de interação, valide no navegador quando o ambiente permitir e registre a limitação quando isso não for possível.
+Para mudanças visuais ou de interação, valide no navegador quando o ambiente permitir e registre a limitação quando isso não for possível.
 
-## Revisão e entrega
+## Gate de conclusão obrigatório
 
-Use `frontend-reviewer` em mudança visual ou comportamental relevante. Inclua `security-reviewer` para autenticação, token, HTML externo ou permissões e `test-reviewer` quando houver vários estados ou contratos afetados.
+Depois da última alteração relevante de código:
 
-Reporte arquivos, comportamento, validações, acessibilidade/responsividade verificadas, limitações visuais e riscos restantes.
+1. use `validate-project`;
+2. use `review-change` como revisão independente de engenharia;
+3. trate `CHANGES_REQUIRED` somente dentro do escopo da tarefa;
+4. depois de qualquer correção, repita validações afetadas e `review-change`;
+5. conclua somente com `PASS` ou `PASS WITH NOTES`.
+
+A revisão deve considerar arquitetura Angular, contrato real da API, estado de UI, tipagem, RxJS, acessibilidade e responsividade quando aplicáveis.
+
+## Entrega
+
+Reporte arquivos, comportamento, validações, acessibilidade/responsividade verificadas, veredito da revisão de engenharia, limitações visuais e riscos residuais.

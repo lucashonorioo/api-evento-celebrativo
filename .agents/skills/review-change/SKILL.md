@@ -1,53 +1,66 @@
 ---
 name: review-change
-description: Revise branch, PR ou diff do Evento Celebrativo procurando bugs, regressões, segurança, compatibilidade e lacunas de testes. Use para revisão estruturada antes de merge; não use para implementar automaticamente todas as sugestões encontradas.
+description: Executa revisão independente de engenharia sobre branch, PR ou diff do Evento Celebrativo, verificando correção, arquitetura, contratos, dados, segurança, desempenho, testes e regressões antes da conclusão ou merge. É somente leitura e não implementa os próprios achados.
 ---
 
 # Revisar alteração
 
+## Política obrigatória
+
+Leia `.ai/review/ENGINEERING_REVIEW.md` antes de iniciar. Ela define critérios, severidade, risco, veredito e formato comum de revisão para Codex e Claude Code.
+
+Leia também os `AGENTS.md` da raiz e das áreas afetadas. Em caso de conflito, instruções mais específicas da área prevalecem para detalhes técnicos, sem reduzir o rigor do gate de revisão.
+
 ## Escopo
 
-1. Determine a base da comparação, normalmente `main`, sem assumir quando houver ambiguidade material.
-2. Leia os AGENTS das áreas afetadas.
-3. Inspecione status, commits e diff sem alterar arquivos.
-4. Priorize comportamento e risco, não preferências estilísticas.
+1. Determine a base correta da comparação. Use a base informada pelo usuário, branch/PR ou merge-base quando houver contexto suficiente; não assuma `main` quando isso puder distorcer o diff.
+2. Para working tree, considere `git status --short`, diff staged, diff unstaged e arquivos untracked pertencentes à tarefa.
+3. Identifique backend, frontend, contrato, persistência, segurança, testes e configuração afetados.
+4. Leia o diff completo antes de concluir sobre arquivos isolados.
+5. Trace consumidores e dependências diretas quando forem necessários para comprovar o comportamento alterado.
+6. Não edite arquivos durante a revisão.
 
-## Delegação
+## Revisão
 
-Para diff relevante, delegue somente as áreas afetadas:
+Aplique todas as dimensões relevantes de `.ai/review/ENGINEERING_REVIEW.md`, com atenção especial a:
 
-- `codebase_explorer`: mapa do fluxo e impacto;
-- `backend_reviewer`: Java/Spring e persistência;
-- `frontend_reviewer`: Angular, UX e acessibilidade;
-- `test_reviewer`: cobertura e fragilidade;
-- `security_reviewer`: auth, autorização, secrets e exposição.
+- requisito, invariantes e regressões;
+- separação de responsabilidades, coesão, acoplamento e aderência à arquitetura existente;
+- contratos HTTP e compatibilidade backend/frontend;
+- transações, integridade, migrations, JPA, queries e concorrência;
+- autenticação, autorização e exposição de dados;
+- tratamento de erro, logs e resiliência;
+- desempenho e escalabilidade apenas quando houver risco concreto;
+- manutenibilidade sem abstração ou refatoração especulativa;
+- cobertura e qualidade dos testes;
+- tipagem, estado, RxJS, UX, acessibilidade e responsividade quando houver frontend.
 
-Aguarde todos e remova duplicações. Não use todos os agents em mudanças pequenas.
+Não trate preferência estética como defeito. Não exija pattern, camada, abstração ou dependência nova sem benefício concreto e demonstrável.
 
-## Critérios
+## Profundidade por risco
 
-Procure:
+- **Baixo:** faça a revisão completa diretamente sobre o diff e o fluxo local.
+- **Médio:** amplie a leitura para dependências/consumidores diretos e valide interações entre camadas afetadas.
+- **Alto:** revise explicitamente todas as superfícies críticas envolvidas, incluindo segurança, dados, contratos, concorrência e estratégia de testes conforme aplicável.
 
-- bug funcional ou regressão;
-- contrato quebrado;
-- autorização ausente ou excessiva;
-- tratamento incorreto de erro;
-- concorrência, transação ou integridade;
-- incompatibilidade de schema/migration;
-- tipagem insegura;
-- estado de UI incorreto;
-- acessibilidade afetada;
-- testes ausentes ou que não exercitam o comportamento real;
-- arquivos ou dados sensíveis acidentais.
+Se o ambiente disponibilizar especialistas ou subagents de revisão, use somente os necessários e consolide os resultados. A ausência deles não reduz a responsabilidade desta skill de executar a revisão completa.
 
-## Formato dos achados
+## Achados e veredito
 
-Ordene por severidade. Cada achado deve incluir:
+Classifique cada achado como `BLOCKER`, `HIGH`, `MEDIUM` ou `LOW` conforme a política comum.
 
-- severidade;
+Cada achado deve conter:
+
 - arquivo e símbolo/linha quando possível;
-- cenário concreto;
+- evidência observada;
+- cenário concreto de falha ou custo;
 - impacto;
-- correção sugerida mínima.
+- correção mínima sugerida.
 
-Se não houver achados, diga isso explicitamente e registre riscos residuais ou validações não executadas. Não invente problemas para preencher a revisão.
+Finalize com exatamente um veredito:
+
+- `PASS`;
+- `PASS WITH NOTES`;
+- `CHANGES_REQUIRED`.
+
+Se não houver achados acionáveis, diga isso explicitamente. Registre validações não executadas e riscos residuais sem transformá-los automaticamente em defeitos.

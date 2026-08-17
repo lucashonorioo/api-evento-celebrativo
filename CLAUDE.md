@@ -34,8 +34,10 @@ Os `CLAUDE.md` aninhados acrescentam instruções específicas quando Claude tra
 4. avalie compatibilidade e riscos de dados, concorrência, desempenho e operação quando aplicável;
 5. implemente uma alteração mínima e coerente;
 6. atualize testes e documentação afetada;
-7. execute validações proporcionais ao risco;
-8. revise o diff e reporte somente resultados verificados.
+7. execute `validate-project` com validações proporcionais ao risco;
+8. depois da última alteração relevante, execute `review-change` conforme `.ai/review/ENGINEERING_REVIEW.md`;
+9. trate `CHANGES_REQUIRED` dentro do escopo, revalide e revise novamente após correções;
+10. conclua somente com `PASS` ou `PASS WITH NOTES` e reporte resultados verificados.
 
 ## Contratos backend e frontend
 
@@ -71,6 +73,7 @@ Os `CLAUDE.md` aninhados acrescentam instruções específicas quando Claude tra
 
 ## Extensões do projeto
 
+- `.ai/review/ENGINEERING_REVIEW.md` é a política canônica de revisão de engenharia compartilhada com o Codex.
 - Use uma skill quando a tarefa corresponder ao workflow descrito nela.
 - Use subagents para exploração ou revisão isolada quando o volume de contexto ou o risco justificar; mantenha a edição e a decisão final no agente principal.
 - Hooks são guardrails determinísticos e não substituem análise de impacto nem testes.
@@ -85,7 +88,9 @@ Uma tarefa está concluída quando:
 - validações aplicáveis foram executadas ou a limitação foi documentada;
 - `git diff --check` não aponta problemas;
 - o diff não contém arquivos inesperados, artefatos, logs temporários ou segredos;
-- a resposta final informa exatamente o que foi e não foi validado.
+- a revisão de engenharia terminou em `PASS` ou `PASS WITH NOTES`;
+- não restam `BLOCKER`, `HIGH` ou `MEDIUM` introduzidos pela tarefa e ainda acionáveis dentro do escopo;
+- a resposta final informa exatamente o que foi e não foi validado e o veredito da revisão.
 
 ## Graphify — consulta e atualização do grafo
 
