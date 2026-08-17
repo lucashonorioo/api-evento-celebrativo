@@ -20,6 +20,12 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
 
     boolean existsByPersonIdAndMinistryType(Long personId, MinistryType ministryType);
 
+    /**
+     * Usada pela autorização escopada de domínio ({@code MinistryAuthorizationService}) para decidir,
+     * a cada requisição, se a Person autenticada pode administrar o MinistryType informado.
+     */
+    boolean existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(Long personId, MinistryType ministryType);
+
     Optional<PersonMinistry> findByPersonIdAndMinistryType(Long personId, MinistryType ministryType);
 
     List<PersonMinistry> findAllByPersonId(Long personId);
