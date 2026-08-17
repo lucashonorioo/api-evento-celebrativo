@@ -28,18 +28,28 @@ description: Implementa feature, correção ou refatoração focada no backend J
 
 ## Testes
 
-Escolha a camada adequada:
+Escolha a camada adequada ao comportamento e risco:
 
-- service com JUnit e Mockito;
+- service com JUnit/Mockito;
 - controller com MockMvc;
 - repository com `@DataJpaTest`;
 - autorização quando segurança mudar;
-- regressão para correção de bug, quando viável.
+- regressão para correção de bug quando viável.
 
-Cubra sucesso e erros relevantes ao risco. Execute primeiro testes específicos e depois a suíte backend proporcional ao risco.
+Execute primeiro testes específicos e depois a suíte backend proporcional ao risco.
 
-## Revisão e entrega
+## Gate de conclusão obrigatório
 
-Para risco médio ou alto, use `backend-reviewer`; inclua `security-reviewer` em autenticação, roles, JWT, CORS ou exposição de endpoint e `test-reviewer` quando a mudança atravessar várias camadas.
+Depois da última alteração relevante de código:
 
-Reporte arquivos, comportamento, decisões, dados/migrations afetados, comandos, resultados e limitações reais.
+1. use `validate-project`;
+2. use `review-change` como revisão independente de engenharia;
+3. se o veredito for `CHANGES_REQUIRED`, corrija somente achados acionáveis relacionados à tarefa;
+4. repita validações afetadas e `review-change` depois de qualquer correção;
+5. conclua somente com `PASS` ou `PASS WITH NOTES`.
+
+O agente implementador integra as correções; os reviewers permanecem somente leitura. Não trate testes passando como substituto da revisão e não amplie a tarefa para dívida preexistente sem relação.
+
+## Entrega
+
+Reporte comportamento, arquivos relevantes, decisões, dados/migrations afetados, comandos/resultados, veredito da revisão de engenharia e limitações reais.

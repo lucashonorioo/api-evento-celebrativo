@@ -58,3 +58,7 @@ Quando houver alterações frontend:
 ## Resultado
 
 Entregue uma matriz curta com comando, resultado e observação. Informe riscos não validados.
+
+## Relação com a revisão de engenharia
+
+`validate-project` comprova build, testes e verificações executáveis; ela não substitui `review-change`. Quando houver alteração de implementação, a conclusão exige validação seguida de revisão independente conforme `.ai/review/ENGINEERING_REVIEW.md`.

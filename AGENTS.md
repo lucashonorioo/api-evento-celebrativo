@@ -44,8 +44,10 @@ Em uma alteração full stack, leia ambos antes de editar. Esta leitura é obrig
 4. Confirme contratos e comportamento existente por código e testes.
 5. Implemente uma alteração mínima e coerente.
 6. Atualize testes relevantes.
-7. Execute validações proporcionais ao risco.
-8. Revise o diff e reporte resultados reais.
+7. Execute `validate-project` com validações proporcionais ao risco.
+8. Depois da última alteração relevante, execute `review-change` conforme `.ai/review/ENGINEERING_REVIEW.md`.
+9. Se a revisão retornar `CHANGES_REQUIRED`, corrija os achados relacionados à tarefa, revalide e revise novamente.
+10. Conclua somente com `PASS` ou `PASS WITH NOTES` e reporte resultados reais.
 
 ## Contratos backend/frontend
 
@@ -85,9 +87,11 @@ Em uma alteração full stack, leia ambos antes de editar. Esta leitura é obrig
 - Build e testes finais: `validate-project`.
 - Revisão de branch ou diff: `review-change`.
 
+A política comum de revisão está em `.ai/review/ENGINEERING_REVIEW.md`. Para qualquer alteração de implementação, `review-change` é um gate obrigatório de conclusão e não deve ser substituído apenas por build ou testes passando.
+
 ## Delegação para Subagents
 
-Use subagents em tarefas grandes quando houver frentes independentes. Exemplos:
+Quando o ambiente disponibilizar subagents, use-os em tarefas grandes quando houver frentes independentes. A ausência de subagents especializados não dispensa `review-change`, que continua responsável pela revisão completa. Exemplos:
 
 - `codebase_explorer`: mapear fluxo e arquivos antes da implementação;
 - `backend_reviewer`: revisar Java/Spring;
@@ -107,7 +111,9 @@ Uma tarefa só está concluída quando:
 - build/testes aplicáveis foram executados ou a limitação foi documentada;
 - `git diff --check` não aponta problemas;
 - o diff foi revisado quanto a arquivos inesperados e segredos;
-- a resposta final informa exatamente o que foi validado.
+- a revisão de engenharia terminou em `PASS` ou `PASS WITH NOTES`;
+- não restam `BLOCKER`, `HIGH` ou `MEDIUM` introduzidos pela tarefa e ainda acionáveis dentro do escopo;
+- a resposta final informa exatamente o que foi validado e o veredito da revisão.
 
 ## graphify
 

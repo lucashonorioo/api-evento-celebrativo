@@ -1,6 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\" --session-start"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
@@ -46,6 +56,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/post-edit-check.mjs\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\""
           }
         ]
       }

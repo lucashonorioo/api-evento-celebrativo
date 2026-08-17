@@ -20,10 +20,15 @@ Encontre a causa raiz com evidência reproduzível antes de alterar código e pr
 9. Adicione teste de regressão quando viável.
 10. Execute validações específicas e depois amplas conforme o risco.
 
-## Delegação
+## Gate de conclusão obrigatório
 
-Em bugs complexos, use `codebase-explorer` para mapear o fluxo e um reviewer especializado para validar a hipótese. Não delegue escritas paralelas.
+Se a investigação resultar em alteração de código, teste, contrato, migration ou configuração executável:
+
+1. use `validate-project` depois da correção;
+2. use `review-change` depois da última alteração;
+3. trate `CHANGES_REQUIRED` antes de concluir;
+4. após qualquer ajuste motivado pela revisão, revalide e revise novamente.
 
 ## Saída
 
-Informe sintomas, reprodução, causa raiz, evidência, correção, regressão, comandos executados e incertezas restantes.
+Informe sintomas, reprodução, causa raiz, evidência, correção, teste de regressão, comandos executados, veredito da revisão de engenharia e incertezas restantes.
