@@ -1,5 +1,6 @@
 package com.eventoscelebrativos.service;
 
+import com.eventoscelebrativos.dto.request.ParishProfileContactUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.ParishProfileUpdateRequestDTO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -158,6 +159,74 @@ class ParishProfileConcurrencyMySqlIntegrationTest {
         boolean matchesB = "Paróquia Concorrente B".equals(finalName) && "Diocese B".equals(finalDiocese);
         assertTrue(matchesA || matchesB,
                 "O estado final deve corresponder integralmente a uma das duas atualizacoes concorrentes, nunca a uma mistura dos dois requests");
+    }
+
+    /**
+     * Prova, contra MySQL 8.4 real, que o segundo caminho de escrita introduzido por esta feature
+     * (updateContact, usado pela secretaria) disputa o MESMO lock pessimista de findByIdForUpdate
+     * que o update administrativo completo, sem nunca produzir lost update: o estado final sempre
+     * corresponde a uma ordem serial valida (admin depois secretaria, ou secretaria depois admin),
+     * e name/diocese - campos que updateContact nunca toca - permanecem sempre os valores definidos
+     * pelo update administrativo.
+     */
+    @Test
+    void shouldSerializeAdminFullUpdateWithSecretaryContactUpdateWithoutLostUpdate() throws Exception {
+        parishProfileService.update(new ParishProfileUpdateRequestDTO(
+                "Paróquia Concorrência Mista", "Diocese Mista", null, null, null, null));
+
+        ParishProfileUpdateRequestDTO adminRequest = new ParishProfileUpdateRequestDTO(
+                "Paróquia Concorrência Mista", "Diocese Mista", "34955550000", null, null, null);
+        ParishProfileContactUpdateRequestDTO secretaryRequest = new ParishProfileContactUpdateRequestDTO(
+                "34966660000", null, null, null);
+
+        AtomicInteger successes = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+
+            Runnable adminTask = () -> {
+                ready.countDown();
+                await(ready, start);
+                parishProfileService.update(adminRequest);
+                successes.incrementAndGet();
+            };
+            Runnable secretaryTask = () -> {
+                ready.countDown();
+                await(ready, start);
+                parishProfileService.updateContact(secretaryRequest);
+                successes.incrementAndGet();
+            };
+
+            var futureAdmin = executor.submit(adminTask);
+            var futureSecretary = executor.submit(secretaryTask);
+            ready.await(5, TimeUnit.SECONDS);
+            start.countDown();
+            futureAdmin.get(15, TimeUnit.SECONDS);
+            futureSecretary.get(15, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(2, successes.get(), "As duas atualizacoes concorrentes devem serializar e concluir com sucesso");
+
+        Integer rowCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_parish_profile", Integer.class);
+        assertEquals(1, rowCount, "Nunca deve existir mais de uma linha na tabela singleton");
+
+        String finalName = jdbcTemplate.queryForObject("SELECT name FROM tb_parish_profile WHERE id = 1", String.class);
+        String finalDiocese = jdbcTemplate.queryForObject("SELECT diocese FROM tb_parish_profile WHERE id = 1", String.class);
+        assertEquals("Paróquia Concorrência Mista", finalName,
+                "updateContact nunca deve alterar o nome, mesmo sob corrida com o update administrativo");
+        assertEquals("Diocese Mista", finalDiocese,
+                "updateContact nunca deve alterar a diocese, mesmo sob corrida com o update administrativo");
+
+        String finalPhone = jdbcTemplate.queryForObject(
+                "SELECT institutional_phone FROM tb_parish_profile WHERE id = 1", String.class);
+        boolean matchesAdminLast = "34955550000".equals(finalPhone);
+        boolean matchesSecretaryLast = "34966660000".equals(finalPhone);
+        assertTrue(matchesAdminLast || matchesSecretaryLast,
+                "O telefone final deve corresponder integralmente a uma das duas atualizacoes concorrentes, "
+                        + "nunca a um estado misto ou corrompido");
     }
 
     private void await(CountDownLatch ready, CountDownLatch start) {

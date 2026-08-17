@@ -233,7 +233,11 @@ class EndpointSecurityTest {
     }
 
     @Test
-    @WithMockUser(roles = "OPERATOR")
+    // POST /locais agora avalia @parishAuthorizationService.canPerformSecretaryOperations(), que
+    // exige um principal AuthenticatedUser real (via AuthenticatedUserResolver); @WithMockUser produz
+    // um UserDetails genérico incompatível, então este teste passa a usar @WithMockAuthenticatedUser
+    // para simular fielmente um ROLE_OPERATOR autenticado sem nenhuma responsabilidade paroquial.
+    @WithMockAuthenticatedUser(authorities = {"ROLE_OPERATOR"})
     void shouldRejectOperatorOnAdministrativeEndpoints() throws Exception {
         mockMvc.perform(post("/locais")
                         .contentType(MediaType.APPLICATION_JSON)

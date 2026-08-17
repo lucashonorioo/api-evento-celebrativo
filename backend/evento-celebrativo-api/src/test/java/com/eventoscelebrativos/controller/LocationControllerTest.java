@@ -4,11 +4,16 @@ import com.eventoscelebrativos.dto.response.LocationResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.service.LocationService;
+import com.eventoscelebrativos.service.ParishAuthorizationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(LocationController.class)
 @WithMockUser(roles = "ADMIN")
+@Import(LocationControllerTest.MethodSecurityConfig.class)
 class LocationControllerTest {
 
     @Autowired
@@ -31,6 +37,23 @@ class LocationControllerTest {
 
     @MockitoBean
     private LocationService locationService;
+
+    @MockitoBean(name = "parishAuthorizationService")
+    private ParishAuthorizationService parishAuthorizationService;
+
+    // Este slice test mocka o service de negócio, não a resolução real de AuthenticatedUser; por
+    // isso o bean de autorização também é mockado. Default true reflete o contexto ADMIN da classe
+    // (@WithMockUser(roles = "ADMIN")); os testes que simulam ROLE_OPERATOR sem secretaria sobrescrevem
+    // para false.
+    @BeforeEach
+    void grantSecretaryOperationsByDefault() {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(true);
+    }
+
+    @TestConfiguration
+    @EnableMethodSecurity
+    static class MethodSecurityConfig {
+    }
 
     @Test
     void shouldReturnCreatedWhenPostingValidLocation() throws Exception {
@@ -121,6 +144,28 @@ class LocationControllerTest {
         mockMvc.perform(delete("/locais/1").with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorPostsLocationWithoutSecretaryResponsibility() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
+        mockMvc.perform(post("/locais").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(validPayload("Igreja Matriz")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(locationService);
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorUpdatesLocationWithoutSecretaryResponsibility() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
+        mockMvc.perform(put("/locais/1").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(validPayload("Igreja Atualizada")))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(locationService);
     }
 
     private LocationResponseDTO response(String churchName) {

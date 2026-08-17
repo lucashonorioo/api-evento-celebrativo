@@ -56,9 +56,10 @@ public class CelebrationEventController {
         this.scheduleUnavailabilityConflictService = scheduleUnavailabilityConflictService;
     }
 
-    @Operation(summary = "Cria um evento celebrativo")
+    @Operation(summary = "Cria um evento celebrativo sem escala. Permitido para ROLE_ADMIN ou ROLE_OPERATOR com "
+            + "responsabilidade de secretaria paroquial ativa.")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
     @PostMapping
     public ResponseEntity<CelebrationEventResponseDTO> createEvent(@Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.createEvent(celebrationEventRequestDTO);
@@ -162,9 +163,10 @@ public class CelebrationEventController {
         return ResponseEntity.ok(celebrationEventScaleParticipationDetailResponseDTO);
     }
 
-    @Operation(summary = "Atualiza um evento celebrativo")
+    @Operation(summary = "Atualiza os dados básicos de um evento celebrativo (não altera escala). Permitido para "
+            + "ROLE_ADMIN ou ROLE_OPERATOR com responsabilidade de secretaria paroquial ativa.")
     @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
     @PutMapping(value = "/{id}")
     public ResponseEntity<CelebrationEventResponseDTO> updateEvent(@PathVariable Long id, @Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.updateEvent(id, celebrationEventRequestDTO);
