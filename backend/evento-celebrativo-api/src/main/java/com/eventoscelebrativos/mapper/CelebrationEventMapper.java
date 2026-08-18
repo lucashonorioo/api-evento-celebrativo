@@ -13,12 +13,16 @@ import java.util.List;
 public interface CelebrationEventMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "status", ignore = true)
     CelebrationEvent toEntity(CelebrationEventRequestDTO celebrationEventRequestDTO);
 
     CelebrationEventResponseDTO toDto(CelebrationEvent celebrationEvent);
 
     List<CelebrationEventResponseDTO> toDtoList(List<CelebrationEvent> celebrationEvents);
 
+    // status e um estado de lifecycle exclusivo de CelebrationEventLifecycleService; o mapper de
+    // request administrativo comum (criacao/edicao de dados basicos) nunca o altera.
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "status", ignore = true)
     void updateCelebrationEventMapperFromDto(CelebrationEventRequestDTO celebrationEventRequestDTO, @MappingTarget CelebrationEvent celebrationEvent);
 }

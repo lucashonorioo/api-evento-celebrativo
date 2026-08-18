@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.dto.response;
 
+import com.eventoscelebrativos.model.CelebrationEventStatus;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +14,7 @@ public class CelebrationEventScaleResponseDTO {
     /** Termino previsto do compromisso para planejamento de disponibilidade e escala. */
     private LocalDateTime endAt;
     private Boolean massOrCelebration;
+    private CelebrationEventStatus status;
     private CelebrationEventScaleLocationResponseDTO location;
     private CelebrationEventScalePersonResponseDTO priest;
     private List<CelebrationEventScalePersonResponseDTO> readers = new ArrayList<>();
@@ -57,6 +60,14 @@ public class CelebrationEventScaleResponseDTO {
 
     public void setMassOrCelebration(Boolean massOrCelebration) {
         this.massOrCelebration = massOrCelebration;
+    }
+
+    public CelebrationEventStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(CelebrationEventStatus status) {
+        this.status = status;
     }
 
     public CelebrationEventScaleLocationResponseDTO getLocation() {

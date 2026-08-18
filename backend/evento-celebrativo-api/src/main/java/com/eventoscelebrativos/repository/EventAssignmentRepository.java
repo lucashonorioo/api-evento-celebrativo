@@ -41,6 +41,7 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
                     WHERE ea.person_id = :personId
                     AND ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
+                    AND ce.status = 'ACTIVE'
                     GROUP BY
                         ce.id,
                         ce.name_mass_or_event,
@@ -56,6 +57,7 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
                     WHERE ea.person_id = :personId
                     AND ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
+                    AND ce.status = 'ACTIVE'
                     """,
             nativeQuery = true)
     Page<PersonScheduleEventProjection> findScheduleEventsByPersonId(
@@ -116,6 +118,7 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             WHERE a.person.id = :personId
               AND a.event.startAt < :endAt
               AND a.event.endAt > :startAt
+              AND a.event.status = com.eventoscelebrativos.model.CelebrationEventStatus.ACTIVE
             """)
     List<PersonUnavailabilityAssignmentConflictProjection> findAssignmentConflictsByPersonIdAndRange(
             @Param("personId") Long personId,
@@ -128,16 +131,18 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
     boolean existsByEvent_IdAndPerson_Id(Long eventId, Long personId);
 
     /**
-     * EventIds distintos aos quais a pessoa esta atribuida e cujo evento ainda nao encerrou
-     * (endAt > currentSecond), em ordem crescente. Usada apos criar uma indisponibilidade para saber
-     * quais eventos reconciliar (secao 12); a verificacao de sobreposicao real e feita pelo proprio
-     * reconciliador por evento, nao aqui.
+     * EventIds distintos aos quais a pessoa esta atribuida, cujo evento ainda nao encerrou
+     * (endAt > currentSecond) e esta ACTIVE, em ordem crescente. Usada apos criar uma indisponibilidade
+     * para saber quais eventos reconciliar (secao 12); a verificacao de sobreposicao real e feita pelo
+     * proprio reconciliador por evento, nao aqui. Evento CANCELLED nao e candidato a reconciliacao: o
+     * proprio reconciliador ja e status-aware, mas filtrar aqui evita reconcile() desnecessario.
      */
     @Query("""
             SELECT DISTINCT a.event.id
             FROM EventAssignment a
             WHERE a.person.id = :personId
               AND a.event.endAt > :currentSecond
+              AND a.event.status = com.eventoscelebrativos.model.CelebrationEventStatus.ACTIVE
             ORDER BY a.event.id ASC
             """)
     List<Long> findEventIdsByPersonIdAndEndAtAfter(
@@ -146,9 +151,10 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
     );
 
     /**
-     * Assignments ativos ou futuros (endAt > currentSecond) de uma pessoa, com os dados do evento
-     * necessarios para a resposta estruturada de {@link com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException}.
-     * Consulta unica (sem exists seguido de detalhe): lista vazia significa ausencia de bloqueio.
+     * Assignments ativos ou futuros (endAt > currentSecond, evento ACTIVE) de uma pessoa, com os dados
+     * do evento necessarios para a resposta estruturada de {@link com.eventoscelebrativos.exception.exceptions.PersonHasActiveAssignmentsException}.
+     * Consulta unica (sem exists seguido de detalhe): lista vazia significa ausencia de bloqueio. Um
+     * assignment de evento CANCELLED nunca e, sozinho, um compromisso operacional ativo/futuro.
      */
     @Query("""
             SELECT a.event.id AS eventId, a.event.nameMassOrEvent AS eventName, a.event.startAt AS startAt,
@@ -156,6 +162,7 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             FROM EventAssignment a
             WHERE a.person.id = :personId
               AND a.event.endAt > :currentSecond
+              AND a.event.status = com.eventoscelebrativos.model.CelebrationEventStatus.ACTIVE
             ORDER BY a.event.startAt ASC, a.event.id ASC, a.assignmentType ASC
             """)
     List<PersonUnavailabilityAssignmentConflictProjection> findActiveOrFutureAssignmentsByPersonId(

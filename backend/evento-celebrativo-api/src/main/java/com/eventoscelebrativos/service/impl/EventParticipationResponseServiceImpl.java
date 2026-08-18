@@ -5,6 +5,7 @@ import com.eventoscelebrativos.dto.response.ParticipationResponseResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ConflictException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.ParticipationResponseMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
@@ -66,8 +67,18 @@ public class EventParticipationResponseServiceImpl implements EventParticipation
         Person person = personRepository.findById(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
 
-        CelebrationEvent event = celebrationEventRepository.findById(eventId)
+        // Lock do evento ANTES do assignment (mesma ordem global usada em todo o dominio: Event ->
+        // Assignment), para serializar corretamente com um cancelamento concorrente (secao 24): quem
+        // vencer o lock decide o resultado da corrida, sem leitura simples de status antes do lock.
+        CelebrationEvent event = celebrationEventRepository.findByIdForUpdate(eventId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento celebrativo", eventId));
+
+        if (event.isCancelled()) {
+            throw new LifecycleConflictException(
+                    "Nao e possivel responder a participacao de um evento cancelado.",
+                    "CELEBRATION_EVENT_CANCELLED_PARTICIPATION_REJECTED"
+            );
+        }
 
         List<EventAssignment> lockedAssignments =
                 eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(eventId, person.getId());

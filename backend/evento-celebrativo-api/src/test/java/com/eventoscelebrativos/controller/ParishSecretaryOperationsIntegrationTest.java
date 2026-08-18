@@ -37,9 +37,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Prova, com Spring Security e banco H2 reais (ParishAuthorizationServiceImpl não mockado), a matriz
- * de autorização da feature de secretaria paroquial sobre os cinco endpoints liberados nesta branch
- * (PUT /paroquia/contato, POST/PUT /locais, POST/PUT /eventos) e a regressão explícita dos endpoints
- * que continuam exclusivos de ROLE_ADMIN (POST /eventos/com-escala, PUT /eventos/{id}/escala,
+ * de autorização sobre os endpoints protegidos por {@code canPerformSecretaryOperations()}: os cinco
+ * liberados em feature/parish-secretary-management (PUT /paroquia/contato, POST/PUT /locais,
+ * POST/PUT /eventos) e os dois de lifecycle liberados em feature/celebration-cancellation-lifecycle
+ * (PUT e DELETE /eventos/{id}/cancelamento). Cobre também a regressão explícita dos endpoints que
+ * continuam exclusivos de ROLE_ADMIN (POST /eventos/com-escala, PUT /eventos/{id}/escala,
  * DELETE /locais/{id}, DELETE /eventos/{id}). Cada teste cria suas próprias pessoas e recursos
  * isolados para não depender da ordem de execução em relação a outras classes que compartilham o
  * mesmo contexto/banco.
@@ -214,6 +216,29 @@ class ParishSecretaryOperationsIntegrationTest {
     }
 
     @Test
+    void revokingSecretaryImmediatelyBlocksCancelOperationWithoutReissuingPrincipal() throws Exception {
+        RequestPostProcessor admin = asUser(ADMIN_PERSON_ID, "ROLE_ADMIN");
+        long eventId = createEvent(admin, "Evento Revogacao Cancelamento");
+
+        long secretaryPersonId = createSecretary("Secretaria Revogacao Cancelamento", true);
+        RequestPostProcessor secretary = asUser(secretaryPersonId, "ROLE_OPERATOR");
+
+        mockMvc.perform(put("/eventos/" + eventId + "/cancelamento").with(secretary))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        ParishStaffAssignment assignment = parishStaffAssignmentRepository
+                .findByPersonIdAndResponsibility(secretaryPersonId, ParishResponsibilityType.PARISH_SECRETARY)
+                .orElseThrow();
+        assignment.deactivate();
+        parishStaffAssignmentRepository.saveAndFlush(assignment);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/eventos/" + eventId + "/cancelamento").with(secretary))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void adminOnlyEndpointsRemainForbiddenForActiveSecretary() throws Exception {
         RequestPostProcessor admin = asUser(ADMIN_PERSON_ID, "ROLE_ADMIN");
         ensureParishProfileConfigured(admin);
@@ -371,6 +396,14 @@ class ParishSecretaryOperationsIntegrationTest {
         mockMvc.perform(withActor(put("/eventos/" + eventId), actor)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(eventPayload("Evento Matriz Atualizado")))
+                .andExpect(status().is(putStatus));
+
+        mockMvc.perform(withActor(put("/eventos/" + eventId + "/cancelamento"), actor))
+                .andExpect(status().is(putStatus));
+
+        mockMvc.perform(withActor(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/eventos/" + eventId + "/cancelamento"),
+                        actor))
                 .andExpect(status().is(putStatus));
     }
 

@@ -38,6 +38,7 @@ public interface ScheduleUnavailabilityConflictRepository extends JpaRepository<
                     INNER JOIN tb_person p ON p.id = ea.person_id
                     WHERE ea.event_id = :eventId
                     AND ce.end_at > :currentSecond
+                    AND ce.status = 'ACTIVE'
                     AND EXISTS (
                         SELECT 1
                         FROM tb_person_unavailability pu
@@ -69,6 +70,7 @@ public interface ScheduleUnavailabilityConflictRepository extends JpaRepository<
                     WHERE ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
                     AND ce.end_at > :currentSecond
+                    AND ce.status = 'ACTIVE'
                     AND EXISTS (
                         SELECT 1
                         FROM tb_person_unavailability pu
@@ -85,6 +87,7 @@ public interface ScheduleUnavailabilityConflictRepository extends JpaRepository<
                     WHERE ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
                     AND ce.end_at > :currentSecond
+                    AND ce.status = 'ACTIVE'
                     AND EXISTS (
                         SELECT 1
                         FROM tb_person_unavailability pu

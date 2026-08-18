@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -85,7 +86,7 @@ class EventParticipationResponseServiceImplTest {
         Person person = person(10L, "34970000001");
         CelebrationEvent event = futureEvent(15L);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
@@ -206,7 +207,7 @@ class EventParticipationResponseServiceImplTest {
     void shouldReturnNotFoundWhenEventDoesNotExist() {
         Person person = person(10L, "34970000012");
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.empty());
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
     }
@@ -216,10 +217,26 @@ class EventParticipationResponseServiceImplTest {
         Person person = person(10L, "34970000013");
         CelebrationEvent event = futureEvent(15L);
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L)).thenReturn(List.of());
 
         assertThrows(ConflictException.class, () -> service.respond(10L, 15L, request("CONFIRMED", null)));
+        verify(eventParticipationResponseRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectParticipationResponseWhenEventIsCancelled() {
+        Person person = person(10L, "34970000014");
+        CelebrationEvent event = futureEvent(15L);
+        event.cancel();
+        when(personRepository.findById(10L)).thenReturn(Optional.of(person));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
+
+        com.eventoscelebrativos.exception.exceptions.LifecycleConflictException exception = assertThrows(
+                com.eventoscelebrativos.exception.exceptions.LifecycleConflictException.class,
+                () -> service.respond(10L, 15L, request("CONFIRMED", null)));
+        assertEquals("CELEBRATION_EVENT_CANCELLED_PARTICIPATION_REJECTED", exception.getErrorCode());
+        verify(eventAssignmentRepository, never()).findAllByEventIdAndPersonIdForUpdate(anyLong(), anyLong());
         verify(eventParticipationResponseRepository, never()).save(any());
     }
 
@@ -323,7 +340,7 @@ class EventParticipationResponseServiceImplTest {
         Person person = person(10L, "34970000021");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0));
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0));
@@ -337,7 +354,7 @@ class EventParticipationResponseServiceImplTest {
         Person person = person(10L, "34970000022");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0));
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 1));
@@ -363,7 +380,7 @@ class EventParticipationResponseServiceImplTest {
         Person person = person(10L, "34970000026");
         CelebrationEvent event = eventAt(15L, LocalDate.of(2026, 7, 1), LocalTime.of(19, 0, 0));
         when(personRepository.findById(10L)).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, person)));
         service = newServiceAt(LocalDateTime.of(2026, 7, 1, 19, 0, 0, 100_000_000));
@@ -390,7 +407,7 @@ class EventParticipationResponseServiceImplTest {
         Person personB = person(11L, "34970000025");
         CelebrationEvent event = futureEvent(15L);
         when(personRepository.findById(10L)).thenReturn(Optional.of(personA));
-        when(celebrationEventRepository.findById(15L)).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(15L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(15L, 10L))
                 .thenReturn(List.of(assignment(event, personA)));
         when(eventParticipationResponseRepository.findByEventIdAndPersonId(15L, 10L)).thenReturn(Optional.empty());
@@ -424,7 +441,7 @@ class EventParticipationResponseServiceImplTest {
 
     private void mockAssignedPerson(Person person, CelebrationEvent event) {
         when(personRepository.findById(person.getId())).thenReturn(Optional.of(person));
-        when(celebrationEventRepository.findById(event.getId())).thenReturn(Optional.of(event));
+        when(celebrationEventRepository.findByIdForUpdate(event.getId())).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdAndPersonIdForUpdate(event.getId(), person.getId()))
                 .thenReturn(List.of(assignment(event, person)));
     }

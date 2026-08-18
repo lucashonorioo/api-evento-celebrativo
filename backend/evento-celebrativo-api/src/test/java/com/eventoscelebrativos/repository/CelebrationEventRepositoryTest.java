@@ -135,6 +135,33 @@ class CelebrationEventRepositoryTest {
     }
 
     @Test
+    void shouldExcludeCancelledEventFromEucharistScaleAndItsCount() {
+        Long personId = insertPerson("Reader Serving Eucharist Cancelled");
+        Long eventId = insertEvent("Parallel Eucharist Cancelled", LocalDate.of(2026, 3, 9));
+        Long locationId = firstLocationId();
+        jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                eventId,
+                personId,
+                EventAssignmentType.EUCHARISTIC_MINISTER.name()
+        );
+        jdbcTemplate.update("UPDATE tb_celebration_event SET status = 'CANCELLED' WHERE id = ?", eventId);
+
+        Page<EucharistScaleEventProjection> result = eventRepository.findEucharistScaleByAssignments(
+                PageRequest.of(0, 10),
+                rs(LocalDate.of(2026, 3, 9)),
+                re(LocalDate.of(2026, 3, 9))
+        );
+
+        Assertions.assertEquals(0, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
     void shouldFindParallelScheduleEventsForEachAssignmentType() {
         for (EventScheduleType type : EventScheduleType.values()) {
             Page<EventScheduleEventProjection> result = findParallelSchedule(type, false);
@@ -195,6 +222,35 @@ class CelebrationEventRepositoryTest {
         Assertions.assertEquals(3, result.getTotalElements());
         Assertions.assertTrue(result.getContent().stream()
                 .anyMatch(event -> assignments.stream().noneMatch(assignment -> assignment.getEventId().equals(event.getEventId()))));
+    }
+
+    @Test
+    void shouldExcludeCancelledEventFromParallelScheduleAndItsCount() {
+        Long personId = insertPerson("Commentator Cancelled Schedule");
+        Long eventId = insertEvent("Parallel Monthly Cancelled", LocalDate.of(2026, 3, 11));
+        Long locationId = firstLocationId();
+        jdbcTemplate.update("INSERT INTO tb_event_location(event_id, location_id) VALUES (?, ?)", eventId, locationId);
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_event_assignment(event_id, person_id, assignment_type, created_at, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                eventId,
+                personId,
+                EventAssignmentType.COMMENTATOR.name()
+        );
+        jdbcTemplate.update("UPDATE tb_celebration_event SET status = 'CANCELLED' WHERE id = ?", eventId);
+
+        Page<EventScheduleEventProjection> result = eventRepository.findEventScheduleEventsByAssignments(
+                PageRequest.of(0, 10),
+                rs(LocalDate.of(2026, 3, 11)),
+                re(LocalDate.of(2026, 3, 11)),
+                EventAssignmentType.COMMENTATOR.name(),
+                false
+        );
+
+        Assertions.assertEquals(0, result.getTotalElements());
+        Assertions.assertTrue(result.getContent().isEmpty());
     }
 
     @Test
