@@ -64,6 +64,43 @@ class ScheduleUnavailabilityConflictRepositoryTest {
     }
 
     @Test
+    void shouldNotReturnConflictForCancelledEventByEventId() {
+        Person reader = savePerson("Conflict Key Cancelled Reader");
+        CelebrationEvent event = saveEvent("Conflict Key Cancelled Event", LocalDateTime.of(2026, 9, 4, 19, 0), LocalDateTime.of(2026, 9, 4, 20, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        saveUnavailability(reader, LocalDateTime.of(2026, 9, 4, 19, 30), LocalDateTime.of(2026, 9, 4, 21, 0));
+        event.cancel();
+        entityManager.persist(event);
+        entityManager.flush();
+
+        List<ScheduleUnavailabilityConflictKeyProjection> result =
+                scheduleUnavailabilityConflictRepository.findConflictsByEventId(event.getId(), LocalDateTime.of(2026, 8, 1, 0, 0));
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldNotReturnConflictForCancelledEventByRange() {
+        Person reader = savePerson("Conflict Range Cancelled Reader");
+        CelebrationEvent event = saveEvent("Conflict Range Cancelled Event", LocalDateTime.of(2026, 9, 5, 19, 0), LocalDateTime.of(2026, 9, 5, 20, 0));
+        saveAssignment(event, reader, EventAssignmentType.READER);
+        saveUnavailability(reader, LocalDateTime.of(2026, 9, 5, 19, 30), LocalDateTime.of(2026, 9, 5, 21, 0));
+        event.cancel();
+        entityManager.persist(event);
+        entityManager.flush();
+
+        Page<ScheduleUnavailabilityConflictKeyProjection> result = scheduleUnavailabilityConflictRepository.findConflictsByRange(
+                LocalDateTime.of(2026, 9, 1, 0, 0),
+                LocalDateTime.of(2026, 9, 30, 0, 0),
+                LocalDateTime.of(2026, 8, 1, 0, 0),
+                PageRequest.of(0, 10)
+        );
+
+        assertEquals(0, result.getTotalElements());
+        assertTrue(result.getContent().isEmpty());
+    }
+
+    @Test
     void shouldNotReturnConflictForEndedEvent() {
         Person reader = savePerson("Conflict Key Ended Reader");
         CelebrationEvent event = saveEvent("Conflict Key Ended Event", LocalDateTime.of(2026, 9, 3, 19, 0), LocalDateTime.of(2026, 9, 3, 20, 0));

@@ -12,6 +12,7 @@ import com.eventoscelebrativos.dto.response.EucharistScaleEventResponseDTO;
 import com.eventoscelebrativos.dto.response.ScheduleUnavailabilityConflictResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.model.EventScheduleType;
+import com.eventoscelebrativos.service.CelebrationEventLifecycleService;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.service.ScheduleUnavailabilityConflictService;
 import com.eventoscelebrativos.config.OpenApiConfig;
@@ -46,13 +47,16 @@ public class CelebrationEventController {
                     .withResolverStyle(ResolverStyle.STRICT);
 
     private final CelebrationEventService celebrationEventService;
+    private final CelebrationEventLifecycleService celebrationEventLifecycleService;
     private final ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
 
     public CelebrationEventController(
             CelebrationEventService celebrationEventService,
+            CelebrationEventLifecycleService celebrationEventLifecycleService,
             ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService
     ) {
         this.celebrationEventService = celebrationEventService;
+        this.celebrationEventLifecycleService = celebrationEventLifecycleService;
         this.scheduleUnavailabilityConflictService = scheduleUnavailabilityConflictService;
     }
 
@@ -171,6 +175,33 @@ public class CelebrationEventController {
     public ResponseEntity<CelebrationEventResponseDTO> updateEvent(@PathVariable Long id, @Valid @RequestBody CelebrationEventRequestDTO celebrationEventRequestDTO){
         CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventService.updateEvent(id, celebrationEventRequestDTO);
         return ResponseEntity.ok().body(celebrationEventResponseDTO);
+    }
+
+    @Operation(summary = "Cancela um evento celebrativo futuro. Nao exclui fisicamente o evento, a escala, "
+            + "assignments ou respostas de participacao ja registradas. Idempotente: um evento ja CANCELLED "
+            + "permanece CANCELLED. Somente eventos ainda nao iniciados podem transicionar; um evento ja "
+            + "iniciado (ACTIVE ou CANCELLED) retorna 409. Permitido para ROLE_ADMIN ou ROLE_OPERATOR com "
+            + "responsabilidade de secretaria paroquial ativa.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
+    @PutMapping(value = "/{id}/cancelamento")
+    public ResponseEntity<CelebrationEventResponseDTO> cancelEvent(@PathVariable Long id) {
+        CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventLifecycleService.cancel(id);
+        return ResponseEntity.ok(celebrationEventResponseDTO);
+    }
+
+    @Operation(summary = "Reativa (remove o cancelamento de) um evento celebrativo futuro. Idempotente: um "
+            + "evento ja ACTIVE permanece ACTIVE. Revalida a escala preservada durante o cancelamento: se "
+            + "algum participante estiver inativo ou sem a funcao ministerial ativa correspondente, a "
+            + "reativacao e recusada com 409 ate a escala ser corrigida em PUT /eventos/{id}/escala. Somente "
+            + "eventos ainda nao iniciados podem transicionar. Permitido para ROLE_ADMIN ou ROLE_OPERATOR com "
+            + "responsabilidade de secretaria paroquial ativa.")
+    @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+    @PreAuthorize("@parishAuthorizationService.canPerformSecretaryOperations()")
+    @DeleteMapping(value = "/{id}/cancelamento")
+    public ResponseEntity<CelebrationEventResponseDTO> reactivateEvent(@PathVariable Long id) {
+        CelebrationEventResponseDTO celebrationEventResponseDTO = celebrationEventLifecycleService.reactivate(id);
+        return ResponseEntity.ok(celebrationEventResponseDTO);
     }
 
     @Operation(summary = "Atualiza a escala de um evento celebrativo")

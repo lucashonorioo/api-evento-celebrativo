@@ -34,6 +34,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     INNER JOIN tb_location l ON l.id = el.location_id
                     WHERE ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
+                    AND ce.status = 'ACTIVE'
                     AND EXISTS (
                         SELECT 1
                         FROM tb_event_assignment ea
@@ -60,6 +61,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                         INNER JOIN tb_location l ON l.id = el.location_id
                         WHERE ce.start_at < :rangeEnd
                         AND ce.end_at > :rangeStart
+                        AND ce.status = 'ACTIVE'
                         AND EXISTS (
                             SELECT 1
                             FROM tb_event_assignment ea
@@ -108,6 +110,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     LEFT JOIN tb_location l ON l.id = el.location_id
                     WHERE ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
+                    AND ce.status = 'ACTIVE'
                     AND (
                         :includeUnassigned = TRUE
                         OR EXISTS (
@@ -130,6 +133,7 @@ public interface CelebrationEventRepository extends JpaRepository<CelebrationEve
                     FROM tb_celebration_event ce
                     WHERE ce.start_at < :rangeEnd
                     AND ce.end_at > :rangeStart
+                    AND ce.status = 'ACTIVE'
                     AND (
                         :includeUnassigned = TRUE
                         OR EXISTS (

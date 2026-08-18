@@ -84,7 +84,9 @@ public class ScheduleConflictNotificationServiceImpl implements ScheduleConflict
         boolean assigned = eventAssignmentRepository.existsByEvent_IdAndPerson_Id(eventId, personId);
         List<PersonUnavailability> overlapping =
                 personUnavailabilityRepository.findOverlapping(personId, event.getStartAt(), event.getEndAt());
-        boolean conflictExists = assigned && !overlapping.isEmpty() && event.getEndAt().isAfter(currentSecond);
+        // Evento CANCELLED nunca produz conflito operacional (secao 26): reconcile chamado apos um
+        // cancelamento resolve qualquer ocorrencia ativa; chamado apos reativacao, reavalia normalmente.
+        boolean conflictExists = event.isActive() && assigned && !overlapping.isEmpty() && event.getEndAt().isAfter(currentSecond);
 
         if (conflictExists && active.isEmpty()) {
             Person person = personRepository.findById(personId)

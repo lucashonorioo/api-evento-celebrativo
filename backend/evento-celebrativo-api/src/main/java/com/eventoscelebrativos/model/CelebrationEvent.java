@@ -34,6 +34,10 @@ public class CelebrationEvent implements Serializable {
 
     private Boolean massOrCelebration;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private CelebrationEventStatus status = CelebrationEventStatus.ACTIVE;
+
     @ManyToMany
     @JoinTable(
             name = "tb_event_location",
@@ -108,6 +112,34 @@ public class CelebrationEvent implements Serializable {
 
     public List<Location> getLocations() {
         return locations;
+    }
+
+    public CelebrationEventStatus getStatus() {
+        return status;
+    }
+
+    public boolean isActive() {
+        return status == CelebrationEventStatus.ACTIVE;
+    }
+
+    public boolean isCancelled() {
+        return status == CelebrationEventStatus.CANCELLED;
+    }
+
+    /**
+     * Transicao de dominio ACTIVE -&gt; CANCELLED. Nao apaga escala, assignments nem participation
+     * responses; a validade temporal da transicao e responsabilidade do caller (lifecycle service).
+     */
+    public void cancel() {
+        this.status = CelebrationEventStatus.CANCELLED;
+    }
+
+    /**
+     * Transicao de dominio CANCELLED -&gt; ACTIVE. A elegibilidade da escala atual (Person/PersonMinistry
+     * ainda ativos) e responsabilidade do caller (lifecycle service), nao desta entidade.
+     */
+    public void reactivate() {
+        this.status = CelebrationEventStatus.ACTIVE;
     }
 
 }

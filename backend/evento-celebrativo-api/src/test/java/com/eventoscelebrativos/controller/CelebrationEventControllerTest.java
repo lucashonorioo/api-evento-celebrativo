@@ -16,10 +16,13 @@ import com.eventoscelebrativos.dto.response.ScheduleUnavailabilityConflictRespon
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.LifecycleConflictException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.exception.exceptions.TemporalPrecisionNotSupportedException;
+import com.eventoscelebrativos.model.CelebrationEventStatus;
 import com.eventoscelebrativos.model.EventScheduleType;
 import com.eventoscelebrativos.model.ParticipationStatus;
+import com.eventoscelebrativos.service.CelebrationEventLifecycleService;
 import com.eventoscelebrativos.service.CelebrationEventService;
 import com.eventoscelebrativos.service.ParishAuthorizationService;
 import com.eventoscelebrativos.service.ScheduleUnavailabilityConflictService;
@@ -70,6 +73,9 @@ class CelebrationEventControllerTest {
 
     @MockitoBean
     private CelebrationEventService celebrationEventService;
+
+    @MockitoBean
+    private CelebrationEventLifecycleService celebrationEventLifecycleService;
 
     @MockitoBean
     private ScheduleUnavailabilityConflictService scheduleUnavailabilityConflictService;
@@ -318,6 +324,75 @@ class CelebrationEventControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(celebrationEventService);
+    }
+
+    @Test
+    void shouldReturnOkWhenCancellingEvent() throws Exception {
+        when(celebrationEventLifecycleService.cancel(1L)).thenReturn(response("Missa", CelebrationEventStatus.CANCELLED));
+
+        mockMvc.perform(put("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void shouldReturnOkWhenReactivatingEvent() throws Exception {
+        when(celebrationEventLifecycleService.reactivate(1L)).thenReturn(response("Missa", CelebrationEventStatus.ACTIVE));
+
+        mockMvc.perform(delete("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorCancelsCommonEvent() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
+        mockMvc.perform(put("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(celebrationEventLifecycleService);
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERATOR")
+    void shouldReturnForbiddenWhenOperatorReactivatesCommonEvent() throws Exception {
+        when(parishAuthorizationService.canPerformSecretaryOperations()).thenReturn(false);
+
+        mockMvc.perform(delete("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(celebrationEventLifecycleService);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenCancellingUnknownEvent() throws Exception {
+        when(celebrationEventLifecycleService.cancel(99L)).thenThrow(new ResourceNotFoundException("Evento celebrativo", 99L));
+
+        mockMvc.perform(put("/eventos/99/cancelamento").with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturnConflictWhenCancellingEventThatAlreadyStarted() throws Exception {
+        when(celebrationEventLifecycleService.cancel(1L)).thenThrow(
+                new LifecycleConflictException("Nao e possivel alterar o lifecycle de um evento que ja iniciou.",
+                        "CELEBRATION_EVENT_LIFECYCLE_ALREADY_STARTED"));
+
+        mockMvc.perform(put("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CELEBRATION_EVENT_LIFECYCLE_ALREADY_STARTED"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenReactivatingEventWithInvalidScale() throws Exception {
+        when(celebrationEventLifecycleService.reactivate(1L)).thenThrow(
+                new LifecycleConflictException("Escala invalida.", "CELEBRATION_EVENT_REACTIVATION_INVALID_SCALE"));
+
+        mockMvc.perform(delete("/eventos/1/cancelamento").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CELEBRATION_EVENT_REACTIVATION_INVALID_SCALE"));
     }
 
     @Test
@@ -920,7 +995,11 @@ class CelebrationEventControllerTest {
     }
 
     private CelebrationEventResponseDTO response(String nameMassOrEvent) {
-        return new CelebrationEventResponseDTO(1L, nameMassOrEvent, EVENT_START_AT, EVENT_END_AT, true);
+        return response(nameMassOrEvent, CelebrationEventStatus.ACTIVE);
+    }
+
+    private CelebrationEventResponseDTO response(String nameMassOrEvent, CelebrationEventStatus status) {
+        return new CelebrationEventResponseDTO(1L, nameMassOrEvent, EVENT_START_AT, EVENT_END_AT, true, status);
     }
 
     private CelebrationEventScaleResponseDTO scaleResponse() {

@@ -588,6 +588,90 @@ class EventAssignmentRepositoryTest {
         assertTrue(statistics.getPrepareStatementCount() <= 3);
     }
 
+    // --- Status-aware queries (feature/celebration-cancellation-lifecycle) ---
+
+    @Test
+    void shouldExcludeCancelledEventFromPersonalScheduleAndItsCount() {
+        Person reader = savePerson("Schedule Cancelled Reader", "34974000021");
+        CelebrationEvent activeEvent = saveEvent("Schedule Active Event", LocalDate.of(2026, 8, 10), LocalTime.of(10, 0));
+        CelebrationEvent cancelledEvent = saveEvent("Schedule Cancelled Event", LocalDate.of(2026, 8, 11), LocalTime.of(10, 0));
+        saveAssignment(activeEvent, reader, EventAssignmentType.READER);
+        saveAssignment(cancelledEvent, reader, EventAssignmentType.READER);
+        cancelledEvent.cancel();
+        entityManager.persist(cancelledEvent);
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<PersonScheduleEventProjection> result = findSchedule(reader, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(activeEvent.getId(), result.getContent().get(0).getEventId());
+    }
+
+    @Test
+    void shouldExcludeCancelledEventFromActiveOrFutureAssignments() {
+        Person reader = savePerson("Active Future Cancelled Reader", "34974000022");
+        CelebrationEvent activeEvent = saveEventWithRange(
+                "Active Future Active Event", LocalDateTime.of(2026, 8, 10, 19, 0), LocalDateTime.of(2026, 8, 10, 20, 0));
+        CelebrationEvent cancelledEvent = saveEventWithRange(
+                "Active Future Cancelled Event", LocalDateTime.of(2026, 8, 11, 19, 0), LocalDateTime.of(2026, 8, 11, 20, 0));
+        saveAssignment(activeEvent, reader, EventAssignmentType.READER);
+        saveAssignment(cancelledEvent, reader, EventAssignmentType.READER);
+        cancelledEvent.cancel();
+        entityManager.persist(cancelledEvent);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection> result =
+                eventAssignmentRepository.findActiveOrFutureAssignmentsByPersonId(
+                        reader.getId(), LocalDateTime.of(2026, 8, 1, 0, 0));
+
+        assertEquals(1, result.size());
+        assertEquals(activeEvent.getId(), result.get(0).getEventId());
+    }
+
+    @Test
+    void shouldExcludeCancelledEventFromEventIdsByEndAtAfter() {
+        Person reader = savePerson("EventIds Cancelled Reader", "34974000023");
+        CelebrationEvent activeEvent = saveEventWithRange(
+                "EventIds Active Event", LocalDateTime.of(2026, 8, 10, 19, 0), LocalDateTime.of(2026, 8, 10, 20, 0));
+        CelebrationEvent cancelledEvent = saveEventWithRange(
+                "EventIds Cancelled Event", LocalDateTime.of(2026, 8, 11, 19, 0), LocalDateTime.of(2026, 8, 11, 20, 0));
+        saveAssignment(activeEvent, reader, EventAssignmentType.READER);
+        saveAssignment(cancelledEvent, reader, EventAssignmentType.READER);
+        cancelledEvent.cancel();
+        entityManager.persist(cancelledEvent);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Long> result = eventAssignmentRepository.findEventIdsByPersonIdAndEndAtAfter(
+                reader.getId(), LocalDateTime.of(2026, 8, 1, 0, 0));
+
+        assertEquals(List.of(activeEvent.getId()), result);
+    }
+
+    @Test
+    void shouldExcludeCancelledEventFromAssignmentConflictCandidatesByRange() {
+        Person reader = savePerson("Conflict Range Cancelled Reader", "34974000024");
+        CelebrationEvent activeEvent = saveEventWithRange(
+                "Conflict Range Active Event", LocalDateTime.of(2026, 8, 10, 19, 0), LocalDateTime.of(2026, 8, 10, 20, 0));
+        CelebrationEvent cancelledEvent = saveEventWithRange(
+                "Conflict Range Cancelled Event", LocalDateTime.of(2026, 8, 11, 19, 0), LocalDateTime.of(2026, 8, 11, 20, 0));
+        saveAssignment(activeEvent, reader, EventAssignmentType.READER);
+        saveAssignment(cancelledEvent, reader, EventAssignmentType.READER);
+        cancelledEvent.cancel();
+        entityManager.persist(cancelledEvent);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<com.eventoscelebrativos.projection.PersonUnavailabilityAssignmentConflictProjection> result =
+                eventAssignmentRepository.findAssignmentConflictsByPersonIdAndRange(
+                        reader.getId(), LocalDateTime.of(2026, 8, 1, 0, 0), LocalDateTime.of(2026, 8, 31, 0, 0));
+
+        assertEquals(1, result.size());
+        assertEquals(activeEvent.getId(), result.get(0).getEventId());
+    }
+
     private Page<PersonScheduleEventProjection> findSchedule(Person person, LocalDate startDate, LocalDate endDate) {
         return findSchedule(person, startDate, endDate, 0, 10);
     }

@@ -20,6 +20,7 @@ import com.eventoscelebrativos.mapper.CelebrationEventScaleDetailMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleMapper;
 import com.eventoscelebrativos.mapper.CelebrationEventScaleParticipationMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
+import com.eventoscelebrativos.model.CelebrationEventStatus;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.EventScheduleType;
@@ -144,7 +145,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent entity = new CelebrationEvent(null, "Missa", now, now.plusHours(1), true);
         CelebrationEvent saved = new CelebrationEvent(1L, "Missa", now, now.plusHours(1), true);
         CelebrationEventResponseDTO response =
-                new CelebrationEventResponseDTO(1L, "Missa", now, now.plusHours(1), true);
+                new CelebrationEventResponseDTO(1L, "Missa", now, now.plusHours(1), true, CelebrationEventStatus.ACTIVE);
 
         when(mapper.toEntity(request)).thenReturn(entity);
         when(repository.save(entity)).thenReturn(saved);
@@ -172,7 +173,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent entity = new CelebrationEvent(null, "Missa", startAt, startAt.plusHours(1), true);
         CelebrationEvent saved = new CelebrationEvent(1L, "Missa", startAt, startAt.plusHours(1), true);
         CelebrationEventResponseDTO response =
-                new CelebrationEventResponseDTO(1L, "Missa", startAt, startAt.plusHours(1), true);
+                new CelebrationEventResponseDTO(1L, "Missa", startAt, startAt.plusHours(1), true, CelebrationEventStatus.ACTIVE);
 
         when(mapper.toEntity(request)).thenReturn(entity);
         when(repository.save(entity)).thenReturn(saved);
@@ -196,7 +197,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent onBoundaryEntity = new CelebrationEvent(null, "Missa", boundary, boundary.plusHours(1), true);
         CelebrationEvent onBoundarySaved = new CelebrationEvent(1L, "Missa", boundary, boundary.plusHours(1), true);
         CelebrationEventResponseDTO onBoundaryResponse =
-                new CelebrationEventResponseDTO(1L, "Missa", boundary, boundary.plusHours(1), true);
+                new CelebrationEventResponseDTO(1L, "Missa", boundary, boundary.plusHours(1), true, CelebrationEventStatus.ACTIVE);
         when(mapper.toEntity(onBoundaryRequest)).thenReturn(onBoundaryEntity);
         when(repository.save(onBoundaryEntity)).thenReturn(onBoundarySaved);
         when(mapper.toDto(onBoundarySaved)).thenReturn(onBoundaryResponse);
@@ -209,7 +210,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent afterBoundaryEntity = new CelebrationEvent(null, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
         CelebrationEvent afterBoundarySaved = new CelebrationEvent(2L, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
         CelebrationEventResponseDTO afterBoundaryResponse =
-                new CelebrationEventResponseDTO(2L, "Missa", afterBoundary, afterBoundary.plusHours(1), true);
+                new CelebrationEventResponseDTO(2L, "Missa", afterBoundary, afterBoundary.plusHours(1), true, CelebrationEventStatus.ACTIVE);
         when(mapper.toEntity(afterBoundaryRequest)).thenReturn(afterBoundaryEntity);
         when(repository.save(afterBoundaryEntity)).thenReturn(afterBoundarySaved);
         when(mapper.toDto(afterBoundarySaved)).thenReturn(afterBoundaryResponse);
@@ -899,7 +900,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEventRequestDTO request =
                 new CelebrationEventRequestDTO("Missa antiga corrigida", pastStart, pastEnd, true);
         CelebrationEventResponseDTO response =
-                new CelebrationEventResponseDTO(1L, "Missa antiga corrigida", pastStart, pastEnd, true);
+                new CelebrationEventResponseDTO(1L, "Missa antiga corrigida", pastStart, pastEnd, true, CelebrationEventStatus.ACTIVE);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existing));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of());
@@ -1410,7 +1411,7 @@ class CelebrationEventServiceImplTest {
     }
 
     private CelebrationEventResponseDTO response(Long id) {
-        return new CelebrationEventResponseDTO(id, "Missa", EVENT_START_AT, EVENT_END_AT, true);
+        return new CelebrationEventResponseDTO(id, "Missa", EVENT_START_AT, EVENT_END_AT, true, CelebrationEventStatus.ACTIVE);
     }
 
     private CelebrationEventScaleDetailResponseDTO detailResponse() {
