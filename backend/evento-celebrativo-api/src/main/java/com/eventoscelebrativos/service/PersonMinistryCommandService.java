@@ -28,6 +28,21 @@ public interface PersonMinistryCommandService {
     void removeMinistry(Long personId, MinistryType ministryType, String entityLabel);
 
     /**
+     * Adiciona ou reativa o vinculo {@code PersonMinistry(personId, ministryType)}, sem afetar
+     * nenhum outro ministerio da pessoa. Trava a {@link Person} (PESSIMISTIC_WRITE) antes de mutar.
+     * Exige {@code Person.active=true} ({@link com.eventoscelebrativos.exception.exceptions.MinistryPersonInactiveException}
+     * caso contrario). Semantica por estado atual do vinculo:
+     * <ul>
+     *     <li>inexistente: cria ativo, {@code coordinator=false};</li>
+     *     <li>inativo: reativa ({@code coordinator} permanece {@code false} - reativacao nunca
+     *     restaura coordenacao);</li>
+     *     <li>ja ativo: no-op idempotente, preservando o estado atual de {@code coordinator}
+     *     (inclusive quando {@code true}, concedido anteriormente por ADMIN).</li>
+     * </ul>
+     */
+    Person addOrReactivateMinistry(Long personId, MinistryType ministryType);
+
+    /**
      * Aplica atomicamente o conjunto desejado de ministérios de uma pessoa já existente:
      * adiciona vínculos inexistentes, reativa vínculos inativos, preserva vínculos inalterados
      * e desativa vínculos ativos ausentes do conjunto desejado. Nenhuma mudança é aplicada se

@@ -1,9 +1,22 @@
 {
-  "description": "Guardrails leves e determinísticos do projeto Evento Celebrativo.",
+  "description": "Guardrails determinísticos do projeto Evento Celebrativo, incluindo gate de revisão de engenharia.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/engineering-review-gate.mjs\" --session-start",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/engineering-review-gate.mjs') --session-start; exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Inicializando estado da revisão de engenharia"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
-        "matcher": "^(Bash|apply_patch|Edit|Write)$",
+        "matcher": "^(Bash|PowerShell|apply_patch|Edit|Write)$",
         "hooks": [
           {
             "type": "command",
@@ -25,6 +38,45 @@
             "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/post-edit-check.mjs'); exit $LASTEXITCODE\"",
             "timeout": 20,
             "statusMessage": "Verificando o diff"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/engineering-review-gate.mjs\" --subagent-start",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/engineering-review-gate.mjs') --subagent-start; exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Registrando reviewer"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/engineering-review-gate.mjs\" --subagent-stop",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/engineering-review-gate.mjs') --subagent-stop; exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Persistindo resultado do reviewer"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/engineering-review-gate.mjs\"",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $root = (& git rev-parse --show-toplevel).Trim(); $payload = [Console]::In.ReadToEnd(); $payload | node (Join-Path $root '.codex/hooks/engineering-review-gate.mjs'); exit $LASTEXITCODE\"",
+            "timeout": 10,
+            "statusMessage": "Validando gate de revisão de engenharia"
           }
         ]
       }

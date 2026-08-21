@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\" --session-start"
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\" --session-start",
+            "timeout": 10
           }
         ]
       }
@@ -17,7 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-tool-guard.mjs\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-tool-guard.mjs\"",
+            "timeout": 10
           }
         ]
       },
@@ -26,7 +28,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-tool-guard.mjs\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pre-tool-guard.mjs\"",
+            "timeout": 10
           }
         ]
       },
@@ -35,7 +38,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-hook-guard.mjs\" search"
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-hook-guard.mjs\" search",
+            "timeout": 12
           }
         ]
       },
@@ -44,7 +48,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-hook-guard.mjs\" read"
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/graphify-hook-guard.mjs\" read",
+            "timeout": 12
           }
         ]
       }
@@ -55,7 +60,30 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/post-edit-check.mjs\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/post-edit-check.mjs\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\" --subagent-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\" --subagent-stop",
+            "timeout": 10
           }
         ]
       }
@@ -65,7 +93,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\""
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/engineering-review-gate.mjs\"",
+            "timeout": 10
           }
         ]
       }

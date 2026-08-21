@@ -2,6 +2,8 @@
 
 Load this only when the user passed `--update` or `--cluster-only`. A first-time full build never reads this file.
 
+For `--update`, this runbook intentionally reuses selected numbered steps from `references/build-pipeline.md`. **Read `references/build-pipeline.md` before the first instruction below that says to run Step 3A/3B/3C or Steps 4–8**, and execute only the referenced sections; do not run the full-build-only detection Step 2 or manifest Step 9 unless this runbook explicitly says so.
+
 ## For --update (incremental re-extraction)
 
 Use when you've added or modified files since the last run. Only re-extracts changed files - saves tokens and time.

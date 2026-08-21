@@ -87,7 +87,7 @@ Em uma alteração full stack, leia ambos antes de editar. Esta leitura é obrig
 - Build e testes finais: `validate-project`.
 - Revisão de branch ou diff: `review-change`.
 
-A política comum de revisão está em `.ai/review/ENGINEERING_REVIEW.md`. Para qualquer alteração de implementação, `review-change` é um gate obrigatório de conclusão e não deve ser substituído apenas por build ou testes passando.
+A política comum de revisão está em `.ai/review/ENGINEERING_REVIEW.md`. Para qualquer alteração de implementação **ou da própria infraestrutura de IA versionada** (`.ai/`, `.claude/`, `.codex/`, `.agents/`, `AGENTS.md`, `CLAUDE.md`), `review-change` é um gate obrigatório de conclusão e não deve ser substituído apenas por build ou testes passando.
 
 ## Delegação para Subagents
 
@@ -115,14 +115,8 @@ Uma tarefa só está concluída quando:
 - não restam `BLOCKER`, `HIGH` ou `MEDIUM` introduzidos pela tarefa e ainda acionáveis dentro do escopo;
 - a resposta final informa exatamente o que foi validado e o veredito da revisão.
 
-## graphify
+## Graphify
 
-Este projeto possui um grafo de conhecimento em `graphify-out/`, com nós de maior conectividade, comunidades e relacionamentos entre arquivos.
+A política canônica compartilhada está em `.ai/graphify/GRAPHIFY_POLICY.md`. Leia e siga esse arquivo para consulta, atualização, custo semântico, proveniência e critérios de encerramento.
 
-Regras:
-
-- Antes de ler arquivos-fonte, executar buscas amplas ou responder perguntas sobre arquitetura e estrutura do projeto, consulte `graphify-out/GRAPH_REPORT.md` como mapa inicial da base de código, quando o arquivo existir.
-- Se `graphify-out/wiki/index.md` existir, navegue pela wiki antes de fazer leitura ampla dos arquivos brutos.
-- Para perguntas entre módulos, como “como X se relaciona com Y”, prefira `graphify query "<pergunta>"`, `graphify path "<A>" "<B>"` ou `graphify explain "<conceito>"` antes de recorrer a buscas amplas.
-- Depois de modificar arquivos de código, execute `graphify update .` para manter o grafo atualizado, quando o Graphify estiver disponível.
-- Quando o usuário digitar `$graphify`, invoque a Skill instalada `graphify` antes de qualquer outra ação.
+Quando o usuário invocar `$graphify` ou `/graphify`, siga `.ai/graphify/GRAPHIFY_POLICY.md`. No Claude Code, use a Skill `graphify` instalada no projeto; no Codex, use o CLI `graphify` disponível no PATH quando aplicável. Não assuma que uma Skill específica de outra plataforma está instalada.

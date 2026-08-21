@@ -1,0 +1,36 @@
+package com.eventoscelebrativos.mapper;
+
+import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
+import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
+import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
+import com.eventoscelebrativos.model.Person;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+
+import java.util.List;
+
+@Mapper(componentModel = "spring")
+public interface MinistryPersonMapper {
+
+    @Mapping(target = "id", ignore = true)
+    Person toEntity(MinistryPersonCreateRequestDTO requestDTO);
+
+    default MinistryPersonResponseDTO toDto(Person person) {
+        return new MinistryPersonResponseDTO(
+                person.getId(),
+                person.getName(),
+                person.getPhoneNumber(),
+                person.getBirthdayDate()
+        );
+    }
+
+    default List<MinistryPersonResponseDTO> toDtoList(List<? extends Person> people) {
+        return people.stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Mapping(target = "id", ignore = true)
+    void updateFromDto(MinistryPersonUpdateRequestDTO requestDTO, @MappingTarget Person person);
+}

@@ -126,7 +126,26 @@ public interface EventAssignmentRepository extends JpaRepository<EventAssignment
             @Param("endAt") LocalDateTime endAt
     );
 
-    boolean existsByPersonIdAndAssignmentType(Long personId, EventAssignmentType assignmentType);
+    /**
+     * Compromisso operacional ativo ou futuro (endAt > currentSecond, evento ACTIVE) de uma pessoa
+     * para uma funcao ministerial especifica. Mesma semantica de {@link #findActiveOrFutureAssignmentsByPersonId},
+     * porem restrita a um {@link EventAssignmentType} e como existence check: usada para decidir se a
+     * remocao de um {@code PersonMinistry} deve ser bloqueada (feature/ministry-scoped-person-management,
+     * secao 30). Um assignment exclusivamente de evento CANCELLED nunca bloqueia sozinho.
+     */
+    @Query("""
+            SELECT COUNT(a) > 0
+            FROM EventAssignment a
+            WHERE a.person.id = :personId
+              AND a.assignmentType = :assignmentType
+              AND a.event.endAt > :currentSecond
+              AND a.event.status = com.eventoscelebrativos.model.CelebrationEventStatus.ACTIVE
+            """)
+    boolean existsActiveOrFutureByPersonIdAndAssignmentType(
+            @Param("personId") Long personId,
+            @Param("assignmentType") EventAssignmentType assignmentType,
+            @Param("currentSecond") LocalDateTime currentSecond
+    );
 
     boolean existsByEvent_IdAndPerson_Id(Long eventId, Long personId);
 

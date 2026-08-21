@@ -19,9 +19,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +49,9 @@ class PersonMinistryCommandServiceImplTest {
 
     @Mock
     private ParishStaffAssignmentRepository parishStaffAssignmentRepository;
+
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("America/Sao_Paulo"));
 
     @InjectMocks
     private PersonMinistryCommandServiceImpl service;
@@ -113,6 +120,18 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldThrowResourceNotFoundWhenPersonIsInactiveEvenWithActiveMinistry() {
+        Person inactiveReader = reader(1L);
+        inactiveReader.setActive(false);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(inactiveReader));
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL));
+
+        verifyNoInteractions(personMinistryRepository);
+    }
+
+    @Test
     void shouldThrowResourceNotFoundWhenMinistryIsInactive() {
         Person reader = reader(1L);
         PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
@@ -168,7 +187,7 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.of(readerMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         service.removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
@@ -188,7 +207,7 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.of(coordinatedMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         service.removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
@@ -204,7 +223,7 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.of(readerMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(true);
 
         assertThrows(DatabaseException.class, () -> service.removeMinistry(1L, MinistryType.READER, ENTITY_LABEL));
@@ -220,7 +239,7 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
                 .thenReturn(Optional.of(readerMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         service.removeMinistry(1L, MinistryType.READER, ENTITY_LABEL);
@@ -263,7 +282,7 @@ class PersonMinistryCommandServiceImplTest {
                 .thenReturn(Optional.of(priestMinistry));
         when(parishStaffAssignmentRepository.existsByPersonIdAndResponsibilityAndActiveTrue(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(false);
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.PRIEST))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.PRIEST), any()))
                 .thenReturn(false);
 
         service.removeMinistry(1L, MinistryType.PRIEST, "Padre");
@@ -312,7 +331,7 @@ class PersonMinistryCommandServiceImplTest {
         PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
@@ -361,7 +380,7 @@ class PersonMinistryCommandServiceImplTest {
         coordinatedMinistry.grantCoordination();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(coordinatedMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
@@ -398,7 +417,7 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L))
                 .thenReturn(List.of(unchangedReader, reactivatedCommentator, deactivatedPriest));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.PRIEST))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.PRIEST), any()))
                 .thenReturn(false);
 
         PersonMinistrySyncResult result = service.syncMinistries(
@@ -424,7 +443,7 @@ class PersonMinistryCommandServiceImplTest {
         PersonMinistry priestMinistry = new PersonMinistry(priest, MinistryType.PRIEST);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(priest));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(priestMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.PRIEST))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.PRIEST), any()))
                 .thenReturn(false);
         when(parishStaffAssignmentRepository.existsByPersonIdAndResponsibilityAndActiveTrue(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(true);
@@ -441,7 +460,7 @@ class PersonMinistryCommandServiceImplTest {
         PersonMinistry activeReaderMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeReaderMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(true);
 
         assertThrows(DatabaseException.class, () -> service.syncMinistries(1L, Set.of()));
@@ -458,9 +477,9 @@ class PersonMinistryCommandServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L))
                 .thenReturn(List.of(activeReaderMinistry, activeCommentatorMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(true);
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.COMMENTATOR))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.COMMENTATOR), any()))
                 .thenReturn(false);
 
         assertThrows(DatabaseException.class,
@@ -477,7 +496,7 @@ class PersonMinistryCommandServiceImplTest {
         PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
-        when(eventAssignmentRepository.existsByPersonIdAndAssignmentType(1L, EventAssignmentType.READER))
+        when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
 
         PersonMinistrySyncResult result = service.syncMinistries(1L, Set.of());
@@ -534,6 +553,83 @@ class PersonMinistryCommandServiceImplTest {
                 .thenThrow(new DataIntegrityViolationException("constraint"));
 
         assertThrows(DatabaseException.class, () -> service.syncMinistries(1L, Set.of(MinistryType.READER)));
+    }
+
+    @Test
+    void shouldCreateMinistryWhenNoneExistsOnAddOrReactivate() {
+        Person reader = reader(1L);
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.COMMENTATOR))
+                .thenReturn(Optional.empty());
+
+        Person result = service.addOrReactivateMinistry(1L, MinistryType.COMMENTATOR);
+
+        assertSame(reader, result);
+        ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
+        verify(personMinistryRepository).save(captor.capture());
+        assertSame(reader, captor.getValue().getPerson());
+        assertEquals(MinistryType.COMMENTATOR, captor.getValue().getMinistryType());
+        assertTrue(captor.getValue().getActive());
+        assertFalse(captor.getValue().getCoordinator());
+    }
+
+    @Test
+    void shouldReactivateInactiveMinistryOnAddOrReactivateWithoutRestoringCoordinator() {
+        Person reader = reader(1L);
+        PersonMinistry inactive = new PersonMinistry(reader, MinistryType.READER);
+        inactive.deactivate();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+                .thenReturn(Optional.of(inactive));
+
+        service.addOrReactivateMinistry(1L, MinistryType.READER);
+
+        assertTrue(inactive.getActive());
+        assertFalse(inactive.getCoordinator());
+        verify(personMinistryRepository).save(inactive);
+    }
+
+    @Test
+    void shouldBeNoOpAndPreserveCoordinatorWhenMinistryAlreadyActiveOnAddOrReactivate() {
+        Person reader = reader(1L);
+        PersonMinistry active = new PersonMinistry(reader, MinistryType.READER);
+        active.grantCoordination();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+                .thenReturn(Optional.of(active));
+
+        service.addOrReactivateMinistry(1L, MinistryType.READER);
+
+        assertTrue(active.getActive());
+        assertTrue(active.getCoordinator());
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectAddOrReactivateWhenPersonIsInactive() {
+        Person inactivePerson = reader(1L);
+        inactivePerson.setActive(false);
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(inactivePerson));
+
+        assertThrows(com.eventoscelebrativos.exception.exceptions.MinistryPersonInactiveException.class,
+                () -> service.addOrReactivateMinistry(1L, MinistryType.READER));
+
+        verifyNoInteractions(personMinistryRepository);
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenAddOrReactivateTargetsMissingPerson() {
+        when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.addOrReactivateMinistry(99L, MinistryType.READER));
+    }
+
+    @Test
+    void shouldRejectAddOrReactivateWithInvalidArguments() {
+        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(null, MinistryType.READER));
+        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(0L, MinistryType.READER));
+        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(1L, null));
+        verifyNoInteractions(personRepository);
     }
 
     private Person reader(Long id) {

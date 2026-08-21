@@ -33,3 +33,12 @@ test('detecta whitespace inválido e cria contexto adicional', () => {
   assert.equal(output.hookSpecificOutput.hookEventName, 'PostToolUse');
   assert.match(output.hookSpecificOutput.additionalContext, /whitespace/);
 });
+
+test('payload inválido do post-edit retorna falha técnica em vez de silenciar erro', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const script = fileURLToPath(new URL('../post-edit-check.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [script], { input: '{json', encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /não conseguiu executar/i);
+});

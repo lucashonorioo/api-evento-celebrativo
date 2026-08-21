@@ -49,6 +49,7 @@ async function main() {
     if (output) process.stdout.write(JSON.stringify(output));
   } catch (error) {
     process.stderr.write(`Hook pós-edição não conseguiu executar a verificação: ${error.message}\n`);
+    process.exitCode = 1;
   }
 }
 
