@@ -91,6 +91,24 @@ Não crie camadas adicionais sem benefício concreto. Não mova pacotes em massa
 - Não modifique migrations Flyway versionadas já aplicáveis; crie uma nova migration incremental.
 - Não inclua credenciais ou secrets em `application*.properties`.
 
+## Estado atual do domínio Person/PersonMinistry/EventAssignment
+
+A migração do modelo legado (entidades por tipo de ministério, ex. `Reader` como entidade JPA, coluna `person_type`, tabela `tb_event_person`) para o modelo unificado está concluída. O runtime atual não possui mais cutover `LEGACY`/`PARALLEL`, shadow-read, `PersonMinistryReadSourceProperties`, `EventAssignmentReadSourceProperties`, write-through legado nem `EventAssignmentCompatibilityService` — nada disso existe mais no código; onde ainda aparecem, é apenas em migrations aplicadas (histórico imutável) ou em nomes de testes que hoje protegem comportamento atual sob um nome antigo.
+
+Fontes oficiais atuais:
+
+- `PersonMinistry` é a única fonte de classificação ministerial de uma `Person`; leia via `PersonMinistryReadService` e escreva via `PersonMinistryCommandService`.
+- `EventAssignment` é a única fonte das funções atribuídas a uma pessoa em um evento; a unicidade é `event_id + person_id + assignment_type` — uma pessoa pode exercer várias funções no mesmo evento.
+- `EventAssignmentCommandService` é o mecanismo oficial de escrita e sincronização de assignments (inclui a limpeza de `EventParticipationResponse` quando a pessoa perde todas as funções no evento).
+- `EventParticipationResponse` registra a confirmação ou recusa de participação da pessoa no evento; é única por `event_id + person_id` (não por função) e é gerenciada por `EventParticipationResponseService`.
+
+Regras para qualquer alteração neste domínio:
+
+- não recrie caminhos `LEGACY`/`PARALLEL` nem qualquer mecanismo de shadow-read;
+- não consulte `tb_event_person` nem dependa da coluna `person_type` — ambos foram removidos por migration e existem apenas para reconstruir bancos antigos;
+- não reintroduza subclasses ministeriais como entidades JPA (`Reader`, `Commentator`, `Priest`, `MinisterOfTheWord`, `EucharisticMinister`); os controllers/services com esses nomes que ainda existem são adaptadores HTTP finos ativos sobre `Person`+`PersonMinistry`, não um modelo de dados paralelo, e continuam necessários enquanto não houver API genérica equivalente para criar pessoa, editar dados de terceiros e definir senha/role inicial;
+- as migrations `V1`–`V9` preservam a evolução histórica do schema e não devem ser alteradas.
+
 ## DTOs e MapStruct
 
 - Mapeamentos devem ser explícitos quando nomes ou responsabilidades diferirem.

@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { recordEngineeringMutation } from './engineering-review-gate.mjs';
 
 export function runDiffCheck(cwd) {
   try {
     execFileSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 5000,
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000,
     });
   } catch {
     return null;
@@ -14,9 +14,7 @@ export function runDiffCheck(cwd) {
 
   try {
     execFileSync('git', ['-C', cwd, 'diff', '--check'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 10000,
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 10000,
     });
     return null;
   } catch (error) {
@@ -32,6 +30,7 @@ async function main() {
     for await (const chunk of process.stdin) input += chunk;
     const payload = JSON.parse(input || '{}');
     const cwd = String(payload.cwd || process.cwd());
+    recordEngineeringMutation(payload);
     const issue = runDiffCheck(cwd);
 
     if (issue) {
@@ -47,9 +46,11 @@ async function main() {
     process.stdout.write(JSON.stringify({
       systemMessage: `Hook pós-edição não conseguiu executar a verificação: ${error.message}`,
     }));
+    process.exitCode = 1;
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main();
-}
+const isDirectExecution = process.argv[1]
+  && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+
+if (isDirectExecution) await main();

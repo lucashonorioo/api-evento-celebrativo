@@ -60,7 +60,7 @@ If the list is empty, say so plainly and stop — do not proceed to traversal.
 
 ### Step 1 — Traversal
 
-Build the **expanded query string** by joining the selected tokens with spaces. Use this string as `QUESTION` below — NOT the original user question. (The original question is preserved only for `save-result` at the end.)
+Build the **expanded query string** by joining the selected tokens with spaces. Use this string as `QUESTION` below — NOT the original user question. (Keep the original question only for the final user-facing answer; persist it with `save-result` solely on explicit user request.)
 
 Prefer the CLI when it is installed:
 ```bash
@@ -165,21 +165,18 @@ print(output)
 
 Replace `QUESTION` with the **expanded** query string, `MODE` with `bfs` or `dfs`, and `BUDGET` with the token budget (default `2000`, or whatever `--budget N` specifies). Then answer based on the subgraph output above, using only what the graph contains.
 
-After writing the answer, save it back into the graph so it improves future queries. Include the expanded tokens inside the `--answer` text (e.g. `"Expanded from original query via vocab: [tokens]. Then traversed..."`) so the next `--update` extracts the expansion history as a graph node:
+Do **not** automatically persist the assistant answer into the source knowledge graph. `save-result` stores derived AI work memory, which has different provenance from code and source documents and must never become self-validating evidence.
 
-```bash
-$(cat graphify-out/.graphify_python) -m graphify save-result --question "ORIGINAL_QUESTION" --answer "ANSWER" --type query --nodes NODE1 NODE2
-```
+Only when the user explicitly asks to persist this answer as graph work memory may you call `graphify save-result`. In that case:
 
-Replace `ORIGINAL_QUESTION` with the user's verbatim question, `ANSWER` with your full answer text (containing the expanded-token trace), `NODE1 NODE2` with the list of node labels you cited. This closes the feedback loop: the next `--update` will extract this Q&A as a node in the graph.
+- make clear that the saved object is derived AI memory, not source truth;
+- include the cited source nodes;
+- use `--outcome useful|dead_end|corrected` as appropriate;
+- on future queries, treat reflections/lessons from saved results as navigation hints only and re-verify factual claims against source-backed graph nodes before answering.
 
-**Work memory (self-improving loop).** Add an `--outcome` so future sessions learn from this one — append `--outcome useful|dead_end|corrected` to the `save-result` command (and `--correction "the right answer"` when correcting):
+Existing `graphify-out/reflections/LESSONS.md`, when present, may be read as a hint layer, but it must not override code, documents, or source locations.
 
-- `useful` — the cited nodes answered the question well (they become *preferred sources*).
-- `dead_end` — the question/path led nowhere; don't re-derive it next time.
-- `corrected` — the saved answer was wrong; `--correction` records what was right.
-
-At the **start** of graph work, refresh and read the lessons: run `graphify reflect --if-stale` (cheap, deterministic, no LLM; `--if-stale` makes it a no-op when `LESSONS.md` is already newer than every input, e.g. when the git hook just refreshed it), then read `graphify-out/reflections/LESSONS.md`. It lists **preferred sources** (start there), **known dead ends** (skip them), and prior **corrections**. Running `reflect` yourself keeps the lessons current even without the git hook installed; if the post-commit hook *is* installed, `--if-stale` means your session-start run costs almost nothing.
+---
 
 ---
 
@@ -243,11 +240,7 @@ except nx.NodeNotFound as e:
 
 Replace `NODE_A` and `NODE_B` with the actual concept names from the user. Then explain the path in plain language - what each hop means, why it's significant.
 
-After writing the explanation, save it back:
-
-```bash
-$(cat graphify-out/.graphify_python) -m graphify save-result --question "Path from NODE_A to NODE_B" --answer "ANSWER" --type path_query --nodes NODE_A NODE_B
-```
+Do not save the path explanation back automatically. Persist it with `save-result` only if the user explicitly requests derived work-memory persistence, under the provenance rules above.
 
 ---
 
@@ -304,8 +297,4 @@ for neighbor in G.neighbors(nid):
 
 Replace `NODE_NAME` with the concept the user asked about. Then write a 3-5 sentence explanation of what this node is, what it connects to, and why those connections are significant. Use the source locations as citations.
 
-After writing the explanation, save it back:
-
-```bash
-$(cat graphify-out/.graphify_python) -m graphify save-result --question "Explain NODE_NAME" --answer "ANSWER" --type explain --nodes NODE_NAME
-```
+Do not save the explanation back automatically. Persist it with `save-result` only if the user explicitly requests derived work-memory persistence, under the provenance rules above.

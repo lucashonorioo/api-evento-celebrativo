@@ -33,3 +33,12 @@ test('ignores directories that are not git repositories', () => {
   const dir = mkdtempSync(join(tmpdir(), 'codex-hook-non-git-'));
   assert.equal(runDiffCheck(dir), null);
 });
+
+test('invalid post-edit payload surfaces technical failure instead of silently succeeding', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const script = fileURLToPath(new URL('../post-edit-check.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [script], { input: '{json', encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /não conseguiu executar/i);
+});
