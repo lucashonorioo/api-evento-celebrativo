@@ -594,10 +594,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
     private Fixture createOperator(String name) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName(name);
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setBirthdayDate(java.time.LocalDate.of(1990, 1, 10));
+            Person person = new Person(name, uniquePhoneNumber(), java.time.LocalDate.of(1990, 1, 10));
             person.setActive(true);
             Person savedPerson = personRepository.save(person);
 
@@ -614,10 +611,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
     private Fixture createOperatorWithMinistry(String name, MinistryType ministryType) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName(name);
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setBirthdayDate(java.time.LocalDate.of(1990, 1, 10));
+            Person person = new Person(name, uniquePhoneNumber(), java.time.LocalDate.of(1990, 1, 10));
             person.setActive(true);
             Person savedPerson = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(savedPerson, ministryType));

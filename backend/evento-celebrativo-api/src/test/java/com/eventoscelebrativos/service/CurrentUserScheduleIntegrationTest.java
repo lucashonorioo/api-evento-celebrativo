@@ -230,10 +230,7 @@ class CurrentUserScheduleIntegrationTest {
     }
 
     private Long savePersonWithRole(String name, String phoneNumber) {
-        Person person = new Person();
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name + " " + UUID.randomUUID(), phoneNumber, BIRTHDAY);
         return personRepository.saveAndFlush(person).getId();
     }
 

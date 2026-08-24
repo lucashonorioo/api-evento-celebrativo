@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,11 +45,11 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         jdbcTemplate.update(
                 "INSERT INTO tb_person_ministry(person_id, ministry_type, active) VALUES (?, 'READER', TRUE)", personId);
 
-        // migrateAll() migra ate a mais recente disponivel no classpath (hoje V22), nao apenas V21;
-        // a partir de V20, isso executa V21 (esta migration) e V22 (celebration-cancellation-lifecycle).
+        // migrateAll() migra ate a mais recente disponivel no classpath, nao apenas V21;
+        // a partir de V20, isso executa V21 (esta migration) e V22-V25.
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(5, result.migrationsExecuted);
         assertFalse(jdbcTemplate.queryForObject(
                 "SELECT coordinator FROM tb_person_ministry WHERE person_id = ?", Boolean.class, personId));
     }
@@ -123,13 +124,13 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
     }
 
     @Test
-    void shouldNotAlterAnyPreviousMigrationAndApplyExactly22MigrationsFromEmptySchema() {
+    void shouldNotAlterAnyPreviousMigrationAndApplyExactly25MigrationsFromEmptySchema() {
         DataSource dataSource = newIsolatedH2DataSource();
 
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(22, first.migrations.size());
+        assertEquals(25, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 
@@ -147,8 +148,34 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
     }
 
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
-        jdbcTemplate.update("INSERT INTO tb_person(name, phone_number) VALUES (?, ?)", name, phoneNumber);
+        if (hasPublicIdColumn(jdbcTemplate)) {
+            jdbcTemplate.update(
+                    "INSERT INTO tb_person(public_id, name, phone_number) VALUES (?, ?, ?)",
+                    newPublicId(), name, phoneNumber);
+        } else {
+            jdbcTemplate.update("INSERT INTO tb_person(name, phone_number) VALUES (?, ?)", name, phoneNumber);
+        }
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
+    }
+
+    private boolean hasPublicIdColumn(JdbcTemplate jdbcTemplate) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE UPPER(TABLE_NAME) = 'TB_PERSON'
+                  AND UPPER(COLUMN_NAME) = 'PUBLIC_ID'
+                """,
+                Integer.class);
+        return count != null && count > 0;
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     private void migrateUntil(DataSource dataSource, String target) {

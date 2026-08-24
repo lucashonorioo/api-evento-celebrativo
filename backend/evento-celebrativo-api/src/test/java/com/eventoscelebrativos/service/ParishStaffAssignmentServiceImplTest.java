@@ -24,8 +24,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -68,16 +70,15 @@ class ParishStaffAssignmentServiceImplTest {
     }
 
     private Person activePerson(Long id, String name) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName(name);
+        Person person = new Person(name, "34979" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(true);
         return person;
     }
 
     private Person inactivePerson(Long id) {
-        Person person = new Person();
-        person.setId(id);
+        Person person = new Person("Pessoa " + id, "34979" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(false);
         return person;
     }

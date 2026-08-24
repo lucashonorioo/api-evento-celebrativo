@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -453,9 +454,10 @@ class CelebrationEventRepositoryTest {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date)
-                VALUES (?, ?, '1990-01-10')
+                INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
+                VALUES (?, ?, ?, '1990-01-10')
                 """,
+                newPublicId(),
                 name + " " + UUID.randomUUID(),
                 phoneNumber
         );
@@ -564,6 +566,14 @@ class CelebrationEventRepositoryTest {
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3498" + String.format("%07d", suffix);
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     private static LocalDateTime rs(LocalDate date) {

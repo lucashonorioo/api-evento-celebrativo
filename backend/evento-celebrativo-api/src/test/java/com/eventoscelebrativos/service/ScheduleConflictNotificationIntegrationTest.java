@@ -343,10 +343,7 @@ class ScheduleConflictNotificationIntegrationTest {
     }
 
     private void createAdminAccount(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(true);
         Person savedPerson = personRepository.saveAndFlush(person);
 
@@ -360,10 +357,7 @@ class ScheduleConflictNotificationIntegrationTest {
     }
 
     private Person createPersonWithMinistry(String name, MinistryType ministryType) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(true);
         Person savedPerson = personRepository.saveAndFlush(person);
         personMinistryRepository.saveAndFlush(new PersonMinistry(savedPerson, ministryType));

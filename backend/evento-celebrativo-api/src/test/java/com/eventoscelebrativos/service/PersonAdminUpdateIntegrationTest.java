@@ -279,14 +279,12 @@ class PersonAdminUpdateIntegrationTest {
     }
 
     private Long savePerson(String name) {
-        Person person = new Person();
-        populatePerson(person, name);
+        Person person = person(name);
         return personRepository.saveAndFlush(person).getId();
     }
 
     private Long savePersonWithRole(String name, String roleAuthority) {
-        Person person = new Person();
-        populatePerson(person, name);
+        Person person = person(name);
         Person saved = personRepository.saveAndFlush(person);
         Role role = roleRepository.findByAuthority(roleAuthority).orElseThrow();
         LocalDateTime now = LocalDateTime.now().withNano(0);
@@ -296,10 +294,8 @@ class PersonAdminUpdateIntegrationTest {
         return saved.getId();
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
     }
 
     private void addMinistry(Long personId, MinistryType ministryType, boolean active) {

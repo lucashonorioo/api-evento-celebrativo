@@ -109,10 +109,7 @@ class EventParticipationSyncRollbackIntegrationTest {
     }
 
     private Person savePersonWithMinistry(String name, MinistryType ministryType) {
-        Person person = new Person();
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         person = personRepository.saveAndFlush(person);
         personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
         return person;

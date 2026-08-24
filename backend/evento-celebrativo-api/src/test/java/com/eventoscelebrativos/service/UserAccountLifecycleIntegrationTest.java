@@ -225,10 +225,7 @@ class UserAccountLifecycleIntegrationTest {
 
     private String adminToken(List<Long> cleanupPersonIds) throws Exception {
         String phone = uniquePhone();
-        Person admin = new Person();
-        admin.setName("Lifecycle Admin " + UUID.randomUUID());
-        admin.setPhoneNumber(phone);
-        admin.setBirthdayDate(BIRTHDAY);
+        Person admin = new Person("Lifecycle Admin " + UUID.randomUUID(), phone, BIRTHDAY);
         admin.setActive(true);
         Person savedAdmin = personRepository.saveAndFlush(admin);
         cleanupPersonIds.add(savedAdmin.getId());

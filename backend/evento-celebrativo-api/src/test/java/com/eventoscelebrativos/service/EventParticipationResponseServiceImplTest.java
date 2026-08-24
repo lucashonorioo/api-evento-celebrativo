@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -451,10 +452,8 @@ class EventParticipationResponseServiceImplTest {
     }
 
     private Person person(Long id, String phoneNumber) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Person " + id);
-        person.setPhoneNumber(phoneNumber);
+        Person person = new Person("Person " + id, phoneNumber, LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

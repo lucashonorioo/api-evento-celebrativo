@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -161,11 +162,12 @@ class MinistryPersonManagementServiceImplTest {
     }
 
     private Person person(Long id) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Pessoa " + id);
-        person.setPhoneNumber("3497" + (id == null ? "0000000" : String.format("%07d", id)));
-        person.setBirthdayDate(LocalDate.of(1990, 1, 1));
+        Person person = new Person(
+                "Pessoa " + id,
+                "3497" + (id == null ? "0000000" : String.format("%07d", id)),
+                LocalDate.of(1990, 1, 1)
+        );
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

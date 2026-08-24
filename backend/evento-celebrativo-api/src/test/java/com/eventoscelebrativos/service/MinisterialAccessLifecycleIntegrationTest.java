@@ -412,10 +412,7 @@ class MinisterialAccessLifecycleIntegrationTest {
             String rawPassword,
             String authority
     ) {
-        Person person = new Person();
-        person.setName("Person " + endpoint.label());
-        person.setPhoneNumber(phone);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person("Person " + endpoint.label(), phone, BIRTHDAY);
         person.setActive(true);
         person = personRepository.saveAndFlush(person);
         if (withAccount) {
@@ -431,10 +428,7 @@ class MinisterialAccessLifecycleIntegrationTest {
 
     private void createConflictingAccountUsername(String username) {
         String anchorPhone = uniquePhone();
-        Person anchor = new Person();
-        anchor.setName("Conflict Anchor");
-        anchor.setPhoneNumber(anchorPhone);
-        anchor.setBirthdayDate(BIRTHDAY);
+        Person anchor = new Person("Conflict Anchor", anchorPhone, BIRTHDAY);
         anchor.setActive(true);
         anchor = personRepository.saveAndFlush(anchor);
         Role operator = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();

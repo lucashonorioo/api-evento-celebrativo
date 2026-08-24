@@ -488,10 +488,7 @@ class NotificationDeliveryServiceIntegrationTest {
     }
 
     private Person createPersonWithoutAccount(String name, boolean active) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(active);
         Person saved = personRepository.saveAndFlush(person);
         entityManager.clear();
@@ -499,10 +496,7 @@ class NotificationDeliveryServiceIntegrationTest {
     }
 
     private Fixture createPersonWithAccount(String name, List<String> authorities, boolean personActive, boolean accountEnabled) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(personActive);
         Person savedPerson = personRepository.saveAndFlush(person);
 

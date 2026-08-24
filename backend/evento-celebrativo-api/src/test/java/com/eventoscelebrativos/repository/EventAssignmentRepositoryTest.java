@@ -736,8 +736,7 @@ class EventAssignmentRepositoryTest {
     }
 
     private Person savePerson(String name, String phoneNumber) {
-        Person person = new Person();
-        populatePerson(person, name, phoneNumber);
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
         entityManager.persist(person);
         entityManager.flush();
         return person;
@@ -747,12 +746,6 @@ class EventAssignmentRepositoryTest {
         EventAssignment assignment = new EventAssignment(event, person, assignmentType);
         entityManager.persist(assignment);
         return assignment;
-    }
-
-    private void populatePerson(Person person, String name, String phoneNumber) {
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
     }
 
     private Statistics hibernateStatistics() {

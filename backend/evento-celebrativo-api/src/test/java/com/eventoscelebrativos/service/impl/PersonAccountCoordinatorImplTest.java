@@ -22,11 +22,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -149,7 +151,7 @@ class PersonAccountCoordinatorImplTest {
 
     @Test
     void shouldRejectProvisioningForUnpersistedPerson() {
-        Person transientPerson = new Person();
+        Person transientPerson = new Person("Transient Person", "34999999990", LocalDate.of(1990, 1, 1));
         assertThrows(BadRequestException.class, () -> coordinator.provisionAccess(transientPerson, request(true, "senha123", null)));
         verifyNoInteractions(userAccountRepository, userAccountRoleRepository);
     }
@@ -243,7 +245,7 @@ class PersonAccountCoordinatorImplTest {
 
     @Test
     void shouldRejectSynchronizationForUnpersistedPerson() {
-        Person transientPerson = new Person();
+        Person transientPerson = new Person("Transient Person", "34999999990", LocalDate.of(1990, 1, 1));
         assertThrows(BadRequestException.class, () -> coordinator.synchronizeAccountAfterPersonUpdate(transientPerson));
     }
 
@@ -363,10 +365,8 @@ class PersonAccountCoordinatorImplTest {
     }
 
     private Person person(Long id, String phoneNumber, boolean active) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Person " + id);
-        person.setPhoneNumber(phoneNumber);
+        Person person = new Person("Person " + id, phoneNumber, LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(active);
         return person;
     }

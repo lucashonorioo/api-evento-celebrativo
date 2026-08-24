@@ -5,7 +5,9 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -188,9 +190,8 @@ class PersonMinistryEligibilityResolverTest {
     }
 
     private Person person(Long id) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Person " + id);
+        Person person = new Person("Person " + id, "34980" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

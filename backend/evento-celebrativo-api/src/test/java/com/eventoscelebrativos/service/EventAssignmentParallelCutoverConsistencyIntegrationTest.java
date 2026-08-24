@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -415,9 +416,10 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
         String phoneNumber = uniquePhoneNumber();
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person(name, phone_number, birthday_date)
-                VALUES (?, ?, '1990-01-10')
+                INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
+                VALUES (?, ?, ?, '1990-01-10')
                 """,
+                newPublicId(),
                 name + " " + UUID.randomUUID(),
                 phoneNumber
         );
@@ -488,6 +490,14 @@ class EventAssignmentParallelCutoverConsistencyIntegrationTest {
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3498" + String.format("%07d", suffix);
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     @FunctionalInterface

@@ -22,9 +22,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -298,10 +300,8 @@ class CelebrationEventLifecycleServiceImplTest {
     }
 
     private Person person(Long id) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Pessoa " + id);
-        person.setPhoneNumber("34" + id);
+        Person person = new Person("Pessoa " + id, "34" + id, LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

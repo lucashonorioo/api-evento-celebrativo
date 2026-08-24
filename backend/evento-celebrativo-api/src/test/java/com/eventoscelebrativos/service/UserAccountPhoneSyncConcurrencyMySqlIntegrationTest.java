@@ -235,10 +235,7 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
     private Long createReaderPersonWithSyncedAccount() {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName("Concurrent Phone Reader");
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setBirthdayDate(BIRTHDAY);
+            Person person = new Person("Concurrent Phone Reader", uniquePhoneNumber(), BIRTHDAY);
             Person saved = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));
             Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();

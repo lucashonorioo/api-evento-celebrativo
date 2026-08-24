@@ -305,32 +305,27 @@ class ScaleParticipantEligibilityIntegrationTest {
     }
 
     private Person savePriestWithMinistry(String name) {
-        Person priest = new Person();
-        populatePerson(priest, name);
+        Person priest = person(name);
         priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
     private Person savePriestWithoutMinistry(String name) {
-        Person priest = new Person();
-        populatePerson(priest, name);
+        Person priest = person(name);
         return personRepository.saveAndFlush(priest);
     }
 
     private Person saveReaderWithExtraMinistry(String name, MinistryType extraMinistry) {
-        Person reader = new Person();
-        populatePerson(reader, name);
+        Person reader = person(name);
         reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, extraMinistry));
         return reader;
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
     }
 
     private Location location(String name) {

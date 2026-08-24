@@ -13,8 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.security.core.GrantedAuthority;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
@@ -216,8 +218,8 @@ class UserAccountAuthenticationServiceImplTest {
     }
 
     private Person person(Long id, boolean active) {
-        Person person = new Person();
-        person.setId(id);
+        Person person = new Person("Person " + id, "34983" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(active);
         return person;
     }

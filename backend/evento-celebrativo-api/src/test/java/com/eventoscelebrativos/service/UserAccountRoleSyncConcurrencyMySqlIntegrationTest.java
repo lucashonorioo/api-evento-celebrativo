@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -280,9 +281,7 @@ class UserAccountRoleSyncConcurrencyMySqlIntegrationTest {
     private Long createPersonWithSyncedAccount(String name, String authority) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName(name);
-            person.setPhoneNumber(uniquePhoneNumber());
+            Person person = new Person(name, uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
             Person saved = personRepository.save(person);
             Role role = roleRepository.findByAuthority(authority).orElseThrow();
             LocalDateTime now = LocalDateTime.now().withNano(0);

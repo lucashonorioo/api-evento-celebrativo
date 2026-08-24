@@ -195,21 +195,15 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
     }
 
     private Person eucharisticMinister(String name) {
-        Person minister = new Person();
-        populatePerson(minister, name);
-        return minister;
+        return person(name);
     }
 
     private Person reader(String name) {
-        Person reader = new Person();
-        populatePerson(reader, name);
-        return reader;
+        return person(name);
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name, uniquePhoneNumber(), BIRTHDAY);
     }
 
     private Location location(String name) {

@@ -158,10 +158,7 @@ class ScheduleConflictCancelledEventIntegrationTest {
     // Person precisa de PersonMinistry(READER).active=true: reactivate() revalida a escala preservada
     // durante o cancelamento (secao 32/38) via PersonMinistryEligibilityResolver antes de reconciliar.
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(true);
         Person saved = personRepository.saveAndFlush(person);
         personMinistryRepository.saveAndFlush(new PersonMinistry(saved, MinistryType.READER));

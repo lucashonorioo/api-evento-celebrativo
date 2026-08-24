@@ -10,6 +10,9 @@ import com.eventoscelebrativos.security.WithMockAuthenticatedUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.ByteBuffer;
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -311,8 +314,17 @@ class ParishStaffAssignmentIntegrationTest {
 
     private long insertPerson(String name, String phoneNumber, boolean active) {
         jdbcTemplate.update(
-                "INSERT INTO tb_person(name, phone_number, active) VALUES (?, ?, ?)", name, phoneNumber, active);
+                "INSERT INTO tb_person(public_id, name, phone_number, active) VALUES (?, ?, ?, ?)",
+                newPublicId(), name, phoneNumber, active);
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     private void insertActivePriestMinistry(long personId) {

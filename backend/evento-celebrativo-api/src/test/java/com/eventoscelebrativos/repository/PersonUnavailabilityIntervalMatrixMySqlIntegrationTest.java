@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -122,9 +123,7 @@ class PersonUnavailabilityIntervalMatrixMySqlIntegrationTest {
     void setUp() {
         Assumptions.assumeTrue(mysqlAvailable, "MySQL 8.4 real nao acessivel; teste ignorado.");
 
-        person = new Person();
-        person.setName("Interval Matrix Person");
-        person.setPhoneNumber(uniquePhoneNumber());
+        person = new Person("Interval Matrix Person", uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         person = personRepository.saveAndFlush(person);
 
         // Evento de referencia: 19h00 as 20h00 do dia 2026-09-10.

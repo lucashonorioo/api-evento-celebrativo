@@ -102,10 +102,7 @@ class PublicLoginProxyIntegrationTest {
     }
 
     private void createPersonWithAccount(String phone, String rawPassword) {
-        Person person = new Person();
-        person.setName("Public Login Proxy Person");
-        person.setPhoneNumber(phone);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person("Public Login Proxy Person", phone, BIRTHDAY);
         person.setActive(true);
         Person saved = personRepository.saveAndFlush(person);
 

@@ -111,10 +111,7 @@ class ScopedDomainAuthorizationIntegrationTest {
     }
 
     private Person savePerson(String name, String phoneNumber) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
         return personRepository.saveAndFlush(person);
     }
 }

@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.LocalDate;
@@ -146,6 +147,13 @@ class PersonCadastralUpdateServiceImplTest {
     }
 
     @Test
+    void shouldRejectPhoneNumberWithNonNumericCharacters() {
+        Person person = person(1L, "Alice", "abcdefghijk");
+        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        verifyNoInteractions(personRepository, personAccountCoordinator);
+    }
+
+    @Test
     void shouldRejectNullBirthdayDate() {
         Person person = person(1L, "Alice", "34999999991");
         person.setBirthdayDate(null);
@@ -175,11 +183,8 @@ class PersonCadastralUpdateServiceImplTest {
     }
 
     private Person person(Long id, String name, String phoneNumber) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(true);
         return person;
     }

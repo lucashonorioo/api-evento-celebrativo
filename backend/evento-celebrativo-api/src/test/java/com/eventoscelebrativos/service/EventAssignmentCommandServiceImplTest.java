@@ -14,7 +14,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -55,8 +57,8 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldCreateAssignmentsForAllTypes() {
         CelebrationEvent event = event(1L);
-        Person priest = person(new Person(), 10L);
-        Person reader = person(new Person(), 11L);
+        Person priest = person(10L);
+        Person reader = person(11L);
 
         service.synchronizeAssignments(event, List.of(), List.of(
                 new EventAssignmentTarget(priest, EventAssignmentType.PRIEST),
@@ -73,7 +75,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldBeIdempotentAndPreserveExistingAssignment() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
@@ -90,9 +92,9 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldAddAndRemoveOnlyChangedAssignments() {
         CelebrationEvent event = event(1L);
-        Person kept = person(new Person(), 11L);
-        Person removed = person(new Person(), 12L);
-        Person added = person(new Person(), 13L);
+        Person kept = person(11L);
+        Person removed = person(12L);
+        Person added = person(13L);
         EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
         EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
 
@@ -113,8 +115,8 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldReplacePriestByRemovingOldAndCreatingNew() {
         CelebrationEvent event = event(1L);
-        Person oldPriest = person(new Person(), 10L);
-        Person newPriest = person(new Person(), 20L);
+        Person oldPriest = person(10L);
+        Person newPriest = person(20L);
         EventAssignment oldAssignment = assignment(100L, event, oldPriest, EventAssignmentType.PRIEST);
 
         service.synchronizeAssignments(event, List.of(oldAssignment),
@@ -131,7 +133,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldUpdateAssignmentTypeInPlaceWhenSamePersonChangesFunctionPreservingIdAndCreatedAt() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         existing.setCreatedAt(createdAt);
@@ -153,7 +155,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldRemoveAllAssignmentsWhenTargetsAreEmpty() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
         EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
 
         service.synchronizeAssignments(event, List.of(assignment), List.of());
@@ -167,7 +169,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldRejectDuplicatePersonAcrossTargetsRegardlessOfAssignmentType() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
 
         MultipleAssignmentsForPersonInEventException sameType = assertThrows(
                 MultipleAssignmentsForPersonInEventException.class, () -> service.synchronizeAssignments(event, List.of(), List.of(
@@ -190,7 +192,7 @@ class EventAssignmentCommandServiceImplTest {
 
     @Test
     void shouldRejectInvalidEventOrTarget() {
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
 
         assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(null), List.of(), List.of()));
         assertThrows(BusinessException.class, () -> service.synchronizeAssignments(event(1L), List.of(), List.of(
@@ -215,9 +217,9 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldRetainParticipationResponsesOnlyForPeopleStillAssignedAfterSync() {
         CelebrationEvent event = event(1L);
-        Person kept = person(new Person(), 11L);
-        Person removed = person(new Person(), 12L);
-        Person added = person(new Person(), 13L);
+        Person kept = person(11L);
+        Person removed = person(12L);
+        Person added = person(13L);
         EventAssignment keptAssignment = assignment(100L, event, kept, EventAssignmentType.READER);
         EventAssignment removedAssignment = assignment(101L, event, removed, EventAssignmentType.READER);
 
@@ -234,7 +236,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldRetainSamePersonWhenOnlyFunctionChanges() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
         EventAssignment existing = assignment(100L, event, reader, EventAssignmentType.READER);
 
         service.synchronizeAssignments(event, List.of(existing),
@@ -248,7 +250,7 @@ class EventAssignmentCommandServiceImplTest {
     @Test
     void shouldRetainEmptyPersonSetWhenAllAssignmentsAreRemoved() {
         CelebrationEvent event = event(1L);
-        Person reader = person(new Person(), 11L);
+        Person reader = person(11L);
         EventAssignment assignment = assignment(100L, event, reader, EventAssignmentType.READER);
 
         service.synchronizeAssignments(event, List.of(assignment), List.of());
@@ -262,10 +264,9 @@ class EventAssignmentCommandServiceImplTest {
         return event;
     }
 
-    private <T extends Person> T person(T person, Long id) {
-        person.setId(id);
-        person.setName("Person " + id);
-        person.setPhoneNumber("34975" + String.format("%06d", id));
+    private Person person(Long id) {
+        Person person = new Person("Person " + id, "34975" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

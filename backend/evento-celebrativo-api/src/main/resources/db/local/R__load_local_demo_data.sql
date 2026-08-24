@@ -6,72 +6,72 @@
 -- PersonMinistry, UserAccount, UserAccountRole, eventos, locations e assignments quando o
 -- Flyway reexecuta o script inteiro em um banco ja populado.
 
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Luana Odinson', '34989374748', '1988-05-21' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000001', 'Luana Odinson', '34989374748', '1988-05-21' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34989374748');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Miguel Souza', '34962165544', '1995-02-18' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000002', 'Miguel Souza', '34962165544', '1995-02-18' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34962165544');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Helena Oliveira', '34991564562', '1999-09-06' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000003', 'Helena Oliveira', '34991564562', '1999-09-06' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991564562');
 
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Alice Lima', '34983246978', '1989-08-24' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000004', 'Alice Lima', '34983246978', '1989-08-24' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34983246978');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Arthur Costa', '34978956324', '2005-03-24' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000005', 'Arthur Costa', '34978956324', '2005-03-24' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34978956324');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Heloísa Ribeiro', '34998632145', '1986-10-17' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000006', 'Heloísa Ribeiro', '34998632145', '1986-10-17' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34998632145');
 
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Davi Gomes', '34963284523', '2003-06-02' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000007', 'Davi Gomes', '34963284523', '2003-06-02' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34963284523');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Laura Alves', '34998563215', '2006-07-11' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000008', 'Laura Alves', '34998563215', '2006-07-11' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34998563215');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Bernardo Ferreira', '34936984562', '1982-12-08' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000009', 'Bernardo Ferreira', '34936984562', '1982-12-08' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34936984562');
 
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Mariana Ferraz', '34989374749', '1988-05-21' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000A', 'Mariana Ferraz', '34989374749', '1988-05-21' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34989374749');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Carlos Silva', '34991234567', '1975-11-10' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000B', 'Carlos Silva', '34991234567', '1975-11-10' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991234567');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Fernanda Souza', '34987654321', '1992-03-25' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000C', 'Fernanda Souza', '34987654321', '1992-03-25' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34987654321');
 
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Padre Miguel', '34988776655', '1968-07-14' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000D', 'Padre Miguel', '34988776655', '1968-07-14' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34988776655');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Padre Paulo', '34999887766', '1980-01-08' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000E', 'Padre Paulo', '34999887766', '1980-01-08' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34999887766');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Padre Roberto', '34981112233', '1972-09-03' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'0000000000000000000000000000000F', 'Padre Roberto', '34981112233', '1972-09-03' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34981112233');
 
 -- Pessoas novas: cobrem o cenario "accountExists=false" / role=null de cada ministry no
 -- frontend. Nunca recebem tb_user_account nem tb_user_account_role.
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Camila Martins', '34991110001', '1990-04-12' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000010', 'Camila Martins', '34991110001', '1990-04-12' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110001');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Gabriel Santos', '34991110002', '1993-11-08' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000011', 'Gabriel Santos', '34991110002', '1993-11-08' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110002');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Rafael Moreira', '34991110003', '1985-02-27' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000012', 'Rafael Moreira', '34991110003', '1985-02-27' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110003');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Juliana Mendes', '34991110004', '1998-06-15' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000013', 'Juliana Mendes', '34991110004', '1998-06-15' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110004');
-INSERT INTO tb_person (name, phone_number, birthday_date)
-SELECT 'Padre Antônio', '34991110005', '1965-09-30' FROM dual
+INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
+SELECT X'00000000000000000000000000000014', 'Padre Antônio', '34991110005', '1965-09-30' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110005');
 
 INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)

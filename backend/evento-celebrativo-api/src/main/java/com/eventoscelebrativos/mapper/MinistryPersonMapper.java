@@ -13,8 +13,17 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface MinistryPersonMapper {
 
-    @Mapping(target = "id", ignore = true)
-    Person toEntity(MinistryPersonCreateRequestDTO requestDTO);
+    default Person toEntity(MinistryPersonCreateRequestDTO requestDTO) {
+        if (requestDTO == null) {
+            return null;
+        }
+
+        return new Person(
+                requestDTO.getName(),
+                requestDTO.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        );
+    }
 
     default MinistryPersonResponseDTO toDto(Person person) {
         return new MinistryPersonResponseDTO(

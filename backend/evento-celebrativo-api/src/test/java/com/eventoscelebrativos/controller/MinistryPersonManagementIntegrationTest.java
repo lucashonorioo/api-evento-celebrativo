@@ -667,10 +667,7 @@ class MinistryPersonManagementIntegrationTest {
     }
 
     private long createPerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(String.valueOf(PHONE_SEQ.incrementAndGet()));
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, String.valueOf(PHONE_SEQ.incrementAndGet()), LocalDate.of(1990, 1, 10));
         return personRepository.saveAndFlush(person).getId();
     }
 

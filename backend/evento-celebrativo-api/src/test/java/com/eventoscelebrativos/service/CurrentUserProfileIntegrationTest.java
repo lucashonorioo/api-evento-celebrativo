@@ -240,10 +240,7 @@ class CurrentUserProfileIntegrationTest {
     }
 
     private Long savePersonWithRole(String name, String phoneNumber, String roleAuthority) {
-        Person person = new Person();
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name + " " + UUID.randomUUID(), phoneNumber, BIRTHDAY);
         Person saved = personRepository.saveAndFlush(person);
         LocalDateTime now = LocalDateTime.now().withNano(0);
         UserAccount account = userAccountRepository.saveAndFlush(

@@ -229,25 +229,21 @@ class EventAssignmentOfficialWriteIntegrationTest {
     }
 
     private Person savePriest(String name) {
-        Person priest = new Person();
-        populatePerson(priest, name);
+        Person priest = person(name);
         priest = personRepository.saveAndFlush(priest);
         personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
         return priest;
     }
 
     private Person saveReader(String name) {
-        Person reader = new Person();
-        populatePerson(reader, name);
+        Person reader = person(name);
         reader = personRepository.saveAndFlush(reader);
         personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
         return reader;
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
     }
 
     private Location location(String name) {

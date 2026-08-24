@@ -175,10 +175,11 @@ class PersonMinistryParallelReadIntegrationTest {
     }
 
     private Person savePerson(String name, String phoneNumber) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber + UUID.randomUUID().toString().replace("-", "").substring(0, 4));
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(
+                name,
+                phoneNumber + UUID.randomUUID().toString().replace("-", "").substring(0, 4),
+                BIRTHDAY
+        );
         Person saved = personRepository.saveAndFlush(person);
         personMinistryRepository.flush();
         return saved;

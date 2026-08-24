@@ -215,10 +215,7 @@ class ScheduleConflictTemporalBoundaryIntegrationTest {
     }
 
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(true);
         return personRepository.saveAndFlush(person);
     }

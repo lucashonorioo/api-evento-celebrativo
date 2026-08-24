@@ -29,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.time.Clock;
@@ -536,11 +537,8 @@ class UserAccountLifecycleServiceImplTest {
     }
 
     private Person person(Long id, String phoneNumber, boolean active) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Person " + id);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person("Person " + id, phoneNumber, BIRTHDAY);
+        ReflectionTestUtils.setField(person, "id", id);
         person.setActive(active);
         return person;
     }
