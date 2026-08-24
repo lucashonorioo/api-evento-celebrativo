@@ -246,10 +246,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
     }
 
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhoneNumber(), BIRTHDAY);
         return personRepository.saveAndFlush(person);
     }
 

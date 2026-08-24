@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,7 +66,7 @@ class V20CreateParishStaffAssignmentIntegrationTest {
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(22, first.migrations.size());
+        assertEquals(25, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 
@@ -168,8 +169,18 @@ class V20CreateParishStaffAssignmentIntegrationTest {
     }
 
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
-        jdbcTemplate.update("INSERT INTO tb_person(name, phone_number) VALUES (?, ?)", name, phoneNumber);
+        jdbcTemplate.update(
+                "INSERT INTO tb_person(public_id, name, phone_number) VALUES (?, ?, ?)",
+                newPublicId(), name, phoneNumber);
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     private void migrateUntil(DataSource dataSource, String target) {

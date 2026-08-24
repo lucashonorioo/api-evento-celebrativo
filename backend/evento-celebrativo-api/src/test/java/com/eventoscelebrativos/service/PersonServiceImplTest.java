@@ -39,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -1166,11 +1167,8 @@ class PersonServiceImplTest {
     }
 
     private Person person(Long id, String name, String phoneNumber) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

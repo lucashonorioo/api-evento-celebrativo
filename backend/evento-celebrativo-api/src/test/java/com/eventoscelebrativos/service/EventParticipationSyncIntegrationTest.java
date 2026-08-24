@@ -204,10 +204,7 @@ class EventParticipationSyncIntegrationTest {
     }
 
     private Person savePersonWithMinistries(String name, MinistryType... ministryTypes) {
-        Person person = new Person();
-        person.setName(name + " " + UUID.randomUUID());
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         person = personRepository.saveAndFlush(person);
         for (MinistryType ministryType : ministryTypes) {
             personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));

@@ -288,10 +288,7 @@ class EventAssignmentConcurrencyIntegrationTest {
     }
 
     private Person savePerson(String name, String phoneNumber) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, phoneNumber, BIRTHDAY);
         return personRepository.saveAndFlush(person);
     }
 

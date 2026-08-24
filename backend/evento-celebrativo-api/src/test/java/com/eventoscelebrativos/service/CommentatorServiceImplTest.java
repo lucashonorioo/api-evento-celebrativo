@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -185,11 +186,8 @@ class CommentatorServiceImplTest {
     }
 
     private Person commentator(Long id) {
-        Person commentator = new Person();
-        commentator.setId(id);
-        commentator.setName("Commentator");
-        commentator.setPhoneNumber("34999999992");
-        commentator.setBirthdayDate(BIRTHDAY);
+        Person commentator = new Person("Commentator", "34999999992", BIRTHDAY);
+        ReflectionTestUtils.setField(commentator, "id", id);
         return commentator;
     }
 
@@ -198,11 +196,8 @@ class CommentatorServiceImplTest {
     }
 
     private Person reader(Long id) {
-        Person reader = new Person();
-        reader.setId(id);
-        reader.setName("Reader");
-        reader.setPhoneNumber("34999999991");
-        reader.setBirthdayDate(BIRTHDAY);
+        Person reader = new Person("Reader", "34999999991", BIRTHDAY);
+        ReflectionTestUtils.setField(reader, "id", id);
         return reader;
     }
 }

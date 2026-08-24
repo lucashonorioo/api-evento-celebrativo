@@ -165,9 +165,7 @@ class AuthenticationCutoverIntegrationTest {
     @Test
     void shouldRejectLoginWhenPersonHasNoAccount() throws Exception {
         String phone = uniquePhone();
-        Person person = new Person();
-        person.setName("Sem Conta");
-        person.setPhoneNumber(phone);
+        Person person = new Person("Sem Conta", phone, BIRTHDAY);
         person.setActive(true);
         personRepository.saveAndFlush(person);
 
@@ -794,10 +792,7 @@ class AuthenticationCutoverIntegrationTest {
     }
 
     private Person createPerson(String phone, boolean active) {
-        Person person = new Person();
-        person.setName("Auth Cutover Person");
-        person.setPhoneNumber(phone);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person("Auth Cutover Person", phone, BIRTHDAY);
         person.setActive(active);
         return person;
     }

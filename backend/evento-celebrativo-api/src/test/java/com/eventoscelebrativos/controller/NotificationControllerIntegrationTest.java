@@ -313,10 +313,7 @@ class NotificationControllerIntegrationTest {
 
     private Account createAccountAndToken(String name, String authority, List<Long> cleanupPersonIds) throws Exception {
         String phone = uniquePhone();
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(phone);
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, phone, BIRTHDAY);
         person.setActive(true);
         Person savedPerson = personRepository.saveAndFlush(person);
         cleanupPersonIds.add(savedPerson.getId());

@@ -532,10 +532,7 @@ class ParishSecretaryOperationsIntegrationTest {
     }
 
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber("3" + PHONE_SEQ.incrementAndGet());
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, "3" + PHONE_SEQ.incrementAndGet(), LocalDate.of(1990, 1, 10));
         return personRepository.saveAndFlush(person);
     }
 }

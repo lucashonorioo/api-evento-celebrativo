@@ -2,20 +2,30 @@ package com.eventoscelebrativos.model;
 
 import jakarta.persistence.*;
 
-import java.io.Serial;
-import java.io.Serializable;
 import java.time.LocalDate;
-import java.util.Objects;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_person")
-public class Person implements Serializable {
-    @Serial
-    private static final long serialVersionUID = 1L;
+public class Person {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(
+            name = "public_id",
+            nullable = false,
+            unique = true,
+            updatable = false,
+            length = 16
+    )
+    private UUID publicId = UUID.randomUUID();
+
     private String name;
 
     @Column(unique = true)
@@ -25,29 +35,53 @@ public class Person implements Serializable {
     @Column(nullable = false)
     private boolean active = true;
 
-    public Person(){
+    protected Person(){
 
+    }
+
+    public Person(String name, String phoneNumber, LocalDate birthdayDate) {
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+        this.birthdayDate = birthdayDate;
+    }
+
+    public void updateCadastralData(
+            String name,
+            String phoneNumber,
+            LocalDate birthdayDate
+    ) {
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+        this.birthdayDate = birthdayDate;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        Person person = (Person) o;
-        return Objects.equals(phoneNumber, person.phoneNumber);
+        if (this == o) {
+            return true;
+        }
+
+        if (!(o instanceof Person person)) {
+            return false;
+        }
+
+        return publicId.equals(person.getPublicId());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(phoneNumber);
+        return publicId.hashCode();
     }
 
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public UUID getPublicId() {
+        return publicId;
     }
+
+
 
     public String getName() {
         return name;

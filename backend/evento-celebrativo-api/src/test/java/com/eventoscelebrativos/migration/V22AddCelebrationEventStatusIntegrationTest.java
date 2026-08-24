@@ -44,7 +44,7 @@ class V22AddCelebrationEventStatusIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(1, result.migrationsExecuted);
+        assertEquals(4, result.migrationsExecuted);
         assertEquals("ACTIVE", jdbcTemplate.queryForObject(
                 "SELECT status FROM tb_celebration_event WHERE id = ?", String.class, eventId));
     }
@@ -96,13 +96,13 @@ class V22AddCelebrationEventStatusIntegrationTest {
     }
 
     @Test
-    void shouldNotAlterAnyPreviousMigrationAndApplyExactly22MigrationsFromEmptySchema() {
+    void shouldNotAlterAnyPreviousMigrationAndApplyExactly25MigrationsFromEmptySchema() {
         DataSource dataSource = newIsolatedH2DataSource();
 
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(22, first.migrations.size());
+        assertEquals(25, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 

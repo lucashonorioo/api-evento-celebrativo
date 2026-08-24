@@ -1,6 +1,9 @@
 package com.eventoscelebrativos.model;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,9 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PersonMinistryTest {
 
     private Person person() {
-        Person person = new Person();
-        person.setId(1L);
-        person.setName("Pessoa");
+        Person person = new Person("Pessoa", "34999999999", LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", 1L);
         return person;
     }
 

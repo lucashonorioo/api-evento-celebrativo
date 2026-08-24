@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -295,6 +296,30 @@ class PersonRepositoryTest {
                 "A quantidade de consultas SQL deve ser constante independentemente do numero de itens na pagina");
     }
 
+    @Test
+    void shouldPersistAndReloadPersonWithSamePublicId() {
+        Person person = newPerson(
+                "Public Id Person",
+                "34979999999"
+        );
+
+        UUID publicIdBeforePersist = person.getPublicId();
+
+        entityManager.persist(person);
+        entityManager.flush();
+        entityManager.clear();
+
+        Person reloaded = personRepository
+                .findById(person.getId())
+                .orElseThrow();
+
+        assertNotSame(person, reloaded);
+        assertEquals(publicIdBeforePersist, reloaded.getPublicId());
+        assertEquals(person, reloaded);
+        assertEquals(person.hashCode(), reloaded.hashCode());
+    }
+
+
     /**
      * entityManager.clear() antes da medicao (apos o setup de cada lote) esvazia o contexto de
      * persistencia para que as consultas medidas nao sejam satisfeitas pelo cache de primeiro nivel;
@@ -356,11 +381,7 @@ class PersonRepositoryTest {
     }
 
     private Person newPerson(String name, String phoneNumber) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(phoneNumber);
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
-        return person;
+        return new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
     }
 
     private void saveMinistry(Person person, MinistryType ministryType) {
@@ -369,6 +390,9 @@ class PersonRepositoryTest {
         entityManager.clear();
     }
 
+
+
+
     private Role operatorRole() {
         return roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();
     }
@@ -376,4 +400,8 @@ class PersonRepositoryTest {
     private Role adminRole() {
         return roleRepository.findByAuthority("ROLE_ADMIN").orElseThrow();
     }
+
+
+
+
 }

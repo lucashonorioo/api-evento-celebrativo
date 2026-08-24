@@ -13,7 +13,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -211,10 +213,8 @@ class EventAssignmentReadServiceImplTest {
     }
 
     private Person person(Long personId, String name) {
-        Person person = new Person();
-        person.setId(personId);
-        person.setName(name);
-        person.setPhoneNumber("34976" + String.format("%06d", personId));
+        Person person = new Person(name, "34976" + String.format("%06d", personId), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", personId);
         return person;
     }
 }

@@ -14,8 +14,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -45,9 +47,8 @@ class MinistryCoordinationServiceImplTest {
     }
 
     private Person person(Long id) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Pessoa " + id);
+        Person person = new Person("Pessoa " + id, "34978" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

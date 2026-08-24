@@ -292,10 +292,7 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
 
     private Long createReaderPerson() {
         return new TransactionTemplate(transactionManager).execute(status -> {
-            Person person = new Person();
-            person.setName("Concurrency Reader " + UUID.randomUUID());
-            person.setPhoneNumber(uniquePhoneNumber());
-            person.setBirthdayDate(BIRTHDAY);
+            Person person = new Person("Concurrency Reader " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
             person.setActive(true);
             Person saved = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));

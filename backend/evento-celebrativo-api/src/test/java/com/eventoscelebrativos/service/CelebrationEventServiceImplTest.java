@@ -49,6 +49,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -221,7 +222,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldAcceptEventWithScaleCreationAtCurrentSecondUsingApplicationClock() {
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
+        Person priest = person(8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
         CelebrationEventWithScaleRequestDTO request = eventWithScaleRequest();
         LocalDateTime now = LocalDateTime.of(2026, 8, 15, 18, 0);
@@ -953,11 +954,11 @@ class CelebrationEventServiceImplTest {
     void shouldUpdateEventScaleWhenEventExists() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
-        Person reader = person(new Person(), 2L, "Leitor");
-        Person commentator = person(new Person(), 4L, "Comentarista");
-        Person ministerOfTheWord = person(new Person(), 5L, "Ministro da Palavra");
-        Person eucharisticMinister = person(new Person(), 6L, "Ministro da Eucaristia");
+        Person priest = person(8L, "Padre");
+        Person reader = person(2L, "Leitor");
+        Person commentator = person(4L, "Comentarista");
+        Person ministerOfTheWord = person(5L, "Ministro da Palavra");
+        Person eucharisticMinister = person(6L, "Ministro da Eucaristia");
         CelebrationEventScaleRequestDTO request = scaleRequest();
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
@@ -988,7 +989,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldCreateEventWithScale() {
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
+        Person priest = person(8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -1038,7 +1039,7 @@ class CelebrationEventServiceImplTest {
     void shouldPropagateOfficialAssignmentWriteFailureOnUpdateWithoutPartialWrite() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
+        Person priest = person(8L, "Padre");
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -1055,7 +1056,7 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldNotSaveEventWithScaleWhenOfficialAssignmentWriteFailsOnCreate() {
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
+        Person priest = person(8L, "Padre");
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(priest, MinistryType.PRIEST)));
@@ -1103,7 +1104,7 @@ class CelebrationEventServiceImplTest {
         CelebrationEvent event = event(1L);
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        Person personWithPriestMinistry = person(new Person(), 8L, "Leitor");
+        Person personWithPriestMinistry = person(8L, "Leitor");
         when(personMinistryEligibilityResolver.resolve(any()))
                 .thenReturn(List.of(eligible(personWithPriestMinistry, MinistryType.PRIEST)));
         when(scaleMapper.toDto(eq(event), any(EventScaleAssignmentPlan.class))).thenReturn(new CelebrationEventScaleResponseDTO());
@@ -1121,7 +1122,7 @@ class CelebrationEventServiceImplTest {
     void shouldThrowBusinessExceptionWhenScalePersonHasCompatibleLegacyTypeButNoActiveMinistry() {
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event(1L)));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
-        Person priestWithoutActiveMinistry = person(new Person(), 8L, "Padre");
+        Person priestWithoutActiveMinistry = person(8L, "Padre");
         when(personMinistryEligibilityResolver.resolve(any()))
                 .thenReturn(List.of(ministryNotAssigned(priestWithoutActiveMinistry, MinistryType.PRIEST)));
 
@@ -1210,7 +1211,7 @@ class CelebrationEventServiceImplTest {
     void shouldNotChangePersonRegistrationDataWhenUpdatingScale() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person priest = person(new Person(), 8L, "Padre");
+        Person priest = person(8L, "Padre");
         priest.setPhoneNumber("34999999999");
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
@@ -1227,7 +1228,7 @@ class CelebrationEventServiceImplTest {
     void shouldNotCreateEventWithScaleWhenScaleIsInvalid() {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location(1L)));
         when(personMinistryEligibilityResolver.resolve(any()))
-                .thenReturn(List.of(ministryNotAssigned(person(new Person(), 8L, "Leitor"), MinistryType.PRIEST)));
+                .thenReturn(List.of(ministryNotAssigned(person(8L, "Leitor"), MinistryType.PRIEST)));
 
         assertThrows(BusinessException.class, () -> service.createEventWithScale(eventWithScaleRequest()));
         verify(repository, never()).save(any());
@@ -1237,8 +1238,8 @@ class CelebrationEventServiceImplTest {
     @Test
     void shouldLockPersonsInAscendingOrderBeforeSavingEventWithScale() {
         Location location = location(1L);
-        Person lowerId = person(new Person(), 2L, "Leitor");
-        Person higherId = person(new Person(), 8L, "Padre");
+        Person lowerId = person(2L, "Leitor");
+        Person higherId = person(8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -1268,12 +1269,12 @@ class CelebrationEventServiceImplTest {
     void shouldLockUnionOfCurrentAndTargetPersonsWhenUpdatingScale() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person newPerson = person(new Person(), 8L, "Padre");
+        Person newPerson = person(8L, "Padre");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
-                eventAssignment(event, person(new Person(), 3L, "Leitor Atual"), EventAssignmentType.READER)
+                eventAssignment(event, person(3L, "Leitor Atual"), EventAssignmentType.READER)
         ));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
         when(personMinistryEligibilityResolver.resolve(any())).thenReturn(List.of(eligible(newPerson, MinistryType.PRIEST)));
@@ -1288,7 +1289,7 @@ class CelebrationEventServiceImplTest {
     void shouldNeverValidateAvailabilityForRetainedPersonWhenFunctionChangesOnScaleUpdate() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person retainedPerson = person(new Person(), 3L, "Leitor Retido");
+        Person retainedPerson = person(3L, "Leitor Retido");
         CelebrationEventScaleResponseDTO response = new CelebrationEventScaleResponseDTO();
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
@@ -1316,7 +1317,7 @@ class CelebrationEventServiceImplTest {
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
-                eventAssignment(existingEvent, person(new Person(), 3L, "Leitor"), EventAssignmentType.READER)
+                eventAssignment(existingEvent, person(3L, "Leitor"), EventAssignmentType.READER)
         ));
         when(repository.save(existingEvent)).thenReturn(saved);
         when(mapper.toDto(saved)).thenReturn(responseDto);
@@ -1332,7 +1333,7 @@ class CelebrationEventServiceImplTest {
         LocalDateTime newStartAt = EVENT_START_AT.plusMinutes(15);
         CelebrationEventRequestDTO request =
                 new CelebrationEventRequestDTO("Missa", newStartAt, EVENT_END_AT, true);
-        Person assignedPerson = person(new Person(), 3L, "Leitor");
+        Person assignedPerson = person(3L, "Leitor");
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
         when(eventAssignmentRepository.findAllByEventIdForUpdate(1L)).thenReturn(List.of(
@@ -1356,7 +1357,7 @@ class CelebrationEventServiceImplTest {
         LocalDateTime newStartAt = EVENT_START_AT.plusDays(5);
         LocalDateTime newEndAt = EVENT_END_AT.plusDays(5);
         CelebrationEventRequestDTO changedDateRequest = new CelebrationEventRequestDTO("Missa", newStartAt, newEndAt, true);
-        Person assignedPerson = person(new Person(), 3L, "Leitor");
+        Person assignedPerson = person(3L, "Leitor");
         CelebrationEventResponseDTO responseDto = response(1L);
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(existingEvent));
@@ -1428,10 +1429,9 @@ class CelebrationEventServiceImplTest {
         return new Location(id, "Igreja Matriz", "Praça Central");
     }
 
-    private <T extends Person> T person(T person, Long id, String name) {
-        person.setId(id);
-        person.setName(name);
-        person.setPhoneNumber("34" + id);
+    private Person person(Long id, String name) {
+        Person person = new Person(name, "34" + id, LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 

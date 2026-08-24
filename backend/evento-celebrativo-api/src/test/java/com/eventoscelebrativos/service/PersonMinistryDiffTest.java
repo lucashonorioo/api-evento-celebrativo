@@ -5,6 +5,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -114,7 +115,10 @@ class PersonMinistryDiffTest {
     }
 
     private PersonMinistry ministry(MinistryType type, boolean active) {
-        PersonMinistry personMinistry = new PersonMinistry(new Person(), type);
+        PersonMinistry personMinistry = new PersonMinistry(
+                new Person("Pessoa Teste", "34999999999", LocalDate.of(1990, 1, 1)),
+                type
+        );
         personMinistry.setActive(active);
         return personMinistry;
     }

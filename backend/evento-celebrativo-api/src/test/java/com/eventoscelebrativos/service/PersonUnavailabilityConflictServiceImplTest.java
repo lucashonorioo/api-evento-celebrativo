@@ -16,6 +16,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -83,9 +84,9 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     @Test
     void shouldLockPersonsInAscendingOrderRegardlessOfInputOrder() {
-        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Person()));
-        when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(new Person()));
-        when(personRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(new Person()));
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person(1L)));
+        when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(person(2L)));
+        when(personRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(person(3L)));
 
         service.lockPersonsInOrder(List.of(3L, 1L, 2L));
 
@@ -163,5 +164,9 @@ class PersonUnavailabilityConflictServiceImplTest {
 
     private static LocalDateTime at(int year, int month, int day, int hour, int minute) {
         return LocalDateTime.of(year, month, day, hour, minute);
+    }
+
+    private Person person(Long id) {
+        return new Person("Pessoa " + id, "34982" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
     }
 }

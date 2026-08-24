@@ -288,10 +288,7 @@ class PersonPhoneNumberContentionConcurrencyMySqlIntegrationTest {
     private Long createPersonWithSyncedAccount(String phoneNumber) {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
-            Person person = new Person();
-            person.setName("Contention Person");
-            person.setPhoneNumber(phoneNumber);
-            person.setBirthdayDate(BIRTHDAY);
+            Person person = new Person("Contention Person", phoneNumber, BIRTHDAY);
             Person saved = personRepository.save(person);
             Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();
             LocalDateTime now = LocalDateTime.now().withNano(0);

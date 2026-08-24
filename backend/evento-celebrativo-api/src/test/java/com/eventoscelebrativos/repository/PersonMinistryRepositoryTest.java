@@ -316,10 +316,7 @@ class PersonMinistryRepositoryTest {
     }
 
     private Person saveReader(String name, String phoneNumber) {
-        Person reader = new Person();
-        reader.setName(name);
-        reader.setPhoneNumber(phoneNumber);
-        reader.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person reader = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
         entityManager.persist(reader);
         entityManager.flush();
         return reader;

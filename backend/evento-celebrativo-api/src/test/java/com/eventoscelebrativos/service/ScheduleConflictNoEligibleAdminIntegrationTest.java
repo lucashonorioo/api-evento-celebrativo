@@ -255,19 +255,13 @@ class ScheduleConflictNoEligibleAdminIntegrationTest {
     }
 
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(true);
         return personRepository.saveAndFlush(person);
     }
 
     private void createAccount(String name, List<String> authorities, boolean personActive, boolean accountEnabled) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhone());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.setActive(personActive);
         Person savedPerson = personRepository.saveAndFlush(person);
 

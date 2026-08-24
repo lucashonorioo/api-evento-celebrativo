@@ -19,6 +19,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -278,8 +279,18 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
 
     private long insertPerson(String name) {
         String phoneNumber = uniquePhoneNumber();
-        jdbcTemplate.update("INSERT INTO tb_person(name, phone_number, active) VALUES (?, ?, TRUE)", name, phoneNumber);
+        jdbcTemplate.update(
+                "INSERT INTO tb_person(public_id, name, phone_number, active) VALUES (?, ?, ?, TRUE)",
+                newPublicId(), name, phoneNumber);
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
+    }
+
+    private byte[] newPublicId() {
+        UUID uuid = UUID.randomUUID();
+        return ByteBuffer.allocate(16)
+                .putLong(uuid.getMostSignificantBits())
+                .putLong(uuid.getLeastSignificantBits())
+                .array();
     }
 
     private void insertActiveMinistry(long personId, MinistryType ministryType) {

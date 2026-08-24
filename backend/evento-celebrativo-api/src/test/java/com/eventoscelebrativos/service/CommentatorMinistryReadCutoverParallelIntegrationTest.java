@@ -57,24 +57,20 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldUseActiveCommentatorMinistryAsOfficialSourceWithoutChangingData() throws Exception {
-        Person activeCommentator = new Person();
-        populatePerson(activeCommentator, "000 Cutover Active Commentator");
+        Person activeCommentator = person("000 Cutover Active Commentator");
         Person savedActiveCommentator = personRepository.saveAndFlush(activeCommentator);
         saveMinistry(savedActiveCommentator, MinistryType.COMMENTATOR, true);
 
-        Person readerWithCommentatorMinistry = new Person();
-        populatePerson(readerWithCommentatorMinistry, "000 Cutover Reader Commentator");
+        Person readerWithCommentatorMinistry = person("000 Cutover Reader Commentator");
         Person savedReader = personRepository.saveAndFlush(readerWithCommentatorMinistry);
         saveMinistry(savedReader, MinistryType.READER, true);
         saveMinistry(savedReader, MinistryType.COMMENTATOR, true);
 
-        Person inactiveCommentator = new Person();
-        populatePerson(inactiveCommentator, "000 Cutover Inactive Commentator");
+        Person inactiveCommentator = person("000 Cutover Inactive Commentator");
         Person savedInactiveCommentator = personRepository.saveAndFlush(inactiveCommentator);
         saveMinistry(savedInactiveCommentator, MinistryType.COMMENTATOR, false);
 
-        Person multiMinistryCommentator = new Person();
-        populatePerson(multiMinistryCommentator, "000 Cutover Multi Commentator");
+        Person multiMinistryCommentator = person("000 Cutover Multi Commentator");
         Person savedMultiMinistryCommentator = personRepository.saveAndFlush(multiMinistryCommentator);
         saveMinistry(savedMultiMinistryCommentator, MinistryType.COMMENTATOR, true);
         saveMinistry(savedMultiMinistryCommentator, MinistryType.READER, true);
@@ -115,10 +111,8 @@ class CommentatorMinistryReadCutoverParallelIntegrationTest {
                 .andReturn();
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name, uniquePhoneNumber(), BIRTHDAY);
     }
 
     private void saveMinistry(Person person, MinistryType ministryType, boolean active) {

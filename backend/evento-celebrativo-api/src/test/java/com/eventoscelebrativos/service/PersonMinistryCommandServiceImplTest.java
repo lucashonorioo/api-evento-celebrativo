@@ -22,9 +22,11 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -633,10 +635,8 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     private Person reader(Long id) {
-        Person reader = new Person();
-        reader.setId(id);
-        reader.setName("Reader");
-        reader.setPhoneNumber("34999999991");
+        Person reader = new Person("Reader", "34999999991", LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(reader, "id", id);
         return reader;
     }
 }

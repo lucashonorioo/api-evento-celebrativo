@@ -226,10 +226,7 @@ class ScheduleUnavailabilityConflictRepositoryTest {
     }
 
     private Person savePerson(String name) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(LocalDate.of(1990, 1, 10));
+        Person person = new Person(name, uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         entityManager.persist(person);
         entityManager.flush();
         return person;

@@ -5,7 +5,9 @@ import com.eventoscelebrativos.exception.exceptions.MultipleAssignmentsForPerson
 import com.eventoscelebrativos.model.EventAssignmentType;
 import com.eventoscelebrativos.model.Person;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -105,9 +107,7 @@ class EventScaleAssignmentPlanTest {
 
     @Test
     void shouldNotDependOnPersonTypeOrLegacySubtypeToBuildTargets() {
-        Person genericPerson = new Person();
-        genericPerson.setId(1L);
-        genericPerson.setName("Generic");
+        Person genericPerson = person(1L, "Generic");
 
         EventScaleAssignmentPlan plan = EventScaleAssignmentPlan.builder()
                 .add(genericPerson, EventAssignmentType.EUCHARISTIC_MINISTER)
@@ -128,9 +128,12 @@ class EventScaleAssignmentPlanTest {
     }
 
     private Person person(Long id) {
-        Person person = new Person();
-        person.setId(id);
-        person.setName("Person " + id);
+        return person(id, "Person " + id);
+    }
+
+    private Person person(Long id, String name) {
+        Person person = new Person(name, "34977" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
+        ReflectionTestUtils.setField(person, "id", id);
         return person;
     }
 }

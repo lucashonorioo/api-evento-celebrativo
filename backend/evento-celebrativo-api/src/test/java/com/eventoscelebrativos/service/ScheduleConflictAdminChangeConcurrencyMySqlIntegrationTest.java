@@ -510,10 +510,7 @@ class ScheduleConflictAdminChangeConcurrencyMySqlIntegrationTest {
     }
 
     private Fixture createAccount(String name, String authority, MinistryType ministryType) {
-        Person person = new Person();
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+        Person person = new Person(name, uniquePhoneNumber(), BIRTHDAY);
         person.setActive(true);
         Person savedPerson = personRepository.saveAndFlush(person);
 

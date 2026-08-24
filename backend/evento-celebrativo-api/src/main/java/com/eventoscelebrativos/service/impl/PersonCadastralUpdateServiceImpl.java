@@ -90,7 +90,7 @@ public class PersonCadastralUpdateServiceImpl implements PersonCadastralUpdateSe
         if (phoneNumber == null || phoneNumber.isBlank()) {
             throw new BadRequestException("O campo telefone não pode ser vazio");
         }
-        if (phoneNumber.length() != PHONE_NUMBER_LENGTH) {
+        if (!phoneNumber.matches("[0-9]{" + PHONE_NUMBER_LENGTH + "}")) {
             throw new BadRequestException("O telefone deve ter 11 dígitos com o DD");
         }
     }

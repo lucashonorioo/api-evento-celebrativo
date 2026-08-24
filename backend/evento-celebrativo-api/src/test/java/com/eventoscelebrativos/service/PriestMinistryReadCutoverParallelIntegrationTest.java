@@ -57,24 +57,20 @@ class PriestMinistryReadCutoverParallelIntegrationTest {
 
     @Test
     void shouldUseActivePriestMinistryAsOfficialSourceWithoutChangingData() throws Exception {
-        Person activePriest = new Person();
-        populatePerson(activePriest, "000 Cutover Active Priest");
+        Person activePriest = person("000 Cutover Active Priest");
         Person savedActivePriest = personRepository.saveAndFlush(activePriest);
         saveMinistry(savedActivePriest, MinistryType.PRIEST, true);
 
-        Person readerWithPriestMinistry = new Person();
-        populatePerson(readerWithPriestMinistry, "000 Cutover Reader Priest");
+        Person readerWithPriestMinistry = person("000 Cutover Reader Priest");
         Person savedReader = personRepository.saveAndFlush(readerWithPriestMinistry);
         saveMinistry(savedReader, MinistryType.READER, true);
         saveMinistry(savedReader, MinistryType.PRIEST, true);
 
-        Person inactivePriest = new Person();
-        populatePerson(inactivePriest, "000 Cutover Inactive Priest");
+        Person inactivePriest = person("000 Cutover Inactive Priest");
         Person savedInactivePriest = personRepository.saveAndFlush(inactivePriest);
         saveMinistry(savedInactivePriest, MinistryType.PRIEST, false);
 
-        Person multiMinistryPriest = new Person();
-        populatePerson(multiMinistryPriest, "000 Cutover Multi Priest");
+        Person multiMinistryPriest = person("000 Cutover Multi Priest");
         Person savedMultiMinistryPriest = personRepository.saveAndFlush(multiMinistryPriest);
         saveMinistry(savedMultiMinistryPriest, MinistryType.PRIEST, true);
         saveMinistry(savedMultiMinistryPriest, MinistryType.READER, true);
@@ -117,10 +113,8 @@ class PriestMinistryReadCutoverParallelIntegrationTest {
                 .andReturn();
     }
 
-    private void populatePerson(Person person, String name) {
-        person.setName(name);
-        person.setPhoneNumber(uniquePhoneNumber());
-        person.setBirthdayDate(BIRTHDAY);
+    private Person person(String name) {
+        return new Person(name, uniquePhoneNumber(), BIRTHDAY);
     }
 
     private void saveMinistry(Person person, MinistryType ministryType, boolean active) {
