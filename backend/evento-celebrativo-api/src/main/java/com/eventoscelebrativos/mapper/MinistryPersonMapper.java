@@ -1,12 +1,9 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
-import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -39,7 +36,4 @@ public interface MinistryPersonMapper {
                 .map(this::toDto)
                 .toList();
     }
-
-    @Mapping(target = "id", ignore = true)
-    void updateFromDto(MinistryPersonUpdateRequestDTO requestDTO, @MappingTarget Person person);
 }

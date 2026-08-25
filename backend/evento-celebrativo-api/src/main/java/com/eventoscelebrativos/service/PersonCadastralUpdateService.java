@@ -2,6 +2,8 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.model.Person;
 
+import java.time.LocalDate;
+
 /**
  * Autoridade unica de atualizacao cadastral de {@link Person} (name, phoneNumber, birthdayDate),
  * usada por todos os fluxos de update cadastral: os cinco CRUDs ministeriais, o update
@@ -20,9 +22,15 @@ public interface PersonCadastralUpdateService {
      * quando a pessoa possuir conta (via {@link PersonAccountCoordinator#synchronizeAccountAfterPersonUpdate(Person)}).
      * <p>
      * Pressupoe que o chamador ja bloqueou {@code person} (PESSIMISTIC_WRITE, tipicamente via
-     * {@link com.eventoscelebrativos.repository.PersonRepository#findByIdForUpdate(Long)}) e ja aplicou
-     * as mutacoes desejadas de name/phoneNumber/birthdayDate na instancia antes de chamar este metodo -
-     * garantindo que o lock de Person seja adquirido uma unica vez, antes do lock de UserAccount.
+     * {@link com.eventoscelebrativos.repository.PersonRepository#findByIdForUpdate(Long)}). Os novos
+     * valores cadastrais devem ser passados como candidatos para que este service valide antes de
+     * mutar a entidade - garantindo que o lock de Person seja adquirido uma unica vez, antes do lock
+     * de UserAccount.
      */
-    Person updateCadastral(Person person);
+    Person updateCadastral(
+            Person person,
+            String name,
+            String phoneNumber,
+            LocalDate birthdayDate
+    );
 }

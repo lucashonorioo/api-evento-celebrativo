@@ -287,7 +287,7 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createReaderCoordinator("Inactive Person Hidden Coordinator");
         long inactiveTargetId = createReader("Inactive Person Hidden Target");
         Person inactiveTarget = personRepository.findById(inactiveTargetId).orElseThrow();
-        inactiveTarget.setActive(false);
+        inactiveTarget.deactivate();
         personRepository.saveAndFlush(inactiveTarget);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
@@ -424,7 +424,7 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createReaderCoordinator("Inactive Person Vinculo Coordinator");
         long targetId = createPerson("Inactive Target Vinculo");
         Person target = personRepository.findById(targetId).orElseThrow();
-        target.setActive(false);
+        target.deactivate();
         personRepository.saveAndFlush(target);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 

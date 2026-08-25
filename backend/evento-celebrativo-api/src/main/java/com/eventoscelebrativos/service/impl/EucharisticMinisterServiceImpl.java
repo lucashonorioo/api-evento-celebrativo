@@ -75,9 +75,13 @@ public class EucharisticMinisterServiceImpl implements EucharisticMinisterServic
         }
         eucharisticMinisterUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.EUCHARISTIC_MINISTER, "Ministro de Eucaristia");
-        eucharisticMinisterMapper.updateEucharisticMinisterFromDto(eucharisticMinisterUpdateRequestDTO, person);
 
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                eucharisticMinisterUpdateRequestDTO.getName(),
+                eucharisticMinisterUpdateRequestDTO.getPhoneNumber(),
+                eucharisticMinisterUpdateRequestDTO.getBirthdayDate()
+        );
         return eucharisticMinisterMapper.toDtoFromPerson(saved);
     }
 

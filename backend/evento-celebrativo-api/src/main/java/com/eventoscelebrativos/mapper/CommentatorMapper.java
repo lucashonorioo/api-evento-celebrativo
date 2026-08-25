@@ -1,12 +1,10 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.CommentatorRequestDTO;
-import com.eventoscelebrativos.dto.request.CommentatorUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CommentatorResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -30,7 +28,4 @@ public interface CommentatorMapper {
                 .map(this::toDtoFromPerson)
                 .toList();
     }
-
-    @Mapping(target = "id", ignore = true)
-    void updateCommentatorFromDto(CommentatorUpdateRequestDTO commentatorUpdateRequestDTO, @MappingTarget Person person);
 }

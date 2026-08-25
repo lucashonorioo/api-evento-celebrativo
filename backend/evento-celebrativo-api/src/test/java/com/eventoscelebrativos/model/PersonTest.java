@@ -78,7 +78,50 @@ class PersonTest {
         assertEquals(publicIdBeforeUpdate, person.getPublicId());
     }
 
+    @Test
+    void newPersonShouldStartActive() {
+        Person person = person("Pessoa Ativa", "34999999996");
 
+        assertTrue(person.isActive());
+    }
+
+    @Test
+    void shouldDeactivatePerson() {
+        Person person = person("Pessoa Inativada", "34999999995");
+
+        person.deactivate();
+
+        assertFalse(person.isActive());
+    }
+
+    @Test
+    void shouldActivatePersonAgain() {
+        Person person = person("Pessoa Reativada", "34999999994");
+
+        person.deactivate();
+        person.activate();
+
+        assertTrue(person.isActive());
+    }
+
+    @Test
+    void deactivatingInactivePersonShouldKeepItInactive() {
+        Person person = person("Pessoa Inativa", "34999999993");
+
+        person.deactivate();
+        person.deactivate();
+
+        assertFalse(person.isActive());
+    }
+
+    @Test
+    void activatingActivePersonShouldKeepItActive() {
+        Person person = person("Pessoa Ja Ativa", "34999999992");
+
+        person.activate();
+
+        assertTrue(person.isActive());
+    }
 
     @Test
     void differentNewPeopleShouldNotBeEqual() {
@@ -94,7 +137,11 @@ class PersonTest {
 
         int hashBeforeChange = person.hashCode();
 
-        person.setPhoneNumber("34888888888");
+        person.updateCadastralData(
+                person.getName(),
+                "34888888888",
+                person.getBirthdayDate()
+        );
 
         int hashAfterChange = person.hashCode();
 
@@ -108,7 +155,11 @@ class PersonTest {
         Set<Person> people = new HashSet<>();
         people.add(person);
 
-        person.setPhoneNumber("34888888888");
+        person.updateCadastralData(
+                person.getName(),
+                "34888888888",
+                person.getBirthdayDate()
+        );
 
         assertTrue(people.contains(person));
     }

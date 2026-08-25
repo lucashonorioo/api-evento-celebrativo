@@ -105,10 +105,20 @@ class MinisterOfTheWordServiceImplTest {
         MinisterOfTheWordUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.MINISTER_OF_THE_WORD, MUTATION_ENTITY_LABEL)).thenReturn(entity);
-        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateMinisterOfTheWord(1L, request));
-        verify(mapper).updateMinisterOfTheWordFromDto(request, entity);
+        verify(personCadastralUpdateService).updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
         verifyNoInteractions(personAccountCoordinator);
 
         service.deleteMinisterOfTheWord(1L);
@@ -189,7 +199,7 @@ class MinisterOfTheWordServiceImplTest {
     }
 
     private MinisterOfTheWordUpdateRequestDTO updateRequest() {
-        return new MinisterOfTheWordUpdateRequestDTO("Minister", "34999999994", BIRTHDAY);
+        return new MinisterOfTheWordUpdateRequestDTO("Minister Updated", "34888888884", LocalDate.of(1994, 5, 14));
     }
 
     private Person minister(Long id) {

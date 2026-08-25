@@ -195,7 +195,7 @@ class ScaleParticipantEligibilityIntegrationTest {
         Long priestId = null;
         try {
             Person inactivePriest = savePriestWithMinistry("Eligibility Inactive Creation Person");
-            inactivePriest.setActive(false);
+            inactivePriest.deactivate();
             personRepository.saveAndFlush(inactivePriest);
             priestId = inactivePriest.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Inactive Creation Church"));
@@ -229,7 +229,7 @@ class ScaleParticipantEligibilityIntegrationTest {
             Person priest = savePriestWithMinistry("Eligibility Retained Inactive Priest");
             priestId = priest.getId();
             Person inactiveReader = saveReaderWithExtraMinistry("Eligibility New Inactive Reader", MinistryType.COMMENTATOR);
-            inactiveReader.setActive(false);
+            inactiveReader.deactivate();
             personRepository.saveAndFlush(inactiveReader);
             readerId = inactiveReader.getId();
             Location location = locationRepository.saveAndFlush(location("Eligibility Inactive Update Church"));
@@ -249,7 +249,7 @@ class ScaleParticipantEligibilityIntegrationTest {
 
             assertEquals(1, countRows("tb_event_assignment", "event_id", eventId));
 
-            priest.setActive(false);
+            priest.deactivate();
             personRepository.saveAndFlush(priest);
 
             mockMvc.perform(put("/eventos/{id}/escala", eventId)

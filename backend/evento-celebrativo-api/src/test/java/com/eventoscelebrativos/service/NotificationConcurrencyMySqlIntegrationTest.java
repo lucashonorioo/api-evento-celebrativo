@@ -500,7 +500,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
             TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
             transactionTemplate.executeWithoutResult(status -> {
                 Person person = personRepository.findByIdForUpdate(personId).orElseThrow();
-                person.setActive(false);
+                person.deactivate();
                 personRepository.save(person);
             });
             return null;
@@ -595,7 +595,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
             Person person = new Person(name, uniquePhoneNumber(), java.time.LocalDate.of(1990, 1, 10));
-            person.setActive(true);
+            person.activate();
             Person savedPerson = personRepository.save(person);
 
             java.time.LocalDateTime now = java.time.LocalDateTime.now().withNano(0);
@@ -612,7 +612,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         return transactionTemplate.execute(status -> {
             Person person = new Person(name, uniquePhoneNumber(), java.time.LocalDate.of(1990, 1, 10));
-            person.setActive(true);
+            person.activate();
             Person savedPerson = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(savedPerson, ministryType));
 

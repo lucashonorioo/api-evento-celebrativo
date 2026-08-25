@@ -77,9 +77,13 @@ public class ReaderServiceImpl implements ReaderService {
         }
         readerUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.READER, ENTITY_LABEL);
-        readerMapper.updateReaderFromDto(readerUpdateRequestDTO, person);
 
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                readerUpdateRequestDTO.getName(),
+                readerUpdateRequestDTO.getPhoneNumber(),
+                readerUpdateRequestDTO.getBirthdayDate()
+        );
         return readerMapper.toDtoFromPerson(saved);
     }
 

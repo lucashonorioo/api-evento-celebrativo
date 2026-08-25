@@ -159,11 +159,21 @@ class ReaderServiceImplTest {
         ReaderResponseDTO response = response(1L);
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL)).thenReturn(entity);
-        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(saved);
+        when(personCadastralUpdateService.updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(saved);
         when(readerMapper.toDtoFromPerson(saved)).thenReturn(response);
 
         assertSame(response, service.updateReader(1L, request));
-        verify(readerMapper).updateReaderFromDto(request, entity);
+        verify(personCadastralUpdateService).updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
         verifyNoInteractions(personAccountCoordinator);
     }
 
@@ -204,7 +214,7 @@ class ReaderServiceImplTest {
     }
 
     private ReaderUpdateRequestDTO updateRequest() {
-        return new ReaderUpdateRequestDTO("Reader", "34999999991", BIRTHDAY);
+        return new ReaderUpdateRequestDTO("Reader Updated", "34888888881", LocalDate.of(1991, 2, 11));
     }
 
     private Person reader(Long id) {

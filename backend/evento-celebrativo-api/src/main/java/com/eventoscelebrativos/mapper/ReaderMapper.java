@@ -1,12 +1,10 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.ReaderRequestDTO;
-import com.eventoscelebrativos.dto.request.ReaderUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.ReaderResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -30,7 +28,4 @@ public interface ReaderMapper {
                 .map(this::toDtoFromPerson)
                 .toList();
     }
-
-    @Mapping(target = "id", ignore = true)
-    void updateReaderFromDto(ReaderUpdateRequestDTO readerUpdateRequestDTO, @MappingTarget Person person);
 }

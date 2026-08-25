@@ -539,7 +539,11 @@ class UserAccountLifecycleServiceImplTest {
     private Person person(Long id, String phoneNumber, boolean active) {
         Person person = new Person("Person " + id, phoneNumber, BIRTHDAY);
         ReflectionTestUtils.setField(person, "id", id);
-        person.setActive(active);
+        if (active) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         return person;
     }
 

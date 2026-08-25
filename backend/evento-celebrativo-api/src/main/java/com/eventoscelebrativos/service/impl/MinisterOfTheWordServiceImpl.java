@@ -75,9 +75,13 @@ public class MinisterOfTheWordServiceImpl implements MinisterOfTheWordService {
         }
         ministerOfTheWordUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.MINISTER_OF_THE_WORD, "Ministro da Palavra");
-        ministerOfTheWordMapper.updateMinisterOfTheWordFromDto(ministerOfTheWordUpdateRequestDTO, person);
 
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                ministerOfTheWordUpdateRequestDTO.getName(),
+                ministerOfTheWordUpdateRequestDTO.getPhoneNumber(),
+                ministerOfTheWordUpdateRequestDTO.getBirthdayDate()
+        );
         return ministerOfTheWordMapper.toDtoFromPerson(saved);
     }
 

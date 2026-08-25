@@ -1,12 +1,10 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.EucharisticMinisterRequestDTO;
-import com.eventoscelebrativos.dto.request.EucharisticMinisterUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.EucharisticMinisterResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -30,7 +28,4 @@ public interface EucharisticMinisterMapper {
                 .map(this::toDtoFromPerson)
                 .toList();
     }
-
-    @Mapping(target = "id", ignore = true)
-    void updateEucharisticMinisterFromDto(EucharisticMinisterUpdateRequestDTO eucharisticMinisterUpdateRequestDTO, @MappingTarget Person person);
 }

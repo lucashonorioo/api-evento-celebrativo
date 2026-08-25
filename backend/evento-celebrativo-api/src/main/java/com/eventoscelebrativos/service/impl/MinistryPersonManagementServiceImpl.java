@@ -73,8 +73,12 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
         requireMinistryType(ministryType);
         requestDTO.rejectForbiddenFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(personId, ministryType, ENTITY_LABEL);
-        ministryPersonMapper.updateFromDto(requestDTO, person);
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                requestDTO.getName(),
+                person.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        );
         return ministryPersonMapper.toDto(saved);
     }
 

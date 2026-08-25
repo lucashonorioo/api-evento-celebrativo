@@ -1,12 +1,10 @@
 package com.eventoscelebrativos.mapper;
 
 import com.eventoscelebrativos.dto.request.PriestRequestDTO;
-import com.eventoscelebrativos.dto.request.PriestUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.PriestResponseDTO;
 import com.eventoscelebrativos.model.Person;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
 
 import java.util.List;
 
@@ -30,7 +28,4 @@ public interface PriestMapper {
                 .map(this::toDtoFromPerson)
                 .toList();
     }
-
-    @Mapping(target = "id", ignore = true)
-    void updatePriestFromDto(PriestUpdateRequestDTO priestUpdateRequestDTO, @MappingTarget Person person);
 }

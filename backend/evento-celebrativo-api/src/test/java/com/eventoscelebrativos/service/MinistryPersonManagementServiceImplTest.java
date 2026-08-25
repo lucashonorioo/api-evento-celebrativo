@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -126,12 +125,22 @@ class MinistryPersonManagementServiceImplTest {
         MinistryPersonResponseDTO dto = responseDto(7L);
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(7L, MinistryType.READER, "Pessoa"))
                 .thenReturn(person);
-        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(saved);
+        when(personCadastralUpdateService.updateCadastral(
+                person,
+                request.getName(),
+                person.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(saved);
         when(ministryPersonMapper.toDto(saved)).thenReturn(dto);
 
         assertSame(dto, service.update(MinistryType.READER, 7L, request));
 
-        verify(ministryPersonMapper).updateFromDto(request, person);
+        verify(personCadastralUpdateService).updateCadastral(
+                person,
+                request.getName(),
+                person.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
     }
 
     @Test

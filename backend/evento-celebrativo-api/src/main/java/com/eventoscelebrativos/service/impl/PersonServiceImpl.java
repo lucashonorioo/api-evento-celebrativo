@@ -182,10 +182,12 @@ public class PersonServiceImpl implements PersonService {
         requestDTO.rejectForbiddenFields();
         Person person = personRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
-        person.setName(requestDTO.getName());
-        person.setPhoneNumber(requestDTO.getPhoneNumber());
-        person.setBirthdayDate(requestDTO.getBirthdayDate());
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                requestDTO.getName(),
+                requestDTO.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        );
         return toAdminResponseDTO(
                 saved,
                 activeMinistriesForPerson(saved.getId()),
@@ -274,9 +276,12 @@ public class PersonServiceImpl implements PersonService {
     public CurrentUserProfileResponseDTO updateCurrentUserProfile(Long personId, CurrentUserProfileUpdateRequestDTO requestDTO) {
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
-        person.setName(normalizeRequiredName(requestDTO.getName()));
-        person.setBirthdayDate(requestDTO.getBirthdayDate());
-        Person savedPerson = personCadastralUpdateService.updateCadastral(person);
+        Person savedPerson = personCadastralUpdateService.updateCadastral(
+                person,
+                requestDTO.getName(),
+                person.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        );
         return toCurrentUserProfileDTO(savedPerson);
     }
 
@@ -378,13 +383,6 @@ public class PersonServiceImpl implements PersonService {
         dto.setMinistries(sortedMinistries(activeMinistriesForPerson(person.getId())));
         dto.setRoles(sortedRoles(rolesForPerson(person.getId())));
         return dto;
-    }
-
-    private String normalizeRequiredName(String name) {
-        if (name == null || name.isBlank()) {
-            throw new BadRequestException("O campo nome não pode ser vazio");
-        }
-        return name.trim();
     }
 
     private PersonMinistriesResponseDTO toMinistriesResponseDTO(

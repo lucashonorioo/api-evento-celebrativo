@@ -77,9 +77,13 @@ public class PriestServiceImpl implements PriestService {
         }
         priestUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.PRIEST, ENTITY_LABEL);
-        priestMapper.updatePriestFromDto(priestUpdateRequestDTO, person);
 
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                priestUpdateRequestDTO.getName(),
+                priestUpdateRequestDTO.getPhoneNumber(),
+                priestUpdateRequestDTO.getBirthdayDate()
+        );
         return priestMapper.toDtoFromPerson(saved);
     }
 

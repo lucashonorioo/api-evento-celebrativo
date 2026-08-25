@@ -145,7 +145,7 @@ class ScheduleConflictReconcileContractTest {
 
     private Person savePerson(String name) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         return personRepository.saveAndFlush(person);
     }
 

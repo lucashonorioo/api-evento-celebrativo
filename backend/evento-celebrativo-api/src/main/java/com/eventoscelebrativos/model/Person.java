@@ -81,38 +81,28 @@ public class Person {
         return publicId;
     }
 
-
-
     public String getName() {
         return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public String getPhoneNumber() {
         return phoneNumber;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
-
     public LocalDate getBirthdayDate() {
         return birthdayDate;
-    }
-
-    public void setBirthdayDate(LocalDate birthdayDate) {
-        this.birthdayDate = birthdayDate;
     }
 
     public boolean isActive() {
         return active;
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    public void activate() {
+        this.active = true;
+    }
+
+    public void deactivate() {
+        this.active = false;
     }
 
 }

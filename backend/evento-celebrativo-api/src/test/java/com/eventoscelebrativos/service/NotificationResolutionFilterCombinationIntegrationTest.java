@@ -78,7 +78,7 @@ class NotificationResolutionFilterCombinationIntegrationTest {
     @BeforeEach
     void setUpFixture() {
         Person person = new Person("Filter Combination Recipient " + UUID.randomUUID(), uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         Person savedPerson = personRepository.saveAndFlush(person);
 
         UserAccount account = new UserAccount(savedPerson, savedPerson.getPhoneNumber(), "hash", CURRENT_SECOND, CURRENT_SECOND);

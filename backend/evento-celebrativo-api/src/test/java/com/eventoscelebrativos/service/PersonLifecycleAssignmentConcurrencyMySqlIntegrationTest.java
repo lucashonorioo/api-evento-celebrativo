@@ -221,7 +221,7 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 roleRepository.findByAuthorityForUpdate("ROLE_ADMIN").orElseThrow();
                 Person person = personRepository.findByIdForUpdate(personId).orElseThrow();
-                person.setActive(false);
+                person.deactivate();
                 personRepository.save(person);
                 personLocked.countDown();
                 await(scaleAttemptStarted);
@@ -293,7 +293,7 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
     private Long createReaderPerson() {
         return new TransactionTemplate(transactionManager).execute(status -> {
             Person person = new Person("Concurrency Reader " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
-            person.setActive(true);
+            person.activate();
             Person saved = personRepository.save(person);
             personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));
             return saved.getId();

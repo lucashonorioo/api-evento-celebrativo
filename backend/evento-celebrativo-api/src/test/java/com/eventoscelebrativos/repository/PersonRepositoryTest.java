@@ -234,7 +234,7 @@ class PersonRepositoryTest {
         Person active = savePersonWithoutAccount("Active Filter Person", "34970100001");
         Person inactive = savePersonWithoutAccount("Inactive Filter Person", "34970100002");
         Person managedInactive = personRepository.findById(inactive.getId()).orElseThrow();
-        managedInactive.setActive(false);
+        managedInactive.deactivate();
         personRepository.saveAndFlush(managedInactive);
         entityManager.clear();
 

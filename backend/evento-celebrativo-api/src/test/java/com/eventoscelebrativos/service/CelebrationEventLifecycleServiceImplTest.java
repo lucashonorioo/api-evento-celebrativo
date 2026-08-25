@@ -211,7 +211,7 @@ class CelebrationEventLifecycleServiceImplTest {
     void shouldRejectReactivateWhenAssignedPersonIsInactive() {
         CelebrationEvent event = cancelledEvent(1L);
         Person inactivePriest = person(8L);
-        inactivePriest.setActive(false);
+        inactivePriest.deactivate();
         EventAssignment assignment = assignment(event, inactivePriest, EventAssignmentType.PRIEST);
 
         when(celebrationEventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));

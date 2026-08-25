@@ -76,9 +76,13 @@ public class CommentatorServiceImpl implements CommentatorService {
         }
         commentatorUpdateRequestDTO.rejectAccountFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(id, MinistryType.COMMENTATOR, ENTITY_LABEL);
-        commentatorMapper.updateCommentatorFromDto(commentatorUpdateRequestDTO, person);
 
-        Person saved = personCadastralUpdateService.updateCadastral(person);
+        Person saved = personCadastralUpdateService.updateCadastral(
+                person,
+                commentatorUpdateRequestDTO.getName(),
+                commentatorUpdateRequestDTO.getPhoneNumber(),
+                commentatorUpdateRequestDTO.getBirthdayDate()
+        );
         return commentatorMapper.toDtoFromPerson(saved);
     }
 
