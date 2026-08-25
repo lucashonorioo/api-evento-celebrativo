@@ -103,7 +103,7 @@ class PublicLoginProxyIntegrationTest {
 
     private void createPersonWithAccount(String phone, String rawPassword) {
         Person person = new Person("Public Login Proxy Person", phone, BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         Person saved = personRepository.saveAndFlush(person);
 
         LocalDateTime now = LocalDateTime.now().withNano(0);

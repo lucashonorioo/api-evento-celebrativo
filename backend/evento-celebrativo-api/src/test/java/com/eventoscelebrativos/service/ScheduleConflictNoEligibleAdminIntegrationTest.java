@@ -256,13 +256,17 @@ class ScheduleConflictNoEligibleAdminIntegrationTest {
 
     private Person savePerson(String name) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         return personRepository.saveAndFlush(person);
     }
 
     private void createAccount(String name, List<String> authorities, boolean personActive, boolean accountEnabled) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(personActive);
+        if (personActive) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         Person savedPerson = personRepository.saveAndFlush(person);
 
         LocalDateTime now = LocalDateTime.now().withNano(0);

@@ -124,7 +124,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenPersonIsInactiveEvenWithActiveMinistry() {
         Person inactiveReader = reader(1L);
-        inactiveReader.setActive(false);
+        inactiveReader.deactivate();
         when(personRepository.findById(1L)).thenReturn(Optional.of(inactiveReader));
 
         assertThrows(ResourceNotFoundException.class,
@@ -610,7 +610,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldRejectAddOrReactivateWhenPersonIsInactive() {
         Person inactivePerson = reader(1L);
-        inactivePerson.setActive(false);
+        inactivePerson.deactivate();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(inactivePerson));
 
         assertThrows(com.eventoscelebrativos.exception.exceptions.MinistryPersonInactiveException.class,

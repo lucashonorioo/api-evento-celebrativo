@@ -105,10 +105,20 @@ class EucharisticMinisterServiceImplTest {
         EucharisticMinisterUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.EUCHARISTIC_MINISTER, MUTATION_ENTITY_LABEL)).thenReturn(entity);
-        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updateEucharisticMinisters(1L, request));
-        verify(mapper).updateEucharisticMinisterFromDto(request, entity);
+        verify(personCadastralUpdateService).updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
         verifyNoInteractions(personAccountCoordinator);
 
         service.deleteEucharisticMinisterById(1L);
@@ -189,7 +199,7 @@ class EucharisticMinisterServiceImplTest {
     }
 
     private EucharisticMinisterUpdateRequestDTO updateRequest() {
-        return new EucharisticMinisterUpdateRequestDTO("Minister", "34999999993", BIRTHDAY);
+        return new EucharisticMinisterUpdateRequestDTO("Minister Updated", "34888888883", LocalDate.of(1993, 4, 13));
     }
 
     private Person minister(Long id) {

@@ -196,7 +196,7 @@ class PersonLifecycleAssignmentBoundaryIntegrationTest {
 
     private Person createPerson() {
         Person person = new Person("Assignment Boundary " + UUID.randomUUID(), uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         Person saved = personRepository.saveAndFlush(person);
         cleanupPersonIds.add(saved.getId());
         return saved;

@@ -104,10 +104,20 @@ class PriestServiceImplTest {
         PriestUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.PRIEST, ENTITY_LABEL)).thenReturn(entity);
-        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
         assertSame(response, service.updatePriest(1L, request));
-        verify(mapper).updatePriestFromDto(request, entity);
+        verify(personCadastralUpdateService).updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
         verifyNoInteractions(personAccountCoordinator);
 
         service.deletePriestById(1L);
@@ -182,7 +192,7 @@ class PriestServiceImplTest {
     }
 
     private PriestUpdateRequestDTO updateRequest() {
-        return new PriestUpdateRequestDTO("Priest", "34999999995", BIRTHDAY);
+        return new PriestUpdateRequestDTO("Priest Updated", "34888888885", LocalDate.of(1981, 6, 15));
     }
 
     private Person priest(Long id) {

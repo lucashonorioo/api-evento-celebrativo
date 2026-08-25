@@ -139,12 +139,20 @@ class NotificationDeliveryServiceIntegrationTest {
 
         // 1. altera o nome do remetente
         Person senderPerson = personRepository.findById(sender.personId()).orElseThrow();
-        senderPerson.setName("Sender Renomeado");
+        senderPerson.updateCadastralData(
+                "Sender Renomeado",
+                senderPerson.getPhoneNumber(),
+                senderPerson.getBirthdayDate()
+        );
         personRepository.saveAndFlush(senderPerson);
 
         // 2. altera o nome do destinatario
         Person recipientPerson = personRepository.findById(recipient.personId()).orElseThrow();
-        recipientPerson.setName("Recipient Renomeado");
+        recipientPerson.updateCadastralData(
+                "Recipient Renomeado",
+                recipientPerson.getPhoneNumber(),
+                recipientPerson.getBirthdayDate()
+        );
         personRepository.saveAndFlush(recipientPerson);
 
         // 3. altera a role do destinatario
@@ -162,7 +170,7 @@ class NotificationDeliveryServiceIntegrationTest {
 
         // 6. desativa a pessoa destinataria
         recipientPerson = personRepository.findById(recipient.personId()).orElseThrow();
-        recipientPerson.setActive(false);
+        recipientPerson.deactivate();
         personRepository.saveAndFlush(recipientPerson);
 
         // 7. reabilita a conta e reativa a pessoa
@@ -170,7 +178,7 @@ class NotificationDeliveryServiceIntegrationTest {
         toToggle.enable(LocalDateTime.now().withNano(0));
         userAccountRepository.saveAndFlush(toToggle);
         recipientPerson = personRepository.findById(recipient.personId()).orElseThrow();
-        recipientPerson.setActive(true);
+        recipientPerson.activate();
         personRepository.saveAndFlush(recipientPerson);
         entityManager.clear();
 
@@ -489,7 +497,11 @@ class NotificationDeliveryServiceIntegrationTest {
 
     private Person createPersonWithoutAccount(String name, boolean active) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(active);
+        if (active) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         Person saved = personRepository.saveAndFlush(person);
         entityManager.clear();
         return saved;
@@ -497,7 +509,11 @@ class NotificationDeliveryServiceIntegrationTest {
 
     private Fixture createPersonWithAccount(String name, List<String> authorities, boolean personActive, boolean accountEnabled) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(personActive);
+        if (personActive) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         Person savedPerson = personRepository.saveAndFlush(person);
 
         LocalDateTime now = LocalDateTime.now().withNano(0);

@@ -220,7 +220,11 @@ class UserAccountAuthenticationServiceImplTest {
     private Person person(Long id, boolean active) {
         Person person = new Person("Person " + id, "34983" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(person, "id", id);
-        person.setActive(active);
+        if (active) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         return person;
     }
 

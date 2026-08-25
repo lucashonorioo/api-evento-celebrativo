@@ -344,7 +344,7 @@ class ScheduleConflictNotificationIntegrationTest {
 
     private void createAdminAccount(String name) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         Person savedPerson = personRepository.saveAndFlush(person);
 
         LocalDateTime now = CURRENT_SECOND;
@@ -358,7 +358,7 @@ class ScheduleConflictNotificationIntegrationTest {
 
     private Person createPersonWithMinistry(String name, MinistryType ministryType) {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
-        person.setActive(true);
+        person.activate();
         Person savedPerson = personRepository.saveAndFlush(person);
         personMinistryRepository.saveAndFlush(new PersonMinistry(savedPerson, ministryType));
         entityManager.clear();

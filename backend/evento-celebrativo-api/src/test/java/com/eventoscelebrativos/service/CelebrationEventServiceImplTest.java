@@ -1211,8 +1211,7 @@ class CelebrationEventServiceImplTest {
     void shouldNotChangePersonRegistrationDataWhenUpdatingScale() {
         CelebrationEvent event = event(1L);
         Location location = location(1L);
-        Person priest = person(8L, "Padre");
-        priest.setPhoneNumber("34999999999");
+        Person priest = person(8L, "Padre", "34999999999");
 
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(event));
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
@@ -1430,7 +1429,11 @@ class CelebrationEventServiceImplTest {
     }
 
     private Person person(Long id, String name) {
-        Person person = new Person(name, "34" + id, LocalDate.of(1990, 1, 1));
+        return person(id, name, "34" + id);
+    }
+
+    private Person person(Long id, String name, String phoneNumber) {
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(person, "id", id);
         return person;
     }

@@ -197,7 +197,11 @@ public class UserAccountLifecycleServiceImpl implements UserAccountLifecycleServ
                 userAccountRepository.save(account);
             });
         }
-        person.setActive(desiredActive);
+        if (desiredActive) {
+            person.activate();
+        } else {
+            person.deactivate();
+        }
         personRepository.save(person);
     }
 

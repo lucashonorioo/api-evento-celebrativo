@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -635,13 +634,16 @@ class PersonServiceImplTest {
     @Test
     void shouldUpdateCurrentUserProfileNameAndBirthdayDate() {
         Person person = person(10L, "Old Name", "34999999999");
+        Person saved = person(10L, "New Name", "34999999999");
         LocalDate newBirthday = LocalDate.of(1992, 3, 15);
+        saved.updateCadastralData("New Name", "34999999999", newBirthday);
 
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
-        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
+        when(personCadastralUpdateService.updateCadastral(person, "New Name", "34999999999", newBirthday))
+                .thenReturn(saved);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
-        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+        when(currentUserProfileMapper.toDto(saved)).thenReturn(currentProfileResponse(
                 10L, "New Name", "34999999999", newBirthday, List.of("ROLE_OPERATOR")
         ));
 
@@ -652,17 +654,23 @@ class PersonServiceImplTest {
 
         assertEquals("New Name", response.getName());
         assertEquals(newBirthday, response.getBirthdayDate());
-        assertEquals("New Name", person.getName());
-        assertEquals(newBirthday, person.getBirthdayDate());
+        verify(personCadastralUpdateService).updateCadastral(person, "New Name", "34999999999", newBirthday);
+        assertEquals("Old Name", person.getName());
     }
 
     @Test
-    void shouldTrimNameBeforePersistingOnUpdate() {
+    void shouldDelegateNameNormalizationOnCurrentUserProfileUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
+        Person saved = person(10L, "New Name", "34999999999");
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
-        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
+        when(personCadastralUpdateService.updateCadastral(
+                person,
+                "  New Name  ",
+                "34999999999",
+                person.getBirthdayDate()
+        )).thenReturn(saved);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
-        when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
+        when(currentUserProfileMapper.toDto(saved)).thenReturn(currentProfileResponse(
                 10L, "New Name", "34999999999", person.getBirthdayDate(), List.of("ROLE_OPERATOR")
         ));
 
@@ -671,7 +679,12 @@ class PersonServiceImplTest {
                 new CurrentUserProfileUpdateRequestDTO("  New Name  ", person.getBirthdayDate())
         );
 
-        assertEquals("New Name", person.getName());
+        verify(personCadastralUpdateService).updateCadastral(
+                person,
+                "  New Name  ",
+                "34999999999",
+                person.getBirthdayDate()
+        );
     }
 
     @Test
@@ -679,7 +692,12 @@ class PersonServiceImplTest {
         Person person = person(10L, "Old Name", "34999999999");
 
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
-        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(person);
+        when(personCadastralUpdateService.updateCadastral(
+                person,
+                "New Name",
+                "34999999999",
+                person.getBirthdayDate()
+        )).thenReturn(person);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L)))
                 .thenReturn(Map.of(10L, Set.of(MinistryType.READER)));
         when(currentUserProfileMapper.toDto(person)).thenReturn(currentProfileResponse(
@@ -691,11 +709,12 @@ class PersonServiceImplTest {
                 new CurrentUserProfileUpdateRequestDTO("New Name", person.getBirthdayDate())
         );
 
-        ArgumentCaptor<Person> captor = ArgumentCaptor.forClass(Person.class);
-        verify(personCadastralUpdateService).updateCadastral(captor.capture());
-        Person saved = captor.getValue();
-        assertEquals(10L, saved.getId());
-        assertEquals("34999999999", saved.getPhoneNumber());
+        verify(personCadastralUpdateService).updateCadastral(
+                person,
+                "New Name",
+                "34999999999",
+                person.getBirthdayDate()
+        );
         verifyNoInteractions(roleRepository, personMinistryCommandService);
     }
 
@@ -714,31 +733,42 @@ class PersonServiceImplTest {
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsBlankOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
+        doThrow(new BadRequestException("O campo nome não pode ser vazio"))
+                .when(personCadastralUpdateService)
+                .updateCadastral(person, "", "34999999999", person.getBirthdayDate());
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
                 10L,
                 new CurrentUserProfileUpdateRequestDTO("", person.getBirthdayDate())
         ));
-        verifyNoInteractions(personCadastralUpdateService);
+        verify(personCadastralUpdateService).updateCadastral(person, "", "34999999999", person.getBirthdayDate());
     }
 
     @Test
     void shouldThrowBadRequestWhenCurrentUserProfileNameIsOnlySpacesOnUpdate() {
         Person person = person(10L, "Old Name", "34999999999");
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(person));
+        doThrow(new BadRequestException("O campo nome não pode ser vazio"))
+                .when(personCadastralUpdateService)
+                .updateCadastral(person, "   ", "34999999999", person.getBirthdayDate());
 
         assertThrows(BadRequestException.class, () -> service.updateCurrentUserProfile(
                 10L,
                 new CurrentUserProfileUpdateRequestDTO("   ", person.getBirthdayDate())
         ));
-        verifyNoInteractions(personCadastralUpdateService);
+        verify(personCadastralUpdateService).updateCadastral(person, "   ", "34999999999", person.getBirthdayDate());
     }
 
     @Test
     void shouldUpdateOnlyAuthenticatedPersonNotAnotherPerson() {
         Person authenticatedPerson = person(10L, "Old Name", "34999999999");
         when(personRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(authenticatedPerson));
-        when(personCadastralUpdateService.updateCadastral(authenticatedPerson)).thenReturn(authenticatedPerson);
+        when(personCadastralUpdateService.updateCadastral(
+                authenticatedPerson,
+                "New Name",
+                "34999999999",
+                authenticatedPerson.getBirthdayDate()
+        )).thenReturn(authenticatedPerson);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(10L))).thenReturn(Map.of());
         when(currentUserProfileMapper.toDto(authenticatedPerson)).thenReturn(currentProfileResponse(
                 10L, "New Name", "34999999999", authenticatedPerson.getBirthdayDate(), List.of("ROLE_OPERATOR")
@@ -750,8 +780,12 @@ class PersonServiceImplTest {
         );
 
         verify(personRepository, never()).findByIdForUpdate(argThat(id -> !Long.valueOf(10L).equals(id)));
-        verify(personCadastralUpdateService, times(1)).updateCadastral(any());
-        verify(personCadastralUpdateService).updateCadastral(authenticatedPerson);
+        verify(personCadastralUpdateService, times(1)).updateCadastral(
+                authenticatedPerson,
+                "New Name",
+                "34999999999",
+                authenticatedPerson.getBirthdayDate()
+        );
     }
 
     @Test
@@ -761,17 +795,26 @@ class PersonServiceImplTest {
         PersonAdminUpdateRequestDTO requestDTO = new PersonAdminUpdateRequestDTO("New Name", "34999999992", LocalDate.of(1985, 6, 15));
 
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personCadastralUpdateService.updateCadastral(person)).thenReturn(saved);
+        when(personCadastralUpdateService.updateCadastral(
+                person,
+                requestDTO.getName(),
+                requestDTO.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        )).thenReturn(saved);
         when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L))).thenReturn(Map.of());
         when(personAdminMapper.toDto(saved)).thenReturn(adminResponse(1L, "New Name", "ROLE_OPERATOR"));
 
         PersonAdminResponseDTO response = service.updatePersonAdmin(1L, requestDTO);
 
         assertEquals("New Name", response.getName());
-        assertEquals("New Name", person.getName());
-        assertEquals("34999999992", person.getPhoneNumber());
-        assertEquals(LocalDate.of(1985, 6, 15), person.getBirthdayDate());
-        verify(personCadastralUpdateService).updateCadastral(person);
+        assertEquals("Old Name", person.getName());
+        assertEquals("34999999991", person.getPhoneNumber());
+        verify(personCadastralUpdateService).updateCadastral(
+                person,
+                requestDTO.getName(),
+                requestDTO.getPhoneNumber(),
+                requestDTO.getBirthdayDate()
+        );
     }
 
     @Test

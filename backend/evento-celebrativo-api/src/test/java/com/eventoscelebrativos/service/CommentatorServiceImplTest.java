@@ -101,13 +101,23 @@ class CommentatorServiceImplTest {
     void shouldUpdateAndDeleteCommentator() {
         Person entity = commentator(1L);
         CommentatorResponseDTO response = response(1L);
+        CommentatorUpdateRequestDTO request = updateRequest();
 
         when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(1L, MinistryType.COMMENTATOR, ENTITY_LABEL)).thenReturn(entity);
-        when(personCadastralUpdateService.updateCadastral(entity)).thenReturn(entity);
+        when(personCadastralUpdateService.updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        )).thenReturn(entity);
         when(mapper.toDtoFromPerson(entity)).thenReturn(response);
-        CommentatorUpdateRequestDTO request = updateRequest();
         assertSame(response, service.updateCommentator(1L, request));
-        verify(mapper).updateCommentatorFromDto(request, entity);
+        verify(personCadastralUpdateService).updateCadastral(
+                entity,
+                request.getName(),
+                request.getPhoneNumber(),
+                request.getBirthdayDate()
+        );
         verifyNoInteractions(personAccountCoordinator);
 
         service.deleteCommentatorById(1L);
@@ -182,7 +192,7 @@ class CommentatorServiceImplTest {
     }
 
     private CommentatorUpdateRequestDTO updateRequest() {
-        return new CommentatorUpdateRequestDTO("Commentator", "34999999992", BIRTHDAY);
+        return new CommentatorUpdateRequestDTO("Commentator Updated", "34888888882", LocalDate.of(1992, 3, 12));
     }
 
     private Person commentator(Long id) {

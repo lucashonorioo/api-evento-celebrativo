@@ -47,13 +47,15 @@ class PersonCadastralUpdateServiceImplTest {
 
     @Test
     void shouldPersistAndSynchronizeAccountWhenPhoneNumberIsAvailable() {
-        Person person = person(1L, "Alice", "34999999991");
+        Person person = person(1L, "Old Alice", "34999999990");
+        LocalDate newBirthdayDate = LocalDate.of(1991, 2, 11);
         when(personRepository.findByPhoneNumber("34999999991")).thenReturn(Optional.of(person));
         when(personRepository.saveAndFlush(person)).thenReturn(person);
 
-        Person saved = service.updateCadastral(person);
+        Person saved = service.updateCadastral(person, "Alice", "34999999991", newBirthdayDate);
 
         assertSame(person, saved);
+        assertCadastralData(person, "Alice", "34999999991", newBirthdayDate);
         verify(personRepository).saveAndFlush(person);
         verify(personAccountCoordinator).synchronizeAccountAfterPersonUpdate(person);
     }
@@ -64,19 +66,21 @@ class PersonCadastralUpdateServiceImplTest {
         when(personRepository.findByPhoneNumber("34999999991")).thenReturn(Optional.of(person));
         when(personRepository.saveAndFlush(person)).thenReturn(person);
 
-        service.updateCadastral(person);
+        service.updateCadastral(person, "Alice", "34999999991", person.getBirthdayDate());
 
         verify(personRepository).saveAndFlush(person);
     }
 
     @Test
     void shouldRejectPhoneNumberAlreadyUsedByAnotherPerson() {
-        Person person = person(1L, "Alice", "34999999991");
+        Person person = person(1L, "Alice", "34999999990");
         Person other = person(2L, "Bob", "34999999991");
         when(personRepository.findByPhoneNumber("34999999991")).thenReturn(Optional.of(other));
 
-        assertThrows(PersonPhoneNumberConflictException.class, () -> service.updateCadastral(person));
+        assertThrows(PersonPhoneNumberConflictException.class,
+                () -> service.updateCadastral(person, "Alice Updated", "34999999991", LocalDate.of(1991, 2, 11)));
 
+        assertCadastralData(person, "Alice", "34999999990", LocalDate.of(1990, 1, 10));
         verify(personRepository, never()).saveAndFlush(any());
         verifyNoInteractions(personAccountCoordinator);
     }
@@ -93,7 +97,8 @@ class PersonCadastralUpdateServiceImplTest {
         when(personRepository.findByPhoneNumber("34999999991")).thenReturn(Optional.empty());
         when(personRepository.saveAndFlush(person)).thenThrow(phoneNumberConstraintViolation());
 
-        assertThrows(PersonPhoneNumberConflictException.class, () -> service.updateCadastral(person));
+        assertThrows(PersonPhoneNumberConflictException.class,
+                () -> service.updateCadastral(person, "Alice", "34999999991", person.getBirthdayDate()));
 
         verifyNoInteractions(personAccountCoordinator);
     }
@@ -106,7 +111,8 @@ class PersonCadastralUpdateServiceImplTest {
         when(personRepository.saveAndFlush(person)).thenThrow(unrelated);
 
         DataIntegrityViolationException thrown = assertThrows(
-                DataIntegrityViolationException.class, () -> service.updateCadastral(person));
+                DataIntegrityViolationException.class,
+                () -> service.updateCadastral(person, "Alice", "34999999991", person.getBirthdayDate()));
 
         assertSame(unrelated, thrown);
         verifyNoInteractions(personAccountCoordinator);
@@ -123,69 +129,92 @@ class PersonCadastralUpdateServiceImplTest {
 
     @Test
     void shouldRejectBlankName() {
-        Person person = person(1L, "   ", "34999999991");
-        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        Person person = person(1L, "Alice", "34999999991");
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "   ", "34999999992", person.getBirthdayDate()));
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldTrimName() {
-        Person person = person(1L, "  Alice  ", "34999999991");
+        Person person = person(1L, "Old Alice", "34999999990");
         when(personRepository.findByPhoneNumber("34999999991")).thenReturn(Optional.empty());
         when(personRepository.saveAndFlush(person)).thenReturn(person);
 
-        service.updateCadastral(person);
+        service.updateCadastral(person, "  Alice  ", "34999999991", person.getBirthdayDate());
 
         assertEquals("Alice", person.getName());
     }
 
     @Test
     void shouldRejectPhoneNumberWithWrongLength() {
-        Person person = person(1L, "Alice", "12345");
-        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        Person person = person(1L, "Alice", "34999999991");
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "Alice", "12345", person.getBirthdayDate()));
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldRejectPhoneNumberWithNonNumericCharacters() {
-        Person person = person(1L, "Alice", "abcdefghijk");
-        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        Person person = person(1L, "Alice", "34999999991");
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "Alice", "abcdefghijk", person.getBirthdayDate()));
+        verifyNoInteractions(personRepository, personAccountCoordinator);
+    }
+
+    @Test
+    void shouldNotMutatePersonWhenCadastralDataIsInvalid() {
+        Person person = person(1L, "Alice", "34999999991");
+        LocalDate originalBirthdayDate = person.getBirthdayDate();
+
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "Maria", "34A99999999", LocalDate.of(1991, 2, 11)));
+
+        assertCadastralData(person, "Alice", "34999999991", originalBirthdayDate);
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldRejectNullBirthdayDate() {
         Person person = person(1L, "Alice", "34999999991");
-        person.setBirthdayDate(null);
-        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "Alice", "34999999992", null));
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldRejectFutureBirthdayDate() {
         Person person = person(1L, "Alice", "34999999991");
-        person.setBirthdayDate(LocalDate.now().plusDays(1));
-        assertThrows(BadRequestException.class, () -> service.updateCadastral(person));
+        assertThrows(BadRequestException.class,
+                () -> service.updateCadastral(person, "Alice", "34999999992", LocalDate.now().plusDays(1)));
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldRejectUnpersistedPerson() {
         Person person = person(null, "Alice", "34999999991");
-        assertThrows(BusinessException.class, () -> service.updateCadastral(person));
+        assertThrows(BusinessException.class,
+                () -> service.updateCadastral(person, "Alice", "34999999991", person.getBirthdayDate()));
         verifyNoInteractions(personRepository, personAccountCoordinator);
     }
 
     @Test
     void shouldRejectNullPerson() {
-        assertThrows(BusinessException.class, () -> service.updateCadastral(null));
+        assertThrows(BusinessException.class,
+                () -> service.updateCadastral(null, "Alice", "34999999991", LocalDate.of(1990, 1, 10)));
         verifyNoInteractions(personRepository, personAccountCoordinator);
+    }
+
+    private void assertCadastralData(Person person, String name, String phoneNumber, LocalDate birthdayDate) {
+        assertEquals(name, person.getName());
+        assertEquals(phoneNumber, person.getPhoneNumber());
+        assertEquals(birthdayDate, person.getBirthdayDate());
     }
 
     private Person person(Long id, String name, String phoneNumber) {
         Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
         ReflectionTestUtils.setField(person, "id", id);
-        person.setActive(true);
+        person.activate();
         return person;
     }
 }

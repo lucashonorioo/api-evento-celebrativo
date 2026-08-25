@@ -32,19 +32,26 @@ public class PersonCadastralUpdateServiceImpl implements PersonCadastralUpdateSe
 
     @Override
     @Transactional
-    public Person updateCadastral(Person person) {
+    public Person updateCadastral(
+            Person person,
+            String name,
+            String phoneNumber,
+            LocalDate birthdayDate
+    ) {
         if (person == null || person.getId() == null) {
             throw new BusinessException("Pessoa persistida é obrigatória para atualização cadastral");
         }
-        person.setName(requireName(person.getName()));
-        requirePhoneNumber(person.getPhoneNumber());
-        requireBirthdayDate(person.getBirthdayDate());
+        String normalizedName = requireName(name);
+        requirePhoneNumber(phoneNumber);
+        requireBirthdayDate(birthdayDate);
 
-        personRepository.findByPhoneNumber(person.getPhoneNumber())
+        personRepository.findByPhoneNumber(phoneNumber)
                 .filter(other -> !other.getId().equals(person.getId()))
                 .ifPresent(other -> {
                     throw new PersonPhoneNumberConflictException("Telefone já está associado a outra pessoa.");
                 });
+
+        person.updateCadastralData(normalizedName, phoneNumber, birthdayDate);
 
         Person saved = saveOrTranslatePhoneNumberConflict(person);
         personAccountCoordinator.synchronizeAccountAfterPersonUpdate(saved);

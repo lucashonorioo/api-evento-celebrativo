@@ -72,14 +72,14 @@ class ParishStaffAssignmentServiceImplTest {
     private Person activePerson(Long id, String name) {
         Person person = new Person(name, "34979" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(person, "id", id);
-        person.setActive(true);
+        person.activate();
         return person;
     }
 
     private Person inactivePerson(Long id) {
         Person person = new Person("Pessoa " + id, "34979" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(person, "id", id);
-        person.setActive(false);
+        person.deactivate();
         return person;
     }
 
