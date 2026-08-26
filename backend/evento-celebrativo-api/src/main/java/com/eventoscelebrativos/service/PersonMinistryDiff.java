@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.service;
 
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.PersonMinistry;
 
 import java.util.ArrayList;
@@ -13,23 +12,23 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Diferenca pura entre o conjunto de ministerios desejado para uma pessoa e o estado atual dela
- * em {@code tb_person_ministry} (ativo ou inativo). Nao acessa banco nem persiste nada; apenas
- * classifica cada {@link MinistryType} do conjunto desejado e cada {@link PersonMinistry} existente
- * em uma das quatro categorias de mudanca.
+ * Diferenca pura entre o conjunto de ministries persistentes desejado para uma pessoa e o estado
+ * atual dela em {@code tb_person_ministry} (ativo ou inativo). Nao acessa banco nem persiste nada;
+ * apenas classifica cada Ministry.id desejado e cada {@link PersonMinistry} existente em uma das
+ * quatro categorias de mudanca.
  */
 public final class PersonMinistryDiff {
 
-    private final Set<MinistryType> toAdd;
+    private final Set<Long> toAdd;
     private final List<PersonMinistry> toReactivate;
     private final List<PersonMinistry> toDeactivate;
-    private final Set<MinistryType> unchanged;
+    private final Set<Long> unchanged;
 
     private PersonMinistryDiff(
-            Set<MinistryType> toAdd,
+            Set<Long> toAdd,
             List<PersonMinistry> toReactivate,
             List<PersonMinistry> toDeactivate,
-            Set<MinistryType> unchanged
+            Set<Long> unchanged
     ) {
         this.toAdd = Collections.unmodifiableSet(toAdd);
         this.toReactivate = Collections.unmodifiableList(toReactivate);
@@ -37,19 +36,19 @@ public final class PersonMinistryDiff {
         this.unchanged = Collections.unmodifiableSet(unchanged);
     }
 
-    public static PersonMinistryDiff compute(Set<MinistryType> desired, List<PersonMinistry> existing) {
-        Map<MinistryType, PersonMinistry> existingByType = existing.stream()
-                .collect(Collectors.toMap(PersonMinistry::getMinistryType, Function.identity()));
+    public static PersonMinistryDiff compute(Set<Long> desiredMinistryIds, List<PersonMinistry> existing) {
+        Map<Long, PersonMinistry> existingByMinistryId = existing.stream()
+                .collect(Collectors.toMap(personMinistry -> personMinistry.getMinistry().getId(), Function.identity()));
 
-        Set<MinistryType> toAdd = new LinkedHashSet<>();
+        Set<Long> toAdd = new LinkedHashSet<>();
         List<PersonMinistry> toReactivate = new ArrayList<>();
-        Set<MinistryType> unchanged = new LinkedHashSet<>();
-        for (MinistryType type : desired) {
-            PersonMinistry existingMinistry = existingByType.get(type);
+        Set<Long> unchanged = new LinkedHashSet<>();
+        for (Long ministryId : desiredMinistryIds) {
+            PersonMinistry existingMinistry = existingByMinistryId.get(ministryId);
             if (existingMinistry == null) {
-                toAdd.add(type);
+                toAdd.add(ministryId);
             } else if (Boolean.TRUE.equals(existingMinistry.getActive())) {
-                unchanged.add(type);
+                unchanged.add(ministryId);
             } else {
                 toReactivate.add(existingMinistry);
             }
@@ -57,13 +56,13 @@ public final class PersonMinistryDiff {
 
         List<PersonMinistry> toDeactivate = existing.stream()
                 .filter(personMinistry -> Boolean.TRUE.equals(personMinistry.getActive()))
-                .filter(personMinistry -> !desired.contains(personMinistry.getMinistryType()))
+                .filter(personMinistry -> !desiredMinistryIds.contains(personMinistry.getMinistry().getId()))
                 .toList();
 
         return new PersonMinistryDiff(toAdd, toReactivate, toDeactivate, unchanged);
     }
 
-    public Set<MinistryType> toAdd() {
+    public Set<Long> toAdd() {
         return toAdd;
     }
 
@@ -75,7 +74,7 @@ public final class PersonMinistryDiff {
         return toDeactivate;
     }
 
-    public Set<MinistryType> unchanged() {
+    public Set<Long> unchanged() {
         return unchanged;
     }
 }

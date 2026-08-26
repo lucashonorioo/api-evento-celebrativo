@@ -19,6 +19,7 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.NotificationRecipientRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -81,6 +83,9 @@ class ScheduleConflictNotificationIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -360,7 +365,7 @@ class ScheduleConflictNotificationIntegrationTest {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.activate();
         Person savedPerson = personRepository.saveAndFlush(person);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(savedPerson, ministryType));
+        personMinistryRepository.saveAndFlush(personMinistry(savedPerson, ministryType, ministryRepository));
         entityManager.clear();
         return savedPerson;
     }

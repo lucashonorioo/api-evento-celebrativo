@@ -5,6 +5,7 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.Person;
@@ -14,6 +15,7 @@ import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.PersonMinistryCommandServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,10 +30,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -52,11 +59,36 @@ class PersonMinistryCommandServiceImplTest {
     @Mock
     private ParishStaffAssignmentRepository parishStaffAssignmentRepository;
 
+    @Mock
+    private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("America/Sao_Paulo"));
 
     @InjectMocks
     private PersonMinistryCommandServiceImpl service;
+
+    @BeforeEach
+    void setUpLegacyMinistryResolver() {
+        for (MinistryType ministryType : MinistryType.values()) {
+            lenient().when(legacyMinistryTypeResolver.requireMinistry(ministryType))
+                    .thenReturn(unitMinistry(ministryType));
+        }
+        lenient().when(legacyMinistryTypeResolver.requireMinistries(anyCollection()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Collection<MinistryType> ministryTypes = invocation.getArgument(0);
+                    Map<MinistryType, Ministry> ministries = new EnumMap<>(MinistryType.class);
+                    for (MinistryType ministryType : ministryTypes) {
+                        ministries.put(ministryType, unitMinistry(ministryType));
+                    }
+                    return ministries;
+                });
+        lenient().when(legacyMinistryTypeResolver.requireMinistryType(any(Ministry.class)))
+                .thenAnswer(invocation -> ministryTypeFor(invocation.getArgument(0)));
+        lenient().when(legacyMinistryTypeResolver.requireEventAssignmentType(any(Ministry.class)))
+                .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.getArgument(0)).name()));
+    }
 
     @Test
     void shouldCreatePersonAndMinistryAtomically() {
@@ -94,9 +126,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldReturnPersonWhenMinistryIsActive() {
         Person reader = reader(1L);
-        PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(ministry));
 
         assertSame(reader, service.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL));
@@ -114,7 +146,7 @@ class PersonMinistryCommandServiceImplTest {
     void shouldThrowResourceNotFoundWhenMinistryIsAbsent() {
         Person reader = reader(1L);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
@@ -136,10 +168,10 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldThrowResourceNotFoundWhenMinistryIsInactive() {
         Person reader = reader(1L);
-        PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(reader, MinistryType.READER);
         ministry.setActive(false);
         when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(ministry));
 
         assertThrows(ResourceNotFoundException.class,
@@ -156,9 +188,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldLockPersonWithFindByIdForUpdateWhenRequiringActiveMinistryPersonForUpdate() {
         Person reader = reader(1L);
-        PersonMinistry ministry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(ministry));
 
         assertSame(reader, service.requireActiveMinistryPersonForUpdate(1L, MinistryType.READER, ENTITY_LABEL));
@@ -185,9 +217,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldDeactivateOnlyTheRequestedMinistryWhenNoAssignmentConflictExists() {
         Person reader = reader(1L);
-        PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry readerMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(readerMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
@@ -204,10 +236,10 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldClearCoordinatorWhenRemovingMinistryThroughIndividualCrudFlow() {
         Person reader = reader(1L);
-        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry coordinatedMinistry = personMinistry(reader, MinistryType.READER);
         coordinatedMinistry.grantCoordination();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(coordinatedMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
@@ -221,9 +253,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBlockRemovalWhenPersonHasEventAssignmentOfSameType() {
         Person reader = reader(1L);
-        PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry readerMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(readerMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(true);
@@ -237,9 +269,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldNotBlockRemovalWhenAssignmentIsOfADifferentType() {
         Person reader = reader(1L);
-        PersonMinistry readerMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry readerMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(readerMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
                 .thenReturn(false);
@@ -260,9 +292,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBlockPriestRemovalWhenPersonIsActivePastor() {
         Person priest = reader(1L);
-        PersonMinistry priestMinistry = new PersonMinistry(priest, MinistryType.PRIEST);
+        PersonMinistry priestMinistry = personMinistry(priest, MinistryType.PRIEST);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(priest));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        whenPersonMinistry(1L, MinistryType.PRIEST)
                 .thenReturn(Optional.of(priestMinistry));
         when(parishStaffAssignmentRepository.existsByPersonIdAndResponsibilityAndActiveTrue(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(true);
@@ -278,9 +310,9 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldAllowPriestRemovalWhenPersonIsNotActivePastor() {
         Person priest = reader(1L);
-        PersonMinistry priestMinistry = new PersonMinistry(priest, MinistryType.PRIEST);
+        PersonMinistry priestMinistry = personMinistry(priest, MinistryType.PRIEST);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(priest));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        whenPersonMinistry(1L, MinistryType.PRIEST)
                 .thenReturn(Optional.of(priestMinistry));
         when(parishStaffAssignmentRepository.existsByPersonIdAndResponsibilityAndActiveTrue(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(false);
@@ -315,7 +347,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldReactivateInactiveMinistryDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry inactiveMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry inactiveMinistry = personMinistry(reader, MinistryType.READER);
         inactiveMinistry.setActive(false);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(inactiveMinistry));
@@ -330,7 +362,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldDeactivateActiveMinistryAbsentFromDesiredSetDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry activeMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
@@ -347,7 +379,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldPreserveUnchangedMinistryDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry activeMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
 
@@ -363,7 +395,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldPreserveCoordinatorOnUnchangedMinistryDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry coordinatedMinistry = personMinistry(reader, MinistryType.READER);
         coordinatedMinistry.grantCoordination();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(coordinatedMinistry));
@@ -378,7 +410,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldClearCoordinatorWhenMinistryIsDeactivatedDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry coordinatedMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry coordinatedMinistry = personMinistry(reader, MinistryType.READER);
         coordinatedMinistry.grantCoordination();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(coordinatedMinistry));
@@ -396,7 +428,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldNotRestoreCoordinatorWhenMinistryIsReactivatedDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry inactiveMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry inactiveMinistry = personMinistry(reader, MinistryType.READER);
         inactiveMinistry.setActive(false);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(inactiveMinistry));
@@ -412,10 +444,10 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldApplyAllFourCategoriesInSingleSync() {
         Person reader = reader(1L);
-        PersonMinistry unchangedReader = new PersonMinistry(reader, MinistryType.READER);
-        PersonMinistry reactivatedCommentator = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        PersonMinistry unchangedReader = personMinistry(reader, MinistryType.READER);
+        PersonMinistry reactivatedCommentator = personMinistry(reader, MinistryType.COMMENTATOR);
         reactivatedCommentator.setActive(false);
-        PersonMinistry deactivatedPriest = new PersonMinistry(reader, MinistryType.PRIEST);
+        PersonMinistry deactivatedPriest = personMinistry(reader, MinistryType.PRIEST);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L))
                 .thenReturn(List.of(unchangedReader, reactivatedCommentator, deactivatedPriest));
@@ -442,7 +474,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBlockSyncWhenDeactivatingPriestOfActivePastor() {
         Person priest = reader(1L);
-        PersonMinistry priestMinistry = new PersonMinistry(priest, MinistryType.PRIEST);
+        PersonMinistry priestMinistry = personMinistry(priest, MinistryType.PRIEST);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(priest));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(priestMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.PRIEST), any()))
@@ -459,7 +491,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBlockSyncAndApplyNoMutationWhenDeactivationConflictsWithEventAssignment() {
         Person reader = reader(1L);
-        PersonMinistry activeReaderMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry activeReaderMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeReaderMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
@@ -474,8 +506,8 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBlockEntireSyncWhenAnyDeactivationConflictsEvenIfOtherChangesWouldSucceed() {
         Person reader = reader(1L);
-        PersonMinistry activeReaderMinistry = new PersonMinistry(reader, MinistryType.READER);
-        PersonMinistry activeCommentatorMinistry = new PersonMinistry(reader, MinistryType.COMMENTATOR);
+        PersonMinistry activeReaderMinistry = personMinistry(reader, MinistryType.READER);
+        PersonMinistry activeCommentatorMinistry = personMinistry(reader, MinistryType.COMMENTATOR);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L))
                 .thenReturn(List.of(activeReaderMinistry, activeCommentatorMinistry));
@@ -495,7 +527,7 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldNotBlockSyncWhenConflictingAssignmentIsOfADifferentTypeDuringSync() {
         Person reader = reader(1L);
-        PersonMinistry activeMinistry = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry activeMinistry = personMinistry(reader, MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of(activeMinistry));
         when(eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(eq(1L), eq(EventAssignmentType.READER), any()))
@@ -561,7 +593,7 @@ class PersonMinistryCommandServiceImplTest {
     void shouldCreateMinistryWhenNoneExistsOnAddOrReactivate() {
         Person reader = reader(1L);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.COMMENTATOR))
+        whenPersonMinistry(1L, MinistryType.COMMENTATOR)
                 .thenReturn(Optional.empty());
 
         Person result = service.addOrReactivateMinistry(1L, MinistryType.COMMENTATOR);
@@ -578,10 +610,10 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldReactivateInactiveMinistryOnAddOrReactivateWithoutRestoringCoordinator() {
         Person reader = reader(1L);
-        PersonMinistry inactive = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry inactive = personMinistry(reader, MinistryType.READER);
         inactive.deactivate();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(inactive));
 
         service.addOrReactivateMinistry(1L, MinistryType.READER);
@@ -594,10 +626,10 @@ class PersonMinistryCommandServiceImplTest {
     @Test
     void shouldBeNoOpAndPreserveCoordinatorWhenMinistryAlreadyActiveOnAddOrReactivate() {
         Person reader = reader(1L);
-        PersonMinistry active = new PersonMinistry(reader, MinistryType.READER);
+        PersonMinistry active = personMinistry(reader, MinistryType.READER);
         active.grantCoordination();
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        whenPersonMinistry(1L, MinistryType.READER)
                 .thenReturn(Optional.of(active));
 
         service.addOrReactivateMinistry(1L, MinistryType.READER);
@@ -638,5 +670,25 @@ class PersonMinistryCommandServiceImplTest {
         Person reader = new Person("Reader", "34999999991", LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(reader, "id", id);
         return reader;
+    }
+
+    private org.mockito.stubbing.OngoingStubbing<Optional<PersonMinistry>> whenPersonMinistry(
+            Long personId,
+            MinistryType ministryType
+    ) {
+        return when(personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId(ministryType)));
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return unitMinistry(ministryType).getId();
+    }
+
+    private MinistryType ministryTypeFor(Ministry ministry) {
+        for (MinistryType ministryType : MinistryType.values()) {
+            if (ministryId(ministryType).equals(ministry.getId())) {
+                return ministryType;
+            }
+        }
+        throw new IllegalArgumentException("Ministry de teste sem tipo legado correspondente");
     }
 }

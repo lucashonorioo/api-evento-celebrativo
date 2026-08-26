@@ -14,6 +14,7 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.EventParticipationResponseRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -41,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -149,6 +151,9 @@ class CancelParticipationResponseConcurrencyMySqlIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private CelebrationEventRepository celebrationEventRepository;
 
     @Autowired
@@ -160,7 +165,7 @@ class CancelParticipationResponseConcurrencyMySqlIntegrationTest {
     @RepeatedTest(6)
     void cancelAndParticipationResponseRaceResultInAValidSerialOutcome() throws Exception {
         Person person = savePerson("Cancel Participation Race Person " + UUID.randomUUID());
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
                 null, "Cancel Participation Race Event " + UUID.randomUUID(),
                 LocalDateTime.of(2026, 11, 20, 19, 0), LocalDateTime.of(2026, 11, 20, 20, 0), true));

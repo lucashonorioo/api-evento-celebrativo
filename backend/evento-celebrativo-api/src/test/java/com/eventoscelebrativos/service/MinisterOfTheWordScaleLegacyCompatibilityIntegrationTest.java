@@ -11,6 +11,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -52,6 +54,9 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
@@ -65,7 +70,7 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
         try {
             Person minister = personRepository.saveAndFlush(ministerOfTheWord("Scale Legacy Word Minister"));
             ministerId = minister.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.MINISTER_OF_THE_WORD));
+            personMinistryRepository.saveAndFlush(personMinistry(minister, MinistryType.MINISTER_OF_THE_WORD, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Scale Legacy Church"));
             locationId = location.getId();
 
@@ -99,8 +104,8 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Word Minister Ministry"));
             readerId = reader.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.MINISTER_OF_THE_WORD));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.MINISTER_OF_THE_WORD, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Scale Accept Church"));
             locationId = location.getId();
 
@@ -131,7 +136,7 @@ class MinisterOfTheWordScaleLegacyCompatibilityIntegrationTest {
         try {
             Person minister = personRepository.saveAndFlush(ministerOfTheWord("Linked Scale Word Minister"));
             ministerId = minister.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.MINISTER_OF_THE_WORD));
+            personMinistryRepository.saveAndFlush(personMinistry(minister, MinistryType.MINISTER_OF_THE_WORD, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Linked Scale Church"));
             locationId = location.getId();
             eventId = celebrationEventService.createEventWithScale(

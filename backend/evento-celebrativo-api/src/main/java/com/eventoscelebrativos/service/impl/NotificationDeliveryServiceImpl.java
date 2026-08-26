@@ -24,6 +24,7 @@ import com.eventoscelebrativos.repository.NotificationTargetMinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.NotificationDeliveryService;
 import com.eventoscelebrativos.service.SystemNotificationCommand;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
     private final UserAccountRepository userAccountRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final AdminRoleMutexService adminRoleMutexService;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
     private final Clock clock;
 
     public NotificationDeliveryServiceImpl(
@@ -73,6 +75,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             UserAccountRepository userAccountRepository,
             PersonMinistryRepository personMinistryRepository,
             AdminRoleMutexService adminRoleMutexService,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver,
             Clock clock
     ) {
         this.notificationRepository = notificationRepository;
@@ -82,6 +85,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
         this.userAccountRepository = userAccountRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.adminRoleMutexService = adminRoleMutexService;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
         this.clock = clock;
     }
 
@@ -160,16 +164,33 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
         adminRoleMutexService.lockAdminRole();
 
         Map<Long, Long> personIdByAccountId = new LinkedHashMap<>();
+        Map<Long, MinistryType> ministryTypeById = Map.of();
+        Set<Long> ministryIds = Set.of();
 
         if (audience == NotificationAudience.MINISTRY) {
+            Map<MinistryType, com.eventoscelebrativos.model.Ministry> ministriesByType =
+                    legacyMinistryTypeResolver.requireMinistries(ministryTypes);
+            Map<MinistryType, Long> ministryIdByType = new EnumMap<>(MinistryType.class);
+            Map<Long, MinistryType> mutableMinistryTypeById = new LinkedHashMap<>();
+            for (Map.Entry<MinistryType, com.eventoscelebrativos.model.Ministry> entry : ministriesByType.entrySet()) {
+                Long ministryId = entry.getValue().getId();
+                ministryIdByType.put(entry.getKey(), ministryId);
+                mutableMinistryTypeById.put(ministryId, entry.getKey());
+            }
+            ministryTypeById = Map.copyOf(mutableMinistryTypeById);
+            ministryIds = Set.copyOf(ministryIdByType.values());
+
             Map<MinistryType, Set<Long>> accountsByMinistryType = new EnumMap<>(MinistryType.class);
             for (MinistryType type : ministryTypes) {
                 accountsByMinistryType.put(type, new LinkedHashSet<>());
             }
             for (UserAccountRepository.EligibleMinistryAccount row
-                    : userAccountRepository.findEligibleAccountsByMinistryTypes(ministryTypes)) {
+                    : userAccountRepository.findEligibleAccountsByMinistryIds(ministryIds)) {
                 personIdByAccountId.put(row.getAccountId(), row.getPersonId());
-                accountsByMinistryType.get(row.getMinistryType()).add(row.getAccountId());
+                MinistryType ministryType = ministryTypeById.get(row.getMinistryId());
+                if (ministryType != null) {
+                    accountsByMinistryType.get(ministryType).add(row.getAccountId());
+                }
             }
             requireMinistryCoverage(ministryTypes, accountsByMinistryType);
         } else {
@@ -196,7 +217,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             for (Long personId : personIdsToLock) {
                 lockedMinistriesByPersonId.put(
                         personId,
-                        personMinistryRepository.findByPersonIdAndMinistryTypeInForUpdate(personId, ministryTypes)
+                        personMinistryRepository.findByPersonIdAndMinistryIdInForUpdate(personId, ministryIds)
                 );
             }
         }
@@ -208,7 +229,14 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
         }
 
         List<Long> finalAccountIds = audience == NotificationAudience.MINISTRY
-                ? resolveMinistryRecipients(ministryTypes, personIdByAccountId, lockedAccounts, lockedPersons, lockedMinistriesByPersonId)
+                ? resolveMinistryRecipients(
+                        ministryTypes,
+                        ministryTypeById,
+                        personIdByAccountId,
+                        lockedAccounts,
+                        lockedPersons,
+                        lockedMinistriesByPersonId
+                )
                 : resolveSimpleRecipients(audience, personIdByAccountId, lockedAccounts, lockedPersons);
 
         List<MinistryType> ministryTypesToPersist = audience == NotificationAudience.MINISTRY ? ministryTypes : List.of();
@@ -217,6 +245,7 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
 
     private List<Long> resolveMinistryRecipients(
             List<MinistryType> ministryTypes,
+            Map<Long, MinistryType> ministryTypeById,
             Map<Long, Long> personIdByAccountId,
             Map<Long, UserAccount> lockedAccounts,
             Map<Long, Person> lockedPersons,
@@ -237,8 +266,9 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
             }
             List<PersonMinistry> ministries = lockedMinistriesByPersonId.getOrDefault(personId, List.of());
             for (PersonMinistry personMinistry : ministries) {
-                if (Boolean.TRUE.equals(personMinistry.getActive()) && ministryTypes.contains(personMinistry.getMinistryType())) {
-                    stillCovered.get(personMinistry.getMinistryType()).add(accountId);
+                MinistryType ministryType = ministryTypeById.get(personMinistry.getMinistry().getId());
+                if (Boolean.TRUE.equals(personMinistry.getActive()) && ministryType != null) {
+                    stillCovered.get(ministryType).add(accountId);
                     includedAccountIds.add(accountId);
                 }
             }

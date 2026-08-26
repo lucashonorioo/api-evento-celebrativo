@@ -20,6 +20,7 @@ import com.eventoscelebrativos.repository.ParishProfileRepository;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.ParishStaffAssignmentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,17 +35,20 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     private final PersonRepository personRepository;
     private final PersonMinistryRepository personMinistryRepository;
     private final ParishStaffAssignmentRepository parishStaffAssignmentRepository;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public ParishStaffAssignmentServiceImpl(
             ParishProfileRepository parishProfileRepository,
             PersonRepository personRepository,
             PersonMinistryRepository personMinistryRepository,
-            ParishStaffAssignmentRepository parishStaffAssignmentRepository
+            ParishStaffAssignmentRepository parishStaffAssignmentRepository,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver
     ) {
         this.parishProfileRepository = parishProfileRepository;
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.parishStaffAssignmentRepository = parishStaffAssignmentRepository;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
@@ -193,7 +197,8 @@ public class ParishStaffAssignmentServiceImpl implements ParishStaffAssignmentSe
     }
 
     private boolean hasActivePriestMinistry(Long personId) {
-        return personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.PRIEST)
+        Long priestMinistryId = legacyMinistryTypeResolver.requireMinistry(MinistryType.PRIEST).getId();
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, priestMinistryId)
                 .map(PersonMinistry::getActive)
                 .map(Boolean.TRUE::equals)
                 .orElse(false);

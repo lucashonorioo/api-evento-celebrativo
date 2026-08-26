@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -64,6 +66,9 @@ class ParishSecretaryOperationsIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     // Pessoas com ParishStaffAssignment/PersonMinistry criadas por este teste: o ParishProfile e as
     // demais tabelas de responsabilidade são estado global compartilhado por todo o contexto Spring
@@ -524,7 +529,7 @@ class ParishSecretaryOperationsIntegrationTest {
 
     private long createCoordinatorOnly(String name) {
         Person person = savePerson(name);
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
         createdCoordinatorMinistryPersonIds.add(person.getId());

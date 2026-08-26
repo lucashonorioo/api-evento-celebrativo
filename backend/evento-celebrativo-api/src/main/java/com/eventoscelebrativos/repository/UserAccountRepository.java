@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.repository;
 
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.UserAccount;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
@@ -107,27 +106,28 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
     List<EligibleAccount> findEligibleAccounts(@Param("requiredAuthority") String requiredAuthority);
 
     /**
-     * Ternas (accountId, personId, ministryType) de contas elegiveis (habilitadas, pessoa ativa,
+     * Ternas (accountId, personId, ministryId) de contas elegiveis (habilitadas, pessoa ativa,
      * exatamente uma role valida - ROLE_ADMIN ou ROLE_OPERATOR) cuja pessoa possui vinculo ativo com
      * algum dos ministerios informados. Usada tanto para descobrir o conjunto de candidatos da
-     * audience MINISTRY quanto para checar, por tipo, se ha pelo menos um destinatario elegivel.
+     * audience MINISTRY quanto para checar, por Ministry persistente, se ha pelo menos um
+     * destinatario elegivel.
      */
     @Query("""
-            SELECT ua.id AS accountId, ua.person.id AS personId, pm.ministryType AS ministryType
+            SELECT ua.id AS accountId, ua.person.id AS personId, pm.ministry.id AS ministryId
             FROM UserAccount ua
             JOIN PersonMinistry pm ON pm.person = ua.person
             WHERE ua.enabled = TRUE
               AND ua.person.active = TRUE
               AND pm.active = TRUE
-              AND pm.ministryType IN :ministryTypes
+              AND pm.ministry.id IN :ministryIds
               AND (SELECT COUNT(uar) FROM UserAccountRole uar WHERE uar.userAccount = ua) = 1
               AND EXISTS (
                   SELECT 1 FROM UserAccountRole uarValid
                   WHERE uarValid.userAccount = ua AND uarValid.role.authority IN ('ROLE_ADMIN', 'ROLE_OPERATOR')
               )
             """)
-    List<EligibleMinistryAccount> findEligibleAccountsByMinistryTypes(
-            @Param("ministryTypes") Collection<MinistryType> ministryTypes);
+    List<EligibleMinistryAccount> findEligibleAccountsByMinistryIds(
+            @Param("ministryIds") Collection<Long> ministryIds);
 
     /**
      * Estado de conta (username, enabled) por personId, em uma unica consulta em lote. Pessoa sem
@@ -162,6 +162,6 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
         Long getPersonId();
 
-        MinistryType getMinistryType();
+        Long getMinistryId();
     }
 }

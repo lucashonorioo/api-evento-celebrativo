@@ -10,6 +10,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -38,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -133,6 +135,9 @@ class MinistryPersonManagementMySqlIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private CelebrationEventRepository celebrationEventRepository;
 
     @Autowired
@@ -141,7 +146,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
     @Test
     void shouldBlockRemovalWhenActiveFutureAssignmentExistsOnRealMySql() {
         Person person = savePerson("Ministry Removal Active Block " + UUID.randomUUID());
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
                 null, "Active Future Event " + UUID.randomUUID(),
                 LocalDateTime.now().plusDays(15), LocalDateTime.now().plusDays(15).plusHours(1), true));
@@ -156,7 +161,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
     @Test
     void shouldNotBlockRemovalWhenOnlyCancelledFutureAssignmentExistsOnRealMySql() {
         Person person = savePerson("Ministry Removal Cancelled Only " + UUID.randomUUID());
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
         CelebrationEvent event = celebrationEventRepository.saveAndFlush(new CelebrationEvent(
                 null, "Cancelled Future Event " + UUID.randomUUID(),
                 LocalDateTime.now().plusDays(16), LocalDateTime.now().plusDays(16).plusHours(1), true));
@@ -173,7 +178,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
     @RepeatedTest(4)
     void addOrReactivateAndRemoveConcurrencyResultsInValidSerialOutcome() throws Exception {
         Person person = savePerson("Add Remove Race " + UUID.randomUUID());
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.deactivate();
         personMinistryRepository.saveAndFlush(ministry);
         Long personId = person.getId();

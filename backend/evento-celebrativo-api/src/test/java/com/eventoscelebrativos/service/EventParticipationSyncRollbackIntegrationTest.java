@@ -9,6 +9,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventParticipationResponseRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -49,6 +51,9 @@ class EventParticipationSyncRollbackIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -111,7 +116,7 @@ class EventParticipationSyncRollbackIntegrationTest {
     private Person savePersonWithMinistry(String name, MinistryType ministryType) {
         Person person = new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         person = personRepository.saveAndFlush(person);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
+        personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
         return person;
     }
 

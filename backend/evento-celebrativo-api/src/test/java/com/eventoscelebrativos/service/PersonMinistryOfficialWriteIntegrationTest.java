@@ -13,6 +13,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -65,6 +67,9 @@ class PersonMinistryOfficialWriteIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private EventAssignmentRepository eventAssignmentRepository;
@@ -211,7 +216,7 @@ class PersonMinistryOfficialWriteIntegrationTest {
 
     private void addExtraMinistry(Long personId, MinistryType ministryType) {
         var person = personRepository.findById(personId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
+        personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
     }
 
     private String readerPayload(String name) throws Exception {

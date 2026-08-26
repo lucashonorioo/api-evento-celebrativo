@@ -11,6 +11,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -51,6 +53,9 @@ class PriestEventLegacyCompatibilityIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
@@ -64,7 +69,7 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         try {
             Person priest = personRepository.saveAndFlush(priest("Event Legacy Priest"));
             priestId = priest.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+            personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Event Legacy Church"));
             locationId = location.getId();
 
@@ -95,8 +100,8 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Priest Ministry"));
             readerId = reader.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.PRIEST));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.PRIEST, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Event Accept Church"));
             locationId = location.getId();
 
@@ -125,7 +130,7 @@ class PriestEventLegacyCompatibilityIntegrationTest {
         try {
             Person priest = personRepository.saveAndFlush(priest("Linked Event Priest"));
             priestId = priest.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+            personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Linked Event Church"));
             locationId = location.getId();
             eventId = celebrationEventService.createEventWithScale(

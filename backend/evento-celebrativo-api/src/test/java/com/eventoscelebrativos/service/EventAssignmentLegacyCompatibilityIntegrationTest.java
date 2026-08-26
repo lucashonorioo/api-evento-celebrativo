@@ -11,6 +11,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -70,6 +72,9 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -369,35 +374,35 @@ class EventAssignmentLegacyCompatibilityIntegrationTest {
     private Person savePriest(String name) {
         Person priest = person(name);
         priest = personRepository.saveAndFlush(priest);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
         return priest;
     }
 
     private Person saveReader(String name) {
         Person reader = person(name);
         reader = personRepository.saveAndFlush(reader);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
         return reader;
     }
 
     private Person saveCommentator(String name) {
         Person commentator = person(name);
         commentator = personRepository.saveAndFlush(commentator);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(commentator, MinistryType.COMMENTATOR));
+        personMinistryRepository.saveAndFlush(personMinistry(commentator, MinistryType.COMMENTATOR, ministryRepository));
         return commentator;
     }
 
     private Person saveMinisterOfTheWord(String name) {
         Person minister = person(name);
         minister = personRepository.saveAndFlush(minister);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.MINISTER_OF_THE_WORD));
+        personMinistryRepository.saveAndFlush(personMinistry(minister, MinistryType.MINISTER_OF_THE_WORD, ministryRepository));
         return minister;
     }
 
     private Person saveEucharisticMinister(String name) {
         Person minister = person(name);
         minister = personRepository.saveAndFlush(minister);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.EUCHARISTIC_MINISTER));
+        personMinistryRepository.saveAndFlush(personMinistry(minister, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
         return minister;
     }
 

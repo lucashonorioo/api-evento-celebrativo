@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -54,6 +55,9 @@ class EventAssignmentRepositoryTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Test
     void shouldPersistEventAssignmentWithEnumAsStringAndTimestamps() {
@@ -551,7 +555,7 @@ class EventAssignmentRepositoryTest {
         Person reader = savePerson("Schedule Legacy Ministry Reader", "34974000019");
         CelebrationEvent event = saveEvent("Schedule Legacy Ministry Event", LocalDate.of(2026, 8, 5), LocalTime.of(10, 0));
         saveAssignment(event, reader, EventAssignmentType.READER);
-        PersonMinistry ministry = personMinistryRepository.save(new PersonMinistry(reader, MinistryType.READER));
+        PersonMinistry ministry = personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
         ministry.deactivate();
         personMinistryRepository.save(ministry);
         entityManager.flush();

@@ -32,6 +32,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -61,12 +63,20 @@ class ParishStaffAssignmentServiceImplTest {
     @Mock
     private ParishStaffAssignmentRepository parishStaffAssignmentRepository;
 
+    @Mock
+    private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
     private ParishStaffAssignmentServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new ParishStaffAssignmentServiceImpl(
-                parishProfileRepository, personRepository, personMinistryRepository, parishStaffAssignmentRepository);
+                parishProfileRepository,
+                personRepository,
+                personMinistryRepository,
+                parishStaffAssignmentRepository,
+                legacyMinistryTypeResolver
+        );
     }
 
     private Person activePerson(Long id, String name) {
@@ -84,7 +94,7 @@ class ParishStaffAssignmentServiceImplTest {
     }
 
     private PersonMinistry activePriestMinistry(Person person) {
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.PRIEST);
+        PersonMinistry ministry = personMinistry(person, MinistryType.PRIEST);
         ministry.setActive(true);
         return ministry;
     }
@@ -126,7 +136,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST)).thenReturn(Optional.empty());
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId)).thenReturn(Optional.empty());
 
         assertThrows(PastorPriestMinistryRequiredException.class, () -> service.grantPastor(1L));
         verify(parishStaffAssignmentRepository, never()).save(any());
@@ -141,7 +152,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST)).thenReturn(Optional.of(inactivePriest));
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId)).thenReturn(Optional.of(inactivePriest));
 
         assertThrows(PastorPriestMinistryRequiredException.class, () -> service.grantPastor(1L));
     }
@@ -153,7 +165,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
         when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
                 .thenReturn(List.of());
@@ -170,7 +183,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(2L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(2L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(2L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
 
         Person otherPastor = activePerson(1L, "Padre Miguel");
@@ -193,7 +207,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
         when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
                 .thenReturn(List.of(existing));
@@ -214,7 +229,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.of(existing));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
         when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
                 .thenReturn(List.of());
@@ -232,7 +248,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
         when(parishStaffAssignmentRepository.findByResponsibilityAndActiveTrue(ParishResponsibilityType.PASTOR))
                 .thenReturn(List.of());
@@ -253,7 +270,8 @@ class ParishStaffAssignmentServiceImplTest {
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
         when(parishStaffAssignmentRepository.findByPersonIdAndResponsibility(1L, ParishResponsibilityType.PASTOR))
                 .thenReturn(Optional.empty());
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.PRIEST))
+        Long priestMinistryId = mockPriestMinistry();
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, priestMinistryId))
                 .thenReturn(Optional.of(activePriestMinistry(person)));
 
         Person personA = activePerson(1L, "Padre A");
@@ -512,6 +530,13 @@ class ParishStaffAssignmentServiceImplTest {
         when(projection.getPersonId()).thenReturn(personId);
         when(projection.getName()).thenReturn(name);
         return projection;
+    }
+
+    private Long mockPriestMinistry() {
+        Long ministryId = unitMinistry(MinistryType.PRIEST).getId();
+        when(legacyMinistryTypeResolver.requireMinistry(MinistryType.PRIEST))
+                .thenReturn(unitMinistry(MinistryType.PRIEST));
+        return ministryId;
     }
 
     private void setUpdatedAt(ParishStaffAssignment assignment, LocalDateTime updatedAt) throws Exception {

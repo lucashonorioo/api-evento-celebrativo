@@ -46,10 +46,10 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
                 "INSERT INTO tb_person_ministry(person_id, ministry_type, active) VALUES (?, 'READER', TRUE)", personId);
 
         // migrateAll() migra ate a mais recente disponivel no classpath, nao apenas V21;
-        // a partir de V20, isso executa V21 (esta migration) e V22-V26.
+        // a partir de V20, isso executa V21 (esta migration) e V22-V27.
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(6, result.migrationsExecuted);
+        assertEquals(7, result.migrationsExecuted);
         assertFalse(jdbcTemplate.queryForObject(
                 "SELECT coordinator FROM tb_person_ministry WHERE person_id = ?", Boolean.class, personId));
     }
@@ -61,7 +61,9 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long personId = insertPerson(jdbcTemplate, "Leitor Novo", "34988770011");
 
-        jdbcTemplate.update("INSERT INTO tb_person_ministry(person_id, ministry_type) VALUES (?, 'READER')", personId);
+        jdbcTemplate.update(
+                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id) VALUES (?, 'READER', ?)",
+                personId, ministryId(jdbcTemplate, "LEITORES"));
 
         assertFalse(jdbcTemplate.queryForObject(
                 "SELECT coordinator FROM tb_person_ministry WHERE person_id = ?", Boolean.class, personId));
@@ -75,8 +77,11 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         Long personId = insertPerson(jdbcTemplate, "Leitor Coordenador", "34988770012");
 
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, 'READER', TRUE, TRUE)",
-                personId);
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator)
+                VALUES (?, 'READER', ?, TRUE, TRUE)
+                """,
+                personId, ministryId(jdbcTemplate, "LEITORES"));
 
         assertTrue(jdbcTemplate.queryForObject(
                 "SELECT coordinator FROM tb_person_ministry WHERE person_id = ?", Boolean.class, personId));
@@ -90,8 +95,11 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         Long personId = insertPerson(jdbcTemplate, "Leitor Inativo", "34988770013");
 
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, 'READER', FALSE, FALSE)",
-                personId);
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator)
+                VALUES (?, 'READER', ?, FALSE, FALSE)
+                """,
+                personId, ministryId(jdbcTemplate, "LEITORES"));
 
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM tb_person_ministry WHERE person_id = ?", Integer.class, personId));
@@ -105,8 +113,11 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         Long personId = insertPerson(jdbcTemplate, "Leitor Invalido", "34988770014");
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, 'READER', FALSE, TRUE)",
-                personId));
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator)
+                VALUES (?, 'READER', ?, FALSE, TRUE)
+                """,
+                personId, ministryId(jdbcTemplate, "LEITORES")));
     }
 
     @Test
@@ -116,8 +127,11 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long personId = insertPerson(jdbcTemplate, "Leitor Coordenador Dois", "34988770015");
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, 'READER', TRUE, TRUE)",
-                personId);
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator)
+                VALUES (?, 'READER', ?, TRUE, TRUE)
+                """,
+                personId, ministryId(jdbcTemplate, "LEITORES"));
 
         assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
                 "UPDATE tb_person_ministry SET active = FALSE WHERE person_id = ?", personId));
@@ -130,7 +144,7 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(26, first.migrations.size());
+        assertEquals(27, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 
@@ -168,6 +182,13 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
                 """,
                 Integer.class);
         return count != null && count > 0;
+    }
+
+    private Long ministryId(JdbcTemplate jdbcTemplate, String normalizedName) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_ministry WHERE normalized_name = ?",
+                Long.class,
+                normalizedName);
     }
 
     private byte[] newPublicId() {

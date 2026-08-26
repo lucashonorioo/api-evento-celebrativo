@@ -13,6 +13,7 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
@@ -38,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,6 +75,9 @@ class MinistryPersonManagementIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private CelebrationEventRepository celebrationEventRepository;
@@ -160,7 +165,7 @@ class MinistryPersonManagementIntegrationTest {
     void activePastorWithoutCoordinationIsForbidden() throws Exception {
         long pastorId = createPerson("Pastor No Coordination");
         Person pastorPerson = personRepository.findById(pastorId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(pastorPerson, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(pastorPerson, MinistryType.PRIEST, ministryRepository));
         ParishStaffAssignment assignment = new ParishStaffAssignment(pastorPerson, ParishResponsibilityType.PASTOR);
         parishStaffAssignmentRepository.saveAndFlush(assignment);
         createdStaffPersonIds.add(pastorId);
@@ -174,7 +179,7 @@ class MinistryPersonManagementIntegrationTest {
     void inactiveCoordinatorLinkIsForbidden() throws Exception {
         long coordinatorId = createPerson("Inactive Coordinator Link");
         Person coordinatorPerson = personRepository.findById(coordinatorId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(coordinatorPerson, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(coordinatorPerson, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         ministry.deactivate();
         personMinistryRepository.saveAndFlush(ministry);
@@ -253,10 +258,10 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createReaderCoordinator("Cross Scope Multi Coordinator");
         long multiMinistryId = createReader("Cross Scope Multi Target");
         Person multiMinistryPerson = personRepository.findById(multiMinistryId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(multiMinistryPerson, MinistryType.COMMENTATOR));
+        personMinistryRepository.saveAndFlush(personMinistry(multiMinistryPerson, MinistryType.COMMENTATOR, ministryRepository));
         long priestId = createPerson("Cross Scope Priest Target");
         Person priest = personRepository.findById(priestId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
         mockMvc.perform(delete("/ministerios/COMMENTATOR/pessoas/" + multiMinistryId + "/vinculo").with(coordinator))
@@ -537,7 +542,7 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createReaderCoordinator("Remove Vinculo Coordinator");
         long targetId = createReader("Remove Vinculo Target");
         Person target = personRepository.findById(targetId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(target, MinistryType.COMMENTATOR));
+        personMinistryRepository.saveAndFlush(personMinistry(target, MinistryType.COMMENTATOR, ministryRepository));
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
         mockMvc.perform(delete("/ministerios/READER/pessoas/" + targetId + "/vinculo").with(coordinator))
@@ -585,7 +590,7 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createPriestCoordinator("Pastor Invariant Coordinator");
         long pastorId = createPerson("Pastor Invariant Target");
         Person pastorPerson = personRepository.findById(pastorId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(pastorPerson, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(pastorPerson, MinistryType.PRIEST, ministryRepository));
         ParishStaffAssignment pastorAssignment = new ParishStaffAssignment(pastorPerson, ParishResponsibilityType.PASTOR);
         parishStaffAssignmentRepository.saveAndFlush(pastorAssignment);
         createdStaffPersonIds.add(pastorId);
@@ -674,21 +679,21 @@ class MinistryPersonManagementIntegrationTest {
     private long createReader(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
         return personId;
     }
 
     private long createCommentator(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.COMMENTATOR));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.COMMENTATOR, ministryRepository));
         return personId;
     }
 
     private long createReaderCoordinator(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
         return personId;
@@ -697,7 +702,7 @@ class MinistryPersonManagementIntegrationTest {
     private long createCommentatorCoordinator(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.COMMENTATOR);
+        PersonMinistry ministry = personMinistry(person, MinistryType.COMMENTATOR, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
         return personId;
@@ -706,7 +711,7 @@ class MinistryPersonManagementIntegrationTest {
     private long createPriestCoordinator(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.PRIEST);
+        PersonMinistry ministry = personMinistry(person, MinistryType.PRIEST, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
         return personId;

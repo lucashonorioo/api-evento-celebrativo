@@ -1,6 +1,5 @@
 package com.eventoscelebrativos.repository;
 
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
@@ -42,11 +41,11 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                     FROM Person p
                     WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
                       AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
-                      AND (:ministryType IS NULL OR EXISTS (
+                      AND (:ministryId IS NULL OR EXISTS (
                           SELECT pm
                           FROM PersonMinistry pm
                           WHERE pm.person = p
-                            AND pm.ministryType = :ministryType
+                            AND pm.ministry.id = :ministryId
                             AND pm.active = TRUE
                       ))
                       AND (:role IS NULL OR EXISTS (
@@ -70,11 +69,11 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
                     FROM Person p
                     WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
                       AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
-                      AND (:ministryType IS NULL OR EXISTS (
+                      AND (:ministryId IS NULL OR EXISTS (
                           SELECT pm
                           FROM PersonMinistry pm
                           WHERE pm.person = p
-                            AND pm.ministryType = :ministryType
+                            AND pm.ministry.id = :ministryId
                             AND pm.active = TRUE
                       ))
                       AND (:role IS NULL OR EXISTS (
@@ -96,7 +95,7 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
     Page<Long> findAdminPageIds(
             @Param("name") String name,
             @Param("phoneNumber") String phoneNumber,
-            @Param("ministryType") MinistryType ministryType,
+            @Param("ministryId") Long ministryId,
             @Param("role") String role,
             @Param("personActive") Boolean personActive,
             @Param("accountExists") Boolean accountExists,

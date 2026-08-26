@@ -4,6 +4,7 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.MinistryAuthorizationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,13 +23,16 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
 
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final PersonMinistryRepository personMinistryRepository;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public MinistryAuthorizationServiceImpl(
             AuthenticatedUserResolver authenticatedUserResolver,
-            PersonMinistryRepository personMinistryRepository
+            PersonMinistryRepository personMinistryRepository,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver
     ) {
         this.authenticatedUserResolver = authenticatedUserResolver;
         this.personMinistryRepository = personMinistryRepository;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
@@ -45,8 +49,8 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
         if (!hasAuthority(currentUser, ROLE_OPERATOR)) {
             return false;
         }
-        return personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-                currentUser.personId(), ministryType);
+        return personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
+                currentUser.personId(), legacyMinistryTypeResolver.requireMinistry(ministryType).getId());
     }
 
     private boolean hasAuthority(AuthenticatedUser user, String authority) {

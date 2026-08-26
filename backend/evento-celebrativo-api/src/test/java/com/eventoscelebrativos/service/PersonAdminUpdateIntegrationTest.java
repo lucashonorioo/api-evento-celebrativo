@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,6 +59,9 @@ class PersonAdminUpdateIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -300,7 +305,7 @@ class PersonAdminUpdateIntegrationTest {
 
     private void addMinistry(Long personId, MinistryType ministryType, boolean active) {
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, ministryType);
+        PersonMinistry ministry = personMinistry(person, ministryType, ministryRepository);
         ministry.setActive(active);
         personMinistryRepository.saveAndFlush(ministry);
     }

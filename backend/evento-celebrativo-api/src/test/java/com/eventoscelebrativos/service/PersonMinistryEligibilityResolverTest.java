@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,8 +28,13 @@ class PersonMinistryEligibilityResolverTest {
 
     private final PersonRepository personRepository = mock(PersonRepository.class);
     private final PersonMinistryRepository personMinistryRepository = mock(PersonMinistryRepository.class);
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver = mock(LegacyMinistryTypeResolver.class);
     private final PersonMinistryEligibilityResolver resolver =
-            new PersonMinistryEligibilityResolver(personRepository, personMinistryRepository);
+            new PersonMinistryEligibilityResolver(
+                    personRepository,
+                    personMinistryRepository,
+                    legacyMinistryTypeResolver
+            );
 
     @Test
     void shouldResolveEligibilityForAllFiveMinistries() {
@@ -145,7 +151,7 @@ class PersonMinistryEligibilityResolverTest {
         assertEquals(List.of(), resolver.resolve(Map.of(MinistryType.PRIEST, List.of())));
 
         verify(personRepository, never()).findAllByIdIn(anyCollection());
-        verify(personMinistryRepository, never()).findActiveMinistryTypesByPersonIds(anyCollection());
+        verify(personMinistryRepository, never()).findActiveMinistriesByPersonIds(anyCollection());
     }
 
     @Test
@@ -163,7 +169,7 @@ class PersonMinistryEligibilityResolverTest {
         resolver.resolve(request);
 
         verify(personRepository, times(1)).findAllByIdIn(anyCollection());
-        verify(personMinistryRepository, times(1)).findActiveMinistryTypesByPersonIds(anyCollection());
+        verify(personMinistryRepository, times(1)).findActiveMinistriesByPersonIds(anyCollection());
     }
 
     @Test
@@ -185,8 +191,19 @@ class PersonMinistryEligibilityResolverTest {
         when(personRepository.findAllByIdIn(anyCollection())).thenReturn(List.of(people));
     }
 
-    private void mockMinistries(PersonMinistryRepository.PersonMinistryTypeView... views) {
-        when(personMinistryRepository.findActiveMinistryTypesByPersonIds(anyCollection())).thenReturn(List.of(views));
+    private void mockMinistries(PersonMinistryRepository.PersonMinistryCatalogView... views) {
+        when(legacyMinistryTypeResolver.requireMinistries(anyCollection()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Iterable<MinistryType> types = (Iterable<MinistryType>) invocation.getArgument(0);
+                    Map<MinistryType, com.eventoscelebrativos.model.Ministry> ministries =
+                            new EnumMap<>(MinistryType.class);
+                    for (MinistryType type : types) {
+                        ministries.put(type, unitMinistry(type));
+                    }
+                    return ministries;
+                });
+        when(personMinistryRepository.findActiveMinistriesByPersonIds(anyCollection())).thenReturn(List.of(views));
     }
 
     private Person person(Long id) {
@@ -195,16 +212,21 @@ class PersonMinistryEligibilityResolverTest {
         return person;
     }
 
-    private PersonMinistryRepository.PersonMinistryTypeView view(Long personId, MinistryType ministryType) {
-        return new PersonMinistryRepository.PersonMinistryTypeView() {
+    private PersonMinistryRepository.PersonMinistryCatalogView view(Long personId, MinistryType ministryType) {
+        return new PersonMinistryRepository.PersonMinistryCatalogView() {
             @Override
             public Long getPersonId() {
                 return personId;
             }
 
             @Override
-            public MinistryType getMinistryType() {
-                return ministryType;
+            public Long getMinistryId() {
+                return unitMinistry(ministryType).getId();
+            }
+
+            @Override
+            public String getMinistryNormalizedName() {
+                return unitMinistry(ministryType).getNormalizedName();
             }
         };
     }

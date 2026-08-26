@@ -23,6 +23,7 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.EventParticipationResponseRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -62,6 +63,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -160,6 +162,9 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -287,7 +292,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         String phone = uniquePhoneNumber();
         Person person = savePerson("Concurrent Invariant Person", phone);
         cleanupPersonIdA = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Test Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 20);
@@ -361,7 +366,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         String phone = uniquePhoneNumber();
         Person person = savePerson("Concurrent Scale Update Person", phone);
         cleanupPersonIdA = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Concurrent Scale Update Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 10, 25);
@@ -558,7 +563,7 @@ class PersonUnavailabilityConcurrencyIntegrationTest {
         String phone = uniquePhoneNumber();
         Person person = savePerson("Deterministic Assignment Wins Person", phone);
         cleanupPersonIdA = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
 
         Long locationId = locationRepository.saveAndFlush(new Location(null, "Deterministic Assignment Church", "Address")).getId();
         LocalDate eventDate = LocalDate.of(2026, 12, 5);

@@ -27,6 +27,7 @@ import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -72,6 +73,7 @@ public class PersonServiceImpl implements PersonService {
     private final UserAccountRoleRepository userAccountRoleRepository;
     private final UserAccountRepository userAccountRepository;
     private final PersonCadastralUpdateService personCadastralUpdateService;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
@@ -85,7 +87,8 @@ public class PersonServiceImpl implements PersonService {
             UserAccountLifecycleService userAccountLifecycleService,
             UserAccountRoleRepository userAccountRoleRepository,
             UserAccountRepository userAccountRepository,
-            PersonCadastralUpdateService personCadastralUpdateService
+            PersonCadastralUpdateService personCadastralUpdateService,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver
     ) {
         this.personRepository = personRepository;
         this.personAdminMapper = personAdminMapper;
@@ -99,6 +102,7 @@ public class PersonServiceImpl implements PersonService {
         this.userAccountRoleRepository = userAccountRoleRepository;
         this.userAccountRepository = userAccountRepository;
         this.personCadastralUpdateService = personCadastralUpdateService;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
@@ -117,6 +121,7 @@ public class PersonServiceImpl implements PersonService {
         String normalizedName = normalizeOptionalFilter(name);
         String normalizedPhoneNumber = normalizeOptionalFilter(phoneNumber);
         MinistryType ministryType = normalizeMinistryFilter(ministry);
+        Long ministryId = ministryType == null ? null : legacyMinistryTypeResolver.requireMinistry(ministryType).getId();
         String normalizedRole = normalizeRoleFilter(role);
         validateAccountFilterCombination(accountExists, accountEnabled, normalizedRole);
         validatePage(page, size);
@@ -125,7 +130,7 @@ public class PersonServiceImpl implements PersonService {
         Page<Long> idPage = personRepository.findAdminPageIds(
                 normalizedName,
                 normalizedPhoneNumber,
-                ministryType,
+                ministryId,
                 normalizedRole,
                 personActive,
                 accountExists,

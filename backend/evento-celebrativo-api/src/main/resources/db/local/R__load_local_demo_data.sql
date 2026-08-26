@@ -74,111 +74,131 @@ INSERT INTO tb_person (public_id, name, phone_number, birthday_date)
 SELECT X'00000000000000000000000000000014', 'Padre Antônio', '34991110005', '1965-09-30' FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM tb_person WHERE phone_number = '34991110005');
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'COMENTARISTAS'
 WHERE p.phone_number = '34989374748'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'COMENTARISTAS'
 WHERE p.phone_number = '34962165544'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'COMENTARISTAS'
 WHERE p.phone_number = '34991564562'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'READER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'LEITORES'
 WHERE p.phone_number = '34983246978'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'READER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'LEITORES'
 WHERE p.phone_number = '34978956324'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'READER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'LEITORES'
 WHERE p.phone_number = '34998632145'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA PALAVRA'
 WHERE p.phone_number = '34963284523'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA PALAVRA'
 WHERE p.phone_number = '34998563215'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA PALAVRA'
 WHERE p.phone_number = '34936984562'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA EUCARISTIA'
 WHERE p.phone_number = '34989374749'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA EUCARISTIA'
 WHERE p.phone_number = '34991234567'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA EUCARISTIA'
 WHERE p.phone_number = '34987654321'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'PRESBITEROS'
 WHERE p.phone_number = '34988776655'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'PRESBITEROS'
 WHERE p.phone_number = '34999887766'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'PRESBITEROS'
 WHERE p.phone_number = '34981112233'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'COMMENTATOR', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'COMMENTATOR', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'COMENTARISTAS'
 WHERE p.phone_number = '34991110001'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'COMMENTATOR');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'READER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'READER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'LEITORES'
 WHERE p.phone_number = '34991110002'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'READER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'MINISTER_OF_THE_WORD', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'MINISTER_OF_THE_WORD', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA PALAVRA'
 WHERE p.phone_number = '34991110003'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'MINISTER_OF_THE_WORD');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'EUCHARISTIC_MINISTER', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'EUCHARISTIC_MINISTER', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'MINISTROS DA EUCARISTIA'
 WHERE p.phone_number = '34991110004'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'EUCHARISTIC_MINISTER');
-INSERT INTO tb_person_ministry (person_id, ministry_type, active, created_at, updated_at)
-SELECT p.id, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
+INSERT INTO tb_person_ministry (person_id, ministry_type, ministry_id, active, created_at, updated_at)
+SELECT p.id, 'PRIEST', m.id, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 FROM tb_person p
+JOIN tb_ministry m ON m.normalized_name = 'PRESBITEROS'
 WHERE p.phone_number = '34991110005'
-  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_type = 'PRIEST');
+  AND NOT EXISTS (SELECT 1 FROM tb_person_ministry pm WHERE pm.person_id = p.id AND pm.ministry_id = m.id);
 
 -- tb_user_account/tb_user_account_role sao a unica fonte de credenciais/autorizacao (Person nao
 -- carrega mais password nem roles desde V18). Cada conta recebe exatamente uma role, escolhida

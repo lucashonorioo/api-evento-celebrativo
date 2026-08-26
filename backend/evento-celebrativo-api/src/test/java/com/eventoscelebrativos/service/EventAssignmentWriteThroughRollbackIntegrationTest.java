@@ -9,6 +9,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,6 +50,9 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -167,14 +172,14 @@ class EventAssignmentWriteThroughRollbackIntegrationTest {
     private Person savePriest(String name) {
         Person priest = person(name);
         priest = personRepository.saveAndFlush(priest);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
         return priest;
     }
 
     private Person saveReader(String name) {
         Person reader = person(name);
         reader = personRepository.saveAndFlush(reader);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
         return reader;
     }
 
