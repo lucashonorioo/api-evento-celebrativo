@@ -46,10 +46,10 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
                 "INSERT INTO tb_person_ministry(person_id, ministry_type, active) VALUES (?, 'READER', TRUE)", personId);
 
         // migrateAll() migra ate a mais recente disponivel no classpath, nao apenas V21;
-        // a partir de V20, isso executa V21 (esta migration) e V22-V25.
+        // a partir de V20, isso executa V21 (esta migration) e V22-V26.
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(5, result.migrationsExecuted);
+        assertEquals(6, result.migrationsExecuted);
         assertFalse(jdbcTemplate.queryForObject(
                 "SELECT coordinator FROM tb_person_ministry WHERE person_id = ?", Boolean.class, personId));
     }
@@ -124,13 +124,13 @@ class V21AddPersonMinistryCoordinatorIntegrationTest {
     }
 
     @Test
-    void shouldNotAlterAnyPreviousMigrationAndApplyExactly25MigrationsFromEmptySchema() {
+    void shouldNotAlterAnyPreviousMigrationAndApplyAllVersionedMigrationsFromEmptySchema() {
         DataSource dataSource = newIsolatedH2DataSource();
 
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(25, first.migrations.size());
+        assertEquals(26, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
     }
 
