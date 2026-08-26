@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,6 +54,9 @@ class ScopedDomainAuthorizationIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private ParishStaffAssignmentRepository parishStaffAssignmentRepository;
 
     @AfterEach
@@ -72,7 +77,7 @@ class ScopedDomainAuthorizationIntegrationTest {
     @Test
     void revokingCoordinatorImmediatelyRemovesMinistryManagementCapability() {
         Person person = savePerson("Integration Coordinator Person", "34971000401");
-        PersonMinistry ministry = new PersonMinistry(person, MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 

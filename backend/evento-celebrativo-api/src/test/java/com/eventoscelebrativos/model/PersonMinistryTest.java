@@ -5,7 +5,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -22,15 +27,30 @@ class PersonMinistryTest {
 
     @Test
     void shouldStartWithCoordinatorFalseWhenCreated() {
-        PersonMinistry ministry = new PersonMinistry(person(), MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
 
         assertTrue(ministry.getActive());
         assertFalse(ministry.getCoordinator());
     }
 
     @Test
+    void shouldKeepPersistentMinistryReferenceWhenCreated() {
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
+
+        assertNotNull(ministry.getMinistry());
+        assertEquals(unitMinistry(MinistryType.READER).getId(), ministry.getMinistry().getId());
+        assertEquals(MinistryType.READER, ministry.getMinistryType());
+    }
+
+    @Test
+    void shouldRejectMissingMinistryWhenCreated() {
+        assertThrows(NullPointerException.class,
+                () -> new PersonMinistry(person(), null, MinistryType.READER));
+    }
+
+    @Test
     void grantCoordinationShouldSetCoordinatorTrue() {
-        PersonMinistry ministry = new PersonMinistry(person(), MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
 
         ministry.grantCoordination();
 
@@ -40,7 +60,7 @@ class PersonMinistryTest {
 
     @Test
     void revokeCoordinationShouldSetCoordinatorFalseWithoutTouchingActive() {
-        PersonMinistry ministry = new PersonMinistry(person(), MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
         ministry.grantCoordination();
 
         ministry.revokeCoordination();
@@ -51,7 +71,7 @@ class PersonMinistryTest {
 
     @Test
     void deactivateShouldClearCoordinationAtomically() {
-        PersonMinistry ministry = new PersonMinistry(person(), MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
         ministry.grantCoordination();
 
         ministry.deactivate();
@@ -62,7 +82,7 @@ class PersonMinistryTest {
 
     @Test
     void activateShouldNeverRestoreCoordination() {
-        PersonMinistry ministry = new PersonMinistry(person(), MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
         ministry.grantCoordination();
         ministry.deactivate();
 
@@ -74,9 +94,8 @@ class PersonMinistryTest {
 
     @Test
     void prePersistShouldDefaultNullCoordinatorToFalse() {
-        PersonMinistry ministry = new PersonMinistry();
-        ministry.setPerson(person());
-        ministry.setMinistryType(MinistryType.READER);
+        PersonMinistry ministry = personMinistry(person(), MinistryType.READER);
+        ReflectionTestUtils.setField(ministry, "coordinator", null);
 
         ministry.prePersist();
 

@@ -10,6 +10,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -64,6 +66,9 @@ class ScaleParticipantEligibilityIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -307,7 +312,7 @@ class ScaleParticipantEligibilityIntegrationTest {
     private Person savePriestWithMinistry(String name) {
         Person priest = person(name);
         priest = personRepository.saveAndFlush(priest);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(priest, MinistryType.PRIEST));
+        personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
         return priest;
     }
 
@@ -319,8 +324,8 @@ class ScaleParticipantEligibilityIntegrationTest {
     private Person saveReaderWithExtraMinistry(String name, MinistryType extraMinistry) {
         Person reader = person(name);
         reader = personRepository.saveAndFlush(reader);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
-        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, extraMinistry));
+        personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+        personMinistryRepository.saveAndFlush(personMinistry(reader, extraMinistry, ministryRepository));
         return reader;
     }
 

@@ -12,6 +12,7 @@ import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.NotificationRecipientRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -42,6 +43,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -91,6 +93,9 @@ class NotificationConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -509,7 +514,12 @@ class NotificationConcurrencyMySqlIntegrationTest {
         }
     }
 
-    private Exception runDeactivatePersonMinistry(Long personId, MinistryType ministryType, CountDownLatch readyLatch, CountDownLatch startLatch) {
+    private Exception runDeactivatePersonMinistry(
+            Long personId,
+            MinistryType ministryType,
+            CountDownLatch readyLatch,
+            CountDownLatch startLatch
+    ) {
         try {
             readyLatch.countDown();
             startLatch.await(10, TimeUnit.SECONDS);
@@ -517,8 +527,11 @@ class NotificationConcurrencyMySqlIntegrationTest {
             transactionTemplate.executeWithoutResult(status -> {
                 // Mesma ordem global Person -> PersonMinistry do envio.
                 personRepository.findByIdForUpdate(personId).orElseThrow();
+                Long ministryId = com.eventoscelebrativos.support.LegacyMinistryTestFactory
+                        .persistentMinistry(ministryType, ministryRepository)
+                        .getId();
                 PersonMinistry personMinistry = personMinistryRepository
-                        .findByPersonIdAndMinistryTypeInForUpdate(personId, List.of(ministryType))
+                        .findByPersonIdAndMinistryIdInForUpdate(personId, List.of(ministryId))
                         .stream().findFirst().orElseThrow();
                 personMinistry.deactivate();
                 personMinistryRepository.save(personMinistry);
@@ -529,14 +542,19 @@ class NotificationConcurrencyMySqlIntegrationTest {
         }
     }
 
-    private Exception runActivatePersonMinistry(Long personId, MinistryType ministryType, CountDownLatch readyLatch, CountDownLatch startLatch) {
+    private Exception runActivatePersonMinistry(
+            Long personId,
+            MinistryType ministryType,
+            CountDownLatch readyLatch,
+            CountDownLatch startLatch
+    ) {
         try {
             readyLatch.countDown();
             startLatch.await(10, TimeUnit.SECONDS);
             TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
             transactionTemplate.executeWithoutResult(status -> {
                 Person person = personRepository.findByIdForUpdate(personId).orElseThrow();
-                personMinistryRepository.save(new PersonMinistry(person, ministryType));
+                personMinistryRepository.save(personMinistry(person, ministryType, ministryRepository));
             });
             return null;
         } catch (Exception e) {
@@ -614,7 +632,7 @@ class NotificationConcurrencyMySqlIntegrationTest {
             Person person = new Person(name, uniquePhoneNumber(), java.time.LocalDate.of(1990, 1, 10));
             person.activate();
             Person savedPerson = personRepository.save(person);
-            personMinistryRepository.save(new PersonMinistry(savedPerson, ministryType));
+            personMinistryRepository.save(personMinistry(savedPerson, ministryType, ministryRepository));
 
             java.time.LocalDateTime now = java.time.LocalDateTime.now().withNano(0);
             UserAccount account = new UserAccount(savedPerson, savedPerson.getPhoneNumber(), "hash", now, now);

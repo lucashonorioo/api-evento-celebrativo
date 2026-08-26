@@ -15,6 +15,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "tb_person_ministry")
@@ -28,9 +29,13 @@ public class PersonMinistry {
     @JoinColumn(name = "person_id", nullable = false)
     private Person person;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "ministry_id", nullable = false, updatable = false)
+    private Ministry ministry;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "ministry_type", nullable = false, length = 50)
-    private MinistryType ministryType;
+    private MinistryType legacyMinistryType;
 
     @Column(nullable = false)
     private Boolean active = true;
@@ -53,9 +58,13 @@ public class PersonMinistry {
     public PersonMinistry() {
     }
 
-    public PersonMinistry(Person person, MinistryType ministryType) {
-        this.person = person;
-        this.ministryType = ministryType;
+    public PersonMinistry(Person person, Ministry ministry, MinistryType legacyMinistryType) {
+        this.person = Objects.requireNonNull(person, "Pessoa e obrigatoria");
+        this.ministry = Objects.requireNonNull(ministry, "Ministerio e obrigatorio");
+        this.legacyMinistryType = Objects.requireNonNull(
+                legacyMinistryType,
+                "Tipo ministerial legado e obrigatorio"
+        );
         this.active = true;
         this.coordinator = false;
     }
@@ -126,12 +135,12 @@ public class PersonMinistry {
         this.person = person;
     }
 
-    public MinistryType getMinistryType() {
-        return ministryType;
+    public Ministry getMinistry() {
+        return ministry;
     }
 
-    public void setMinistryType(MinistryType ministryType) {
-        this.ministryType = ministryType;
+    public MinistryType getMinistryType() {
+        return legacyMinistryType;
     }
 
     public Boolean getActive() {

@@ -1,10 +1,12 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -29,13 +31,16 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
 
     private final PersonMinistryRepository personMinistryRepository;
     private final PersonRepository personRepository;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public PersonMinistryReadServiceImpl(
             PersonMinistryRepository personMinistryRepository,
-            PersonRepository personRepository
+            PersonRepository personRepository,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver
     ) {
         this.personMinistryRepository = personMinistryRepository;
         this.personRepository = personRepository;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
@@ -43,8 +48,9 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
     public Page<Person> findActivePeopleByMinistry(MinistryType ministryType, Pageable pageable) {
         validateMinistryType(ministryType);
         PageRequest safePageable = safePageable(pageable);
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
 
-        Page<Long> idPage = personMinistryRepository.findActivePersonIdsByMinistryType(ministryType, safePageable);
+        Page<Long> idPage = personMinistryRepository.findActivePersonIdsByMinistryId(ministry.getId(), safePageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(Collections.emptyList(), safePageable, idPage.getTotalElements());
         }
@@ -65,7 +71,8 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
     @Transactional(readOnly = true)
     public List<Person> findAllActivePeopleByMinistry(MinistryType ministryType) {
         validateMinistryType(ministryType);
-        return personMinistryRepository.findActivePeopleByMinistryType(ministryType);
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        return personMinistryRepository.findActivePeopleByMinistryId(ministry.getId());
     }
 
     @Override
@@ -88,8 +95,9 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         Map<Long, EnumSet<MinistryType>> mutableResult = new LinkedHashMap<>();
         distinctIds.forEach(personId -> mutableResult.put(personId, EnumSet.noneOf(MinistryType.class)));
 
-        personMinistryRepository.findActiveMinistryTypesByPersonIds(distinctIds)
-                .forEach(row -> mutableResult.get(row.getPersonId()).add(row.getMinistryType()));
+        personMinistryRepository.findActiveMinistriesByPersonIds(distinctIds)
+                .forEach(row -> mutableResult.get(row.getPersonId())
+                        .add(legacyMinistryTypeResolver.requireMinistryType(row.getMinistryNormalizedName())));
 
         Map<Long, Set<MinistryType>> result = new LinkedHashMap<>();
         mutableResult.forEach((personId, ministries) -> result.put(personId, immutableEnumSet(ministries)));
@@ -102,7 +110,10 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         if (personId == null) {
             throw new BusinessException("Id de pessoa e obrigatorio");
         }
-        List<MinistryType> coordinated = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(personId);
+        List<MinistryType> coordinated = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(personId)
+                .stream()
+                .map(legacyMinistryTypeResolver::requireMinistryType)
+                .toList();
         if (coordinated.isEmpty()) {
             return Collections.emptySet();
         }

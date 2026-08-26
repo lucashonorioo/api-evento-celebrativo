@@ -9,6 +9,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -62,6 +64,9 @@ class CurrentUserScheduleIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private CelebrationEventRepository celebrationEventRepository;
@@ -236,7 +241,7 @@ class CurrentUserScheduleIntegrationTest {
 
     private PersonMinistry addMinistry(Long personId, MinistryType ministryType) {
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, ministryType);
+        PersonMinistry ministry = personMinistry(person, ministryType, ministryRepository);
         ministry.setActive(true);
         return personMinistryRepository.saveAndFlush(ministry);
     }

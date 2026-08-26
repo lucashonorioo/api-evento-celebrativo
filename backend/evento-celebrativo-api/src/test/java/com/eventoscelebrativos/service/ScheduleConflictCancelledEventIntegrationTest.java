@@ -12,6 +12,7 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.PersonUnavailabilityRepository;
 import com.eventoscelebrativos.service.impl.AdminRoleMutexService;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -72,6 +74,9 @@ class ScheduleConflictCancelledEventIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private AdminRoleMutexService adminRoleMutexService;
@@ -161,7 +166,7 @@ class ScheduleConflictCancelledEventIntegrationTest {
         Person person = new Person(name, uniquePhone(), BIRTHDAY);
         person.activate();
         Person saved = personRepository.saveAndFlush(person);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(saved, MinistryType.READER));
+        personMinistryRepository.saveAndFlush(personMinistry(saved, MinistryType.READER, ministryRepository));
         return saved;
     }
 

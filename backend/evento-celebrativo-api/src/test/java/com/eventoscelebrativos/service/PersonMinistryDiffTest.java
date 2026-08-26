@@ -9,6 +9,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,11 +19,11 @@ class PersonMinistryDiffTest {
     @Test
     void shouldAddAllDesiredMinistriesWhenPersonHasNone() {
         PersonMinistryDiff diff = PersonMinistryDiff.compute(
-                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                Set.of(ministryId(MinistryType.READER), ministryId(MinistryType.COMMENTATOR)),
                 List.of()
         );
 
-        assertEquals(Set.of(MinistryType.READER, MinistryType.COMMENTATOR), diff.toAdd());
+        assertEquals(Set.of(ministryId(MinistryType.READER), ministryId(MinistryType.COMMENTATOR)), diff.toAdd());
         assertTrue(diff.toReactivate().isEmpty());
         assertTrue(diff.toDeactivate().isEmpty());
         assertTrue(diff.unchanged().isEmpty());
@@ -32,14 +34,14 @@ class PersonMinistryDiffTest {
         PersonMinistry activeReader = ministry(MinistryType.READER, true);
 
         PersonMinistryDiff diff = PersonMinistryDiff.compute(
-                Set.of(MinistryType.READER),
+                Set.of(ministryId(MinistryType.READER)),
                 List.of(activeReader)
         );
 
         assertTrue(diff.toAdd().isEmpty());
         assertTrue(diff.toReactivate().isEmpty());
         assertTrue(diff.toDeactivate().isEmpty());
-        assertEquals(Set.of(MinistryType.READER), diff.unchanged());
+        assertEquals(Set.of(ministryId(MinistryType.READER)), diff.unchanged());
     }
 
     @Test
@@ -47,7 +49,7 @@ class PersonMinistryDiffTest {
         PersonMinistry inactiveReader = ministry(MinistryType.READER, false);
 
         PersonMinistryDiff diff = PersonMinistryDiff.compute(
-                Set.of(MinistryType.READER),
+                Set.of(ministryId(MinistryType.READER)),
                 List.of(inactiveReader)
         );
 
@@ -94,14 +96,18 @@ class PersonMinistryDiffTest {
         PersonMinistry deactivatedPriest = ministry(MinistryType.PRIEST, true);
 
         PersonMinistryDiff diff = PersonMinistryDiff.compute(
-                Set.of(MinistryType.READER, MinistryType.COMMENTATOR, MinistryType.EUCHARISTIC_MINISTER),
+                Set.of(
+                        ministryId(MinistryType.READER),
+                        ministryId(MinistryType.COMMENTATOR),
+                        ministryId(MinistryType.EUCHARISTIC_MINISTER)
+                ),
                 List.of(unchangedReader, reactivatedCommentator, deactivatedPriest)
         );
 
-        assertEquals(Set.of(MinistryType.EUCHARISTIC_MINISTER), diff.toAdd());
+        assertEquals(Set.of(ministryId(MinistryType.EUCHARISTIC_MINISTER)), diff.toAdd());
         assertEquals(List.of(reactivatedCommentator), diff.toReactivate());
         assertEquals(List.of(deactivatedPriest), diff.toDeactivate());
-        assertEquals(Set.of(MinistryType.READER), diff.unchanged());
+        assertEquals(Set.of(ministryId(MinistryType.READER)), diff.unchanged());
     }
 
     @Test
@@ -115,11 +121,15 @@ class PersonMinistryDiffTest {
     }
 
     private PersonMinistry ministry(MinistryType type, boolean active) {
-        PersonMinistry personMinistry = new PersonMinistry(
+        PersonMinistry personMinistry = personMinistry(
                 new Person("Pessoa Teste", "34999999999", LocalDate.of(1990, 1, 1)),
                 type
         );
         personMinistry.setActive(active);
         return personMinistry;
+    }
+
+    private Long ministryId(MinistryType type) {
+        return unitMinistry(type).getId();
     }
 }

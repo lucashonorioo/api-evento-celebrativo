@@ -5,6 +5,7 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,6 +47,9 @@ class PersonMinistryParallelReadIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -186,7 +191,7 @@ class PersonMinistryParallelReadIntegrationTest {
     }
 
     private void saveMinistry(Person person, MinistryType ministryType, boolean active) {
-        PersonMinistry ministry = new PersonMinistry(person, ministryType);
+        PersonMinistry ministry = personMinistry(person, ministryType, ministryRepository);
         ministry.setActive(active);
         personMinistryRepository.saveAndFlush(ministry);
     }

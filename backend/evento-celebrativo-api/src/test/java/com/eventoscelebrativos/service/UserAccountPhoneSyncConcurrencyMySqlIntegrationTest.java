@@ -8,6 +8,7 @@ import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -41,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -83,6 +85,9 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -237,7 +242,7 @@ class UserAccountPhoneSyncConcurrencyMySqlIntegrationTest {
         return transactionTemplate.execute(status -> {
             Person person = new Person("Concurrent Phone Reader", uniquePhoneNumber(), BIRTHDAY);
             Person saved = personRepository.save(person);
-            personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));
+            personMinistryRepository.save(personMinistry(saved, MinistryType.READER, ministryRepository));
             Role operatorRole = roleRepository.findByAuthority("ROLE_OPERATOR").orElseThrow();
             LocalDateTime now = LocalDateTime.now().withNano(0);
             UserAccount account = userAccountRepository.save(

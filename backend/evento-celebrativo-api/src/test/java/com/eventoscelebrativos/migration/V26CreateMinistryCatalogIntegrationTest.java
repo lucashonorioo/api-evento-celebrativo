@@ -39,7 +39,7 @@ class V26CreateMinistryCatalogIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(1, result.migrationsExecuted);
+        assertEquals(2, result.migrationsExecuted);
         assertEquals(1, tableCount(jdbcTemplate, "TB_MINISTRY"));
     }
 
@@ -113,7 +113,7 @@ class V26CreateMinistryCatalogIntegrationTest {
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(26, first.migrations.size());
+        assertEquals(27, first.migrations.size());
         assertTrue(second.migrations.isEmpty());
         assertEquals(5, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_ministry", Integer.class));
     }

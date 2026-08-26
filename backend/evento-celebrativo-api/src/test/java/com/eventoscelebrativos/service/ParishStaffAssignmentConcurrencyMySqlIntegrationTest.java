@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -412,9 +413,10 @@ class ParishStaffAssignmentConcurrencyMySqlIntegrationTest {
 
     private void insertActivePriestMinistry(long personId) {
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) "
-                        + "VALUES (?, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
-                personId);
+                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, created_at, updated_at) "
+                        + "VALUES (?, 'PRIEST', (SELECT id FROM tb_ministry WHERE normalized_name = ?), "
+                        + "TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
+                personId, normalizedName(MinistryType.PRIEST));
     }
 
     private String uniquePhoneNumber() {

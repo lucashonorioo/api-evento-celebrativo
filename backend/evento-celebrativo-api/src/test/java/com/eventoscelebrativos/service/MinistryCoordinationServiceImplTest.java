@@ -3,6 +3,7 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.MinistryCoordinationRequiresActiveMinistryException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -21,6 +22,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,11 +42,18 @@ class MinistryCoordinationServiceImplTest {
     @Mock
     private PersonMinistryRepository personMinistryRepository;
 
+    @Mock
+    private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
     private MinistryCoordinationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new MinistryCoordinationServiceImpl(personRepository, personMinistryRepository);
+        service = new MinistryCoordinationServiceImpl(
+                personRepository,
+                personMinistryRepository,
+                legacyMinistryTypeResolver
+        );
     }
 
     private Person person(Long id) {
@@ -53,7 +63,7 @@ class MinistryCoordinationServiceImplTest {
     }
 
     private PersonMinistry activeMinistry(Person person, MinistryType type) {
-        return new PersonMinistry(person, type);
+        return personMinistry(person, type);
     }
 
     // ---- grantCoordinator ----
@@ -62,8 +72,9 @@ class MinistryCoordinationServiceImplTest {
     void shouldGrantCoordinatorOnActiveMinistry() {
         Person person = person(1L);
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.grantCoordinator(1L, "READER");
@@ -79,8 +90,9 @@ class MinistryCoordinationServiceImplTest {
         ministry.grantCoordination();
         LocalDateTime originalUpdatedAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         setUpdatedAt(ministry, originalUpdatedAt);
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.grantCoordinator(1L, "READER");
@@ -91,8 +103,9 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldRejectGrantingCoordinatorWhenMinistryDoesNotExist() {
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person(1L)));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.empty());
 
         assertThrows(MinistryCoordinationRequiresActiveMinistryException.class,
@@ -105,8 +118,9 @@ class MinistryCoordinationServiceImplTest {
         Person person = person(1L);
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
         ministry.deactivate();
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         assertThrows(MinistryCoordinationRequiresActiveMinistryException.class,
@@ -116,6 +130,7 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenGrantingCoordinatorForNonexistentPerson() {
+        resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.grantCoordinator(99L, "READER"));
@@ -124,6 +139,10 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldRejectInvalidMinistryTypeOnGrant() {
+        rejectMinistryType("BISHOP");
+        rejectMinistryType(null);
+        rejectMinistryType("  ");
+
         assertThrows(BadRequestException.class, () -> service.grantCoordinator(1L, "BISHOP"));
         assertThrows(BadRequestException.class, () -> service.grantCoordinator(1L, null));
         assertThrows(BadRequestException.class, () -> service.grantCoordinator(1L, "  "));
@@ -135,11 +154,12 @@ class MinistryCoordinationServiceImplTest {
         Person personB = person(2L);
         PersonMinistry ministryA = activeMinistry(personA, MinistryType.READER);
         PersonMinistry ministryB = activeMinistry(personB, MinistryType.READER);
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(personA));
         when(personRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(personB));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministryA));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(2L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(2L, readerMinistryId))
                 .thenReturn(Optional.of(ministryB));
 
         service.grantCoordinator(1L, "READER");
@@ -154,10 +174,12 @@ class MinistryCoordinationServiceImplTest {
         Person person = person(1L);
         PersonMinistry reader = activeMinistry(person, MinistryType.READER);
         PersonMinistry commentator = activeMinistry(person, MinistryType.COMMENTATOR);
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
+        Long commentatorMinistryId = resolveMinistry("COMMENTATOR", MinistryType.COMMENTATOR);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(reader));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.COMMENTATOR))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, commentatorMinistryId))
                 .thenReturn(Optional.of(commentator));
 
         service.grantCoordinator(1L, "READER");
@@ -173,8 +195,9 @@ class MinistryCoordinationServiceImplTest {
         // possui essas dependencias injetadas, provando estruturalmente que nao sao exigidas.
         Person person = person(1L);
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
+        Long readerMinistryId = resolveMinistry("reader", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.grantCoordinator(1L, "reader");
@@ -189,8 +212,9 @@ class MinistryCoordinationServiceImplTest {
         Person person = person(1L);
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
         ministry.grantCoordination();
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.revokeCoordinator(1L, "READER");
@@ -205,8 +229,9 @@ class MinistryCoordinationServiceImplTest {
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
         LocalDateTime originalUpdatedAt = LocalDateTime.of(2026, 1, 1, 10, 0);
         setUpdatedAt(ministry, originalUpdatedAt);
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.revokeCoordinator(1L, "READER");
@@ -217,8 +242,9 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldBeIdempotentWhenRevokingCoordinatorOnMissingMinistry() {
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person(1L)));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.empty());
 
         service.revokeCoordinator(1L, "READER");
@@ -231,8 +257,9 @@ class MinistryCoordinationServiceImplTest {
         Person person = person(1L);
         PersonMinistry ministry = activeMinistry(person, MinistryType.READER);
         ministry.deactivate();
+        Long readerMinistryId = resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person));
-        when(personMinistryRepository.findByPersonIdAndMinistryType(1L, MinistryType.READER))
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistryId))
                 .thenReturn(Optional.of(ministry));
 
         service.revokeCoordinator(1L, "READER");
@@ -242,6 +269,7 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenRevokingCoordinatorForNonexistentPerson() {
+        resolveMinistry("READER", MinistryType.READER);
         when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.revokeCoordinator(99L, "READER"));
@@ -249,7 +277,21 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldRejectInvalidMinistryTypeOnRevoke() {
+        rejectMinistryType("BISHOP");
+
         assertThrows(BadRequestException.class, () -> service.revokeCoordinator(1L, "BISHOP"));
+    }
+
+    private Long resolveMinistry(String rawMinistryType, MinistryType ministryType) {
+        Ministry ministry = unitMinistry(ministryType);
+        when(legacyMinistryTypeResolver.parseMinistryType(rawMinistryType)).thenReturn(ministryType);
+        when(legacyMinistryTypeResolver.requireMinistry(ministryType)).thenReturn(ministry);
+        return ministry.getId();
+    }
+
+    private void rejectMinistryType(String rawMinistryType) {
+        when(legacyMinistryTypeResolver.parseMinistryType(rawMinistryType))
+                .thenThrow(new BadRequestException("Tipo de ministerio invalido"));
     }
 
     private void setUpdatedAt(PersonMinistry ministry, LocalDateTime updatedAt) throws Exception {

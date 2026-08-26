@@ -22,6 +22,7 @@ import com.eventoscelebrativos.repository.NotificationRecipientRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.NotificationTargetMinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -72,6 +74,9 @@ class NotificationDeliveryServiceIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -491,7 +496,7 @@ class NotificationDeliveryServiceIntegrationTest {
 
     private void addPersonMinistry(Long personId, MinistryType ministryType) {
         Person person = personRepository.findById(personId).orElseThrow();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
+        personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
         entityManager.clear();
     }
 

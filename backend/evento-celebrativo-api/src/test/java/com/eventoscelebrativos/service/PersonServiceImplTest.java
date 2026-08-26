@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -96,6 +97,9 @@ class PersonServiceImplTest {
     @Mock
     private PersonCadastralUpdateService personCadastralUpdateService;
 
+    @Mock
+    private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
     @InjectMocks
     private PersonServiceImpl service;
 
@@ -104,8 +108,11 @@ class PersonServiceImplTest {
         PageRequest pageable = PageRequest.of(0, 10);
         Person first = person(2L, "Alice", "34911111111");
         Person second = person(1L, "Alice", "34922222222");
+        Long readerMinistryId = unitMinistry(MinistryType.READER).getId();
 
-        when(personRepository.findAdminPageIds("Ali", "349", MinistryType.READER, "ROLE_ADMIN", null, null, null, pageable))
+        when(legacyMinistryTypeResolver.requireMinistry(MinistryType.READER))
+                .thenReturn(unitMinistry(MinistryType.READER));
+        when(personRepository.findAdminPageIds("Ali", "349", readerMinistryId, "ROLE_ADMIN", null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(2L, 1L), pageable, 2));
         when(personRepository.findAllByIdIn(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
@@ -191,13 +198,15 @@ class PersonServiceImplTest {
     void shouldFilterPeopleByEachOfTheFiveMinistryTypes(MinistryType ministryType) {
         PageRequest pageable = PageRequest.of(0, 10);
         String filterValue = ministryType.name().toLowerCase();
-        when(personRepository.findAdminPageIds(null, null, ministryType, null, null, null, null, pageable))
+        Long ministryId = unitMinistry(ministryType).getId();
+        when(legacyMinistryTypeResolver.requireMinistry(ministryType)).thenReturn(unitMinistry(ministryType));
+        when(personRepository.findAdminPageIds(null, null, ministryId, null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
         Page<PersonAdminResponseDTO> result = service.findPeople(null, null, filterValue, null, null, null, null, 0, 10);
 
         assertEquals(0, result.getTotalElements());
-        verify(personRepository).findAdminPageIds(null, null, ministryType, null, null, null, null, pageable);
+        verify(personRepository).findAdminPageIds(null, null, ministryId, null, null, null, null, pageable);
     }
 
     @Test

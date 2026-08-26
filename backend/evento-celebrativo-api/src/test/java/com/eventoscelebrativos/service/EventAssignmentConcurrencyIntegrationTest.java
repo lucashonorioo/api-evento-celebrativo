@@ -12,6 +12,7 @@ import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +44,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -138,6 +140,9 @@ class EventAssignmentConcurrencyIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
@@ -200,8 +205,8 @@ class EventAssignmentConcurrencyIntegrationTest {
     void shouldSerializeConcurrentFullScaleUpdatesForSamePersonAndKeepExactlyOneFunction() throws Exception {
         Person person = savePerson("Concurrent Scale Update Person", uniquePhoneNumber());
         cleanupPersonId = person.getId();
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.COMMENTATOR));
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, MinistryType.EUCHARISTIC_MINISTER));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.COMMENTATOR, ministryRepository));
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
 
         Location location = locationRepository.saveAndFlush(new Location(null, "Concurrent Scale Update Church", "Address"));
         cleanupLocationId = location.getId();

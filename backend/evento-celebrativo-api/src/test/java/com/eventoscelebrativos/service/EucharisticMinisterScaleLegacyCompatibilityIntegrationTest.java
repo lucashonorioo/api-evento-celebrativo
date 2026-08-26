@@ -16,6 +16,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -59,6 +61,9 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
     private PersonMinistryRepository personMinistryRepository;
 
     @Autowired
+    private MinistryRepository ministryRepository;
+
+    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
@@ -75,10 +80,10 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
         try {
             Person firstMinister = personRepository.saveAndFlush(eucharisticMinister("Scale Legacy Eucharistic Minister A"));
             firstMinisterId = firstMinister.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(firstMinister, MinistryType.EUCHARISTIC_MINISTER));
+            personMinistryRepository.saveAndFlush(personMinistry(firstMinister, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
             Person secondMinister = personRepository.saveAndFlush(eucharisticMinister("Scale Legacy Eucharistic Minister B"));
             secondMinisterId = secondMinister.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(secondMinister, MinistryType.EUCHARISTIC_MINISTER));
+            personMinistryRepository.saveAndFlush(personMinistry(secondMinister, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Scale Legacy Eucharistic Church"));
             locationId = location.getId();
 
@@ -132,8 +137,8 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
         try {
             Person reader = personRepository.saveAndFlush(reader("Reader With Eucharistic Minister Ministry"));
             readerId = reader.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.READER));
-            personMinistryRepository.saveAndFlush(new PersonMinistry(reader, MinistryType.EUCHARISTIC_MINISTER));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+            personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Scale Accept Eucharistic Church"));
             locationId = location.getId();
 
@@ -172,7 +177,7 @@ class EucharisticMinisterScaleLegacyCompatibilityIntegrationTest {
         try {
             Person minister = personRepository.saveAndFlush(eucharisticMinister("Linked Scale Eucharistic Minister"));
             ministerId = minister.getId();
-            personMinistryRepository.saveAndFlush(new PersonMinistry(minister, MinistryType.EUCHARISTIC_MINISTER));
+            personMinistryRepository.saveAndFlush(personMinistry(minister, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
             Location location = locationRepository.saveAndFlush(location("Linked Scale Eucharistic Church"));
             locationId = location.getId();
             eventId = celebrationEventService.createEventWithScale(

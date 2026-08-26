@@ -14,6 +14,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,6 +64,9 @@ class ScheduleUnavailabilityConflictIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -222,7 +227,7 @@ class ScheduleUnavailabilityConflictIntegrationTest {
         Person person = new Person(name + " " + UUID.randomUUID(), uniquePhoneNumber(), LocalDate.of(1990, 1, 10));
         person = personRepository.saveAndFlush(person);
         for (MinistryType ministryType : ministryTypes) {
-            personMinistryRepository.saveAndFlush(new PersonMinistry(person, ministryType));
+            personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
         }
         return person;
     }

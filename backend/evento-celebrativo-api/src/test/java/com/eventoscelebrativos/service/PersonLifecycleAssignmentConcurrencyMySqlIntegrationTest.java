@@ -12,6 +12,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
@@ -46,6 +47,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -86,6 +88,9 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -295,7 +300,7 @@ class PersonLifecycleAssignmentConcurrencyMySqlIntegrationTest {
             Person person = new Person("Concurrency Reader " + UUID.randomUUID(), uniquePhoneNumber(), BIRTHDAY);
             person.activate();
             Person saved = personRepository.save(person);
-            personMinistryRepository.save(new PersonMinistry(saved, MinistryType.READER));
+            personMinistryRepository.save(personMinistry(saved, MinistryType.READER, ministryRepository));
             return saved.getId();
         });
     }

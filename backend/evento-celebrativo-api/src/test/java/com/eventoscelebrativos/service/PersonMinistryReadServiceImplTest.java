@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,20 +30,25 @@ class PersonMinistryReadServiceImplTest {
 
     private final PersonMinistryRepository personMinistryRepository = mock(PersonMinistryRepository.class);
     private final PersonRepository personRepository = mock(PersonRepository.class);
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver = mock(LegacyMinistryTypeResolver.class);
     private final PersonMinistryReadServiceImpl service =
-            new PersonMinistryReadServiceImpl(personMinistryRepository, personRepository);
+            new PersonMinistryReadServiceImpl(
+                    personMinistryRepository,
+                    personRepository,
+                    legacyMinistryTypeResolver
+            );
 
     @Test
     void shouldNotQueryRepositoryWhenBatchIsEmpty() {
         Map<Long, Set<MinistryType>> result = service.findActiveMinistriesByPersonIds(List.of());
 
         assertTrue(result.isEmpty());
-        verify(personMinistryRepository, never()).findActiveMinistryTypesByPersonIds(org.mockito.ArgumentMatchers.any());
+        verify(personMinistryRepository, never()).findActiveMinistriesByPersonIds(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void shouldIgnoreDuplicatedPersonIdsAndReturnEmptySetForPeopleWithoutMinistries() {
-        when(personMinistryRepository.findActiveMinistryTypesByPersonIds(org.mockito.ArgumentMatchers.any()))
+        when(personMinistryRepository.findActiveMinistriesByPersonIds(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         Map<Long, Set<MinistryType>> result = service.findActiveMinistriesByPersonIds(List.of(2L, 1L, 2L));
@@ -51,18 +57,21 @@ class PersonMinistryReadServiceImplTest {
         assertEquals(Set.of(), result.get(2L));
         assertEquals(List.of(1L, 2L), result.keySet().stream().toList());
 
-        verify(personMinistryRepository).findActiveMinistryTypesByPersonIds(argThat(ids ->
+        verify(personMinistryRepository).findActiveMinistriesByPersonIds(argThat(ids ->
                 ids.stream().toList().equals(List.of(1L, 2L))));
     }
 
     @Test
     void shouldFindAllActivePeopleByMinistryUsingSingleRepositoryQuery() {
         List<Person> people = List.of(person(1L), person(2L));
+        Long readerMinistryId = unitMinistry(MinistryType.READER).getId();
 
-        when(personMinistryRepository.findActivePeopleByMinistryType(MinistryType.READER)).thenReturn(people);
+        when(legacyMinistryTypeResolver.requireMinistry(MinistryType.READER))
+                .thenReturn(unitMinistry(MinistryType.READER));
+        when(personMinistryRepository.findActivePeopleByMinistryId(readerMinistryId)).thenReturn(people);
 
         assertEquals(people, service.findAllActivePeopleByMinistry(MinistryType.READER));
-        verify(personMinistryRepository).findActivePeopleByMinistryType(MinistryType.READER);
+        verify(personMinistryRepository).findActivePeopleByMinistryId(readerMinistryId);
         verify(personRepository, never()).findAllByIdIn(org.mockito.ArgumentMatchers.any());
     }
 
@@ -78,15 +87,19 @@ class PersonMinistryReadServiceImplTest {
 
     @Test
     void shouldReturnEmptySetWhenPersonCoordinatesNothing() {
-        when(personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(1L)).thenReturn(List.of());
+        when(personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(1L)).thenReturn(List.of());
 
         assertEquals(Set.of(), service.findActiveCoordinatedMinistriesByPersonId(1L));
     }
 
     @Test
     void shouldReturnCoordinatedMinistriesForPerson() {
-        when(personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(1L))
-                .thenReturn(List.of(MinistryType.READER, MinistryType.COMMENTATOR));
+        var reader = unitMinistry(MinistryType.READER);
+        var commentator = unitMinistry(MinistryType.COMMENTATOR);
+        when(personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(1L))
+                .thenReturn(List.of(reader, commentator));
+        when(legacyMinistryTypeResolver.requireMinistryType(reader)).thenReturn(MinistryType.READER);
+        when(legacyMinistryTypeResolver.requireMinistryType(commentator)).thenReturn(MinistryType.COMMENTATOR);
 
         assertEquals(
                 Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
@@ -98,5 +111,24 @@ class PersonMinistryReadServiceImplTest {
         Person person = new Person("Person " + id, "34981" + String.format("%06d", id), LocalDate.of(1990, 1, 1));
         ReflectionTestUtils.setField(person, "id", id);
         return person;
+    }
+
+    private PersonMinistryRepository.PersonMinistryCatalogView view(Long personId, MinistryType ministryType) {
+        return new PersonMinistryRepository.PersonMinistryCatalogView() {
+            @Override
+            public Long getPersonId() {
+                return personId;
+            }
+
+            @Override
+            public Long getMinistryId() {
+                return unitMinistry(ministryType).getId();
+            }
+
+            @Override
+            public String getMinistryNormalizedName() {
+                return unitMinistry(ministryType).getNormalizedName();
+            }
+        };
     }
 }

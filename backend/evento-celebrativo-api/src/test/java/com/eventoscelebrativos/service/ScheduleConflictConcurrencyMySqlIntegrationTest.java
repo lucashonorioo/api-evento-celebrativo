@@ -20,6 +20,7 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.NotificationRecipientRepository;
 import com.eventoscelebrativos.repository.NotificationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -52,6 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -115,6 +117,9 @@ class ScheduleConflictConcurrencyMySqlIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private LocationRepository locationRepository;
@@ -890,7 +895,7 @@ class ScheduleConflictConcurrencyMySqlIntegrationTest {
         Person savedPerson = personRepository.saveAndFlush(person);
 
         if (ministryType != null) {
-            personMinistryRepository.saveAndFlush(new PersonMinistry(savedPerson, ministryType));
+            personMinistryRepository.saveAndFlush(personMinistry(savedPerson, ministryType, ministryRepository));
         }
 
         LocalDateTime now = LocalDateTime.now().withNano(0);

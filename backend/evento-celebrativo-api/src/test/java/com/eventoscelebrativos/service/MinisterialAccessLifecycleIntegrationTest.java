@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -38,6 +39,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -83,6 +85,9 @@ class MinisterialAccessLifecycleIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -422,7 +427,7 @@ class MinisterialAccessLifecycleIntegrationTest {
             UserAccount savedAccount = userAccountRepository.saveAndFlush(account);
             userAccountRoleRepository.saveAndFlush(new UserAccountRole(savedAccount, role));
         }
-        personMinistryRepository.saveAndFlush(new PersonMinistry(person, endpoint.ministryType()));
+        personMinistryRepository.saveAndFlush(personMinistry(person, endpoint.ministryType(), ministryRepository));
         return person;
     }
 

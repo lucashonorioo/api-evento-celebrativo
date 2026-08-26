@@ -329,8 +329,10 @@ class ParishStaffAssignmentIntegrationTest {
 
     private void insertActivePriestMinistry(long personId) {
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, active, created_at, updated_at) "
-                        + "VALUES (?, 'PRIEST', TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
+                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, created_at, updated_at) "
+                        + "VALUES (?, 'PRIEST', "
+                        + "(SELECT id FROM tb_ministry WHERE normalized_name = 'PRESBITEROS'), "
+                        + "TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
                 personId);
     }
 

@@ -12,6 +12,7 @@ import com.eventoscelebrativos.model.UserAccountRole;
 import com.eventoscelebrativos.repository.CelebrationEventRepository;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -73,6 +75,9 @@ class CurrentUserProfileIntegrationTest {
 
     @Autowired
     private PersonMinistryRepository personMinistryRepository;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private EventAssignmentRepository eventAssignmentRepository;
@@ -259,7 +264,7 @@ class CurrentUserProfileIntegrationTest {
 
     private void addMinistry(Long personId, MinistryType ministryType) {
         Person person = personRepository.findById(personId).orElseThrow();
-        PersonMinistry ministry = new PersonMinistry(person, ministryType);
+        PersonMinistry ministry = personMinistry(person, ministryType, ministryRepository);
         ministry.setActive(true);
         personMinistryRepository.saveAndFlush(ministry);
     }

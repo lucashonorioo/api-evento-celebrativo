@@ -5,7 +5,7 @@ import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.MinistryPersonInactiveException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.Person;
@@ -14,6 +14,7 @@ import com.eventoscelebrativos.repository.EventAssignmentRepository;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryDiff;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
@@ -23,7 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +39,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final PersonMinistryRepository personMinistryRepository;
     private final EventAssignmentRepository eventAssignmentRepository;
     private final ParishStaffAssignmentRepository parishStaffAssignmentRepository;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
     private final Clock clock;
 
     public PersonMinistryCommandServiceImpl(
@@ -42,12 +47,14 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
             PersonMinistryRepository personMinistryRepository,
             EventAssignmentRepository eventAssignmentRepository,
             ParishStaffAssignmentRepository parishStaffAssignmentRepository,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver,
             Clock clock
     ) {
         this.personRepository = personRepository;
         this.personMinistryRepository = personMinistryRepository;
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.parishStaffAssignmentRepository = parishStaffAssignmentRepository;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
         this.clock = clock;
     }
 
@@ -57,9 +64,10 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (person == null || ministryType == null) {
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
         Person saved = personRepository.save(person);
         try {
-            personMinistryRepository.save(new PersonMinistry(saved, ministryType));
+            personMinistryRepository.save(new PersonMinistry(saved, ministry, ministryType));
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Não é possível associar esta pessoa à função ministerial informada.");
         }
@@ -77,7 +85,22 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         return requireActiveMinistryPerson(personId, ministryType, entityLabel, true);
     }
 
-    private Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel, boolean forUpdate) {
+    private Person requireActiveMinistryPerson(
+            Long personId,
+            MinistryType ministryType,
+            String entityLabel,
+            boolean forUpdate
+    ) {
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        return requireActiveMinistryPerson(personId, ministry, entityLabel, forUpdate);
+    }
+
+    private Person requireActiveMinistryPerson(
+            Long personId,
+            Ministry ministry,
+            String entityLabel,
+            boolean forUpdate
+    ) {
         if (personId == null || personId <= 0) {
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
@@ -86,7 +109,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (!person.isActive()) {
             throw new ResourceNotFoundException(entityLabel, personId);
         }
-        personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType)
+        personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId())
                 .filter(pm -> Boolean.TRUE.equals(pm.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         return person;
@@ -95,16 +118,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     @Override
     @Transactional
     public void removeMinistry(Long personId, MinistryType ministryType, String entityLabel) {
-        requireActiveMinistryPersonForUpdate(personId, ministryType, entityLabel);
-        if (ministryType == MinistryType.PRIEST) {
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        requireActiveMinistryPerson(personId, ministry, entityLabel, true);
+        if (isPriestMinistry(ministry)) {
             guardPastorRequiresActivePriest(personId);
         }
-        EventAssignmentType assignmentType = EventAssignmentType.valueOf(ministryType.name());
         if (eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(
-                personId, assignmentType, LocalDateTime.now(clock).withNano(0))) {
+                personId,
+                legacyMinistryTypeResolver.requireEventAssignmentType(ministry),
+                LocalDateTime.now(clock).withNano(0))) {
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
-        PersonMinistry personMinistry = personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType)
+        PersonMinistry personMinistry = personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         personMinistry.deactivate();
         personMinistryRepository.save(personMinistry);
@@ -116,16 +141,17 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (personId == null || personId <= 0 || ministryType == null) {
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         if (!person.isActive()) {
             throw new MinistryPersonInactiveException();
         }
 
-        Optional<PersonMinistry> existing = personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType);
+        Optional<PersonMinistry> existing = personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId());
         if (existing.isEmpty()) {
             try {
-                personMinistryRepository.save(new PersonMinistry(person, ministryType));
+                personMinistryRepository.save(new PersonMinistry(person, ministry, ministryType));
             } catch (DataIntegrityViolationException e) {
                 throw new DatabaseException("Não é possível associar esta pessoa à função ministerial informada.");
             }
@@ -149,17 +175,32 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
 
+        Map<MinistryType, Ministry> ministriesByType = legacyMinistryTypeResolver.requireMinistries(desiredMinistries);
+        Map<Long, Ministry> ministriesById = ministriesByType.values().stream()
+                .collect(Collectors.toMap(Ministry::getId, ministry -> ministry, (left, right) -> left, LinkedHashMap::new));
+        Map<Long, MinistryType> legacyTypesByMinistryId = ministriesByType.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> entry.getValue().getId(),
+                        Map.Entry::getKey,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        Set<Long> desiredMinistryIds = desiredMinistries.stream()
+                .map(type -> ministriesByType.get(type).getId())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
         List<PersonMinistry> existing = personMinistryRepository.findAllByPersonId(personId);
-        PersonMinistryDiff diff = PersonMinistryDiff.compute(desiredMinistries, existing);
+        PersonMinistryDiff diff = PersonMinistryDiff.compute(desiredMinistryIds, existing);
 
         validateNoAssignmentConflicts(personId, diff.toDeactivate());
-        if (diff.toDeactivate().stream().anyMatch(pm -> pm.getMinistryType() == MinistryType.PRIEST)) {
+        if (diff.toDeactivate().stream().anyMatch(this::isPriestMinistry)) {
             guardPastorRequiresActivePriest(personId);
         }
 
         try {
-            for (MinistryType type : diff.toAdd()) {
-                personMinistryRepository.save(new PersonMinistry(person, type));
+            for (Long ministryId : diff.toAdd()) {
+                Ministry ministry = ministriesById.get(ministryId);
+                personMinistryRepository.save(new PersonMinistry(person, ministry, legacyTypesByMinistryId.get(ministryId)));
             }
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Não é possível associar esta pessoa às funções ministeriais informadas.");
@@ -176,10 +217,10 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         return new PersonMinistrySyncResult(
                 person,
                 desiredMinistries,
-                diff.toAdd(),
-                diff.toReactivate().stream().map(PersonMinistry::getMinistryType).collect(Collectors.toUnmodifiableSet()),
-                diff.toDeactivate().stream().map(PersonMinistry::getMinistryType).collect(Collectors.toUnmodifiableSet()),
-                diff.unchanged()
+                mapMinistryIdsToLegacyTypes(diff.toAdd(), legacyTypesByMinistryId),
+                mapPersonMinistriesToLegacyTypes(diff.toReactivate()),
+                mapPersonMinistriesToLegacyTypes(diff.toDeactivate()),
+                mapMinistryIdsToLegacyTypes(diff.unchanged(), legacyTypesByMinistryId)
         );
     }
 
@@ -198,9 +239,11 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private void validateNoAssignmentConflicts(Long personId, List<PersonMinistry> toDeactivate) {
         LocalDateTime currentSecond = LocalDateTime.now(clock).withNano(0);
         List<MinistryType> conflicting = toDeactivate.stream()
-                .map(PersonMinistry::getMinistryType)
-                .filter(type -> eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(
-                        personId, EventAssignmentType.valueOf(type.name()), currentSecond))
+                .filter(personMinistry -> eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(
+                        personId,
+                        legacyMinistryTypeResolver.requireEventAssignmentType(personMinistry.getMinistry()),
+                        currentSecond))
+                .map(personMinistry -> legacyMinistryTypeResolver.requireMinistryType(personMinistry.getMinistry()))
                 .toList();
         if (!conflicting.isEmpty()) {
             String types = conflicting.stream().map(Enum::name).collect(Collectors.joining(", "));
@@ -208,5 +251,28 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
                     "Não é possível remover os seguintes ministérios, pois possuem vínculos com escalas: " + types
             );
         }
+    }
+
+    private boolean isPriestMinistry(PersonMinistry personMinistry) {
+        return isPriestMinistry(personMinistry.getMinistry());
+    }
+
+    private boolean isPriestMinistry(Ministry ministry) {
+        return ministry.getId().equals(legacyMinistryTypeResolver.requireMinistry(MinistryType.PRIEST).getId());
+    }
+
+    private Set<MinistryType> mapMinistryIdsToLegacyTypes(
+            Set<Long> ministryIds,
+            Map<Long, MinistryType> legacyTypesByMinistryId
+    ) {
+        return ministryIds.stream()
+                .map(legacyTypesByMinistryId::get)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<MinistryType> mapPersonMinistriesToLegacyTypes(List<PersonMinistry> personMinistries) {
+        return personMinistries.stream()
+                .map(personMinistry -> legacyMinistryTypeResolver.requireMinistryType(personMinistry.getMinistry()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

@@ -6,6 +6,7 @@ import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.model.Role;
 import com.eventoscelebrativos.model.UserAccount;
 import com.eventoscelebrativos.model.UserAccountRole;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import com.eventoscelebrativos.service.impl.PersonMinistryReadServiceImpl;
 import jakarta.persistence.EntityManagerFactory;
@@ -28,10 +29,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
-@Import(PersonMinistryReadServiceImpl.class)
+@Import({PersonMinistryReadServiceImpl.class, LegacyMinistryTypeResolver.class})
 class PersonRepositoryTest {
 
     @Autowired
@@ -48,6 +50,9 @@ class PersonRepositoryTest {
 
     @Autowired
     private PersonMinistryReadService personMinistryReadService;
+
+    @Autowired
+    private MinistryRepository ministryRepository;
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
@@ -123,7 +128,7 @@ class PersonRepositoryTest {
         Page<Long> result = personRepository.findAdminPageIds(
                 "Type",
                 null,
-                MinistryType.READER,
+                ministryId(MinistryType.READER),
                 null,
                 null,
                 null,
@@ -167,7 +172,7 @@ class PersonRepositoryTest {
         Page<Long> result = personRepository.findAdminPageIds(
                 "Combined",
                 "00010",
-                MinistryType.READER,
+                ministryId(MinistryType.READER),
                 "ROLE_ADMIN",
                 null,
                 null,
@@ -330,7 +335,7 @@ class PersonRepositoryTest {
         entityManager.clear();
         IntStream.rangeClosed(1, personCount).forEach(i -> {
             Person person = savePersonWithRole(namePrefix + " " + i, phonePrefix + String.format("%03d", i), operatorRole());
-            entityManager.persist(new PersonMinistry(person, MinistryType.READER));
+            entityManager.persist(personMinistry(person, MinistryType.READER, ministryRepository));
             entityManager.flush();
         });
         entityManager.clear();
@@ -385,9 +390,15 @@ class PersonRepositoryTest {
     }
 
     private void saveMinistry(Person person, MinistryType ministryType) {
-        entityManager.persist(new PersonMinistry(person, ministryType));
+        entityManager.persist(personMinistry(person, ministryType, ministryRepository));
         entityManager.flush();
         entityManager.clear();
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return com.eventoscelebrativos.support.LegacyMinistryTestFactory
+                .persistentMinistry(ministryType, ministryRepository)
+                .getId();
     }
 
 
