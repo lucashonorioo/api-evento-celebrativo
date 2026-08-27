@@ -1,6 +1,7 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.Person;
 
 import java.util.Set;
@@ -12,7 +13,11 @@ import java.util.Set;
  */
 public interface PersonMinistryCommandService {
 
+    Person create(Person person, Ministry ministry);
+
     Person create(Person person, MinistryType ministryType);
+
+    Person requireActiveMinistryPerson(Long personId, Ministry ministry, String entityLabel);
 
     Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel);
 
@@ -23,7 +28,11 @@ public interface PersonMinistryCommandService {
      * garantindo que o lock de Person seja adquirido antes de qualquer mutacao e antes do lock de
      * UserAccount feito por {@link com.eventoscelebrativos.service.PersonAccountCoordinator}.
      */
+    Person requireActiveMinistryPersonForUpdate(Long personId, Ministry ministry, String entityLabel);
+
     Person requireActiveMinistryPersonForUpdate(Long personId, MinistryType ministryType, String entityLabel);
+
+    void removeMinistry(Long personId, Ministry ministry, String entityLabel);
 
     void removeMinistry(Long personId, MinistryType ministryType, String entityLabel);
 
@@ -40,6 +49,8 @@ public interface PersonMinistryCommandService {
      *     (inclusive quando {@code true}, concedido anteriormente por ADMIN).</li>
      * </ul>
      */
+    Person addOrReactivateMinistry(Long personId, Ministry ministry);
+
     Person addOrReactivateMinistry(Long personId, MinistryType ministryType);
 
     /**

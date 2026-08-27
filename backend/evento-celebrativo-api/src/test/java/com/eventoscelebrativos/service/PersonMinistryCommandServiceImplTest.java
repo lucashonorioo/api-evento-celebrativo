@@ -106,9 +106,28 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldCreatePersonAndMinistryByPersistentMinistryAtomically() {
+        Person reader = reader(null);
+        Person saved = reader(1L);
+        Ministry readerMinistry = unitMinistry(MinistryType.READER);
+        when(personRepository.save(reader)).thenReturn(saved);
+
+        Person result = service.create(reader, readerMinistry);
+
+        assertSame(saved, result);
+        ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
+        verify(personMinistryRepository).save(captor.capture());
+        assertSame(saved, captor.getValue().getPerson());
+        assertSame(readerMinistry, captor.getValue().getMinistry());
+        assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
+    }
+
+    @Test
     void shouldRejectCreateWithMissingArguments() {
         assertThrows(BusinessException.class, () -> service.create(null, MinistryType.READER));
-        assertThrows(BusinessException.class, () -> service.create(reader(1L), null));
+        assertThrows(BusinessException.class, () -> service.create(reader(1L), (MinistryType) null));
+        assertThrows(BusinessException.class, () -> service.create(null, unitMinistry(MinistryType.READER)));
+        assertThrows(BusinessException.class, () -> service.create(reader(1L), (Ministry) null));
         verifyNoInteractions(personRepository);
     }
 
@@ -132,6 +151,18 @@ class PersonMinistryCommandServiceImplTest {
                 .thenReturn(Optional.of(ministry));
 
         assertSame(reader, service.requireActiveMinistryPerson(1L, MinistryType.READER, ENTITY_LABEL));
+    }
+
+    @Test
+    void shouldReturnPersonWhenPersistentMinistryIsActive() {
+        Person reader = reader(1L);
+        Ministry readerMinistry = unitMinistry(MinistryType.READER);
+        PersonMinistry ministry = personMinistry(reader, MinistryType.READER);
+        when(personRepository.findById(1L)).thenReturn(Optional.of(reader));
+        when(personMinistryRepository.findByPersonIdAndMinistryId(1L, readerMinistry.getId()))
+                .thenReturn(Optional.of(ministry));
+
+        assertSame(reader, service.requireActiveMinistryPerson(1L, readerMinistry, ENTITY_LABEL));
     }
 
     @Test
@@ -183,6 +214,14 @@ class PersonMinistryCommandServiceImplTest {
         assertThrows(BusinessException.class, () -> service.requireActiveMinistryPerson(null, MinistryType.READER, ENTITY_LABEL));
         assertThrows(BusinessException.class, () -> service.requireActiveMinistryPerson(0L, MinistryType.READER, ENTITY_LABEL));
         assertThrows(BusinessException.class, () -> service.requireActiveMinistryPerson(-1L, MinistryType.READER, ENTITY_LABEL));
+    }
+
+    @Test
+    void shouldRejectMissingPersistentMinistryOnRequireActiveMinistryPerson() {
+        assertThrows(BusinessException.class,
+                () -> service.requireActiveMinistryPerson(1L, (Ministry) null, ENTITY_LABEL));
+
+        verifyNoInteractions(personRepository);
     }
 
     @Test
@@ -662,7 +701,7 @@ class PersonMinistryCommandServiceImplTest {
     void shouldRejectAddOrReactivateWithInvalidArguments() {
         assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(null, MinistryType.READER));
         assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(0L, MinistryType.READER));
-        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(1L, null));
+        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(1L, (MinistryType) null));
         verifyNoInteractions(personRepository);
     }
 

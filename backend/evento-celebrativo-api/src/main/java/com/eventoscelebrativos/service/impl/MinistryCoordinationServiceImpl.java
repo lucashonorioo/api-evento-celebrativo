@@ -4,11 +4,10 @@ import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.MinistryCoordinationRequiresActiveMinistryException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.Ministry;
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.PersonMinistry;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.MinistryCoordinationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,25 +18,24 @@ import java.util.Optional;
 public class MinistryCoordinationServiceImpl implements MinistryCoordinationService {
 
     private final PersonRepository personRepository;
+    private final MinistryRepository ministryRepository;
     private final PersonMinistryRepository personMinistryRepository;
-    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public MinistryCoordinationServiceImpl(
             PersonRepository personRepository,
-            PersonMinistryRepository personMinistryRepository,
-            LegacyMinistryTypeResolver legacyMinistryTypeResolver
+            MinistryRepository ministryRepository,
+            PersonMinistryRepository personMinistryRepository
     ) {
         this.personRepository = personRepository;
+        this.ministryRepository = ministryRepository;
         this.personMinistryRepository = personMinistryRepository;
-        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
     @Transactional
-    public void grantCoordinator(Long personId, String rawMinistryType) {
+    public void grantCoordinator(Long personId, Long ministryId) {
         validateId(personId);
-        MinistryType ministryType = legacyMinistryTypeResolver.parseMinistryType(rawMinistryType);
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        Ministry ministry = requireMinistry(ministryId);
 
         // Lock order: Person -> consulta comum de PersonMinistry -> decisao/mutacao. Sem lock
         // proprio sobre PersonMinistry: a serializacao vem inteiramente do lock da Person.
@@ -56,10 +54,9 @@ public class MinistryCoordinationServiceImpl implements MinistryCoordinationServ
 
     @Override
     @Transactional
-    public void revokeCoordinator(Long personId, String rawMinistryType) {
+    public void revokeCoordinator(Long personId, Long ministryId) {
         validateId(personId);
-        MinistryType ministryType = legacyMinistryTypeResolver.parseMinistryType(rawMinistryType);
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        Ministry ministry = requireMinistry(ministryId);
 
         personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
@@ -70,6 +67,12 @@ public class MinistryCoordinationServiceImpl implements MinistryCoordinationServ
         }
         existing.get().revokeCoordination();
         personMinistryRepository.save(existing.get());
+    }
+
+    private Ministry requireMinistry(Long ministryId) {
+        validateId(ministryId);
+        return ministryRepository.findById(ministryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ministério", ministryId));
     }
 
     private void validateId(Long id) {

@@ -3,7 +3,7 @@ package com.eventoscelebrativos.dto.response;
 import java.time.LocalDate;
 
 /**
- * Contrato de resposta escopado de {@code /ministerios/{ministryType}/pessoas}. Expoe somente os
+ * Contrato de resposta escopado de {@code /ministerios/{ministryId}/pessoas}. Expoe somente os
  * dados necessarios ao gerenciamento ministerial (id, name, phoneNumber, birthdayDate); nunca expoe
  * accountId, username, accountEnabled, roles, passwordHash, tokenVersion, parishResponsibilities ou
  * coordinatedMinistries.

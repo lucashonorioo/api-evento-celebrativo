@@ -60,14 +60,14 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
 
     @Override
     @Transactional
-    public Person create(Person person, MinistryType ministryType) {
-        if (person == null || ministryType == null) {
+    public Person create(Person person, Ministry ministry) {
+        if (person == null || ministry == null) {
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        MinistryType legacyMinistryType = requireLegacyMinistryTypeForWrite(ministry);
         Person saved = personRepository.save(person);
         try {
-            personMinistryRepository.save(new PersonMinistry(saved, ministry, ministryType));
+            personMinistryRepository.save(new PersonMinistry(saved, ministry, legacyMinistryType));
         } catch (DataIntegrityViolationException e) {
             throw new DatabaseException("Não é possível associar esta pessoa à função ministerial informada.");
         }
@@ -75,24 +75,36 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     }
 
     @Override
+    @Transactional
+    public Person create(Person person, MinistryType ministryType) {
+        if (ministryType == null) {
+            throw new BusinessException("Pessoa e função ministerial são obrigatórias");
+        }
+        return create(person, legacyMinistryTypeResolver.requireMinistry(ministryType));
+    }
+
+    @Override
     public Person requireActiveMinistryPerson(Long personId, MinistryType ministryType, String entityLabel) {
-        return requireActiveMinistryPerson(personId, ministryType, entityLabel, false);
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        return requireActiveMinistryPerson(personId, ministry, entityLabel);
     }
 
     @Override
     @Transactional
     public Person requireActiveMinistryPersonForUpdate(Long personId, MinistryType ministryType, String entityLabel) {
-        return requireActiveMinistryPerson(personId, ministryType, entityLabel, true);
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        return requireActiveMinistryPersonForUpdate(personId, ministry, entityLabel);
     }
 
-    private Person requireActiveMinistryPerson(
-            Long personId,
-            MinistryType ministryType,
-            String entityLabel,
-            boolean forUpdate
-    ) {
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
-        return requireActiveMinistryPerson(personId, ministry, entityLabel, forUpdate);
+    @Override
+    public Person requireActiveMinistryPerson(Long personId, Ministry ministry, String entityLabel) {
+        return requireActiveMinistryPerson(personId, ministry, entityLabel, false);
+    }
+
+    @Override
+    @Transactional
+    public Person requireActiveMinistryPersonForUpdate(Long personId, Ministry ministry, String entityLabel) {
+        return requireActiveMinistryPerson(personId, ministry, entityLabel, true);
     }
 
     private Person requireActiveMinistryPerson(
@@ -104,6 +116,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (personId == null || personId <= 0) {
             throw new BusinessException("O Id deve ser positivo e não nulo");
         }
+        requireMinistry(ministry);
         Person person = (forUpdate ? personRepository.findByIdForUpdate(personId) : personRepository.findById(personId))
                 .orElseThrow(() -> new ResourceNotFoundException(entityLabel, personId));
         if (!person.isActive()) {
@@ -117,15 +130,15 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
 
     @Override
     @Transactional
-    public void removeMinistry(Long personId, MinistryType ministryType, String entityLabel) {
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+    public void removeMinistry(Long personId, Ministry ministry, String entityLabel) {
+        requireMinistry(ministry);
         requireActiveMinistryPerson(personId, ministry, entityLabel, true);
         if (isPriestMinistry(ministry)) {
             guardPastorRequiresActivePriest(personId);
         }
         if (eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(
                 personId,
-                legacyMinistryTypeResolver.requireEventAssignmentType(ministry),
+                requireLegacyEventAssignmentType(ministry),
                 LocalDateTime.now(clock).withNano(0))) {
             throw new DatabaseException("Não é possível excluir este registro, pois ele possui vínculos com outros cadastros.");
         }
@@ -137,11 +150,18 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
 
     @Override
     @Transactional
-    public Person addOrReactivateMinistry(Long personId, MinistryType ministryType) {
-        if (personId == null || personId <= 0 || ministryType == null) {
+    public void removeMinistry(Long personId, MinistryType ministryType, String entityLabel) {
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        removeMinistry(personId, ministry, entityLabel);
+    }
+
+    @Override
+    @Transactional
+    public Person addOrReactivateMinistry(Long personId, Ministry ministry) {
+        if (personId == null || personId <= 0 || ministry == null) {
             throw new BusinessException("Pessoa e função ministerial são obrigatórias");
         }
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        MinistryType legacyMinistryType = requireLegacyMinistryTypeForWrite(ministry);
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         if (!person.isActive()) {
@@ -151,7 +171,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         Optional<PersonMinistry> existing = personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId());
         if (existing.isEmpty()) {
             try {
-                personMinistryRepository.save(new PersonMinistry(person, ministry, ministryType));
+                personMinistryRepository.save(new PersonMinistry(person, ministry, legacyMinistryType));
             } catch (DataIntegrityViolationException e) {
                 throw new DatabaseException("Não é possível associar esta pessoa à função ministerial informada.");
             }
@@ -161,6 +181,15 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
             personMinistryRepository.save(personMinistry);
         }
         return person;
+    }
+
+    @Override
+    @Transactional
+    public Person addOrReactivateMinistry(Long personId, MinistryType ministryType) {
+        if (ministryType == null) {
+            throw new BusinessException("Pessoa e função ministerial são obrigatórias");
+        }
+        return addOrReactivateMinistry(personId, legacyMinistryTypeResolver.requireMinistry(ministryType));
     }
 
     @Override
@@ -241,7 +270,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         List<MinistryType> conflicting = toDeactivate.stream()
                 .filter(personMinistry -> eventAssignmentRepository.existsActiveOrFutureByPersonIdAndAssignmentType(
                         personId,
-                        legacyMinistryTypeResolver.requireEventAssignmentType(personMinistry.getMinistry()),
+                        requireLegacyEventAssignmentType(personMinistry.getMinistry()),
                         currentSecond))
                 .map(personMinistry -> legacyMinistryTypeResolver.requireMinistryType(personMinistry.getMinistry()))
                 .toList();
@@ -259,6 +288,33 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
 
     private boolean isPriestMinistry(Ministry ministry) {
         return ministry.getId().equals(legacyMinistryTypeResolver.requireMinistry(MinistryType.PRIEST).getId());
+    }
+
+    private void requireMinistry(Ministry ministry) {
+        if (ministry == null || ministry.getId() == null || ministry.getId() <= 0) {
+            throw new BusinessException("Função ministerial persistente é obrigatória");
+        }
+    }
+
+    private MinistryType requireLegacyMinistryTypeForWrite(Ministry ministry) {
+        requireMinistry(ministry);
+        try {
+            return legacyMinistryTypeResolver.requireMinistryType(ministry);
+        } catch (IllegalStateException e) {
+            throw new BusinessException(
+                    "Ministério ainda não pode ser vinculado operacionalmente enquanto a compatibilidade legada estiver ativa"
+            );
+        }
+    }
+
+    private com.eventoscelebrativos.model.EventAssignmentType requireLegacyEventAssignmentType(Ministry ministry) {
+        try {
+            return legacyMinistryTypeResolver.requireEventAssignmentType(ministry);
+        } catch (IllegalStateException e) {
+            throw new BusinessException(
+                    "Ministério ainda não pode ser administrado operacionalmente enquanto a compatibilidade legada estiver ativa"
+            );
+        }
     }
 
     private Set<MinistryType> mapMinistryIdsToLegacyTypes(

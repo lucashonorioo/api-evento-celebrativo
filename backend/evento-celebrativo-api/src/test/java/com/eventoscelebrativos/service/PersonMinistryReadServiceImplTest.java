@@ -6,6 +6,8 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.PersonMinistryReadServiceImpl;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.argThat;
 
@@ -76,9 +79,31 @@ class PersonMinistryReadServiceImplTest {
     }
 
     @Test
+    void shouldFindActivePeopleByMinistryIdUsingCanonicalQueries() {
+        Long readerMinistryId = unitMinistry(MinistryType.READER).getId();
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Long> idPage = new PageImpl<>(List.of(2L, 1L), pageable, 2);
+        Person first = person(1L);
+        Person second = person(2L);
+
+        when(personMinistryRepository.findActivePersonIdsByMinistryId(readerMinistryId, pageable)).thenReturn(idPage);
+        when(personRepository.findAllByIdIn(List.of(2L, 1L))).thenReturn(List.of(first, second));
+
+        Page<Person> result = service.findActivePeopleByMinistryId(readerMinistryId, pageable);
+
+        assertEquals(List.of(second, first), result.getContent());
+        assertEquals(2, result.getTotalElements());
+        verifyNoInteractions(legacyMinistryTypeResolver);
+    }
+
+    @Test
     void shouldRejectInvalidArguments() {
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(null, PageRequest.of(0, 10)));
         assertThrows(BusinessException.class, () -> service.findAllActivePeopleByMinistry(null));
+        assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistryId(null, PageRequest.of(0, 10)));
+        assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistryId(0L, PageRequest.of(0, 10)));
+        assertThrows(BusinessException.class, () -> service.findAllActivePeopleByMinistryId(null));
+        assertThrows(BusinessException.class, () -> service.findAllActivePeopleByMinistryId(0L));
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, null));
         assertThrows(BusinessException.class, () -> service.findActivePeopleByMinistry(MinistryType.READER, Pageable.unpaged()));
         assertThrows(BusinessException.class, () -> service.findActiveMinistriesByPersonIds(null));

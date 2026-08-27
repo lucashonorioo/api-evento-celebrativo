@@ -4,7 +4,6 @@ import com.eventoscelebrativos.config.OpenApiConfig;
 import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.service.MinistryPersonManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,16 +30,16 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 
 /**
- * Administracao de pessoas escopada a um unico {@link MinistryType}
- * ({@code /ministerios/{ministryType}/pessoas}). Toda a autorizacao e centralizada em
- * {@code @ministryAuthorizationService.canManageMinistry(#ministryType)}: ROLE_ADMIN tem override
+ * Administracao de pessoas escopada a um unico Ministry persistente
+ * ({@code /ministerios/{ministryId}/pessoas}). Toda a autorizacao e centralizada em
+ * {@code @ministryAuthorizationService.canManageMinistry(#ministryId)}: ROLE_ADMIN tem override
  * global; ROLE_OPERATOR precisa coordenar (PersonMinistry.active=true e coordinator=true) exatamente
- * o ministryType do path. Nao substitui nem abre os CRUDs administrativos globais existentes
+ * o ministryId do path. Nao substitui nem abre os CRUDs administrativos globais existentes
  * (GET/PUT /pessoas/{id}, PUT /pessoas/{id}/ministries, coordenacao, conta, roles), que continuam
  * exclusivos de ROLE_ADMIN.
  */
 @RestController
-@RequestMapping(value = "/ministerios/{ministryType}/pessoas")
+@RequestMapping(value = "/ministerios/{ministryId}/pessoas")
 @Tag(name = "Ministérios - Pessoas", description = "Administração de pessoas escopada a um ministério")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class MinistryPersonController {
@@ -53,9 +52,9 @@ public class MinistryPersonController {
 
     @Operation(
             summary = "Lista pessoas ativas do ministério informado.",
-            description = "Retorna somente Person.active=true com PersonMinistry(ministryType).active=true. "
+            description = "Retorna somente Person.active=true com PersonMinistry(ministryId).active=true. "
                     + "Ordenado por nome e id. Tamanho de página máximo: 100. Permitido para ROLE_ADMIN (qualquer "
-                    + "ministryType) ou ROLE_OPERATOR com PersonMinistry(ministryType).active=true e coordinator=true."
+                    + "ministryId) ou ROLE_OPERATOR com PersonMinistry(ministryId).active=true e coordinator=true."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pessoas listadas com sucesso"),
@@ -63,21 +62,21 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "401", description = "Usuário não autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuário sem autoridade sobre o ministério informado")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @GetMapping
     public ResponseEntity<Page<MinistryPersonResponseDTO>> findPeople(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @Parameter(description = "Número da página, iniciando em 0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Quantidade de registros por página. Máximo: 100")
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ResponseEntity.ok(ministryPersonManagementService.findPeople(ministryType, page, size));
+        return ResponseEntity.ok(ministryPersonManagementService.findPeople(ministryId, page, size));
     }
 
     @Operation(
             summary = "Busca uma pessoa por id dentro do escopo do ministério informado.",
-            description = "Só encontra a pessoa se ela possuir PersonMinistry(ministryType).active=true; "
+            description = "Só encontra a pessoa se ela possuir PersonMinistry(ministryId).active=true; "
                     + "caso contrário, retorna 404 mesmo que a pessoa exista globalmente (evita vazamento cross-scope)."
     )
     @ApiResponses({
@@ -86,18 +85,18 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "403", description = "Usuário sem autoridade sobre o ministério informado"),
             @ApiResponse(responseCode = "404", description = "Pessoa inexistente ou fora do escopo do ministério")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @GetMapping(value = "/{personId}")
     public ResponseEntity<MinistryPersonResponseDTO> findPersonById(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @PathVariable Long personId
     ) {
-        return ResponseEntity.ok(ministryPersonManagementService.findPersonById(ministryType, personId));
+        return ResponseEntity.ok(ministryPersonManagementService.findPersonById(ministryId, personId));
     }
 
     @Operation(
             summary = "Cria uma pessoa nova já vinculada ao ministério informado.",
-            description = "Cria somente Person + PersonMinistry(ministryType).active=true, coordinator=false. "
+            description = "Cria somente Person + PersonMinistry(ministryId).active=true, coordinator=false. "
                     + "Nunca cria UserAccount. Aceita somente name, phoneNumber e birthdayDate; qualquer outro campo "
                     + "no corpo (inclusive password, createAccess, accessRole, role, roles, active, coordinator ou "
                     + "campo desconhecido) é rejeitado, mesmo quando enviado como null, vazio ou false."
@@ -109,13 +108,13 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "403", description = "Usuário sem autoridade sobre o ministério informado"),
             @ApiResponse(responseCode = "409", description = "Telefone já associado a outra pessoa")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @PostMapping
     public ResponseEntity<MinistryPersonResponseDTO> create(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @Valid @RequestBody MinistryPersonCreateRequestDTO requestDTO
     ) {
-        MinistryPersonResponseDTO responseDTO = ministryPersonManagementService.create(ministryType, requestDTO);
+        MinistryPersonResponseDTO responseDTO = ministryPersonManagementService.create(ministryId, requestDTO);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(responseDTO.getId()).toUri();
         return ResponseEntity.status(HttpStatus.CREATED).location(location).body(responseDTO);
     }
@@ -124,7 +123,7 @@ public class MinistryPersonController {
             summary = "Atualiza name e birthdayDate de uma pessoa dentro do escopo do ministério informado.",
             description = "Aceita somente name e birthdayDate. phoneNumber e qualquer campo de conta, role, "
                     + "ministério ou status são rejeitados, mesmo quando enviados como null, vazio ou false. A "
-                    + "pessoa precisa possuir PersonMinistry(ministryType).active=true; caso contrário, 404."
+                    + "pessoa precisa possuir PersonMinistry(ministryId).active=true; caso contrário, 404."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Pessoa atualizada com sucesso"),
@@ -133,14 +132,14 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "403", description = "Usuário sem autoridade sobre o ministério informado"),
             @ApiResponse(responseCode = "404", description = "Pessoa inexistente ou fora do escopo do ministério")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @PutMapping(value = "/{personId}")
     public ResponseEntity<MinistryPersonResponseDTO> update(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @PathVariable Long personId,
             @Valid @RequestBody MinistryPersonUpdateRequestDTO requestDTO
     ) {
-        return ResponseEntity.ok(ministryPersonManagementService.update(ministryType, personId, requestDTO));
+        return ResponseEntity.ok(ministryPersonManagementService.update(ministryId, personId, requestDTO));
     }
 
     @Operation(
@@ -157,13 +156,13 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "404", description = "Pessoa inexistente"),
             @ApiResponse(responseCode = "409", description = "Pessoa inativa")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @PutMapping(value = "/{personId}/vinculo")
     public ResponseEntity<MinistryPersonResponseDTO> addOrReactivateMinistry(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @PathVariable Long personId
     ) {
-        return ResponseEntity.ok(ministryPersonManagementService.addOrReactivateMinistry(ministryType, personId));
+        return ResponseEntity.ok(ministryPersonManagementService.addOrReactivateMinistry(ministryId, personId));
     }
 
     @Operation(
@@ -181,13 +180,13 @@ public class MinistryPersonController {
             @ApiResponse(responseCode = "404", description = "Pessoa inexistente ou fora do escopo do ministério"),
             @ApiResponse(responseCode = "409", description = "Compromisso operacional ativo/futuro ou invariante PASTOR/PRIEST")
     })
-    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryType)")
+    @PreAuthorize("@ministryAuthorizationService.canManageMinistry(#ministryId)")
     @DeleteMapping(value = "/{personId}/vinculo")
     public ResponseEntity<Void> removeMinistry(
-            @PathVariable MinistryType ministryType,
+            @PathVariable Long ministryId,
             @PathVariable Long personId
     ) {
-        ministryPersonManagementService.removeMinistry(ministryType, personId);
+        ministryPersonManagementService.removeMinistry(ministryId, personId);
         return ResponseEntity.noContent().build();
     }
 }

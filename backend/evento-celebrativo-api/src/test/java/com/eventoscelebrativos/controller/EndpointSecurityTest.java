@@ -139,10 +139,10 @@ class EndpointSecurityTest {
                         .content(ministriesPayload()))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(put("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(delete("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/pessoas/me/indisponibilidades")
@@ -286,10 +286,10 @@ class EndpointSecurityTest {
                         .content(ministriesPayload()))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(put("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(delete("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/eventos/com-escala")
@@ -352,13 +352,13 @@ class EndpointSecurityTest {
         jdbcTemplate.update(
                 "UPDATE tb_person_ministry SET coordinator = TRUE WHERE person_id = 4 AND ministry_type = 'READER'");
         try {
-            mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+            mockMvc.perform(put("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                     .andExpect(status().isForbidden());
 
-            mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+            mockMvc.perform(delete("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                     .andExpect(status().isForbidden());
 
-            mockMvc.perform(put("/pessoas/4/ministries/READER/coordinator"))
+            mockMvc.perform(put("/pessoas/4/ministries/" + readerMinistryId() + "/coordinator"))
                     .andExpect(status().isForbidden());
         } finally {
             jdbcTemplate.update(
@@ -487,10 +487,10 @@ class EndpointSecurityTest {
                         .content(ministriesPayload()))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(put("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(put("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(delete("/pessoas/1/ministries/COMMENTATOR/coordinator"))
+        mockMvc.perform(delete("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/eventos/com-escala")
@@ -677,5 +677,21 @@ class EndpointSecurityTest {
                   "eucharisticMinisterIds": [10]
                 }
                 """;
+    }
+
+    private long readerMinistryId() {
+        return ministryId("LEITORES");
+    }
+
+    private long commentatorMinistryId() {
+        return ministryId("COMENTARISTAS");
+    }
+
+    private long ministryId(String normalizedName) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_ministry WHERE normalized_name = ?",
+                Long.class,
+                normalizedName
+        );
     }
 }

@@ -12,6 +12,10 @@ import java.util.Set;
 
 public interface PersonMinistryReadService {
 
+    Page<Person> findActivePeopleByMinistryId(Long ministryId, Pageable pageable);
+
+    List<Person> findAllActivePeopleByMinistryId(Long ministryId);
+
     Page<Person> findActivePeopleByMinistry(MinistryType ministryType, Pageable pageable);
 
     List<Person> findAllActivePeopleByMinistry(MinistryType ministryType);

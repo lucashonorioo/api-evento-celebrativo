@@ -45,12 +45,11 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Person> findActivePeopleByMinistry(MinistryType ministryType, Pageable pageable) {
-        validateMinistryType(ministryType);
+    public Page<Person> findActivePeopleByMinistryId(Long ministryId, Pageable pageable) {
+        validateMinistryId(ministryId);
         PageRequest safePageable = safePageable(pageable);
-        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
 
-        Page<Long> idPage = personMinistryRepository.findActivePersonIdsByMinistryId(ministry.getId(), safePageable);
+        Page<Long> idPage = personMinistryRepository.findActivePersonIdsByMinistryId(ministryId, safePageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(Collections.emptyList(), safePageable, idPage.getTotalElements());
         }
@@ -69,10 +68,26 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
 
     @Override
     @Transactional(readOnly = true)
+    public List<Person> findAllActivePeopleByMinistryId(Long ministryId) {
+        validateMinistryId(ministryId);
+        return personMinistryRepository.findActivePeopleByMinistryId(ministryId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<Person> findActivePeopleByMinistry(MinistryType ministryType, Pageable pageable) {
+        validateMinistryType(ministryType);
+        PageRequest safePageable = safePageable(pageable);
+        Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
+        return findActivePeopleByMinistryId(requireMinistryId(ministry), safePageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Person> findAllActivePeopleByMinistry(MinistryType ministryType) {
         validateMinistryType(ministryType);
         Ministry ministry = legacyMinistryTypeResolver.requireMinistry(ministryType);
-        return personMinistryRepository.findActivePeopleByMinistryId(ministry.getId());
+        return findAllActivePeopleByMinistryId(requireMinistryId(ministry));
     }
 
     @Override
@@ -124,6 +139,19 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         if (ministryType == null) {
             throw new BusinessException("Funcao ministerial e obrigatoria");
         }
+    }
+
+    private void validateMinistryId(Long ministryId) {
+        if (ministryId == null || ministryId <= 0) {
+            throw new BusinessException("O Id do ministerio deve ser positivo e nao nulo");
+        }
+    }
+
+    private Long requireMinistryId(Ministry ministry) {
+        if (ministry == null || ministry.getId() == null || ministry.getId() <= 0) {
+            throw new BusinessException("Funcao ministerial persistente e obrigatoria");
+        }
+        return ministry.getId();
     }
 
     private PageRequest safePageable(Pageable pageable) {

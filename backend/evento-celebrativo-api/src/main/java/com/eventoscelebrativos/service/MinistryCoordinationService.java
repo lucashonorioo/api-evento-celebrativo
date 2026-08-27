@@ -3,16 +3,14 @@ package com.eventoscelebrativos.service;
 public interface MinistryCoordinationService {
 
     /**
-     * Concede ou reconfirma (idempotente) a coordenacao do ministerio para a Person. Exige
-     * PersonMinistry(personId, ministryType).active=true; nao cria o vinculo ministerial.
-     *
-     * @param rawMinistryType nome do {@link com.eventoscelebrativos.model.MinistryType}, validado aqui
+     * Concede ou reconfirma (idempotente) a coordenacao do ministerio persistente para a Person.
+     * Exige PersonMinistry(personId, ministryId).active=true; nao cria o vinculo ministerial.
      */
-    void grantCoordinator(Long personId, String rawMinistryType);
+    void grantCoordinator(Long personId, Long ministryId);
 
     /**
      * Remove (idempotente) a coordenacao do ministerio para a Person. Nao desativa o ministerio nem
      * remove a linha fisicamente.
      */
-    void revokeCoordinator(Long personId, String rawMinistryType);
+    void revokeCoordinator(Long personId, Long ministryId);
 }
