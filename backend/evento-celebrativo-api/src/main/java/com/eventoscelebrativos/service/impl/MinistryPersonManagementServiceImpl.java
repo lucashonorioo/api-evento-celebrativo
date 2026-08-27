@@ -4,10 +4,11 @@ import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
-import com.eventoscelebrativos.exception.exceptions.BusinessException;
+import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinistryPersonMapper;
-import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.service.MinistryPersonManagementService;
 import com.eventoscelebrativos.service.PersonCadastralUpdateService;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
@@ -24,17 +25,20 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
     private static final int MAX_PAGE_SIZE = 100;
 
     private final MinistryPersonMapper ministryPersonMapper;
+    private final MinistryRepository ministryRepository;
     private final PersonMinistryCommandService personMinistryCommandService;
     private final PersonMinistryReadService personMinistryReadService;
     private final PersonCadastralUpdateService personCadastralUpdateService;
 
     public MinistryPersonManagementServiceImpl(
             MinistryPersonMapper ministryPersonMapper,
+            MinistryRepository ministryRepository,
             PersonMinistryCommandService personMinistryCommandService,
             PersonMinistryReadService personMinistryReadService,
             PersonCadastralUpdateService personCadastralUpdateService
     ) {
         this.ministryPersonMapper = ministryPersonMapper;
+        this.ministryRepository = ministryRepository;
         this.personMinistryCommandService = personMinistryCommandService;
         this.personMinistryReadService = personMinistryReadService;
         this.personCadastralUpdateService = personCadastralUpdateService;
@@ -42,37 +46,37 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MinistryPersonResponseDTO> findPeople(MinistryType ministryType, int page, int size) {
-        requireMinistryType(ministryType);
+    public Page<MinistryPersonResponseDTO> findPeople(Long ministryId, int page, int size) {
         validatePagination(page, size);
-        Page<Person> people = personMinistryReadService.findActivePeopleByMinistry(ministryType, PageRequest.of(page, size));
+        Ministry ministry = requireMinistry(ministryId);
+        Page<Person> people = personMinistryReadService.findActivePeopleByMinistryId(ministry.getId(), PageRequest.of(page, size));
         return people.map(ministryPersonMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MinistryPersonResponseDTO findPersonById(MinistryType ministryType, Long personId) {
-        requireMinistryType(ministryType);
-        Person person = personMinistryCommandService.requireActiveMinistryPerson(personId, ministryType, ENTITY_LABEL);
+    public MinistryPersonResponseDTO findPersonById(Long ministryId, Long personId) {
+        Ministry ministry = requireMinistry(ministryId);
+        Person person = personMinistryCommandService.requireActiveMinistryPerson(personId, ministry, ENTITY_LABEL);
         return ministryPersonMapper.toDto(person);
     }
 
     @Override
     @Transactional
-    public MinistryPersonResponseDTO create(MinistryType ministryType, MinistryPersonCreateRequestDTO requestDTO) {
-        requireMinistryType(ministryType);
+    public MinistryPersonResponseDTO create(Long ministryId, MinistryPersonCreateRequestDTO requestDTO) {
+        Ministry ministry = requireMinistry(ministryId);
         requestDTO.rejectForbiddenFields();
         Person person = ministryPersonMapper.toEntity(requestDTO);
-        Person saved = personMinistryCommandService.create(person, ministryType);
+        Person saved = personMinistryCommandService.create(person, ministry);
         return ministryPersonMapper.toDto(saved);
     }
 
     @Override
     @Transactional
-    public MinistryPersonResponseDTO update(MinistryType ministryType, Long personId, MinistryPersonUpdateRequestDTO requestDTO) {
-        requireMinistryType(ministryType);
+    public MinistryPersonResponseDTO update(Long ministryId, Long personId, MinistryPersonUpdateRequestDTO requestDTO) {
+        Ministry ministry = requireMinistry(ministryId);
         requestDTO.rejectForbiddenFields();
-        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(personId, ministryType, ENTITY_LABEL);
+        Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(personId, ministry, ENTITY_LABEL);
         Person saved = personCadastralUpdateService.updateCadastral(
                 person,
                 requestDTO.getName(),
@@ -84,23 +88,25 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
 
     @Override
     @Transactional
-    public MinistryPersonResponseDTO addOrReactivateMinistry(MinistryType ministryType, Long personId) {
-        requireMinistryType(ministryType);
-        Person person = personMinistryCommandService.addOrReactivateMinistry(personId, ministryType);
+    public MinistryPersonResponseDTO addOrReactivateMinistry(Long ministryId, Long personId) {
+        Ministry ministry = requireMinistry(ministryId);
+        Person person = personMinistryCommandService.addOrReactivateMinistry(personId, ministry);
         return ministryPersonMapper.toDto(person);
     }
 
     @Override
     @Transactional
-    public void removeMinistry(MinistryType ministryType, Long personId) {
-        requireMinistryType(ministryType);
-        personMinistryCommandService.removeMinistry(personId, ministryType, ENTITY_LABEL);
+    public void removeMinistry(Long ministryId, Long personId) {
+        Ministry ministry = requireMinistry(ministryId);
+        personMinistryCommandService.removeMinistry(personId, ministry, ENTITY_LABEL);
     }
 
-    private void requireMinistryType(MinistryType ministryType) {
-        if (ministryType == null) {
-            throw new BusinessException("Função ministerial é obrigatória");
+    private Ministry requireMinistry(Long ministryId) {
+        if (ministryId == null || ministryId <= 0) {
+            throw new BadRequestException("O Id do ministério deve ser positivo e não nulo");
         }
+        return ministryRepository.findById(ministryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ministério", ministryId));
     }
 
     private void validatePagination(int page, int size) {

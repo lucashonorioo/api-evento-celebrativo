@@ -419,7 +419,7 @@ public class PersonController {
             summary = "Atualiza atomicamente o conjunto de ministerios de uma pessoa.",
             description = "Desativar um ministerio (ausente do conjunto desejado) remove sua coordenacao atomicamente. "
                     + "Reativar um ministerio previamente desativado NAO restaura a coordenacao (precisa ser concedida "
-                    + "novamente via PUT /{id}/ministries/{ministryType}/coordinator). Um ministerio que permanece no "
+                    + "novamente via PUT /{id}/ministries/{ministryId}/coordinator). Um ministerio que permanece no "
                     + "conjunto desejado (unchanged) preserva sua coordenacao como estava."
     )
     @ApiResponses({
@@ -443,8 +443,8 @@ public class PersonController {
 
     @Operation(
             summary = "Concede ou reconfirma a coordenacao de um ministerio para uma pessoa.",
-            description = "Coordenacao pertence ao vinculo PersonMinistry (ministryType + coordinator), separada de Person, "
-                    + "UserAccount, UserAccountRole e ParishStaffAssignment. Exige PersonMinistry(ministryType).active=true "
+            description = "Coordenacao pertence ao vinculo PersonMinistry (ministryId + coordinator), separada de Person, "
+                    + "UserAccount, UserAccountRole e ParishStaffAssignment. Exige PersonMinistry(ministryId).active=true "
                     + "(409 MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY quando ausente ou inativo); nao cria o vinculo "
                     + "ministerial implicitamente. Um ministerio pode ter 0..N coordenadores; uma pessoa pode coordenar "
                     + "0..N ministerios. Nao exige UserAccount. Idempotente: se ja for coordenador, retorna sucesso sem "
@@ -453,16 +453,16 @@ public class PersonController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Coordenacao concedida/reconfirmada com sucesso (ou ja concedida, idempotente)"),
-            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "400", description = "Id de ministerio invalido"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
-            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),
+            @ApiResponse(responseCode = "404", description = "Pessoa ou ministerio nao encontrado"),
             @ApiResponse(responseCode = "409", description = "Vinculo ministerial inexistente ou inativo (MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY)")
     })
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @PutMapping(value = "/{id}/ministries/{ministryType}/coordinator")
-    public ResponseEntity<Void> grantMinistryCoordinator(@PathVariable Long id, @PathVariable String ministryType) {
-        ministryCoordinationService.grantCoordinator(id, ministryType);
+    @PutMapping(value = "/{id}/ministries/{ministryId}/coordinator")
+    public ResponseEntity<Void> grantMinistryCoordinator(@PathVariable Long id, @PathVariable Long ministryId) {
+        ministryCoordinationService.grantCoordinator(id, ministryId);
         return ResponseEntity.noContent().build();
     }
 
@@ -473,15 +473,15 @@ public class PersonController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Coordenacao removida com sucesso (ou ja ausente, idempotente)"),
-            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "400", description = "Id de ministerio invalido"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
-            @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada")
+            @ApiResponse(responseCode = "404", description = "Pessoa ou ministerio nao encontrado")
     })
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @DeleteMapping(value = "/{id}/ministries/{ministryType}/coordinator")
-    public ResponseEntity<Void> revokeMinistryCoordinator(@PathVariable Long id, @PathVariable String ministryType) {
-        ministryCoordinationService.revokeCoordinator(id, ministryType);
+    @DeleteMapping(value = "/{id}/ministries/{ministryId}/coordinator")
+    public ResponseEntity<Void> revokeMinistryCoordinator(@PathVariable Long id, @PathVariable Long ministryId) {
+        ministryCoordinationService.revokeCoordinator(id, ministryId);
         return ResponseEntity.noContent().build();
     }
 

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -369,7 +370,7 @@ class PersonMinistryManagementIntegrationTest {
             personId = savePerson("Coordinator Grant Revoke Person");
             addMinistry(personId, MinistryType.READER, true);
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
@@ -379,10 +380,10 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.coordinatedMinistries.length()").value(1));
 
             // idempotente
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
 
-            mockMvc.perform(delete("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(delete(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
@@ -391,7 +392,7 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
 
             // idempotente
-            mockMvc.perform(delete("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(delete(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
         } finally {
             cleanupPerson(personId);
@@ -405,7 +406,7 @@ class PersonMinistryManagementIntegrationTest {
             personId = savePerson("Coordinator Inactive Ministry Person");
             addMinistry(personId, MinistryType.READER, false);
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.errorCode").value("MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY"));
         } finally {
@@ -419,7 +420,7 @@ class PersonMinistryManagementIntegrationTest {
         try {
             personId = savePerson("Coordinator Missing Ministry Person");
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.errorCode").value("MINISTRY_COORDINATION_REQUIRES_ACTIVE_MINISTRY"));
         } finally {
@@ -429,17 +430,30 @@ class PersonMinistryManagementIntegrationTest {
 
     @Test
     void shouldReturnNotFoundWhenGrantingCoordinatorForNonexistentPerson() throws Exception {
-        mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", 987654321L, "READER"))
+        mockMvc.perform(put(coordinatorPath(987654321L, MinistryType.READER)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void shouldReturnBadRequestWhenMinistryTypeIsInvalid() throws Exception {
+    void shouldReturnNotFoundWhenGrantingCoordinatorForNonexistentMinistry() throws Exception {
+        Long personId = null;
+        try {
+            personId = savePerson("Coordinator Missing Ministry Id Person");
+
+            mockMvc.perform(put(coordinatorPath(personId, 987654321L)))
+                    .andExpect(status().isNotFound());
+        } finally {
+            cleanupPerson(personId);
+        }
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenMinistryIdIsNonNumeric() throws Exception {
         Long personId = null;
         try {
             personId = savePerson("Coordinator Invalid Ministry Person");
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "BISHOP"))
+            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryId}/coordinator", personId, "BISHOP"))
                     .andExpect(status().isBadRequest());
         } finally {
             cleanupPerson(personId);
@@ -452,7 +466,7 @@ class PersonMinistryManagementIntegrationTest {
         try {
             personId = savePerson("Coordinator Sync Clears Person");
             addMinistry(personId, MinistryType.READER, true);
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
@@ -477,7 +491,7 @@ class PersonMinistryManagementIntegrationTest {
         try {
             personId = savePerson("Coordinator Sync Reactivate Person");
             addMinistry(personId, MinistryType.READER, true);
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -505,9 +519,9 @@ class PersonMinistryManagementIntegrationTest {
             addMinistry(personA, MinistryType.READER, true);
             addMinistry(personB, MinistryType.READER, true);
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personA, "READER"))
+            mockMvc.perform(put(coordinatorPath(personA, MinistryType.READER)))
                     .andExpect(status().isNoContent());
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personB, "READER"))
+            mockMvc.perform(put(coordinatorPath(personB, MinistryType.READER)))
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personA))
@@ -528,9 +542,9 @@ class PersonMinistryManagementIntegrationTest {
             addMinistry(personId, MinistryType.READER, true);
             addMinistry(personId, MinistryType.COMMENTATOR, true);
 
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "READER"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
                     .andExpect(status().isNoContent());
-            mockMvc.perform(put("/pessoas/{id}/ministries/{ministryType}/coordinator", personId, "COMMENTATOR"))
+            mockMvc.perform(put(coordinatorPath(personId, MinistryType.COMMENTATOR)))
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
@@ -593,6 +607,20 @@ class PersonMinistryManagementIntegrationTest {
 
     private String ministriesPayload(String... ministries) throws Exception {
         return objectMapper.writeValueAsString(new MinistriesPayload(List.of(ministries)));
+    }
+
+    private String coordinatorPath(Long personId, MinistryType ministryType) {
+        return coordinatorPath(personId, ministryId(ministryType));
+    }
+
+    private String coordinatorPath(Long personId, Long ministryId) {
+        return "/pessoas/" + personId + "/ministries/" + ministryId + "/coordinator";
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
     }
 
     private void assertActiveMinistry(Long personId, MinistryType ministryType, boolean expectedActive) {

@@ -4,7 +4,6 @@ import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.MinistryPersonInactiveException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.service.MinistryAuthorizationService;
 import com.eventoscelebrativos.service.MinistryPersonManagementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(MinistryPersonControllerTest.MethodSecurityConfig.class)
 class MinistryPersonControllerTest {
 
+    private static final long READER_MINISTRY_ID = 10L;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -66,15 +67,15 @@ class MinistryPersonControllerTest {
     @Test
     void shouldReturnOkWhenListingPeople() throws Exception {
         Page<MinistryPersonResponseDTO> page = new PageImpl<>(List.of(response(1L)), PageRequest.of(0, 10), 1);
-        when(ministryPersonManagementService.findPeople(eq(MinistryType.READER), anyInt(), anyInt())).thenReturn(page);
+        when(ministryPersonManagementService.findPeople(eq(READER_MINISTRY_ID), anyInt(), anyInt())).thenReturn(page);
 
-        mockMvc.perform(get("/ministerios/READER/pessoas"))
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1));
     }
 
     @Test
-    void shouldReturnBadRequestForUnknownMinistryTypeInPath() throws Exception {
+    void shouldReturnBadRequestForNonNumericMinistryIdInPath() throws Exception {
         mockMvc.perform(get("/ministerios/UNKNOWN_TYPE/pessoas"))
                 .andExpect(status().isBadRequest());
 
@@ -82,40 +83,53 @@ class MinistryPersonControllerTest {
     }
 
     @Test
-    void shouldReturnForbiddenWhenAuthorizationDenies() throws Exception {
-        when(ministryAuthorizationService.canManageMinistry(MinistryType.READER)).thenReturn(false);
+    void shouldReturnBadRequestForNegativeMinistryIdInPath() throws Exception {
+        when(ministryAuthorizationService.canManageMinistry(-1L))
+                .thenThrow(new BadRequestException("O Id do ministério deve ser positivo e não nulo"));
 
-        mockMvc.perform(get("/ministerios/READER/pessoas")).andExpect(status().isForbidden());
-        mockMvc.perform(get("/ministerios/READER/pessoas/1")).andExpect(status().isForbidden());
-        mockMvc.perform(post("/ministerios/READER/pessoas").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas", -1L))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(ministryPersonManagementService);
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenAuthorizationDenies() throws Exception {
+        when(ministryAuthorizationService.canManageMinistry(READER_MINISTRY_ID)).thenReturn(false);
+
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID)).andExpect(status().isForbidden());
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas/1", READER_MINISTRY_ID)).andExpect(status().isForbidden());
+        mockMvc.perform(post("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(createPayload()))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(put("/ministerios/READER/pessoas/1").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload()))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(put("/ministerios/READER/pessoas/1/vinculo").with(csrf())).andExpect(status().isForbidden());
-        mockMvc.perform(delete("/ministerios/READER/pessoas/1/vinculo").with(csrf())).andExpect(status().isForbidden());
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1/vinculo", READER_MINISTRY_ID).with(csrf()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/ministerios/{ministryId}/pessoas/1/vinculo", READER_MINISTRY_ID).with(csrf()))
+                .andExpect(status().isForbidden());
 
         verifyNoInteractions(ministryPersonManagementService);
     }
 
     @Test
     void shouldReturnNotFoundWhenPersonOutsideScope() throws Exception {
-        when(ministryPersonManagementService.findPersonById(MinistryType.READER, 99L))
+        when(ministryPersonManagementService.findPersonById(READER_MINISTRY_ID, 99L))
                 .thenThrow(new ResourceNotFoundException("Pessoa", 99L));
 
-        mockMvc.perform(get("/ministerios/READER/pessoas/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas/99", READER_MINISTRY_ID)).andExpect(status().isNotFound());
     }
 
     @Test
     void shouldReturnCreatedWithLocationWhenCreatingPerson() throws Exception {
-        when(ministryPersonManagementService.create(eq(MinistryType.READER), any())).thenReturn(response(5L));
+        when(ministryPersonManagementService.create(eq(READER_MINISTRY_ID), any())).thenReturn(response(5L));
 
-        mockMvc.perform(post("/ministerios/READER/pessoas").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(createPayload()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(5))
-                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/ministerios/READER/pessoas/5")));
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/ministerios/" + READER_MINISTRY_ID + "/pessoas/5")));
     }
 
     @Test
@@ -124,11 +138,11 @@ class MinistryPersonControllerTest {
         // mapeamento HTTP do BadRequestException resultante. A rejeicao real do DTO contra JSON com
         // password/createAccess/etc (mesmo null/false) e provada com o service real em
         // MinistryPersonManagementIntegrationTest.createRejectsAccountAndLifecycleFieldsEvenWhenFalseOrNull.
-        when(ministryPersonManagementService.create(eq(MinistryType.READER), any())).thenThrow(
+        when(ministryPersonManagementService.create(eq(READER_MINISTRY_ID), any())).thenThrow(
                 new BadRequestException("Campos não permitidos na criação escopada de pessoa: password",
                         "MINISTRY_PERSON_CREATE_FIELDS_INVALID"));
 
-        mockMvc.perform(post("/ministerios/READER/pessoas").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "X", "phoneNumber": "34999999999", "birthdayDate": "1990-01-01", "password": "abc"}
                                 """))
@@ -138,11 +152,11 @@ class MinistryPersonControllerTest {
 
     @Test
     void shouldReturnBadRequestWhenUpdateServiceRejectsPhoneNumberField() throws Exception {
-        when(ministryPersonManagementService.update(eq(MinistryType.READER), eq(1L), any())).thenThrow(
+        when(ministryPersonManagementService.update(eq(READER_MINISTRY_ID), eq(1L), any())).thenThrow(
                 new BadRequestException("Campos não permitidos na atualização escopada de pessoa: phoneNumber",
                         "MINISTRY_PERSON_UPDATE_FIELDS_INVALID"));
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/1").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "X", "birthdayDate": "1990-01-01", "phoneNumber": "34999999999"}
                                 """))
@@ -152,9 +166,9 @@ class MinistryPersonControllerTest {
 
     @Test
     void shouldReturnOkWhenUpdatingPerson() throws Exception {
-        when(ministryPersonManagementService.update(eq(MinistryType.READER), eq(1L), any())).thenReturn(response(1L));
+        when(ministryPersonManagementService.update(eq(READER_MINISTRY_ID), eq(1L), any())).thenReturn(response(1L));
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/1").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1", READER_MINISTRY_ID).with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
@@ -162,35 +176,35 @@ class MinistryPersonControllerTest {
 
     @Test
     void shouldReturnOkWhenAddingOrReactivatingVinculo() throws Exception {
-        when(ministryPersonManagementService.addOrReactivateMinistry(MinistryType.READER, 1L)).thenReturn(response(1L));
+        when(ministryPersonManagementService.addOrReactivateMinistry(READER_MINISTRY_ID, 1L)).thenReturn(response(1L));
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/1/vinculo").with(csrf()))
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1/vinculo", READER_MINISTRY_ID).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
     }
 
     @Test
     void shouldReturnConflictWhenAddingVinculoToInactivePerson() throws Exception {
-        when(ministryPersonManagementService.addOrReactivateMinistry(MinistryType.READER, 1L))
+        when(ministryPersonManagementService.addOrReactivateMinistry(READER_MINISTRY_ID, 1L))
                 .thenThrow(new MinistryPersonInactiveException());
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/1/vinculo").with(csrf()))
+        mockMvc.perform(put("/ministerios/{ministryId}/pessoas/1/vinculo", READER_MINISTRY_ID).with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("MINISTRY_PERSON_INACTIVE"));
     }
 
     @Test
     void shouldReturnNoContentWhenRemovingVinculo() throws Exception {
-        mockMvc.perform(delete("/ministerios/READER/pessoas/1/vinculo").with(csrf()))
+        mockMvc.perform(delete("/ministerios/{ministryId}/pessoas/1/vinculo", READER_MINISTRY_ID).with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void shouldReturnBadRequestWhenPageSizeAboveMaximum() throws Exception {
-        when(ministryPersonManagementService.findPeople(MinistryType.READER, 0, 500))
+        when(ministryPersonManagementService.findPeople(READER_MINISTRY_ID, 0, 500))
                 .thenThrow(new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100"));
 
-        mockMvc.perform(get("/ministerios/READER/pessoas").param("size", "500"))
+        mockMvc.perform(get("/ministerios/{ministryId}/pessoas", READER_MINISTRY_ID).param("size", "500"))
                 .andExpect(status().isBadRequest());
     }
 

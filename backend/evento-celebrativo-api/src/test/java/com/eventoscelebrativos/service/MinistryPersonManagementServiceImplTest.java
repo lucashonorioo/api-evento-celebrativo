@@ -4,11 +4,12 @@ import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
-import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinistryPersonMapper;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.service.impl.MinistryPersonManagementServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +23,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,6 +42,9 @@ class MinistryPersonManagementServiceImplTest {
     private MinistryPersonMapper ministryPersonMapper;
 
     @Mock
+    private MinistryRepository ministryRepository;
+
+    @Mock
     private PersonMinistryCommandService personMinistryCommandService;
 
     @Mock
@@ -52,13 +58,14 @@ class MinistryPersonManagementServiceImplTest {
 
     @Test
     void shouldListActivePeopleOfMinistry() {
+        Ministry ministry = mockMinistry(MinistryType.READER);
         Person person = person(1L);
         MinistryPersonResponseDTO dto = responseDto(1L);
         Page<Person> page = new PageImpl<>(List.of(person), PageRequest.of(0, 10), 1);
-        when(personMinistryReadService.findActivePeopleByMinistry(eq(MinistryType.READER), any())).thenReturn(page);
+        when(personMinistryReadService.findActivePeopleByMinistryId(eq(ministry.getId()), any())).thenReturn(page);
         when(ministryPersonMapper.toDto(person)).thenReturn(dto);
 
-        Page<MinistryPersonResponseDTO> result = service.findPeople(MinistryType.READER, 0, 10);
+        Page<MinistryPersonResponseDTO> result = service.findPeople(ministry.getId(), 0, 10);
 
         assertEquals(1, result.getTotalElements());
         assertSame(dto, result.getContent().get(0));
@@ -66,64 +73,80 @@ class MinistryPersonManagementServiceImplTest {
 
     @Test
     void shouldRejectNegativePageOnFindPeople() {
-        assertThrows(BadRequestException.class, () -> service.findPeople(MinistryType.READER, -1, 10));
+        assertThrows(BadRequestException.class, () -> service.findPeople(unitMinistry(MinistryType.READER).getId(), -1, 10));
         verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
     void shouldRejectPageSizeAboveMaximumOnFindPeople() {
-        assertThrows(BadRequestException.class, () -> service.findPeople(MinistryType.READER, 0, 101));
-        assertThrows(BadRequestException.class, () -> service.findPeople(MinistryType.READER, 0, 0));
+        assertThrows(BadRequestException.class, () -> service.findPeople(unitMinistry(MinistryType.READER).getId(), 0, 101));
+        assertThrows(BadRequestException.class, () -> service.findPeople(unitMinistry(MinistryType.READER).getId(), 0, 0));
         verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
-    void shouldRejectNullMinistryTypeOnFindPeople() {
-        assertThrows(BusinessException.class, () -> service.findPeople(null, 0, 10));
+    void shouldRejectInvalidMinistryIdOnFindPeople() {
+        assertThrows(BadRequestException.class, () -> service.findPeople(null, 0, 10));
+        assertThrows(BadRequestException.class, () -> service.findPeople(0L, 0, 10));
+        assertThrows(BadRequestException.class, () -> service.findPeople(-1L, 0, 10));
         verifyNoInteractions(personMinistryReadService);
     }
 
     @Test
     void shouldFindPersonByIdWithinMinistryScope() {
+        Ministry ministry = mockMinistry(MinistryType.COMMENTATOR);
         Person person = person(10L);
         MinistryPersonResponseDTO dto = responseDto(10L);
-        when(personMinistryCommandService.requireActiveMinistryPerson(10L, MinistryType.COMMENTATOR, "Pessoa"))
+        when(personMinistryCommandService.requireActiveMinistryPerson(10L, ministry, "Pessoa"))
                 .thenReturn(person);
         when(ministryPersonMapper.toDto(person)).thenReturn(dto);
 
-        assertSame(dto, service.findPersonById(MinistryType.COMMENTATOR, 10L));
+        assertSame(dto, service.findPersonById(ministry.getId(), 10L));
     }
 
     @Test
     void shouldPropagateResourceNotFoundWhenPersonOutsideMinistryScope() {
-        when(personMinistryCommandService.requireActiveMinistryPerson(10L, MinistryType.COMMENTATOR, "Pessoa"))
+        Ministry ministry = mockMinistry(MinistryType.COMMENTATOR);
+        when(personMinistryCommandService.requireActiveMinistryPerson(10L, ministry, "Pessoa"))
                 .thenThrow(new ResourceNotFoundException("Pessoa", 10L));
 
-        assertThrows(ResourceNotFoundException.class, () -> service.findPersonById(MinistryType.COMMENTATOR, 10L));
+        assertThrows(ResourceNotFoundException.class, () -> service.findPersonById(ministry.getId(), 10L));
+    }
+
+    @Test
+    void shouldThrowResourceNotFoundWhenMinistryIdDoesNotExist() {
+        Long missingMinistryId = 999L;
+        when(ministryRepository.findById(missingMinistryId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findPersonById(missingMinistryId, 10L));
+
+        verifyNoInteractions(personMinistryCommandService, personMinistryReadService, personCadastralUpdateService);
     }
 
     @Test
     void shouldCreatePersonAndDelegateToCommandService() {
+        Ministry ministry = mockMinistry(MinistryType.READER);
         MinistryPersonCreateRequestDTO request = new MinistryPersonCreateRequestDTO("Nova Pessoa", "34999999999", LocalDate.of(1990, 1, 1));
         Person mapped = person(null);
         Person saved = person(5L);
         MinistryPersonResponseDTO dto = responseDto(5L);
         when(ministryPersonMapper.toEntity(request)).thenReturn(mapped);
-        when(personMinistryCommandService.create(mapped, MinistryType.READER)).thenReturn(saved);
+        when(personMinistryCommandService.create(mapped, ministry)).thenReturn(saved);
         when(ministryPersonMapper.toDto(saved)).thenReturn(dto);
 
-        assertSame(dto, service.create(MinistryType.READER, request));
+        assertSame(dto, service.create(ministry.getId(), request));
 
-        verify(personMinistryCommandService).create(mapped, MinistryType.READER);
+        verify(personMinistryCommandService).create(mapped, ministry);
     }
 
     @Test
     void shouldUpdatePersonWithinMinistryScope() {
+        Ministry ministry = mockMinistry(MinistryType.READER);
         MinistryPersonUpdateRequestDTO request = new MinistryPersonUpdateRequestDTO("Nome Atualizado", LocalDate.of(1991, 2, 2));
         Person person = person(7L);
         Person saved = person(7L);
         MinistryPersonResponseDTO dto = responseDto(7L);
-        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(7L, MinistryType.READER, "Pessoa"))
+        when(personMinistryCommandService.requireActiveMinistryPersonForUpdate(7L, ministry, "Pessoa"))
                 .thenReturn(person);
         when(personCadastralUpdateService.updateCadastral(
                 person,
@@ -133,7 +156,7 @@ class MinistryPersonManagementServiceImplTest {
         )).thenReturn(saved);
         when(ministryPersonMapper.toDto(saved)).thenReturn(dto);
 
-        assertSame(dto, service.update(MinistryType.READER, 7L, request));
+        assertSame(dto, service.update(ministry.getId(), 7L, request));
 
         verify(personCadastralUpdateService).updateCadastral(
                 person,
@@ -145,29 +168,32 @@ class MinistryPersonManagementServiceImplTest {
 
     @Test
     void shouldAddOrReactivateMinistryDelegatingToCommandService() {
+        Ministry ministry = mockMinistry(MinistryType.EUCHARISTIC_MINISTER);
         Person person = person(3L);
         MinistryPersonResponseDTO dto = responseDto(3L);
-        when(personMinistryCommandService.addOrReactivateMinistry(3L, MinistryType.EUCHARISTIC_MINISTER)).thenReturn(person);
+        when(personMinistryCommandService.addOrReactivateMinistry(3L, ministry)).thenReturn(person);
         when(ministryPersonMapper.toDto(person)).thenReturn(dto);
 
-        assertSame(dto, service.addOrReactivateMinistry(MinistryType.EUCHARISTIC_MINISTER, 3L));
+        assertSame(dto, service.addOrReactivateMinistry(ministry.getId(), 3L));
     }
 
     @Test
     void shouldRemoveMinistryDelegatingToCommandService() {
-        service.removeMinistry(MinistryType.READER, 9L);
+        Ministry ministry = mockMinistry(MinistryType.READER);
 
-        verify(personMinistryCommandService).removeMinistry(9L, MinistryType.READER, "Pessoa");
+        service.removeMinistry(ministry.getId(), 9L);
+
+        verify(personMinistryCommandService).removeMinistry(9L, ministry, "Pessoa");
     }
 
     @Test
-    void shouldRejectNullMinistryTypeOnAllOperations() {
-        assertThrows(BusinessException.class, () -> service.findPersonById(null, 1L));
-        assertThrows(BusinessException.class, () -> service.create(null, new MinistryPersonCreateRequestDTO()));
-        assertThrows(BusinessException.class, () -> service.update(null, 1L, new MinistryPersonUpdateRequestDTO()));
-        assertThrows(BusinessException.class, () -> service.addOrReactivateMinistry(null, 1L));
-        assertThrows(BusinessException.class, () -> service.removeMinistry(null, 1L));
-        verifyNoInteractions(personMinistryCommandService, personMinistryReadService, personCadastralUpdateService);
+    void shouldRejectInvalidMinistryIdOnAllOperations() {
+        assertThrows(BadRequestException.class, () -> service.findPersonById(null, 1L));
+        assertThrows(BadRequestException.class, () -> service.create(null, new MinistryPersonCreateRequestDTO()));
+        assertThrows(BadRequestException.class, () -> service.update(null, 1L, new MinistryPersonUpdateRequestDTO()));
+        assertThrows(BadRequestException.class, () -> service.addOrReactivateMinistry(null, 1L));
+        assertThrows(BadRequestException.class, () -> service.removeMinistry(null, 1L));
+        verifyNoInteractions(ministryRepository, personMinistryCommandService, personMinistryReadService, personCadastralUpdateService);
     }
 
     private Person person(Long id) {
@@ -182,5 +208,11 @@ class MinistryPersonManagementServiceImplTest {
 
     private MinistryPersonResponseDTO responseDto(Long id) {
         return new MinistryPersonResponseDTO(id, "Pessoa " + id, "34970000000", LocalDate.of(1990, 1, 1));
+    }
+
+    private Ministry mockMinistry(MinistryType ministryType) {
+        Ministry ministry = unitMinistry(ministryType);
+        when(ministryRepository.findById(ministry.getId())).thenReturn(Optional.of(ministry));
+        return ministry;
     }
 }

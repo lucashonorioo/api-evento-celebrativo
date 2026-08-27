@@ -80,14 +80,15 @@ class ScopedDomainAuthorizationIntegrationTest {
         PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
+        Long ministryId = ministry.getMinistry().getId();
 
         authenticateAs(person.getId(), "ROLE_OPERATOR");
-        assertTrue(ministryAuthorizationService.canManageMinistry(MinistryType.READER));
+        assertTrue(ministryAuthorizationService.canManageMinistry(ministryId));
 
         ministry.revokeCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        assertFalse(ministryAuthorizationService.canManageMinistry(MinistryType.READER));
+        assertFalse(ministryAuthorizationService.canManageMinistry(ministryId));
     }
 
     @Test

@@ -1,10 +1,9 @@
 package com.eventoscelebrativos.service.impl;
 
-import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
-import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.MinistryAuthorizationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,23 +22,20 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
 
     private final AuthenticatedUserResolver authenticatedUserResolver;
     private final PersonMinistryRepository personMinistryRepository;
-    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public MinistryAuthorizationServiceImpl(
             AuthenticatedUserResolver authenticatedUserResolver,
-            PersonMinistryRepository personMinistryRepository,
-            LegacyMinistryTypeResolver legacyMinistryTypeResolver
+            PersonMinistryRepository personMinistryRepository
     ) {
         this.authenticatedUserResolver = authenticatedUserResolver;
         this.personMinistryRepository = personMinistryRepository;
-        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public boolean canManageMinistry(MinistryType ministryType) {
-        if (ministryType == null) {
-            return false;
+    public boolean canManageMinistry(Long ministryId) {
+        if (ministryId == null || ministryId <= 0) {
+            throw new BadRequestException("O Id do ministério deve ser positivo e não nulo");
         }
 
         AuthenticatedUser currentUser = authenticatedUserResolver.requireCurrentUser();
@@ -50,7 +46,7 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
             return false;
         }
         return personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
-                currentUser.personId(), legacyMinistryTypeResolver.requireMinistry(ministryType).getId());
+                currentUser.personId(), ministryId);
     }
 
     private boolean hasAuthority(AuthenticatedUser user, String authority) {

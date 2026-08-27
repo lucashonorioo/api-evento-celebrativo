@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Prova, com Spring Security e banco H2 reais (MinistryAuthorizationServiceImpl não mockado), a
- * feature/ministry-scoped-person-management: {@code /ministerios/{ministryType}/pessoas}. Cobre a
+ * feature/ministry-scoped-person-management: {@code /ministerios/{ministryId}/pessoas}. Cobre a
  * matriz de autorização, isolamento cross-ministry, ausência de UserAccount na criação escopada,
  * fail-closed de mass assignment, idempotência de vínculo, invariantes PASTOR/PRIEST e
  * ACTIVE/CANCELLED assignment na remoção, revogação imediata de coordenação e auto-remoção. Cada
@@ -193,40 +194,40 @@ class MinistryPersonManagementIntegrationTest {
     void anonymousIsUnauthorized() throws Exception {
         long targetId = createReader("Anonymous Scope Target");
 
-        mockMvc.perform(get("/ministerios/READER/pessoas")).andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + targetId)).andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/ministerios/READER/pessoas").contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(get(ministryPeoplePath(MinistryType.READER))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, targetId))).andExpect(status().isUnauthorized());
+        mockMvc.perform(post(ministryPeoplePath(MinistryType.READER)).contentType(MediaType.APPLICATION_JSON)
                         .content(createPayload("Anon Create")))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload("Anon Update")))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId + "/vinculo")).andExpect(status().isUnauthorized());
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + targetId + "/vinculo")).andExpect(status().isUnauthorized());
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId))).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, targetId))).andExpect(status().isUnauthorized());
     }
 
     private void assertScopedEndpoints(RequestPostProcessor actor, boolean allowed, long readerTargetId, int deniedStatus) throws Exception {
         int okList = allowed ? 200 : deniedStatus;
-        mockMvc.perform(get("/ministerios/READER/pessoas").with(actor)).andExpect(status().is(okList));
+        mockMvc.perform(get(ministryPeoplePath(MinistryType.READER)).with(actor)).andExpect(status().is(okList));
 
         int okDetail = allowed ? 200 : deniedStatus;
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + readerTargetId).with(actor)).andExpect(status().is(okDetail));
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, readerTargetId)).with(actor)).andExpect(status().is(okDetail));
 
         int okCreate = allowed ? 201 : deniedStatus;
-        mockMvc.perform(post("/ministerios/READER/pessoas").with(actor).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post(ministryPeoplePath(MinistryType.READER)).with(actor).contentType(MediaType.APPLICATION_JSON)
                         .content(createPayload("Matrix Create " + PHONE_SEQ.incrementAndGet())))
                 .andExpect(status().is(okCreate));
 
         int okUpdate = allowed ? 200 : deniedStatus;
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + readerTargetId).with(actor).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, readerTargetId)).with(actor).contentType(MediaType.APPLICATION_JSON)
                         .content(updatePayload("Matrix Update")))
                 .andExpect(status().is(okUpdate));
 
         int okVinculo = allowed ? 200 : deniedStatus;
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + readerTargetId + "/vinculo").with(actor))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, readerTargetId)).with(actor))
                 .andExpect(status().is(okVinculo));
 
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + readerTargetId + "/vinculo").with(actor))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, readerTargetId)).with(actor))
                 .andExpect(status().is(allowed ? 204 : deniedStatus));
     }
 
@@ -238,18 +239,18 @@ class MinistryPersonManagementIntegrationTest {
         long commentatorOnlyId = createCommentator("Commentator Only Target");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(get("/ministerios/COMMENTATOR/pessoas").with(coordinator)).andExpect(status().isForbidden());
-        mockMvc.perform(get("/ministerios/COMMENTATOR/pessoas/" + commentatorOnlyId).with(coordinator))
+        mockMvc.perform(get(ministryPeoplePath(MinistryType.COMMENTATOR)).with(coordinator)).andExpect(status().isForbidden());
+        mockMvc.perform(get(ministryPersonPath(MinistryType.COMMENTATOR, commentatorOnlyId)).with(coordinator))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/ministerios/COMMENTATOR/pessoas").with(coordinator).contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(post(ministryPeoplePath(MinistryType.COMMENTATOR)).with(coordinator).contentType(MediaType.APPLICATION_JSON)
                         .content(createPayload("Cross Create")))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(put("/ministerios/COMMENTATOR/pessoas/" + commentatorOnlyId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.COMMENTATOR, commentatorOnlyId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON).content(updatePayload("Cross Update")))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(put("/ministerios/COMMENTATOR/pessoas/" + commentatorOnlyId + "/vinculo").with(coordinator))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.COMMENTATOR, commentatorOnlyId)).with(coordinator))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/ministerios/COMMENTATOR/pessoas/" + commentatorOnlyId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.COMMENTATOR, commentatorOnlyId)).with(coordinator))
                 .andExpect(status().isForbidden());
     }
 
@@ -264,9 +265,9 @@ class MinistryPersonManagementIntegrationTest {
         personMinistryRepository.saveAndFlush(personMinistry(priest, MinistryType.PRIEST, ministryRepository));
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(delete("/ministerios/COMMENTATOR/pessoas/" + multiMinistryId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.COMMENTATOR, multiMinistryId)).with(coordinator))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/ministerios/PRIEST/pessoas/" + priestId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.PRIEST, priestId)).with(coordinator))
                 .andExpect(status().isForbidden());
 
         assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(multiMinistryId, MinistryType.READER).orElseThrow().getActive());
@@ -280,9 +281,9 @@ class MinistryPersonManagementIntegrationTest {
         long commentatorOnlyId = createCommentator("Scope Leak Target");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + commentatorOnlyId).with(coordinator))
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, commentatorOnlyId)).with(coordinator))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + commentatorOnlyId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, commentatorOnlyId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON).content(updatePayload("Leak Update")))
                 .andExpect(status().isNotFound());
     }
@@ -296,15 +297,15 @@ class MinistryPersonManagementIntegrationTest {
         personRepository.saveAndFlush(inactiveTarget);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(get("/ministerios/READER/pessoas").with(coordinator))
+        mockMvc.perform(get(ministryPeoplePath(MinistryType.READER)).with(coordinator))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(inactiveTargetId)).isEmpty());
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + inactiveTargetId).with(coordinator))
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, inactiveTargetId)).with(coordinator))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + inactiveTargetId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, inactiveTargetId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON).content(updatePayload("Inactive Update")))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + inactiveTargetId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, inactiveTargetId)).with(coordinator))
                 .andExpect(status().isNotFound());
 
         Person unchangedPerson = personRepository.findById(inactiveTargetId).orElseThrow();
@@ -321,7 +322,7 @@ class MinistryPersonManagementIntegrationTest {
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
         String phone = String.valueOf(PHONE_SEQ.incrementAndGet());
 
-        String response = mockMvc.perform(post("/ministerios/READER/pessoas").with(coordinator)
+        String response = mockMvc.perform(post(ministryPeoplePath(MinistryType.READER)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Criado Pelo Coordenador", "phoneNumber": "%s", "birthdayDate": "1995-05-05"}
@@ -365,7 +366,7 @@ class MinistryPersonManagementIntegrationTest {
             String payload = """
                     {"name": "X", "phoneNumber": "%s", "birthdayDate": "1995-05-05", "%s": %s}
                     """.formatted(phone, field[0], field[1]);
-            mockMvc.perform(post("/ministerios/READER/pessoas").with(coordinator)
+            mockMvc.perform(post(ministryPeoplePath(MinistryType.READER)).with(coordinator)
                             .contentType(MediaType.APPLICATION_JSON).content(payload))
                     .andExpect(status().isBadRequest());
             assertTrue(personRepository.findByPhoneNumber(phone).isEmpty(), field[0]);
@@ -380,7 +381,7 @@ class MinistryPersonManagementIntegrationTest {
         long existingId = createCommentator("Existing Person No Reader Yet");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + existingId + "/vinculo").with(coordinator))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, existingId)).with(coordinator))
                 .andExpect(status().isOk());
 
         PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(existingId, MinistryType.READER).orElseThrow();
@@ -399,7 +400,7 @@ class MinistryPersonManagementIntegrationTest {
         personMinistryRepository.saveAndFlush(ministry);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId + "/vinculo").with(coordinator))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isOk());
 
         PersonMinistry reactivated = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
@@ -416,7 +417,7 @@ class MinistryPersonManagementIntegrationTest {
         personMinistryRepository.saveAndFlush(ministry);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId + "/vinculo").with(coordinator))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isOk());
 
         PersonMinistry unchanged = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
@@ -433,7 +434,7 @@ class MinistryPersonManagementIntegrationTest {
         personRepository.saveAndFlush(target);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId + "/vinculo").with(coordinator))
+        mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("MINISTRY_PERSON_INACTIVE"));
     }
@@ -446,7 +447,7 @@ class MinistryPersonManagementIntegrationTest {
         long targetId = createReader("Update Target Original");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Nome Atualizado Pelo Coordenador", "birthdayDate": "1988-03-03"}
@@ -458,14 +459,14 @@ class MinistryPersonManagementIntegrationTest {
         assertEquals("Nome Atualizado Pelo Coordenador", updated.getName());
         assertEquals(LocalDate.of(1988, 3, 3), updated.getBirthdayDate());
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "X", "birthdayDate": "1988-03-03", "phoneNumber": "34988887777"}
                                 """))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "X", "birthdayDate": "1988-03-03", "active": false}
@@ -501,7 +502,7 @@ class MinistryPersonManagementIntegrationTest {
             String payload = """
                     {"name": "X", "birthdayDate": "1988-03-03", "%s": %s}
                     """.formatted(field[0], field[1]);
-            mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).with(coordinator)
+            mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)
                             .contentType(MediaType.APPLICATION_JSON).content(payload))
                     .andExpect(status().isBadRequest());
         }
@@ -522,7 +523,7 @@ class MinistryPersonManagementIntegrationTest {
         userAccountRepository.saveAndFlush(account);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(put("/ministerios/READER/pessoas/" + targetId).with(coordinator)
+        mockMvc.perform(put(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Nome Com Conta Atualizado", "birthdayDate": "1980-01-01"}
@@ -545,7 +546,7 @@ class MinistryPersonManagementIntegrationTest {
         personMinistryRepository.saveAndFlush(personMinistry(target, MinistryType.COMMENTATOR, ministryRepository));
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + targetId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isNoContent());
 
         PersonMinistry readerMinistry = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
@@ -576,11 +577,11 @@ class MinistryPersonManagementIntegrationTest {
         celebrationEventRepository.saveAndFlush(futureCancelledEvent);
         eventAssignmentRepository.saveAndFlush(new EventAssignment(futureCancelledEvent, cancelledOnlyPerson, EventAssignmentType.READER));
 
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + activeBlockedTargetId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, activeBlockedTargetId)).with(coordinator))
                 .andExpect(status().isConflict());
         assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(activeBlockedTargetId, MinistryType.READER).orElseThrow().getActive());
 
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + cancelledOnlyTargetId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, cancelledOnlyTargetId)).with(coordinator))
                 .andExpect(status().isNoContent());
         assertFalse(personMinistryRepository.findByPersonIdAndMinistryType(cancelledOnlyTargetId, MinistryType.READER).orElseThrow().getActive());
     }
@@ -596,7 +597,7 @@ class MinistryPersonManagementIntegrationTest {
         createdStaffPersonIds.add(pastorId);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(delete("/ministerios/PRIEST/pessoas/" + pastorId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.PRIEST, pastorId)).with(coordinator))
                 .andExpect(status().isConflict());
         assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(pastorId, MinistryType.PRIEST).orElseThrow().getActive());
     }
@@ -609,13 +610,13 @@ class MinistryPersonManagementIntegrationTest {
         long targetId = createReader("Immediate Revoke Target");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + targetId).with(coordinator)).andExpect(status().isOk());
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)).andExpect(status().isOk());
 
         PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(coordinatorId, MinistryType.READER).orElseThrow();
         ministry.revokeCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        mockMvc.perform(get("/ministerios/READER/pessoas/" + targetId).with(coordinator)).andExpect(status().isForbidden());
+        mockMvc.perform(get(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)).andExpect(status().isForbidden());
     }
 
     @Test
@@ -623,14 +624,14 @@ class MinistryPersonManagementIntegrationTest {
         long coordinatorId = createReaderCoordinator("Self Removal Coordinator");
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
-        mockMvc.perform(delete("/ministerios/READER/pessoas/" + coordinatorId + "/vinculo").with(coordinator))
+        mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, coordinatorId)).with(coordinator))
                 .andExpect(status().isNoContent());
 
         PersonMinistry selfMinistry = personMinistryRepository.findByPersonIdAndMinistryType(coordinatorId, MinistryType.READER).orElseThrow();
         assertFalse(selfMinistry.getActive());
         assertFalse(selfMinistry.getCoordinator());
 
-        mockMvc.perform(get("/ministerios/READER/pessoas").with(coordinator)).andExpect(status().isForbidden());
+        mockMvc.perform(get(ministryPeoplePath(MinistryType.READER)).with(coordinator)).andExpect(status().isForbidden());
     }
 
     // --- Regressao: endpoints administrativos globais continuam ROLE_ADMIN-only ---
@@ -653,9 +654,9 @@ class MinistryPersonManagementIntegrationTest {
                                 {"ministries": ["READER"]}
                                 """))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(put("/pessoas/" + coordinatorId + "/ministries/READER/coordinator").with(coordinator))
+        mockMvc.perform(put(ministryCoordinatorPath(coordinatorId, MinistryType.READER)).with(coordinator))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(delete("/pessoas/" + coordinatorId + "/ministries/READER/coordinator").with(coordinator))
+        mockMvc.perform(delete(ministryCoordinatorPath(coordinatorId, MinistryType.READER)).with(coordinator))
                 .andExpect(status().isForbidden());
     }
 
@@ -735,5 +736,25 @@ class MinistryPersonManagementIntegrationTest {
             throw new IllegalStateException("Resposta sem campo id: " + jsonResponse);
         }
         return Long.parseLong(matcher.group(1));
+    }
+
+    private String ministryPeoplePath(MinistryType ministryType) {
+        return "/ministerios/" + ministryId(ministryType) + "/pessoas";
+    }
+
+    private String ministryPersonPath(MinistryType ministryType, long personId) {
+        return ministryPeoplePath(ministryType) + "/" + personId;
+    }
+
+    private String ministryVinculoPath(MinistryType ministryType, long personId) {
+        return ministryPersonPath(ministryType, personId) + "/vinculo";
+    }
+
+    private String ministryCoordinatorPath(long personId, MinistryType ministryType) {
+        return "/pessoas/" + personId + "/ministries/" + ministryId(ministryType) + "/coordinator";
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType)).orElseThrow().getId();
     }
 }

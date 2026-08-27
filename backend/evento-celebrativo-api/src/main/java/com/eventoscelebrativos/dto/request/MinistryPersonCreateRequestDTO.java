@@ -12,7 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Criacao escopada de pessoa por um coordenador ({@code POST /ministerios/{ministryType}/pessoas}).
+ * Criacao escopada de pessoa por um coordenador ({@code POST /ministerios/{ministryId}/pessoas}).
  * Aceita somente name, phoneNumber e birthdayDate: nunca cria {@code UserAccount}. Qualquer outro
  * campo no corpo - inclusive password, createAccess, accessRole, role, roles, ministries, active,
  * personActive, accountEnabled, coordinator, ou campo desconhecido - e capturado por

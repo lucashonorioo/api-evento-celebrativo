@@ -244,7 +244,7 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
             ready.countDown();
             await(start);
             try {
-                ministryCoordinationService.grantCoordinator(personId, "READER");
+                ministryCoordinationService.grantCoordinator(personId, ministryId(MinistryType.READER));
                 return null;
             } catch (Exception exception) {
                 return exception;
@@ -257,7 +257,7 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
             ready.countDown();
             await(start);
             try {
-                ministryCoordinationService.revokeCoordinator(personId, "READER");
+                ministryCoordinationService.revokeCoordinator(personId, ministryId(MinistryType.READER));
                 return null;
             } catch (Exception exception) {
                 return exception;
@@ -300,6 +300,14 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
                         + "VALUES (?, ?, (SELECT id FROM tb_ministry WHERE normalized_name = ?), "
                         + "TRUE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
                 personId, ministryType.name(), normalizedName(ministryType));
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM tb_ministry WHERE normalized_name = ?",
+                Long.class,
+                normalizedName(ministryType)
+        );
     }
 
     private String uniquePhoneNumber() {

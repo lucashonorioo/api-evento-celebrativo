@@ -11,7 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Atualizacao escopada de pessoa por um coordenador ({@code PUT /ministerios/{ministryType}/pessoas/{personId}}).
+ * Atualizacao escopada de pessoa por um coordenador ({@code PUT /ministerios/{ministryId}/pessoas/{personId}}).
  * Aceita somente name e birthdayDate: phoneNumber nunca pode ser alterado por este fluxo (usado por
  * UserAccount/username). Qualquer outro campo no corpo - inclusive phoneNumber, password, roles,
  * ministries, active, personActive, account, accountEnabled, enabled, username, coordinator,
