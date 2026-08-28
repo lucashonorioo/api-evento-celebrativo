@@ -151,8 +151,13 @@ class PersonMinistryReadServiceImplTest {
             }
 
             @Override
-            public String getMinistryNormalizedName() {
-                return unitMinistry(ministryType).getNormalizedName();
+            public String getMinistryName() {
+                return unitMinistry(ministryType).getName();
+            }
+
+            @Override
+            public Boolean getCoordinator() {
+                return false;
             }
         };
     }

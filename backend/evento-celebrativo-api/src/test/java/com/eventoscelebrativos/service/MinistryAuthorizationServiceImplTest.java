@@ -1,6 +1,9 @@
 package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.model.Ministry;
+import com.eventoscelebrativos.model.MinistryType;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
@@ -14,11 +17,14 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +40,9 @@ class MinistryAuthorizationServiceImplTest {
     private AuthenticatedUserResolver authenticatedUserResolver;
 
     @Mock
+    private MinistryRepository ministryRepository;
+
+    @Mock
     private PersonMinistryRepository personMinistryRepository;
 
     private MinistryAuthorizationServiceImpl service;
@@ -42,6 +51,7 @@ class MinistryAuthorizationServiceImplTest {
     void setUp() {
         service = new MinistryAuthorizationServiceImpl(
                 authenticatedUserResolver,
+                ministryRepository,
                 personMinistryRepository
         );
     }
@@ -60,12 +70,14 @@ class MinistryAuthorizationServiceImplTest {
 
         assertTrue(service.canManageMinistry(READER_MINISTRY_ID));
 
+        verifyNoInteractions(ministryRepository);
         verifyNoInteractions(personMinistryRepository);
     }
 
     @Test
     void operatorCoordinatingRequestedMinistryIdCanManageIt() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, true);
 
         assertTrue(service.canManageMinistry(READER_MINISTRY_ID));
@@ -74,6 +86,7 @@ class MinistryAuthorizationServiceImplTest {
     @Test
     void operatorCoordinatingReaderCannotManageCommentator() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(COMMENTATOR_MINISTRY_ID);
         mockCoordinatorStatus(COMMENTATOR_MINISTRY_ID, false);
 
         assertFalse(service.canManageMinistry(COMMENTATOR_MINISTRY_ID));
@@ -82,6 +95,7 @@ class MinistryAuthorizationServiceImplTest {
     @Test
     void operatorMemberOfMinistryWithoutCoordinationCannotManageIt() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, false);
 
         assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
@@ -90,6 +104,7 @@ class MinistryAuthorizationServiceImplTest {
     @Test
     void operatorWithoutAnyPersonMinistryCannotManage() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, false);
 
         assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
@@ -98,6 +113,9 @@ class MinistryAuthorizationServiceImplTest {
     @Test
     void operatorCoordinatingMultipleMinistriesOnlyManagesEachCorrespondingOne() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
+        mockActiveMinistry(COMMENTATOR_MINISTRY_ID);
+        mockActiveMinistry(EUCHARISTIC_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, true);
         mockCoordinatorStatus(COMMENTATOR_MINISTRY_ID, true);
         mockCoordinatorStatus(EUCHARISTIC_MINISTRY_ID, false);
@@ -112,6 +130,7 @@ class MinistryAuthorizationServiceImplTest {
         // PARISH_SECRETARY nao concede autoridade ministerial: o service nunca consulta
         // ParishStaffAssignment, entao a decisao depende exclusivamente da coordenacao ministerial.
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, false);
 
         assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
@@ -120,9 +139,23 @@ class MinistryAuthorizationServiceImplTest {
     @Test
     void pastorWithoutCoordinationCannotManageMinistry() {
         when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        mockActiveMinistry(READER_MINISTRY_ID);
         mockCoordinatorStatus(READER_MINISTRY_ID, false);
 
         assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
+    }
+
+    @Test
+    void operatorCoordinatorCannotManageInactiveMinistry() {
+        when(authenticatedUserResolver.requireCurrentUser()).thenReturn(userWith("ROLE_OPERATOR"));
+        Ministry reader = unitMinistry(MinistryType.READER);
+        reader.deactivate();
+        when(ministryRepository.findById(READER_MINISTRY_ID)).thenReturn(Optional.of(reader));
+
+        assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
+
+        verify(personMinistryRepository, org.mockito.Mockito.never())
+                .existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(PERSON_ID, READER_MINISTRY_ID);
     }
 
     @Test
@@ -132,6 +165,7 @@ class MinistryAuthorizationServiceImplTest {
         assertThrows(BadRequestException.class, () -> service.canManageMinistry(-1L));
 
         verifyNoInteractions(authenticatedUserResolver);
+        verifyNoInteractions(ministryRepository);
         verifyNoInteractions(personMinistryRepository);
     }
 
@@ -141,7 +175,17 @@ class MinistryAuthorizationServiceImplTest {
 
         assertFalse(service.canManageMinistry(READER_MINISTRY_ID));
 
+        verifyNoInteractions(ministryRepository);
         verifyNoInteractions(personMinistryRepository);
+    }
+
+    private void mockActiveMinistry(Long ministryId) {
+        Ministry ministry = unitMinistry(ministryId.equals(READER_MINISTRY_ID)
+                ? MinistryType.READER
+                : ministryId.equals(COMMENTATOR_MINISTRY_ID)
+                        ? MinistryType.COMMENTATOR
+                        : MinistryType.EUCHARISTIC_MINISTER);
+        when(ministryRepository.findById(ministryId)).thenReturn(Optional.of(ministry));
     }
 
     private void mockCoordinatorStatus(Long ministryId, boolean canManage) {

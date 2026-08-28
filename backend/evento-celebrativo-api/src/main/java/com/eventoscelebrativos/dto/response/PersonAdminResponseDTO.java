@@ -1,7 +1,5 @@
 package com.eventoscelebrativos.dto.response;
 
-import com.eventoscelebrativos.model.MinistryType;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +11,7 @@ public class PersonAdminResponseDTO {
     private String phoneNumber;
     private LocalDate birthdayDate;
     private boolean personActive;
-    private List<MinistryType> ministries = new ArrayList<>();
+    private List<MinistrySummaryDTO> ministries = new ArrayList<>();
     private boolean accountExists;
     private Boolean accountEnabled;
     private String username;
@@ -28,7 +26,7 @@ public class PersonAdminResponseDTO {
             String phoneNumber,
             LocalDate birthdayDate,
             boolean personActive,
-            List<MinistryType> ministries,
+            List<MinistrySummaryDTO> ministries,
             boolean accountExists,
             Boolean accountEnabled,
             String username,
@@ -86,11 +84,11 @@ public class PersonAdminResponseDTO {
         this.personActive = personActive;
     }
 
-    public List<MinistryType> getMinistries() {
+    public List<MinistrySummaryDTO> getMinistries() {
         return ministries;
     }
 
-    public void setMinistries(List<MinistryType> ministries) {
+    public void setMinistries(List<MinistrySummaryDTO> ministries) {
         this.ministries = ministries;
     }
 

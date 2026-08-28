@@ -22,10 +22,10 @@
 
     <div class="admin-users__field">
       <label for="user-ministry">Ministério</label>
-      <select id="user-ministry" formControlName="ministry">
+      <select id="user-ministry" formControlName="ministryId">
         <option value="">Todos</option>
-        @for (option of ministryTypeOptions; track option.value) {
-          <option [value]="option.value">{{ option.label }}</option>
+        @for (ministry of ministryCatalog(); track ministry.id) {
+          <option [value]="ministry.id">{{ ministry.name }}</option>
         }
       </select>
     </div>
@@ -102,6 +102,12 @@
     @if (errorMessage()) {
       <p class="admin-users__feedback admin-users__feedback--error" role="alert">
         {{ errorMessage() }}
+      </p>
+    }
+
+    @if (ministryCatalogErrorMessage()) {
+      <p class="admin-users__feedback admin-users__feedback--error" role="alert">
+        {{ ministryCatalogErrorMessage() }}
       </p>
     }
   </div>
@@ -309,15 +315,15 @@
                         >
                           <legend>Ministérios da pessoa</legend>
 
-                          @for (option of ministryTypeOptions; track option.value) {
+                          @for (ministry of activeMinistryOptions(); track ministry.id) {
                             <label class="admin-users__role-option">
                               <input
                                 type="checkbox"
-                                [id]="ministryCheckboxId(person, option.value)"
-                                [checked]="isMinistrySelected(option.value)"
-                                (change)="toggleMinistry(option.value)"
+                                [id]="ministryCheckboxId(person, ministry.id)"
+                                [checked]="isMinistrySelected(ministry.id)"
+                                (change)="toggleMinistry(ministry.id)"
                               />
-                              <span>{{ option.label }}</span>
+                              <span>{{ ministry.name }}</span>
                             </label>
                           }
                         </fieldset>

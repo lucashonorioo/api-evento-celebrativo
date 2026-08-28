@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -260,9 +261,9 @@ class MinisterialAccessLifecycleIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "ministries": ["READER", "COMMENTATOR"]
+                                  "ministryIds": [%d, %d]
                                 }
-                                """))
+                                """.formatted(ministryId(MinistryType.READER), ministryId(MinistryType.COMMENTATOR))))
                 .andReturn();
 
         assertEquals(200, result.getResponse().getStatus(), result.getResponse().getContentAsString());
@@ -429,6 +430,12 @@ class MinisterialAccessLifecycleIntegrationTest {
         }
         personMinistryRepository.saveAndFlush(personMinistry(person, endpoint.ministryType(), ministryRepository));
         return person;
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
     }
 
     private void createConflictingAccountUsername(String username) {

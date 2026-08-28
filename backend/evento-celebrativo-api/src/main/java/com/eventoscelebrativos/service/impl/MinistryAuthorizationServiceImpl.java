@@ -1,6 +1,8 @@
 package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.model.Ministry;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.security.AuthenticatedUser;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
@@ -8,12 +10,6 @@ import com.eventoscelebrativos.service.MinistryAuthorizationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Bean nomeado explicitamente ({@code ministryAuthorizationService}) para uso estável em expressões
- * futuras de {@code @PreAuthorize}. Consulta apenas o principal já validado pelo converter JWT
- * ({@link AuthenticatedUserResolver}) e uma leitura pontual de {@code PersonMinistry}; não recarrega
- * UserAccount/Person/roles (isso já foi feito na entrada da requisição) e não mantém nenhum cache.
- */
 @Service("ministryAuthorizationService")
 public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationService {
 
@@ -21,13 +17,16 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
     private static final String ROLE_OPERATOR = "ROLE_OPERATOR";
 
     private final AuthenticatedUserResolver authenticatedUserResolver;
+    private final MinistryRepository ministryRepository;
     private final PersonMinistryRepository personMinistryRepository;
 
     public MinistryAuthorizationServiceImpl(
             AuthenticatedUserResolver authenticatedUserResolver,
+            MinistryRepository ministryRepository,
             PersonMinistryRepository personMinistryRepository
     ) {
         this.authenticatedUserResolver = authenticatedUserResolver;
+        this.ministryRepository = ministryRepository;
         this.personMinistryRepository = personMinistryRepository;
     }
 
@@ -35,7 +34,7 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
     @Transactional(readOnly = true)
     public boolean canManageMinistry(Long ministryId) {
         if (ministryId == null || ministryId <= 0) {
-            throw new BadRequestException("O Id do ministério deve ser positivo e não nulo");
+            throw new BadRequestException("O Id do ministerio deve ser positivo e nao nulo");
         }
 
         AuthenticatedUser currentUser = authenticatedUserResolver.requireCurrentUser();
@@ -43,6 +42,12 @@ public class MinistryAuthorizationServiceImpl implements MinistryAuthorizationSe
             return true;
         }
         if (!hasAuthority(currentUser, ROLE_OPERATOR)) {
+            return false;
+        }
+        boolean activeMinistry = ministryRepository.findById(ministryId)
+                .map(Ministry::isActive)
+                .orElse(false);
+        if (!activeMinistry) {
             return false;
         }
         return personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
