@@ -21,6 +21,8 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
 
     boolean existsByPersonIdAndMinistryId(Long personId, Long ministryId);
 
+    boolean existsByMinistryIdAndActiveTrue(Long ministryId);
+
     /**
      * Usada pela autorizacao escopada de dominio ({@code MinistryAuthorizationService}) para decidir,
      * a cada requisicao, se a Person autenticada pode administrar o Ministry persistente informado.
@@ -137,7 +139,8 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
     @Query("""
             SELECT pm.person.id AS personId,
                    pm.ministry.id AS ministryId,
-                   pm.ministry.normalizedName AS ministryNormalizedName
+                   pm.ministry.name AS ministryName,
+                   pm.coordinator AS coordinator
             FROM PersonMinistry pm
             WHERE pm.active = TRUE
               AND pm.person.id IN :personIds
@@ -219,7 +222,9 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
 
         Long getMinistryId();
 
-        String getMinistryNormalizedName();
+        String getMinistryName();
+
+        Boolean getCoordinator();
     }
 
     interface PersonMinistryCatalogStatusView {

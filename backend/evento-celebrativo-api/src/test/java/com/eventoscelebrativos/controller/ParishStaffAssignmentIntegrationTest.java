@@ -220,7 +220,7 @@ class ParishStaffAssignmentIntegrationTest {
 
         mockMvc.perform(put("/pessoas/" + priestId + "/ministries")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ministries\": []}"))
+                        .content("{\"ministryIds\": []}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("PASTOR_PRIEST_MINISTRY_REQUIRED"));
 

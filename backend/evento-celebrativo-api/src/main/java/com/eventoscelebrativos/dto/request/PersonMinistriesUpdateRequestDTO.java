@@ -6,21 +6,21 @@ import java.util.List;
 
 public class PersonMinistriesUpdateRequestDTO {
 
-    @NotNull(message = "O campo ministries não pode ser nulo")
-    private List<String> ministries;
+    @NotNull(message = "O campo ministryIds nao pode ser nulo")
+    private List<Long> ministryIds;
 
     public PersonMinistriesUpdateRequestDTO() {
     }
 
-    public PersonMinistriesUpdateRequestDTO(List<String> ministries) {
-        this.ministries = ministries;
+    public PersonMinistriesUpdateRequestDTO(List<Long> ministryIds) {
+        this.ministryIds = ministryIds;
     }
 
-    public List<String> getMinistries() {
-        return ministries;
+    public List<Long> getMinistryIds() {
+        return ministryIds;
     }
 
-    public void setMinistries(List<String> ministries) {
-        this.ministries = ministries;
+    public void setMinistryIds(List<Long> ministryIds) {
+        this.ministryIds = ministryIds;
     }
 }

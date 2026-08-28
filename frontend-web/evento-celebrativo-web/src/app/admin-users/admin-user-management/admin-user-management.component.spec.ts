@@ -7,8 +7,11 @@ import { of, Subject, throwError } from 'rxjs';
 
 import { AuthSessionService } from '../../auth-session.service';
 import {
+  MinistryCatalogItem,
+  MinistrySummary,
   PersonAdmin,
   PersonAdminPage,
+  PersonMinistryMembership,
   PersonMinistriesResponse,
   PersonRoleUpdateResponse,
 } from '../admin-user.models';
@@ -33,6 +36,7 @@ describe('AdminUserManagementComponent', () => {
       'findAll',
       'findById',
       'updateRole',
+      'findMinistryCatalog',
       'findMinistries',
       'updateMinistries',
     ]);
@@ -40,6 +44,7 @@ describe('AdminUserManagementComponent', () => {
       'getUsername',
     ]);
     adminUserService.findAll.and.returnValue(of(page));
+    adminUserService.findMinistryCatalog.and.returnValue(of(ministryCatalog()));
     adminUserService.findMinistries.and.returnValue(of(ministriesResponse()));
     authSessionService.getUsername.and.returnValue(username);
 
@@ -67,6 +72,7 @@ describe('AdminUserManagementComponent', () => {
       'findAll',
       'findById',
       'updateRole',
+      'findMinistryCatalog',
       'findMinistries',
       'updateMinistries',
     ]);
@@ -74,6 +80,7 @@ describe('AdminUserManagementComponent', () => {
       'getUsername',
     ]);
     adminUserService.findAll.and.returnValue(throwError(() => error));
+    adminUserService.findMinistryCatalog.and.returnValue(of(ministryCatalog()));
     authSessionService.getUsername.and.returnValue(username);
 
     await TestBed.configureTestingModule({
@@ -197,19 +204,19 @@ describe('AdminUserManagementComponent', () => {
     });
   });
 
-  it('should apply filters explicitly with the official ministry value and return to the first page', async () => {
+  it('should apply filters explicitly with the selected ministryId and return to the first page', async () => {
     await setup();
 
     setInputValue('#user-name', '  Maria  ');
     setInputValue('#user-phone', ' 3499 ');
-    setSelectValue('#user-ministry', 'MINISTER_OF_THE_WORD');
+    setSelectValue('#user-ministry', '3');
     setSelectValue('#user-role', 'ROLE_ADMIN');
     submitFilters();
 
     expect(adminUserService.findAll).toHaveBeenCalledWith({
       name: 'Maria',
       phoneNumber: '3499',
-      ministry: 'MINISTER_OF_THE_WORD',
+      ministryId: 3,
       role: 'ROLE_ADMIN',
       personActive: undefined,
       accountExists: undefined,
@@ -410,16 +417,16 @@ describe('AdminUserManagementComponent', () => {
     expect(adminUserService.findAll).toHaveBeenCalledWith({ page: 2, size: 10 });
   });
 
-  it('should render the five ministry labels in the filter and in the panel', async () => {
+  it('should render ministry labels from the dynamic catalog', async () => {
     await setup();
 
     const filterText = query('#user-ministry').textContent ?? '';
 
-    expect(filterText).toContain('Padre');
-    expect(filterText).toContain('Leitor');
-    expect(filterText).toContain('Comentarista');
-    expect(filterText).toContain('Ministro da Palavra');
-    expect(filterText).toContain('Ministro da Eucaristia');
+    expect(adminUserService.findMinistryCatalog).toHaveBeenCalledTimes(1);
+    expect(filterText).toContain('Presbiteros');
+    expect(filterText).toContain('Leitores');
+    expect(filterText).toContain('Comentaristas');
+    expect(filterText).toContain('Acolitos');
   });
 
   it('should display zero, one and multiple ministries without picking only the first one', async () => {
@@ -427,11 +434,15 @@ describe('AdminUserManagementComponent', () => {
       pageResponse({
         content: [
           person({ id: 1, ministries: [] }),
-          person({ id: 2, name: 'João Souza', ministries: ['PRIEST'] }),
+          person({ id: 2, name: 'João Souza', ministries: [ministrySummary(1, 'Presbiteros')] }),
           person({
             id: 3,
             name: 'Ana Lima',
-            ministries: ['READER', 'COMMENTATOR', 'MINISTER_OF_THE_WORD'],
+            ministries: [
+              ministrySummary(2, 'Leitores'),
+              ministrySummary(3, 'Comentaristas'),
+              ministrySummary(9, 'Salmistas'),
+            ],
           }),
         ],
         totalElements: 3,
@@ -441,8 +452,8 @@ describe('AdminUserManagementComponent', () => {
     const cells = queryAll('[data-label="Ministérios"]').map((cell) => cell.textContent?.trim());
 
     expect(cells[0]).toBe('Sem ministérios');
-    expect(cells[1]).toBe('Padre');
-    expect(cells[2]).toBe('Leitor, Comentarista, Ministro da Palavra');
+    expect(cells[1]).toBe('Presbiteros');
+    expect(cells[2]).toBe('Leitores, Comentaristas, Salmistas');
   });
 
   describe('person and account display', () => {
@@ -609,7 +620,7 @@ describe('AdminUserManagementComponent', () => {
             name: 'João Souza',
             phoneNumber: '34888888888',
             username: '34888888888',
-            ministries: ['PRIEST'],
+            ministries: [ministrySummary(1, 'Presbiteros')],
             roles: ['ROLE_OPERATOR'],
           }),
         ],
@@ -623,7 +634,7 @@ describe('AdminUserManagementComponent', () => {
 
     expect(queryAll('.admin-users__details-row').length).toBe(1);
     expect(query('.admin-users__details-row').textContent).toContain('João Souza');
-    expect(query('.admin-users__details-row').textContent).toContain('Padre');
+    expect(query('.admin-users__details-row').textContent).toContain('Presbiteros');
     expect(confirmButton().disabled).toBeTrue();
   });
 
@@ -925,45 +936,67 @@ describe('AdminUserManagementComponent', () => {
     expect(text).not.toContain('"roles"');
   });
 
-  it('should open the ministries panel, request the GET and load the official set', async () => {
-    await setup(pageResponse({ content: [person({ ministries: ['READER', 'COMMENTATOR'] })] }));
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['PRIEST'] })));
+  it('should open the ministries panel, request the GET and load the persisted ministries', async () => {
+    await setup(
+      pageResponse({
+        content: [
+          person({
+            ministries: [ministrySummary(2, 'Leitores'), ministrySummary(3, 'Comentaristas')],
+          }),
+        ],
+      }),
+    );
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(1, 'Presbiteros')] })),
+    );
 
     clickButton('Gerenciar ministérios');
 
     expect(adminUserService.findMinistries).toHaveBeenCalledOnceWith(1);
-    expect(ministryCheckbox(1, 'PRIEST').checked).toBeTrue();
-    expect(ministryCheckbox(1, 'READER').checked).toBeFalse();
-    expect(ministryCheckbox(1, 'COMMENTATOR').checked).toBeFalse();
+    expect(ministryCheckbox(1, 1).checked).toBeTrue();
+    expect(ministryCheckbox(1, 2).checked).toBeFalse();
+    expect(ministryCheckbox(1, 3).checked).toBeFalse();
   });
 
-  it('should render the five ministry checkboxes in the panel', async () => {
+  it('should render only active ministry checkboxes from the dynamic catalog in the panel', async () => {
     await setup();
 
     clickButton('Gerenciar ministérios');
 
-    expect(queryAll('#ministries-panel-1 input[type="checkbox"]').length).toBe(5);
+    const panelText = query('#ministries-panel-1').textContent ?? '';
+
+    expect(queryAll('#ministries-panel-1 input[type="checkbox"]').length).toBe(3);
+    expect(panelText).toContain('Presbiteros');
+    expect(panelText).toContain('Leitores');
+    expect(panelText).toContain('Comentaristas');
+    expect(panelText).not.toContain('Acolitos');
   });
 
   it('should save the full set of selected ministries', async () => {
-    await setup(pageResponse({ content: [person({ ministries: ['READER'] })] }));
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+    await setup(pageResponse({ content: [person({ ministries: [ministrySummary(2, 'Leitores')] })] }));
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+    );
     const updateResponse = new Subject<PersonMinistriesResponse>();
     adminUserService.updateMinistries.and.returnValue(updateResponse.asObservable());
 
     clickButton('Gerenciar ministérios');
-    toggleMinistryCheckbox(1, 'COMMENTATOR');
-    toggleMinistryCheckbox(1, 'PRIEST');
+    toggleMinistryCheckbox(1, 3);
+    toggleMinistryCheckbox(1, 1);
     clickButton('Salvar ministérios');
     clickButton('Salvar ministérios');
 
-    expect(adminUserService.updateMinistries).toHaveBeenCalledOnceWith(1, [
-      'READER',
-      'COMMENTATOR',
-      'PRIEST',
-    ]);
+    expect(adminUserService.updateMinistries).toHaveBeenCalledOnceWith(1, [2, 3, 1]);
 
-    updateResponse.next(ministriesResponse({ ministries: ['READER', 'COMMENTATOR', 'PRIEST'] }));
+    updateResponse.next(
+      ministriesResponse({
+        ministries: [
+          ministryMembership(2, 'Leitores'),
+          ministryMembership(3, 'Comentaristas'),
+          ministryMembership(1, 'Presbiteros'),
+        ],
+      }),
+    );
     updateResponse.complete();
     harness.detectChanges();
 
@@ -972,30 +1005,44 @@ describe('AdminUserManagementComponent', () => {
   });
 
   it('should save an empty ministries set', async () => {
-    await setup(pageResponse({ content: [person({ ministries: ['READER'] })] }));
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+    await setup(pageResponse({ content: [person({ ministries: [ministrySummary(2, 'Leitores')] })] }));
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+    );
     adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: [] })));
 
     clickButton('Gerenciar ministérios');
-    toggleMinistryCheckbox(1, 'READER');
+    toggleMinistryCheckbox(1, 2);
     clickButton('Salvar ministérios');
 
     expect(adminUserService.updateMinistries).toHaveBeenCalledOnceWith(1, []);
   });
 
-  it('should never send duplicate ministries even if the backend returns duplicates', async () => {
-    await setup(pageResponse({ content: [person({ ministries: ['READER'] })] }));
+  it('should never send duplicate ministry ids even if the backend returns duplicates', async () => {
+    await setup(pageResponse({ content: [person({ ministries: [ministrySummary(2, 'Leitores')] })] }));
     adminUserService.findMinistries.and.returnValue(
-      of(ministriesResponse({ ministries: ['READER', 'READER', 'COMMENTATOR'] })),
+      of(
+        ministriesResponse({
+          ministries: [
+            ministryMembership(2, 'Leitores'),
+            ministryMembership(2, 'Leitores'),
+            ministryMembership(3, 'Comentaristas'),
+          ],
+        }),
+      ),
     );
     adminUserService.updateMinistries.and.returnValue(
-      of(ministriesResponse({ ministries: ['READER', 'COMMENTATOR'] })),
+      of(
+        ministriesResponse({
+          ministries: [ministryMembership(2, 'Leitores'), ministryMembership(3, 'Comentaristas')],
+        }),
+      ),
     );
 
     clickButton('Gerenciar ministérios');
     clickButton('Salvar ministérios');
 
-    expect(adminUserService.updateMinistries).toHaveBeenCalledOnceWith(1, ['READER', 'COMMENTATOR']);
+    expect(adminUserService.updateMinistries).toHaveBeenCalledOnceWith(1, [2, 3]);
   });
 
   it('should cancel ministries editing without sending a PUT', async () => {
@@ -1057,18 +1104,22 @@ describe('AdminUserManagementComponent', () => {
 
     expect(textContent()).toContain('Carregando ministérios...');
 
-    firstRequest.next(ministriesResponse({ id: 1, ministries: ['PRIEST'] }));
+    firstRequest.next(
+      ministriesResponse({ id: 1, ministries: [ministryMembership(1, 'Presbiteros')] }),
+    );
     firstRequest.complete();
     harness.detectChanges();
 
     expect(textContent()).toContain('Gerenciar ministérios de João Souza');
     expect(textContent()).toContain('Carregando ministérios...');
 
-    secondRequest.next(ministriesResponse({ id: 2, ministries: ['READER'] }));
+    secondRequest.next(
+      ministriesResponse({ id: 2, ministries: [ministryMembership(2, 'Leitores')] }),
+    );
     secondRequest.complete();
     harness.detectChanges();
 
-    expect(ministryCheckbox(2, 'READER').checked).toBeTrue();
+    expect(ministryCheckbox(2, 2).checked).toBeTrue();
     expect(adminUserService.findMinistries).toHaveBeenCalledTimes(2);
   });
 
@@ -1087,7 +1138,7 @@ describe('AdminUserManagementComponent', () => {
       ),
       of(
         pageResponse({
-          content: [person({ ministries: ['COMMENTATOR'] })],
+          content: [person({ ministries: [ministrySummary(3, 'Comentaristas')] })],
           totalElements: 21,
           totalPages: 3,
           number: 1,
@@ -1096,16 +1147,20 @@ describe('AdminUserManagementComponent', () => {
         }),
       ),
     );
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
-    adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: ['COMMENTATOR'] })));
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+    );
+    adminUserService.updateMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(3, 'Comentaristas')] })),
+    );
 
     setInputValue('#user-name', ' Maria ');
     setSelectValue('#user-role', 'ROLE_ADMIN');
     submitFilters();
     clickButton('Próxima página');
     clickButton('Gerenciar ministérios');
-    toggleMinistryCheckbox(1, 'COMMENTATOR');
-    toggleMinistryCheckbox(1, 'READER');
+    toggleMinistryCheckbox(1, 3);
+    toggleMinistryCheckbox(1, 2);
     clickButton('Salvar ministérios');
 
     expect(adminUserService.findAll).toHaveBeenCalledWith(
@@ -1133,11 +1188,13 @@ describe('AdminUserManagementComponent', () => {
       ),
       of(pageResponse({ content: [person({ id: 3, name: 'Ana Lima' })] })),
     );
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+    );
     adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: [] })));
 
     clickButton('Gerenciar ministérios');
-    toggleMinistryCheckbox(1, 'READER');
+    toggleMinistryCheckbox(1, 2);
     clickButton('Salvar ministérios');
 
     expect(adminUserService.findAll).toHaveBeenCalledWith({ page: 1, size: 10 });
@@ -1146,20 +1203,22 @@ describe('AdminUserManagementComponent', () => {
   });
 
   it('should keep the ministries panel open and preserve selections on a 409 conflict', async () => {
-    await setup(pageResponse({ content: [person({ ministries: ['READER'] })] }));
-    adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+    await setup(pageResponse({ content: [person({ ministries: [ministrySummary(2, 'Leitores')] })] }));
+    adminUserService.findMinistries.and.returnValue(
+      of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+    );
     adminUserService.updateMinistries.and.returnValue(
       throwError(() => new HttpErrorResponse({ status: 409 })),
     );
 
     clickButton('Gerenciar ministérios');
-    toggleMinistryCheckbox(1, 'COMMENTATOR');
+    toggleMinistryCheckbox(1, 3);
     clickButton('Salvar ministérios');
 
     expect(textContent()).toContain('Não é possível remover um ministério vinculado a uma escala.');
     expect(textContent()).toContain('Gerenciar ministérios de Maria Silva');
-    expect(ministryCheckbox(1, 'READER').checked).toBeTrue();
-    expect(ministryCheckbox(1, 'COMMENTATOR').checked).toBeTrue();
+    expect(ministryCheckbox(1, 2).checked).toBeTrue();
+    expect(ministryCheckbox(1, 3).checked).toBeTrue();
     expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
   });
 
@@ -1199,7 +1258,7 @@ describe('AdminUserManagementComponent', () => {
     clickButton('Gerenciar ministérios');
     await waitForTimers();
 
-    expect(document.activeElement).toBe(ministryCheckbox(1, 'PRIEST'));
+    expect(document.activeElement).toBe(ministryCheckbox(1, 1));
   });
 
   describe('query parameter restoration', () => {
@@ -1235,13 +1294,13 @@ describe('AdminUserManagementComponent', () => {
       expect((query('#user-phone') as HTMLInputElement).value).toBe('34999999999');
     });
 
-    it('should restore a valid ministry from the URL', async () => {
-      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=READER');
+    it('should restore a valid ministryId from the URL', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministryId=2');
 
       expect(adminUserService.findAll).toHaveBeenCalledOnceWith(
-        jasmine.objectContaining({ ministry: 'READER' }),
+        jasmine.objectContaining({ ministryId: 2 }),
       );
-      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('READER');
+      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('2');
     });
 
     it('should restore a valid role from the URL', async () => {
@@ -1379,13 +1438,13 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&personActive=true&accountExists=true&accountEnabled=true&page=1',
+        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministryId=1&role=ROLE_OPERATOR&personActive=true&accountExists=true&accountEnabled=true&page=1',
       );
 
       expect(adminUserService.findAll).toHaveBeenCalledOnceWith({
         name: 'Joao',
         phoneNumber: '34999999999',
-        ministry: 'PRIEST',
+        ministryId: 1,
         role: 'ROLE_OPERATOR',
         personActive: true,
         accountExists: true,
@@ -1395,7 +1454,7 @@ describe('AdminUserManagementComponent', () => {
       });
       expect((query('#user-name') as HTMLInputElement).value).toBe('Joao');
       expect((query('#user-phone') as HTMLInputElement).value).toBe('34999999999');
-      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('PRIEST');
+      expect((query('#user-ministry') as HTMLSelectElement).value).toBe('1');
       expect((query('#user-role') as HTMLSelectElement).value).toBe('ROLE_OPERATOR');
     });
 
@@ -1403,7 +1462,7 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministry=PRIEST&role=ROLE_OPERATOR&page=0',
+        '/admin/usuarios?name=Joao&phoneNumber=34999999999&ministryId=1&role=ROLE_OPERATOR&page=0',
       );
 
       expect(adminUserService.findAll).toHaveBeenCalledTimes(1);
@@ -1501,7 +1560,7 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?name=Maria&phoneNumber=34999999999&ministry=READER&role=ROLE_ADMIN&personActive=true&accountExists=true&accountEnabled=true&page=1',
+        '/admin/usuarios?name=Maria&phoneNumber=34999999999&ministryId=2&role=ROLE_ADMIN&personActive=true&accountExists=true&accountEnabled=true&page=1',
       );
       await harness.fixture.whenStable();
 
@@ -1620,8 +1679,8 @@ describe('AdminUserManagementComponent', () => {
   });
 
   describe('invalid query parameters', () => {
-    it('should remove an invalid ministry from the URL and use no filter', async () => {
-      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=INVALID');
+    it('should remove an invalid ministryId from the URL and use no filter', async () => {
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministryId=INVALID');
       await harness.fixture.whenStable();
 
       expect(adminUserService.findAll).toHaveBeenCalledOnceWith({ page: 0, size: 10 });
@@ -1664,7 +1723,7 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse(),
         '34000000000',
-        '/admin/usuarios?ministry=INVALID&role=ADMIN&page=-1',
+        '/admin/usuarios?ministryId=INVALID&role=ADMIN&page=-1',
       );
       await harness.fixture.whenStable();
 
@@ -1672,11 +1731,11 @@ describe('AdminUserManagementComponent', () => {
     });
 
     it('should preserve unknown query parameters while correcting invalid ones', async () => {
-      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministry=INVALID&foo=bar');
+      await setup(pageResponse(), '34000000000', '/admin/usuarios?ministryId=INVALID&foo=bar');
       await harness.fixture.whenStable();
 
       expect(location.path()).toContain('foo=bar');
-      expect(location.path()).not.toContain('ministry=');
+      expect(location.path()).not.toContain('ministryId=');
     });
   });
 
@@ -1798,20 +1857,20 @@ describe('AdminUserManagementComponent', () => {
       await setup(
         pageResponse({ number: 0, totalPages: 1 }),
         '34000000000',
-        '/admin/usuarios?name=Maria&ministry=READER',
+        '/admin/usuarios?name=Maria&ministryId=2',
       );
       await harness.fixture.whenStable();
       adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: [] })));
 
       clickButton('Gerenciar ministérios');
-      toggleMinistryCheckbox(1, 'READER');
+      toggleMinistryCheckbox(1, 2);
       clickButton('Salvar ministérios');
       await harness.fixture.whenStable();
 
       const path = location.path();
 
       expect(path).toContain('name=Maria');
-      expect(path).toContain('ministry=READER');
+      expect(path).toContain('ministryId=2');
     });
 
     it('should let a person disappear from the page after a role update that no longer matches the active filter', async () => {
@@ -1834,19 +1893,27 @@ describe('AdminUserManagementComponent', () => {
 
     it('should let a person disappear from the page after a ministries update that no longer matches the active filter', async () => {
       await setup(
-        pageResponse({ content: [person({ ministries: ['READER'] })], number: 0, totalPages: 1 }),
+        pageResponse({
+          content: [person({ ministries: [ministrySummary(2, 'Leitores')] })],
+          number: 0,
+          totalPages: 1,
+        }),
         '34000000000',
-        '/admin/usuarios?ministry=READER',
+        '/admin/usuarios?ministryId=2',
       );
-      adminUserService.findMinistries.and.returnValue(of(ministriesResponse({ ministries: ['READER'] })));
+      adminUserService.findMinistries.and.returnValue(
+        of(ministriesResponse({ ministries: [ministryMembership(2, 'Leitores')] })),
+      );
       adminUserService.findAll.and.returnValue(
         of(pageResponse({ content: [], number: 0, totalPages: 0, totalElements: 0, empty: true })),
       );
-      adminUserService.updateMinistries.and.returnValue(of(ministriesResponse({ ministries: ['PRIEST'] })));
+      adminUserService.updateMinistries.and.returnValue(
+        of(ministriesResponse({ ministries: [ministryMembership(1, 'Presbiteros')] })),
+      );
 
       clickButton('Gerenciar ministérios');
-      toggleMinistryCheckbox(1, 'READER');
-      toggleMinistryCheckbox(1, 'PRIEST');
+      toggleMinistryCheckbox(1, 2);
+      toggleMinistryCheckbox(1, 1);
       clickButton('Salvar ministérios');
 
       expect(textContent()).toContain('Nenhuma pessoa foi encontrada com os filtros informados.');
@@ -1943,12 +2010,12 @@ describe('AdminUserManagementComponent', () => {
     ) as HTMLButtonElement;
   }
 
-  function ministryCheckbox(personId: number, ministry: string): HTMLInputElement {
-    return query(`#ministry-checkbox-${personId}-${ministry}`) as HTMLInputElement;
+  function ministryCheckbox(personId: number, ministryId: number): HTMLInputElement {
+    return query(`#ministry-checkbox-${personId}-${ministryId}`) as HTMLInputElement;
   }
 
-  function toggleMinistryCheckbox(personId: number, ministry: string): void {
-    const checkbox = ministryCheckbox(personId, ministry);
+  function toggleMinistryCheckbox(personId: number, ministryId: number): void {
+    const checkbox = ministryCheckbox(personId, ministryId);
     checkbox.checked = !checkbox.checked;
     checkbox.dispatchEvent(new Event('change'));
     harness.detectChanges();
@@ -1985,7 +2052,7 @@ describe('AdminUserManagementComponent', () => {
       phoneNumber: '34999999999',
       birthdayDate: '1988-04-16',
       personActive: true,
-      ministries: ['READER'],
+      ministries: [ministrySummary(2, 'Leitores')],
       accountExists: true,
       accountEnabled: true,
       username: '34999999999',
@@ -2001,7 +2068,7 @@ describe('AdminUserManagementComponent', () => {
       id: 1,
       name: 'Maria Silva',
       phoneNumber: '34999999999',
-      ministries: ['READER'],
+      ministries: [ministrySummary(2, 'Leitores')],
       roles: ['ROLE_ADMIN'],
       ...overrides,
     };
@@ -2012,8 +2079,35 @@ describe('AdminUserManagementComponent', () => {
   ): PersonMinistriesResponse {
     return {
       id: 1,
-      ministries: ['READER'],
+      ministries: [ministryMembership(2, 'Leitores')],
       ...overrides,
     };
+  }
+
+  function ministryCatalog(
+    ministries: MinistryCatalogItem[] = [
+      ministryCatalogItem(1, 'Presbiteros', true),
+      ministryCatalogItem(2, 'Leitores', true),
+      ministryCatalogItem(3, 'Comentaristas', true),
+      ministryCatalogItem(8, 'Acolitos', false),
+    ],
+  ): MinistryCatalogItem[] {
+    return ministries;
+  }
+
+  function ministryCatalogItem(id: number, name: string, active: boolean): MinistryCatalogItem {
+    return { id, name, active };
+  }
+
+  function ministrySummary(id: number, name: string): MinistrySummary {
+    return { id, name };
+  }
+
+  function ministryMembership(
+    id: number,
+    name: string,
+    coordinator = false,
+  ): PersonMinistryMembership {
+    return { id, name, coordinator };
   }
 });

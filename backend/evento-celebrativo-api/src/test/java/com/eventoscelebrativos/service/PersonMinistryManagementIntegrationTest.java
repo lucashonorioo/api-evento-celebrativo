@@ -119,10 +119,12 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(personId))
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false))
                     .andExpect(jsonPath("$.ministries.length()").value(1));
 
             assertActiveMinistry(personId, MinistryType.READER, true);
@@ -139,7 +141,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER", "COMMENTATOR", "PRIEST")))
+                            .content(ministriesPayload(MinistryType.READER, MinistryType.COMMENTATOR, MinistryType.PRIEST)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.ministries.length()").value(3));
 
@@ -162,9 +164,11 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
             PersonMinistry reactivated = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
                     .orElseThrow();
@@ -186,10 +190,12 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.ministries.length()").value(1))
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
             assertActiveMinistry(personId, MinistryType.READER, true);
             assertActiveMinistry(personId, MinistryType.COMMENTATOR, false);
@@ -210,9 +216,11 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
             PersonMinistry unchanged = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
                     .orElseThrow();
@@ -232,7 +240,7 @@ class PersonMinistryManagementIntegrationTest {
 
         mockMvc.perform(put("/pessoas/{id}/ministries", 999_999L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(ministriesPayload("READER")))
+                        .content(ministriesPayload(MinistryType.READER)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
     }
@@ -245,7 +253,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("BISHOP")))
+                            .content(ministriesPayloadWithIds(0L)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
 
@@ -263,7 +271,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER", "READER")))
+                            .content(ministriesPayload(MinistryType.READER, MinistryType.READER)))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.errorCode").value("BUSINESS_RULE_VIOLATION"));
 
@@ -286,7 +294,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("COMMENTATOR")))
+                            .content(ministriesPayload(MinistryType.COMMENTATOR)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.errorCode").value("DATABASE_RULE_VIOLATION"));
 
@@ -333,7 +341,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER", "PRIEST")))
+                            .content(ministriesPayload(MinistryType.READER, MinistryType.PRIEST)))
                     .andExpect(status().isOk());
 
             Person after = personRepository.findById(personId).orElseThrow();
@@ -352,7 +360,7 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.phoneNumber").doesNotExist())
                     .andExpect(jsonPath("$.password").doesNotExist())
@@ -375,9 +383,10 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
-                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"))
-                    .andExpect(jsonPath("$.coordinatedMinistries.length()").value(1));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(true))
+                    .andExpect(jsonPath("$.ministries.length()").value(1));
 
             // idempotente
             mockMvc.perform(put(coordinatorPath(personId, MinistryType.READER)))
@@ -388,8 +397,9 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
-                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
             // idempotente
             mockMvc.perform(delete(coordinatorPath(personId, MinistryType.READER)))
@@ -474,7 +484,7 @@ class PersonMinistryManagementIntegrationTest {
                             .content(ministriesPayload()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.ministries").isEmpty())
-                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+                    .andExpect(jsonPath("$.ministries").isEmpty());
 
             PersonMinistry deactivated = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
                     .orElseThrow();
@@ -500,10 +510,11 @@ class PersonMinistryManagementIntegrationTest {
 
             mockMvc.perform(put("/pessoas/{id}/ministries", personId)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(ministriesPayload("READER")))
+                            .content(ministriesPayload(MinistryType.READER)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
-                    .andExpect(jsonPath("$.coordinatedMinistries").isEmpty());
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
         } finally {
             cleanupPerson(personId);
         }
@@ -525,9 +536,11 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personA))
-                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(true));
             mockMvc.perform(get("/pessoas/{id}/ministries", personB))
-                    .andExpect(jsonPath("$.coordinatedMinistries[0]").value("READER"));
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(true));
         } finally {
             cleanupPerson(personA);
             cleanupPerson(personB);
@@ -548,7 +561,9 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(status().isNoContent());
 
             mockMvc.perform(get("/pessoas/{id}/ministries", personId))
-                    .andExpect(jsonPath("$.coordinatedMinistries.length()").value(2));
+                    .andExpect(jsonPath("$.ministries.length()").value(2))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(true))
+                    .andExpect(jsonPath("$.ministries[1].coordinator").value(true));
         } finally {
             cleanupPerson(personId);
         }
@@ -605,8 +620,15 @@ class PersonMinistryManagementIntegrationTest {
         eventAssignmentRepository.saveAndFlush(new EventAssignment(event, person, assignmentType));
     }
 
-    private String ministriesPayload(String... ministries) throws Exception {
-        return objectMapper.writeValueAsString(new MinistriesPayload(List.of(ministries)));
+    private String ministriesPayload(MinistryType... ministries) throws Exception {
+        List<Long> ministryIds = java.util.Arrays.stream(ministries)
+                .map(this::ministryId)
+                .toList();
+        return objectMapper.writeValueAsString(new MinistriesPayload(ministryIds));
+    }
+
+    private String ministriesPayloadWithIds(Long... ministryIds) throws Exception {
+        return objectMapper.writeValueAsString(new MinistriesPayload(List.of(ministryIds)));
     }
 
     private String coordinatorPath(Long personId, MinistryType ministryType) {
@@ -621,6 +643,12 @@ class PersonMinistryManagementIntegrationTest {
         return ministryRepository.findByNormalizedName(normalizedName(ministryType))
                 .orElseThrow()
                 .getId();
+    }
+
+    private String ministryName(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getName();
     }
 
     private void assertActiveMinistry(Long personId, MinistryType ministryType, boolean expectedActive) {
@@ -681,6 +709,6 @@ class PersonMinistryManagementIntegrationTest {
         return "3493" + String.format("%07d", suffix);
     }
 
-    private record MinistriesPayload(List<String> ministries) {
+    private record MinistriesPayload(List<Long> ministryIds) {
     }
 }
