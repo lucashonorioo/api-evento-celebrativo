@@ -7,8 +7,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -31,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
+class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
+
+    private static final String VERSIONED_MIGRATIONS_LOCATION = "classpath:db/migration";
 
     private static String host;
     private static String port;
@@ -52,11 +54,12 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
             mysqlAvailable = false;
             return;
         }
+
         try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
              Statement statement = connection.createStatement()) {
             mysqlVersion = queryVersion(statement);
             mysqlAvailable = connection.isValid(3) && mysqlVersion.startsWith("8.4.");
-        } catch (SQLException e) {
+        } catch (SQLException exception) {
             mysqlAvailable = false;
         }
     }
@@ -71,6 +74,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
         if (!mysqlAvailable) {
             return;
         }
+
         try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
              Statement statement = connection.createStatement()) {
             for (String db : CREATED_DATABASES) {
@@ -87,42 +91,127 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     }
 
     @Test
-    void shouldBackfillLegacyRowsAndPreserveExistingDataOnRealMySql() throws SQLException {
-        DataSource dataSource = createDatabase("v27my_backfill");
-        migrateUntil(dataSource, "26");
+    void shouldNotHaveMappingTableBeforeV28OnRealMySql() throws SQLException {
+        DataSource dataSource = createDatabase("v28my_before");
+        migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        Long personId = insertPerson(jdbcTemplate, "Leitor V27 MySQL", "34988773010");
+
+        assertThrows(BadSqlGrammarException.class,
+                () -> jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tb_ministry_legacy_type_mapping", Integer.class));
+    }
+
+    @Test
+    void shouldCreateFiveMappingsWhenUpgradingFromV27OnRealMySql() throws SQLException {
+        DataSource dataSource = createDatabase("v28my_upgrade");
+        migrateUntil(dataSource, "27");
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+
+        MigrateResult result = migrateAll(dataSource);
+
+        assertEquals(1, result.migrationsExecuted);
+        assertEquals(5, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_ministry_legacy_type_mapping", Integer.class));
+        assertEquals(5, jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT ministry_id) FROM tb_ministry_legacy_type_mapping", Integer.class));
+        assertEquals(5, jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT ministry_type) FROM tb_ministry_legacy_type_mapping", Integer.class));
+
+        Map<String, String> actualByType = new LinkedHashMap<>();
+        jdbcTemplate.queryForList(
+                """
+                SELECT lm.ministry_type, m.normalized_name
+                FROM tb_ministry_legacy_type_mapping lm
+                JOIN tb_ministry m ON m.id = lm.ministry_id
+                ORDER BY lm.ministry_type
+                """
+        ).forEach(row -> actualByType.put((String) row.get("ministry_type"), (String) row.get("normalized_name")));
+
+        Map<String, String> expectedByType = new LinkedHashMap<>();
+        expectedByType.put("COMMENTATOR", "COMENTARISTAS");
+        expectedByType.put("EUCHARISTIC_MINISTER", "MINISTROS DA EUCARISTIA");
+        expectedByType.put("MINISTER_OF_THE_WORD", "MINISTROS DA PALAVRA");
+        expectedByType.put("PRIEST", "PRESBITEROS");
+        expectedByType.put("READER", "LEITORES");
+        assertEquals(expectedByType, actualByType);
+    }
+
+    @Test
+    void shouldEnforceMappingConstraintsOnRealMySql() throws SQLException {
+        DataSource dataSource = createDatabase("v28my_constraints");
+        migrateAll(dataSource);
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
+        Long arbitraryMinistryId = insertMinistry(jdbcTemplate, "Acolitos", "ACOLITOS");
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'COMMENTATOR')",
+                readerMinistryId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'READER')",
+                arbitraryMinistryId));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (999999, 'READER')"));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+                "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'ACOLYTE')",
+                arbitraryMinistryId));
+    }
+
+    @Test
+    void shouldKeepMappingStableWhenLegacyMinistryIsRenamedOnRealMySql() throws SQLException {
+        DataSource dataSource = createDatabase("v28my_rename");
+        migrateAll(dataSource);
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
+
+        jdbcTemplate.update(
+                """
+                UPDATE tb_ministry
+                SET name = 'Leitores e Salmistas',
+                    normalized_name = 'LEITORES E SALMISTAS',
+                    updated_at = CURRENT_TIMESTAMP(6)
+                WHERE id = ?
+                """,
+                readerMinistryId);
+
+        assertEquals(readerMinistryId, jdbcTemplate.queryForObject(
+                """
+                SELECT ministry_id
+                FROM tb_ministry_legacy_type_mapping
+                WHERE ministry_type = 'READER'
+                """,
+                Long.class));
+    }
+
+    @Test
+    void shouldNotModifyPersonMinistryRowsWhenCreatingMappingOnRealMySql() throws SQLException {
+        DataSource dataSource = createDatabase("v28my_preserve_pm");
+        migrateUntil(dataSource, "27");
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        Long personId = insertPerson(jdbcTemplate, "Leitor V28 MySQL", "34988775010");
+        Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
         LocalDateTime createdAt = LocalDateTime.of(2026, 1, 2, 3, 4, 5);
         LocalDateTime updatedAt = LocalDateTime.of(2026, 1, 3, 4, 5, 6);
         jdbcTemplate.update(
                 """
-                INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator, created_at, updated_at)
-                VALUES (?, 'READER', TRUE, TRUE, ?, ?)
+                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator, created_at, updated_at)
+                VALUES (?, 'READER', ?, TRUE, TRUE, ?, ?)
                 """,
                 personId,
+                readerMinistryId,
                 Timestamp.valueOf(createdAt),
                 Timestamp.valueOf(updatedAt));
-        Long personMinistryId = jdbcTemplate.queryForObject(
-                "SELECT id FROM tb_person_ministry WHERE person_id = ?",
-                Long.class,
-                personId);
 
-        MigrateResult result = migrateAll(dataSource);
+        migrateAll(dataSource);
 
-        assertEquals(2, result.migrationsExecuted);
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
-                SELECT pm.id, pm.person_id, pm.ministry_type, pm.ministry_id, pm.active, pm.coordinator,
-                       pm.created_at, pm.updated_at, m.normalized_name
-                FROM tb_person_ministry pm
-                JOIN tb_ministry m ON m.id = pm.ministry_id
-                WHERE pm.person_id = ?
+                SELECT ministry_type, ministry_id, active, coordinator, created_at, updated_at
+                FROM tb_person_ministry
+                WHERE person_id = ?
                 """,
                 personId);
-        assertEquals(personMinistryId, ((Number) row.get("id")).longValue());
-        assertEquals(personId, ((Number) row.get("person_id")).longValue());
         assertEquals("READER", row.get("ministry_type"));
-        assertEquals("LEITORES", row.get("normalized_name"));
+        assertEquals(readerMinistryId, ((Number) row.get("ministry_id")).longValue());
         assertTrue(isTrue(row.get("active")));
         assertTrue(isTrue(row.get("coordinator")));
         assertEquals(Timestamp.valueOf(createdAt), row.get("created_at"));
@@ -130,69 +219,9 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     }
 
     @Test
-    void shouldMapAllFiveLegacyMinistryTypesOnRealMySql() throws SQLException {
-        DataSource dataSource = createDatabase("v27my_mapping");
-        migrateUntil(dataSource, "26");
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        Map<String, String> expectedByType = new LinkedHashMap<>();
-        expectedByType.put("PRIEST", "PRESBITEROS");
-        expectedByType.put("READER", "LEITORES");
-        expectedByType.put("COMMENTATOR", "COMENTARISTAS");
-        expectedByType.put("MINISTER_OF_THE_WORD", "MINISTROS DA PALAVRA");
-        expectedByType.put("EUCHARISTIC_MINISTER", "MINISTROS DA EUCARISTIA");
-        int phoneSuffix = 20;
-        for (String ministryType : expectedByType.keySet()) {
-            Long personId = insertPerson(jdbcTemplate, "Pessoa " + ministryType, "349887730" + phoneSuffix++);
-            jdbcTemplate.update(
-                    "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, ?, TRUE, FALSE)",
-                    personId,
-                    ministryType);
-        }
-
-        migrateAll(dataSource);
-
-        Map<String, String> actualByType = new LinkedHashMap<>();
-        jdbcTemplate.queryForList(
-                """
-                SELECT pm.ministry_type, m.normalized_name
-                FROM tb_person_ministry pm
-                JOIN tb_ministry m ON m.id = pm.ministry_id
-                ORDER BY pm.id
-                """
-        ).forEach(row -> actualByType.put((String) row.get("ministry_type"), (String) row.get("normalized_name")));
-        assertEquals(expectedByType, actualByType);
-    }
-
-    @Test
-    void shouldEnforceMinistryIdConstraintsOnRealMySql() throws SQLException {
-        DataSource dataSource = createDatabase("v27my_constraints");
-        migrateAll(dataSource);
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        Long personId = insertPerson(jdbcTemplate, "Leitor Constraints MySQL", "34988773030");
-        Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
-
-        DataAccessException missingMinistryId = assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type) VALUES (?, 'READER')",
-                personId));
-        assertTrue(missingMinistryId.getMessage().contains("ministry_id"));
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id) VALUES (?, 'READER', 999999)",
-                personId));
-
-        jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id) VALUES (?, 'READER', ?)",
-                personId,
-                readerMinistryId);
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id) VALUES (?, 'COMMENTATOR', ?)",
-                personId,
-                readerMinistryId));
-    }
-
-    @Test
     void shouldFailSafelyWhenRequiredCatalogRowIsMissingOnRealMySql() throws SQLException {
-        DataSource dataSource = createDatabase("v27my_missing_catalog");
-        migrateUntil(dataSource, "26");
+        DataSource dataSource = createDatabase("v28my_missing_catalog");
+        migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("DELETE FROM tb_ministry WHERE normalized_name = 'LEITORES'");
 
@@ -202,8 +231,21 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
         jdbcTemplate.update(
                 "INSERT INTO tb_person(public_id, name, phone_number) VALUES (?, ?, ?)",
-                newPublicId(), name, phoneNumber);
+                newPublicId(),
+                name,
+                phoneNumber);
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
+    }
+
+    private Long insertMinistry(JdbcTemplate jdbcTemplate, String name, String normalizedName) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_ministry(name, normalized_name, active, created_at, updated_at)
+                VALUES (?, ?, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                name,
+                normalizedName);
+        return ministryId(jdbcTemplate, normalizedName);
     }
 
     private Long ministryId(JdbcTemplate jdbcTemplate, String normalizedName) {
@@ -251,7 +293,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     private void migrateUntil(DataSource dataSource, String target) {
         Flyway.configure()
                 .dataSource(dataSource)
-                .locations("classpath:db/migration")
+                .locations(VERSIONED_MIGRATIONS_LOCATION)
                 .target(target)
                 .load()
                 .migrate();
@@ -260,7 +302,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     private MigrateResult migrateAll(DataSource dataSource) {
         return Flyway.configure()
                 .dataSource(dataSource)
-                .locations("classpath:db/migration")
+                .locations(VERSIONED_MIGRATIONS_LOCATION)
                 .load()
                 .migrate();
     }

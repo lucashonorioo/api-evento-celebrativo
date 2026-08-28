@@ -7,6 +7,7 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
+import com.eventoscelebrativos.service.PersonMinistryMembershipView;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -92,6 +93,46 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
 
     @Override
     @Transactional(readOnly = true)
+    public Map<Long, List<PersonMinistryMembershipView>> findActiveMinistryMembershipsByPersonIds(Collection<Long> personIds) {
+        if (personIds == null) {
+            throw new BusinessException("Ids de pessoas sao obrigatorios");
+        }
+
+        List<Long> distinctIds = personIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, List<PersonMinistryMembershipView>> result = new LinkedHashMap<>();
+        distinctIds.forEach(personId -> result.put(personId, List.of()));
+
+        Map<Long, List<PersonMinistryMembershipView>> grouped = personMinistryRepository
+                .findActiveMinistriesByPersonIds(distinctIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        PersonMinistryRepository.PersonMinistryCatalogView::getPersonId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                row -> new PersonMinistryMembershipView(
+                                        row.getMinistryId(),
+                                        row.getMinistryName(),
+                                        Boolean.TRUE.equals(row.getCoordinator())
+                                ),
+                                Collectors.toList()
+                        )
+                ));
+
+        grouped.forEach((personId, memberships) -> result.put(personId, List.copyOf(memberships)));
+        return Collections.unmodifiableMap(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Map<Long, Set<MinistryType>> findActiveMinistriesByPersonIds(Collection<Long> personIds) {
         if (personIds == null) {
             throw new BusinessException("Ids de pessoas sao obrigatorios");
@@ -110,9 +151,15 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         Map<Long, EnumSet<MinistryType>> mutableResult = new LinkedHashMap<>();
         distinctIds.forEach(personId -> mutableResult.put(personId, EnumSet.noneOf(MinistryType.class)));
 
-        personMinistryRepository.findActiveMinistriesByPersonIds(distinctIds)
-                .forEach(row -> mutableResult.get(row.getPersonId())
-                        .add(legacyMinistryTypeResolver.requireMinistryType(row.getMinistryNormalizedName())));
+        List<PersonMinistryRepository.PersonMinistryCatalogView> rows =
+                personMinistryRepository.findActiveMinistriesByPersonIds(distinctIds);
+        Map<Long, MinistryType> legacyTypesByMinistryId = legacyMinistryTypeResolver
+                .requireTypesByPersistentMinistryId(rows.stream()
+                        .map(PersonMinistryRepository.PersonMinistryCatalogView::getMinistryId)
+                        .toList());
+
+        rows.forEach(row -> mutableResult.get(row.getPersonId())
+                .add(legacyTypesByMinistryId.get(row.getMinistryId())));
 
         Map<Long, Set<MinistryType>> result = new LinkedHashMap<>();
         mutableResult.forEach((personId, ministries) -> result.put(personId, immutableEnumSet(ministries)));

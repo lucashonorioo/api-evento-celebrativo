@@ -3,8 +3,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  OnInit,
   ElementRef,
+  OnInit,
   inject,
   signal,
 } from '@angular/core';
@@ -13,10 +13,11 @@ import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
-import { apiErrorCode } from '../../api-error.utils';
+import { apiErrorCode, apiErrorMessage } from '../../api-error.utils';
 import { AuthSessionService } from '../../auth-session.service';
 import {
-  MinistryType,
+  MinistryCatalogItem,
+  MinistrySummary,
   PersonAdmin,
   PersonAdminFilters,
   PersonAdminPage,
@@ -29,7 +30,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const QUERY_PARAM_KEYS = [
   'name',
   'phoneNumber',
-  'ministry',
+  'ministryId',
   'role',
   'personActive',
   'accountExists',
@@ -38,11 +39,6 @@ const QUERY_PARAM_KEYS = [
 ] as const;
 
 type BooleanFilterValue = '' | 'true' | 'false';
-
-interface MinistryTypeOption {
-  readonly value: MinistryType;
-  readonly label: string;
-}
 
 interface UserRoleOption {
   readonly value: UserRole;
@@ -102,20 +98,13 @@ export class AdminUserManagementComponent implements OnInit {
   readonly filtersForm = this.formBuilder.group({
     name: [''],
     phoneNumber: [''],
-    ministry: ['' as MinistryType | ''],
+    ministryId: [''],
     role: ['' as UserRole | ''],
     personActive: ['' as BooleanFilterValue],
     accountExists: ['' as BooleanFilterValue],
     accountEnabled: ['' as BooleanFilterValue],
   });
 
-  readonly ministryTypeOptions: readonly MinistryTypeOption[] = [
-    { value: 'PRIEST', label: 'Padre' },
-    { value: 'READER', label: 'Leitor' },
-    { value: 'COMMENTATOR', label: 'Comentarista' },
-    { value: 'MINISTER_OF_THE_WORD', label: 'Ministro da Palavra' },
-    { value: 'EUCHARISTIC_MINISTER', label: 'Ministro da Eucaristia' },
-  ];
   readonly roleOptions: readonly UserRoleOption[] = [
     { value: 'ROLE_ADMIN', label: 'Administrador' },
     { value: 'ROLE_OPERATOR', label: 'Operador' },
@@ -137,9 +126,11 @@ export class AdminUserManagementComponent implements OnInit {
   ];
 
   readonly people = signal<PersonAdmin[]>([]);
+  readonly ministryCatalog = signal<MinistryCatalogItem[]>([]);
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly ministryCatalogErrorMessage = signal<string | null>(null);
   readonly roleChangeErrorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   readonly currentPage = signal(0);
@@ -152,7 +143,7 @@ export class AdminUserManagementComponent implements OnInit {
   readonly selectedRole = signal<UserRole | null>(null);
 
   readonly pendingMinistriesChange = signal<PersonAdmin | null>(null);
-  readonly selectedMinistries = signal<MinistryType[]>([]);
+  readonly selectedMinistries = signal<number[]>([]);
   readonly isMinistriesLoading = signal(false);
   readonly isMinistriesLoaded = signal(false);
   readonly isSavingMinistries = signal(false);
@@ -161,6 +152,8 @@ export class AdminUserManagementComponent implements OnInit {
   private readonly authenticatedUsername = this.authSessionService.getUsername();
 
   ngOnInit(): void {
+    this.loadMinistryCatalog();
+
     this.queryRequests
       .pipe(
         switchMap((query) => {
@@ -222,7 +215,9 @@ export class AdminUserManagementComponent implements OnInit {
           return;
         }
 
-        this.selectedMinistries.set(dedupeMinistries(result.response.ministries));
+        this.selectedMinistries.set(
+          dedupeMinistryIds(result.response.ministries.map((ministry) => ministry.id)),
+        );
         this.isMinistriesLoaded.set(true);
         this.focusMinistriesPanel(result.personId);
       });
@@ -250,7 +245,7 @@ export class AdminUserManagementComponent implements OnInit {
     this.filtersForm.reset({
       name: '',
       phoneNumber: '',
-      ministry: '',
+      ministryId: '',
       role: '',
       personActive: '',
       accountExists: '',
@@ -365,18 +360,18 @@ export class AdminUserManagementComponent implements OnInit {
     this.focusLastMinistriesButton();
   }
 
-  toggleMinistry(ministry: MinistryType): void {
+  toggleMinistry(ministryId: number): void {
     const current = this.selectedMinistries();
 
     this.selectedMinistries.set(
-      current.includes(ministry)
-        ? current.filter((value) => value !== ministry)
-        : dedupeMinistries([...current, ministry]),
+      current.includes(ministryId)
+        ? current.filter((value) => value !== ministryId)
+        : dedupeMinistryIds([...current, ministryId]),
     );
   }
 
-  isMinistrySelected(ministry: MinistryType): boolean {
-    return this.selectedMinistries().includes(ministry);
+  isMinistrySelected(ministryId: number): boolean {
+    return this.selectedMinistries().includes(ministryId);
   }
 
   confirmMinistriesChange(): void {
@@ -391,13 +386,13 @@ export class AdminUserManagementComponent implements OnInit {
       return;
     }
 
-    const ministries = dedupeMinistries(this.selectedMinistries());
+    const ministryIds = dedupeMinistryIds(this.selectedMinistries());
 
     this.isSavingMinistries.set(true);
     this.ministriesErrorMessage.set(null);
     this.successMessage.set(null);
 
-    this.adminUserService.updateMinistries(person.id, ministries).subscribe({
+    this.adminUserService.updateMinistries(person.id, ministryIds).subscribe({
       next: () => {
         this.isSavingMinistries.set(false);
         this.resetMinistriesPanelState();
@@ -411,16 +406,14 @@ export class AdminUserManagementComponent implements OnInit {
     });
   }
 
-  ministryLabel(ministry: MinistryType): string {
-    return (
-      this.ministryTypeOptions.find((option) => option.value === ministry)?.label ?? ministry
-    );
+  activeMinistryOptions(): readonly MinistryCatalogItem[] {
+    return this.ministryCatalog().filter((ministry) => ministry.active);
   }
 
-  ministriesLabel(ministries: readonly MinistryType[]): string {
+  ministriesLabel(ministries: readonly MinistrySummary[]): string {
     return ministries.length === 0
       ? 'Sem ministérios'
-      : ministries.map((ministry) => this.ministryLabel(ministry)).join(', ');
+      : ministries.map((ministry) => ministry.name).join(', ');
   }
 
   roleLabel(role: UserRole): string {
@@ -451,7 +444,7 @@ export class AdminUserManagementComponent implements OnInit {
     return (
       Boolean(filters.name) ||
       Boolean(filters.phoneNumber) ||
-      Boolean(filters.ministry) ||
+      filters.ministryId !== undefined ||
       Boolean(filters.role) ||
       filters.personActive !== undefined ||
       filters.accountExists !== undefined ||
@@ -547,8 +540,21 @@ export class AdminUserManagementComponent implements OnInit {
     return `ministries-title-${person.id}`;
   }
 
-  ministryCheckboxId(person: PersonAdmin, ministry: MinistryType): string {
-    return `ministry-checkbox-${person.id}-${ministry}`;
+  ministryCheckboxId(person: PersonAdmin, ministryId: number): string {
+    return `ministry-checkbox-${person.id}-${ministryId}`;
+  }
+
+  private loadMinistryCatalog(): void {
+    this.ministryCatalogErrorMessage.set(null);
+
+    this.adminUserService
+      .findMinistryCatalog()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (ministries) => this.ministryCatalog.set(ministries),
+        error: (error: unknown) =>
+          this.ministryCatalogErrorMessage.set(ministryCatalogErrorMessageFor(error)),
+      });
   }
 
   private loadPage(
@@ -571,7 +577,7 @@ export class AdminUserManagementComponent implements OnInit {
     const desired: Params = {
       name: filters.name ?? null,
       phoneNumber: filters.phoneNumber ?? null,
-      ministry: filters.ministry ?? null,
+      ministryId: filters.ministryId === undefined ? null : String(filters.ministryId),
       role: filters.role ?? null,
       personActive: booleanToQueryParam(filters.personActive),
       accountExists: booleanToQueryParam(filters.accountExists),
@@ -598,9 +604,8 @@ export class AdminUserManagementComponent implements OnInit {
     const queryParamMap = this.activatedRoute.snapshot.queryParamMap;
     const name = trimmedOrUndefined(queryParamMap.get('name') ?? '');
     const phoneNumber = trimmedOrUndefined(queryParamMap.get('phoneNumber') ?? '');
-    const ministryParam = queryParamMap.get('ministry');
+    const ministryId = parsePositiveNumberParam(queryParamMap.get('ministryId'));
     const roleParam = queryParamMap.get('role');
-    const ministry = isMinistryType(ministryParam) ? ministryParam : undefined;
     let role = isUserRole(roleParam) ? roleParam : undefined;
     const personActive = parseBooleanParam(queryParamMap.get('personActive'));
     const accountExists = parseBooleanParam(queryParamMap.get('accountExists'));
@@ -616,7 +621,7 @@ export class AdminUserManagementComponent implements OnInit {
       {
         name: name ?? '',
         phoneNumber: phoneNumber ?? '',
-        ministry: ministry ?? '',
+        ministryId: ministryId === undefined ? '' : String(ministryId),
         role: role ?? '',
         personActive: booleanToFilterValue(personActive),
         accountExists: booleanToFilterValue(accountExists),
@@ -629,7 +634,7 @@ export class AdminUserManagementComponent implements OnInit {
     return {
       ...(name !== undefined ? { name } : {}),
       ...(phoneNumber !== undefined ? { phoneNumber } : {}),
-      ...(ministry !== undefined ? { ministry } : {}),
+      ...(ministryId !== undefined ? { ministryId } : {}),
       ...(role !== undefined ? { role } : {}),
       ...(personActive !== undefined ? { personActive } : {}),
       ...(accountExists !== undefined ? { accountExists } : {}),
@@ -663,7 +668,7 @@ export class AdminUserManagementComponent implements OnInit {
     return {
       name: trimmedOrUndefined(value.name),
       phoneNumber: trimmedOrUndefined(value.phoneNumber),
-      ministry: value.ministry || undefined,
+      ministryId: parsePositiveNumericFilterValue(value.ministryId),
       role: value.role || undefined,
       personActive: filterValueToBoolean(value.personActive),
       accountExists: filterValueToBoolean(value.accountExists),
@@ -747,8 +752,8 @@ function emptyFilters(): PersonAdminFilters {
   };
 }
 
-function dedupeMinistries(ministries: readonly MinistryType[]): MinistryType[] {
-  return [...new Set(ministries)];
+function dedupeMinistryIds(ministryIds: readonly number[]): number[] {
+  return [...new Set(ministryIds)];
 }
 
 function trimmedOrUndefined(value: string): string | undefined {
@@ -757,14 +762,21 @@ function trimmedOrUndefined(value: string): string | undefined {
   return trimmedValue.length === 0 ? undefined : trimmedValue;
 }
 
-function isMinistryType(value: string | null): value is MinistryType {
-  return (
-    value === 'PRIEST' ||
-    value === 'READER' ||
-    value === 'COMMENTATOR' ||
-    value === 'MINISTER_OF_THE_WORD' ||
-    value === 'EUCHARISTIC_MINISTER'
-  );
+function parsePositiveNumberParam(value: string | null): number | undefined {
+  if (value === null || !/^[1-9]\d*$/.test(value)) {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
+function parsePositiveNumericFilterValue(value: string): number | undefined {
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0 || !/^[1-9]\d*$/.test(trimmedValue)) {
+    return undefined;
+  }
+
+  return Number(trimmedValue);
 }
 
 function isUserRole(value: string | null): value is UserRole {
@@ -832,6 +844,10 @@ function listErrorMessageFor(error: unknown): string {
     if (error.status === 403) {
       return 'Você não possui permissão para gerenciar usuários.';
     }
+
+    if (error.status === 404) {
+      return 'O ministério informado no filtro não foi encontrado.';
+    }
   }
 
   return 'Não foi possível carregar os usuários. Tente novamente.';
@@ -873,6 +889,14 @@ function ministriesLoadErrorMessageFor(error: unknown): string {
   return 'Não foi possível carregar os ministérios. Tente novamente.';
 }
 
+function ministryCatalogErrorMessageFor(error: unknown): string {
+  if (error instanceof HttpErrorResponse && error.status === 403) {
+    return 'Você não possui permissão para consultar o catálogo de ministérios.';
+  }
+
+  return 'Não foi possível carregar o catálogo de ministérios.';
+}
+
 function ministriesUpdateErrorMessageFor(error: unknown): string {
   if (error instanceof HttpErrorResponse) {
     if (error.status === 400) {
@@ -884,10 +908,23 @@ function ministriesUpdateErrorMessageFor(error: unknown): string {
     }
 
     if (error.status === 404) {
-      return 'A pessoa selecionada não foi encontrada.';
+      return 'A pessoa selecionada ou o ministério informado não foi encontrado.';
     }
 
     if (error.status === 409) {
+      const errorCode = apiErrorCode(error.error);
+
+      if (errorCode === 'MINISTRY_LEGACY_COMPATIBILITY_REQUIRED') {
+        return (
+          apiErrorMessage(error.error) ??
+          'Este ministério ainda não pode ser vinculado a pessoas nesta etapa da migração.'
+        );
+      }
+
+      if (errorCode === 'MINISTRY_INACTIVE') {
+        return 'Ministério inativo não pode ser associado ou reativado para uma pessoa.';
+      }
+
       return 'Não é possível remover um ministério vinculado a uma escala.';
     }
 

@@ -1,4 +1,5 @@
-import { MinistryType, UserRole } from '../admin-users/admin-user.models';
+import { UserRole } from '../admin-users/admin-user.models';
+import { MinistryType } from '../legacy-ministry-type.model';
 
 export interface CurrentUserProfile {
   readonly id: number;

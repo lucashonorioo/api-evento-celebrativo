@@ -18,7 +18,7 @@ public interface PersonService {
     Page<PersonAdminResponseDTO> findPeople(
             String name,
             String phoneNumber,
-            String ministry,
+            Long ministryId,
             String role,
             Boolean personActive,
             Boolean accountExists,

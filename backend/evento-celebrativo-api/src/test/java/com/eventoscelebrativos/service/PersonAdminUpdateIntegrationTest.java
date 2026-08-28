@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -195,7 +196,8 @@ class PersonAdminUpdateIntegrationTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(updatePayload("Preserve State Renamed", uniquePhoneNumber(), "1985-06-15")))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.ministries[0]").value("READER"))
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId(MinistryType.READER)))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
                     .andExpect(jsonPath("$.roles[0]").value("ROLE_ADMIN"))
                     .andExpect(jsonPath("$.personActive").value(true))
                     .andExpect(jsonPath("$.accountEnabled").value(true));
@@ -324,6 +326,18 @@ class PersonAdminUpdateIntegrationTest {
                 ministryType.name()
         );
         return count == null ? 0 : count;
+    }
+
+    private Long ministryId(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
+    }
+
+    private String ministryName(MinistryType ministryType) {
+        return ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getName();
     }
 
     private void cleanupPerson(Long personId) {

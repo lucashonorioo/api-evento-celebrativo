@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 
 import { API_BASE_URL } from '../api.config';
 import {
-  MinistryType,
+  MinistryCatalogItem,
+  MinistrySummary,
   PersonAdmin,
   PersonAdminPage,
   PersonMinistriesResponse,
@@ -46,12 +47,12 @@ describe('AdminUserService', () => {
     request.flush(pageResponse());
   });
 
-  it('should send combined filters with the official ministry value and role', () => {
+  it('should send combined filters with ministryId and role', () => {
     service
       .findAll({
         name: '  Maria  ',
         phoneNumber: ' 3499 ',
-        ministry: 'MINISTER_OF_THE_WORD',
+        ministryId: 3,
         role: 'ROLE_ADMIN',
         page: 2,
         size: 25,
@@ -65,7 +66,7 @@ describe('AdminUserService', () => {
         currentRequest.params.get('size') === '25' &&
         currentRequest.params.get('name') === 'Maria' &&
         currentRequest.params.get('phoneNumber') === '3499' &&
-        currentRequest.params.get('ministry') === 'MINISTER_OF_THE_WORD' &&
+        currentRequest.params.get('ministryId') === '3' &&
         currentRequest.params.get('role') === 'ROLE_ADMIN',
     );
 
@@ -96,11 +97,11 @@ describe('AdminUserService', () => {
     request.flush(pageResponse());
   });
 
-  it('should send the ministry filter', () => {
-    service.findAll({ ministry: 'READER', page: 0, size: 10 }).subscribe();
+  it('should send the ministryId filter', () => {
+    service.findAll({ ministryId: 2, page: 0, size: 10 }).subscribe();
 
     const request = httpTestingController.expectOne(
-      (currentRequest) => currentRequest.params.get('ministry') === 'READER',
+      (currentRequest) => currentRequest.params.get('ministryId') === '2',
     );
 
     expect(request.request.method).toBe('GET');
@@ -189,7 +190,7 @@ describe('AdminUserService', () => {
       .findAll({
         name: '   ',
         phoneNumber: '',
-        ministry: undefined,
+        ministryId: undefined,
         role: undefined,
         personActive: undefined,
         accountExists: undefined,
@@ -203,7 +204,7 @@ describe('AdminUserService', () => {
 
     expect(request.request.params.has('name')).toBeFalse();
     expect(request.request.params.has('phoneNumber')).toBeFalse();
-    expect(request.request.params.has('ministry')).toBeFalse();
+    expect(request.request.params.has('ministryId')).toBeFalse();
     expect(request.request.params.has('role')).toBeFalse();
     expect(request.request.params.has('personActive')).toBeFalse();
     expect(request.request.params.has('accountExists')).toBeFalse();
@@ -222,6 +223,22 @@ describe('AdminUserService', () => {
     expect(request.request.method).toBe('GET');
     httpTestingController.expectNone((current) => current.url.includes('/conta'));
     httpTestingController.expectNone((current) => current.url.includes('/ministries'));
+  });
+
+  it('should request the dynamic ministry catalog', () => {
+    const catalog: MinistryCatalogItem[] = [
+      ministry({ id: 2, name: 'Leitores', active: true }),
+      ministry({ id: 8, name: 'Acolitos', active: false }),
+    ];
+
+    service.findMinistryCatalog().subscribe((response) => {
+      expect(response).toEqual(catalog);
+    });
+
+    const request = httpTestingController.expectOne(`${API_BASE_URL}/ministerios`);
+
+    expect(request.request.method).toBe('GET');
+    request.flush(catalog);
   });
 
   it('should propagate the consolidated response including accountEnabled=null and username=null', () => {
@@ -252,17 +269,26 @@ describe('AdminUserService', () => {
 
   it('should request a person by id with multiple ministries', () => {
     service.findById(7).subscribe((response) => {
-      expect(response).toEqual(person({ ministries: ['READER', 'COMMENTATOR'] }));
+      expect(response).toEqual(
+        person({ ministries: [ministrySummary(2, 'Leitores'), ministrySummary(3, 'Comentaristas')] }),
+      );
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/pessoas/7`);
 
-    request.flush(person({ ministries: ['READER', 'COMMENTATOR'] }));
+    request.flush(
+      person({ ministries: [ministrySummary(2, 'Leitores'), ministrySummary(3, 'Comentaristas')] }),
+    );
   });
 
   it('should update a person role with a single role payload and receive the partial role update DTO back', () => {
     service.updateRole(7, 'ROLE_OPERATOR').subscribe((response) => {
-      expect(response).toEqual(roleUpdateResponse({ roles: ['ROLE_OPERATOR'], ministries: ['READER'] }));
+      expect(response).toEqual(
+        roleUpdateResponse({
+          roles: ['ROLE_OPERATOR'],
+          ministries: [ministrySummary(2, 'Leitores')],
+        }),
+      );
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/pessoas/7/roles`);
@@ -271,7 +297,12 @@ describe('AdminUserService', () => {
     expect(request.request.body).toEqual({ role: 'ROLE_OPERATOR' });
     expect(Object.keys(request.request.body as Record<string, unknown>)).toEqual(['role']);
 
-    request.flush(roleUpdateResponse({ roles: ['ROLE_OPERATOR'], ministries: ['READER'] }));
+    request.flush(
+      roleUpdateResponse({
+        roles: ['ROLE_OPERATOR'],
+        ministries: [ministrySummary(2, 'Leitores')],
+      }),
+    );
   });
 
   it('should not pretend the role update response is a full PersonAdmin', () => {
@@ -298,16 +329,16 @@ describe('AdminUserService', () => {
     request.flush(ministriesResponse());
   });
 
-  it('should update ministries with multiple values sending only the ministries payload', () => {
-    service.updateMinistries(10, ['READER', 'COMMENTATOR']).subscribe((response) => {
+  it('should update ministries with multiple ids sending only the ministryIds payload', () => {
+    service.updateMinistries(10, [2, 3]).subscribe((response) => {
       expect(response).toEqual(ministriesResponse());
     });
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/pessoas/10/ministries`);
 
     expect(request.request.method).toBe('PUT');
-    expect(request.request.body).toEqual({ ministries: ['READER', 'COMMENTATOR'] });
-    expect(Object.keys(request.request.body as Record<string, unknown>)).toEqual(['ministries']);
+    expect(request.request.body).toEqual({ ministryIds: [2, 3] });
+    expect(Object.keys(request.request.body as Record<string, unknown>)).toEqual(['ministryIds']);
     request.flush(ministriesResponse());
   });
 
@@ -318,7 +349,7 @@ describe('AdminUserService', () => {
 
     const request = httpTestingController.expectOne(`${API_BASE_URL}/pessoas/10/ministries`);
 
-    expect(request.request.body).toEqual({ ministries: [] });
+    expect(request.request.body).toEqual({ ministryIds: [] });
     request.flush(ministriesResponse({ ministries: [] }));
   });
 
@@ -341,7 +372,7 @@ describe('AdminUserService', () => {
     const statuses = [400, 403, 404, 409, 422];
 
     for (const status of statuses) {
-      service.updateMinistries(status, ['READER']).subscribe({
+      service.updateMinistries(status, [2]).subscribe({
         error: (error: unknown) => {
           expect(error).toBeTruthy();
         },
@@ -386,7 +417,7 @@ describe('AdminUserService', () => {
       phoneNumber: '34999999999',
       birthdayDate: '1988-04-16',
       personActive: true,
-      ministries: ['READER' as MinistryType],
+      ministries: [ministrySummary(2, 'Leitores')],
       accountExists: true,
       accountEnabled: true,
       username: '34999999999',
@@ -402,7 +433,7 @@ describe('AdminUserService', () => {
       id: 7,
       name: 'Maria Silva',
       phoneNumber: '34999999999',
-      ministries: ['READER' as MinistryType],
+      ministries: [ministrySummary(2, 'Leitores')],
       roles: ['ROLE_ADMIN'],
       ...overrides,
     };
@@ -413,7 +444,23 @@ describe('AdminUserService', () => {
   ): PersonMinistriesResponse {
     return {
       id: 10,
-      ministries: ['READER', 'COMMENTATOR'],
+      ministries: [
+        { ...ministrySummary(2, 'Leitores'), coordinator: true },
+        { ...ministrySummary(3, 'Comentaristas'), coordinator: false },
+      ],
+      ...overrides,
+    };
+  }
+
+  function ministrySummary(id: number, name: string): MinistrySummary {
+    return { id, name };
+  }
+
+  function ministry(overrides: Partial<MinistryCatalogItem> = {}): MinistryCatalogItem {
+    return {
+      id: 1,
+      name: 'Presbiteros',
+      active: true,
       ...overrides,
     };
   }

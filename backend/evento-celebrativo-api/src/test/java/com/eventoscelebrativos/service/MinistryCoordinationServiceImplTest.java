@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -141,11 +142,12 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenGrantingCoordinatorForNonexistentMinistry() {
-        when(ministryRepository.findById(999L)).thenReturn(Optional.empty());
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person(1L)));
+        when(ministryRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.grantCoordinator(1L, 999L));
 
-        verifyNoInteractions(personRepository, personMinistryRepository);
+        verifyNoInteractions(personMinistryRepository);
     }
 
     @Test
@@ -286,11 +288,12 @@ class MinistryCoordinationServiceImplTest {
 
     @Test
     void shouldThrowResourceNotFoundWhenRevokingCoordinatorForNonexistentMinistry() {
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(person(1L)));
         when(ministryRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.revokeCoordinator(1L, 999L));
 
-        verifyNoInteractions(personRepository, personMinistryRepository);
+        verifyNoInteractions(personMinistryRepository);
     }
 
     @Test
@@ -304,7 +307,8 @@ class MinistryCoordinationServiceImplTest {
 
     private Ministry mockMinistry(MinistryType ministryType) {
         Ministry ministry = unitMinistry(ministryType);
-        when(ministryRepository.findById(ministry.getId())).thenReturn(Optional.of(ministry));
+        lenient().when(ministryRepository.findById(ministry.getId())).thenReturn(Optional.of(ministry));
+        lenient().when(ministryRepository.findByIdForUpdate(ministry.getId())).thenReturn(Optional.of(ministry));
         return ministry;
     }
 
