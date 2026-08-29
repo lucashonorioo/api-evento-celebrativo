@@ -2,7 +2,6 @@ package com.eventoscelebrativos.service.impl;
 
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.exception.exceptions.MinistryCoordinationRequiresActiveMinistryException;
-import com.eventoscelebrativos.exception.exceptions.MinistryInactiveException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -36,13 +35,12 @@ public class MinistryCoordinationServiceImpl implements MinistryCoordinationServ
     @Transactional
     public void grantCoordinator(Long personId, Long ministryId) {
         validateId(personId);
-        validateId(ministryId);
+        Ministry ministry = requireMinistry(ministryId);
 
-        // Lock order: Person -> Ministry -> PersonMinistry. This keeps Person as the first lock
-        // for mutations of existing people and serializes with concurrent catalog deactivation.
+        // Lock order: Person -> consulta comum de PersonMinistry -> decisao/mutacao. Sem lock
+        // proprio sobre PersonMinistry: a serializacao vem inteiramente do lock da Person.
         personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
-        Ministry ministry = requireActiveMinistryForUpdate(ministryId);
         PersonMinistry personMinistry = personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId())
                 .filter(pm -> Boolean.TRUE.equals(pm.getActive()))
                 .orElseThrow(MinistryCoordinationRequiresActiveMinistryException::new);
@@ -58,11 +56,10 @@ public class MinistryCoordinationServiceImpl implements MinistryCoordinationServ
     @Transactional
     public void revokeCoordinator(Long personId, Long ministryId) {
         validateId(personId);
-        validateId(ministryId);
+        Ministry ministry = requireMinistry(ministryId);
 
         personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
-        Ministry ministry = requireMinistry(ministryId);
         Optional<PersonMinistry> existing = personMinistryRepository.findByPersonIdAndMinistryId(personId, ministry.getId());
 
         if (existing.isEmpty() || !Boolean.TRUE.equals(existing.get().getCoordinator())) {
@@ -75,22 +72,12 @@ public class MinistryCoordinationServiceImpl implements MinistryCoordinationServ
     private Ministry requireMinistry(Long ministryId) {
         validateId(ministryId);
         return ministryRepository.findById(ministryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ministerio", ministryId));
-    }
-
-    private Ministry requireActiveMinistryForUpdate(Long ministryId) {
-        validateId(ministryId);
-        Ministry ministry = ministryRepository.findByIdForUpdate(ministryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ministerio", ministryId));
-        if (!ministry.isActive()) {
-            throw new MinistryInactiveException();
-        }
-        return ministry;
+                .orElseThrow(() -> new ResourceNotFoundException("Ministério", ministryId));
     }
 
     private void validateId(Long id) {
         if (id == null || id <= 0) {
-            throw new BadRequestException("O Id deve ser positivo e nao nulo");
+            throw new BadRequestException("O Id deve ser positivo e não nulo");
         }
     }
 }

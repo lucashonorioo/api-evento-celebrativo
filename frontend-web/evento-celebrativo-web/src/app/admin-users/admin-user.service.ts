@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.config';
 import {
-  MinistryCatalogItem,
+  MinistryType,
   PersonAdmin,
   PersonAdminFilters,
   PersonAdminPage,
@@ -31,10 +31,6 @@ export class AdminUserService {
     return this.http.get<PersonAdmin>(`${API_BASE_URL}/pessoas/${id}`);
   }
 
-  findMinistryCatalog(): Observable<MinistryCatalogItem[]> {
-    return this.http.get<MinistryCatalogItem[]>(`${API_BASE_URL}/ministerios`);
-  }
-
   updateRole(id: number, role: UserRole): Observable<PersonRoleUpdateResponse> {
     const request: PersonRoleUpdateRequest = { role };
 
@@ -45,8 +41,8 @@ export class AdminUserService {
     return this.http.get<PersonMinistriesResponse>(`${API_BASE_URL}/pessoas/${id}/ministries`);
   }
 
-  updateMinistries(id: number, ministryIds: number[]): Observable<PersonMinistriesResponse> {
-    const request: PersonMinistriesUpdateRequest = { ministryIds };
+  updateMinistries(id: number, ministries: MinistryType[]): Observable<PersonMinistriesResponse> {
+    const request: PersonMinistriesUpdateRequest = { ministries };
 
     return this.http.put<PersonMinistriesResponse>(
       `${API_BASE_URL}/pessoas/${id}/ministries`,
@@ -59,7 +55,7 @@ export class AdminUserService {
 
     params = appendTrimmedParam(params, 'name', filters.name);
     params = appendTrimmedParam(params, 'phoneNumber', filters.phoneNumber);
-    params = appendNumberParam(params, 'ministryId', filters.ministryId);
+    params = appendTrimmedParam(params, 'ministry', filters.ministry);
     params = appendTrimmedParam(params, 'role', filters.role);
     params = appendBooleanParam(params, 'personActive', filters.personActive);
     params = appendBooleanParam(params, 'accountExists', filters.accountExists);
@@ -77,14 +73,6 @@ function appendTrimmedParam(
   const trimmedValue = value?.trim();
 
   return trimmedValue ? params.set(key, trimmedValue) : params;
-}
-
-function appendNumberParam(
-  params: HttpParams,
-  key: string,
-  value: number | undefined,
-): HttpParams {
-  return value === undefined ? params : params.set(key, String(value));
 }
 
 function appendBooleanParam(

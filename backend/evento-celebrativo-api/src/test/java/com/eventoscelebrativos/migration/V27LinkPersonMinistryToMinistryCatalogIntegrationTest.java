@@ -58,7 +58,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(1, result.migrationsExecuted);
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
                 SELECT pm.id, pm.person_id, pm.ministry_type, pm.ministry_id, pm.active, pm.coordinator,
@@ -173,7 +173,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
         MigrateResult first = migrateAll(dataSource);
         MigrateResult second = migrateAll(dataSource);
 
-        assertEquals(28, first.migrationsExecuted);
+        assertEquals(27, first.migrationsExecuted);
         assertTrue(second.migrations.isEmpty());
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '27' AND success = TRUE",

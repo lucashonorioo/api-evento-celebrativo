@@ -1,13 +1,11 @@
+export type MinistryType =
+  | 'PRIEST'
+  | 'READER'
+  | 'COMMENTATOR'
+  | 'MINISTER_OF_THE_WORD'
+  | 'EUCHARISTIC_MINISTER';
+
 export type UserRole = 'ROLE_ADMIN' | 'ROLE_OPERATOR';
-
-export interface MinistrySummary {
-  readonly id: number;
-  readonly name: string;
-}
-
-export interface MinistryCatalogItem extends MinistrySummary {
-  readonly active: boolean;
-}
 
 export interface PersonAdmin {
   readonly id: number;
@@ -15,7 +13,7 @@ export interface PersonAdmin {
   readonly phoneNumber: string;
   readonly birthdayDate: string;
   readonly personActive: boolean;
-  readonly ministries: MinistrySummary[];
+  readonly ministries: MinistryType[];
   readonly accountExists: boolean;
   readonly accountEnabled: boolean | null;
   readonly username: string | null;
@@ -25,7 +23,7 @@ export interface PersonAdmin {
 export interface PersonAdminFilters {
   readonly name?: string;
   readonly phoneNumber?: string;
-  readonly ministryId?: number;
+  readonly ministry?: MinistryType;
   readonly role?: UserRole;
   readonly personActive?: boolean;
   readonly accountExists?: boolean;
@@ -42,7 +40,7 @@ export interface PersonRoleUpdateResponse {
   readonly id: number;
   readonly name: string;
   readonly phoneNumber: string;
-  readonly ministries: MinistrySummary[];
+  readonly ministries: MinistryType[];
   readonly roles: UserRole[];
 }
 
@@ -57,15 +55,11 @@ export interface PersonAdminPage {
   readonly empty: boolean;
 }
 
-export interface PersonMinistryMembership extends MinistrySummary {
-  readonly coordinator: boolean;
-}
-
 export interface PersonMinistriesResponse {
   readonly id: number;
-  readonly ministries: PersonMinistryMembership[];
+  readonly ministries: MinistryType[];
 }
 
 export interface PersonMinistriesUpdateRequest {
-  readonly ministryIds: number[];
+  readonly ministries: MinistryType[];
 }

@@ -3,8 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal 
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
-import { UserRole } from '../admin-users/admin-user.models';
-import { MinistryType } from '../legacy-ministry-type.model';
+import { MinistryType, UserRole } from '../admin-users/admin-user.models';
 import { todayLocalDate } from '../people/person-form.helpers';
 import { notBlankValidator, pastDateValidator } from '../people/person-form.validators';
 import { CurrentUserProfile, CurrentUserProfileUpdateRequest } from './current-user-profile.models';

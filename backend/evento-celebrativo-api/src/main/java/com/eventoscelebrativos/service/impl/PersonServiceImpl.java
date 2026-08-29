@@ -6,9 +6,7 @@ import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
-import com.eventoscelebrativos.dto.response.MinistrySummaryDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
-import com.eventoscelebrativos.dto.response.PersonMinistryMembershipResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
@@ -25,17 +23,16 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
-import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.UserAccountRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.service.EventParticipationResponseService;
+import com.eventoscelebrativos.service.LegacyMinistryTypeResolver;
 import com.eventoscelebrativos.service.ParticipationResponseSnapshot;
 import com.eventoscelebrativos.service.PersonCadastralUpdateService;
-import com.eventoscelebrativos.service.PersonMinistryCatalogSyncResult;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
-import com.eventoscelebrativos.service.PersonMinistryMembershipView;
 import com.eventoscelebrativos.service.PersonMinistryReadService;
+import com.eventoscelebrativos.service.PersonMinistrySyncResult;
 import com.eventoscelebrativos.service.PersonService;
 import com.eventoscelebrativos.service.UserAccountLifecycleService;
 import org.springframework.data.domain.Page;
@@ -65,7 +62,6 @@ public class PersonServiceImpl implements PersonService {
     private static final Set<String> ALLOWED_ROLES = Set.of(ROLE_ADMIN, ROLE_OPERATOR);
 
     private final PersonRepository personRepository;
-    private final MinistryRepository ministryRepository;
     private final PersonAdminMapper personAdminMapper;
     private final PersonRoleUpdateMapper personRoleUpdateMapper;
     private final CurrentUserProfileMapper currentUserProfileMapper;
@@ -77,10 +73,10 @@ public class PersonServiceImpl implements PersonService {
     private final UserAccountRoleRepository userAccountRoleRepository;
     private final UserAccountRepository userAccountRepository;
     private final PersonCadastralUpdateService personCadastralUpdateService;
+    private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
 
     public PersonServiceImpl(
             PersonRepository personRepository,
-            MinistryRepository ministryRepository,
             PersonAdminMapper personAdminMapper,
             PersonRoleUpdateMapper personRoleUpdateMapper,
             CurrentUserProfileMapper currentUserProfileMapper,
@@ -91,10 +87,10 @@ public class PersonServiceImpl implements PersonService {
             UserAccountLifecycleService userAccountLifecycleService,
             UserAccountRoleRepository userAccountRoleRepository,
             UserAccountRepository userAccountRepository,
-            PersonCadastralUpdateService personCadastralUpdateService
+            PersonCadastralUpdateService personCadastralUpdateService,
+            LegacyMinistryTypeResolver legacyMinistryTypeResolver
     ) {
         this.personRepository = personRepository;
-        this.ministryRepository = ministryRepository;
         this.personAdminMapper = personAdminMapper;
         this.personRoleUpdateMapper = personRoleUpdateMapper;
         this.currentUserProfileMapper = currentUserProfileMapper;
@@ -106,6 +102,7 @@ public class PersonServiceImpl implements PersonService {
         this.userAccountRoleRepository = userAccountRoleRepository;
         this.userAccountRepository = userAccountRepository;
         this.personCadastralUpdateService = personCadastralUpdateService;
+        this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
     }
 
     @Override
@@ -113,7 +110,7 @@ public class PersonServiceImpl implements PersonService {
     public Page<PersonAdminResponseDTO> findPeople(
             String name,
             String phoneNumber,
-            Long ministryId,
+            String ministry,
             String role,
             Boolean personActive,
             Boolean accountExists,
@@ -123,7 +120,8 @@ public class PersonServiceImpl implements PersonService {
     ) {
         String normalizedName = normalizeOptionalFilter(name);
         String normalizedPhoneNumber = normalizeOptionalFilter(phoneNumber);
-        Long normalizedMinistryId = normalizeMinistryIdFilter(ministryId);
+        MinistryType ministryType = normalizeMinistryFilter(ministry);
+        Long ministryId = ministryType == null ? null : legacyMinistryTypeResolver.requireMinistry(ministryType).getId();
         String normalizedRole = normalizeRoleFilter(role);
         validateAccountFilterCombination(accountExists, accountEnabled, normalizedRole);
         validatePage(page, size);
@@ -132,7 +130,7 @@ public class PersonServiceImpl implements PersonService {
         Page<Long> idPage = personRepository.findAdminPageIds(
                 normalizedName,
                 normalizedPhoneNumber,
-                normalizedMinistryId,
+                ministryId,
                 normalizedRole,
                 personActive,
                 accountExists,
@@ -147,8 +145,7 @@ public class PersonServiceImpl implements PersonService {
         List<Long> ids = idPage.getContent();
         Map<Long, Person> peopleById = personRepository.findAllByIdIn(ids).stream()
                 .collect(Collectors.toMap(Person::getId, Function.identity()));
-        Map<Long, List<PersonMinistryMembershipView>> activeMinistriesById =
-                personMinistryReadService.findActiveMinistryMembershipsByPersonIds(ids);
+        Map<Long, Set<MinistryType>> activeMinistriesById = personMinistryReadService.findActiveMinistriesByPersonIds(ids);
         Map<Long, List<String>> rolesById = userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(ids);
         Map<Long, UserAccountRepository.AccountState> accountStatesById =
                 userAccountRepository.findAccountStatesByPersonIdInGroupedByPerson(ids);
@@ -157,7 +154,7 @@ public class PersonServiceImpl implements PersonService {
                 .map(peopleById::get)
                 .map(person -> toAdminResponseDTO(
                         person,
-                        activeMinistriesById.getOrDefault(person.getId(), List.of()),
+                        activeMinistriesById.getOrDefault(person.getId(), Set.of()),
                         rolesById.getOrDefault(person.getId(), List.of()),
                         accountStatesById.get(person.getId())
                 ))
@@ -174,7 +171,7 @@ public class PersonServiceImpl implements PersonService {
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", id));
         return toAdminResponseDTO(
                 person,
-                activeMinistryMembershipsForPerson(id),
+                activeMinistriesForPerson(id),
                 rolesForPerson(id),
                 accountStateForPerson(id)
         );
@@ -198,7 +195,7 @@ public class PersonServiceImpl implements PersonService {
         );
         return toAdminResponseDTO(
                 saved,
-                activeMinistryMembershipsForPerson(saved.getId()),
+                activeMinistriesForPerson(saved.getId()),
                 rolesForPerson(saved.getId()),
                 accountStateForPerson(saved.getId())
         );
@@ -206,12 +203,12 @@ public class PersonServiceImpl implements PersonService {
 
     private PersonAdminResponseDTO toAdminResponseDTO(
             Person person,
-            List<PersonMinistryMembershipView> ministries,
+            Set<MinistryType> ministries,
             List<String> roles,
             UserAccountRepository.AccountState accountState
     ) {
         PersonAdminResponseDTO dto = personAdminMapper.toDto(person);
-        dto.setMinistries(toMinistrySummaries(ministries));
+        dto.setMinistries(sortedMinistries(ministries));
         dto.setRoles(sortedRoles(roles));
         dto.setAccountExists(accountState != null);
         dto.setAccountEnabled(accountState == null ? null : accountState.isEnabled());
@@ -243,7 +240,7 @@ public class PersonServiceImpl implements PersonService {
                 dto.getId(),
                 dto.getName(),
                 dto.getPhoneNumber(),
-                toMinistrySummaries(activeMinistryMembershipsForPerson(savedPerson.getId())),
+                sortedMinistries(activeMinistriesForPerson(savedPerson.getId())),
                 sortedRoles(rolesForPerson(savedPerson.getId()))
         );
     }
@@ -255,21 +252,21 @@ public class PersonServiceImpl implements PersonService {
         if (!personRepository.existsById(id)) {
             throw new ResourceNotFoundException("Pessoa", id);
         }
-        return toMinistriesResponseDTO(id, activeMinistryMembershipsForPerson(id));
+        Set<MinistryType> activeMinistries = personMinistryReadService
+                .findActiveMinistriesByPersonIds(List.of(id))
+                .getOrDefault(id, Set.of());
+        Set<MinistryType> coordinatedMinistries = personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(id);
+        return toMinistriesResponseDTO(id, activeMinistries, coordinatedMinistries);
     }
 
     @Override
     @Transactional
     public PersonMinistriesResponseDTO updatePersonMinistries(Long id, PersonMinistriesUpdateRequestDTO requestDTO) {
-        if (requestDTO == null) {
-            throw new BusinessException("O conjunto de ministerios e obrigatorio");
-        }
-        List<Long> desiredMinistryIds = parseDesiredMinistryIds(requestDTO.getMinistryIds());
-        PersonMinistryCatalogSyncResult result = personMinistryCommandService.syncMinistriesById(id, desiredMinistryIds);
-        return toMinistriesResponseDTO(
-                result.person().getId(),
-                activeMinistryMembershipsForPerson(result.person().getId())
-        );
+        Set<MinistryType> desiredMinistries = parseDesiredMinistries(requestDTO.getMinistries());
+        PersonMinistrySyncResult result = personMinistryCommandService.syncMinistries(id, desiredMinistries);
+        Set<MinistryType> coordinatedMinistries = personMinistryReadService
+                .findActiveCoordinatedMinistriesByPersonId(result.person().getId());
+        return toMinistriesResponseDTO(result.person().getId(), result.activeMinistries(), coordinatedMinistries);
     }
 
     @Override
@@ -393,32 +390,10 @@ public class PersonServiceImpl implements PersonService {
         return dto;
     }
 
-    private PersonMinistriesResponseDTO toMinistriesResponseDTO(Long id, List<PersonMinistryMembershipView> ministries) {
-        return new PersonMinistriesResponseDTO(
-                id,
-                ministries.stream()
-                        .sorted(Comparator
-                                .comparing(PersonMinistryMembershipView::name)
-                                .thenComparing(PersonMinistryMembershipView::id))
-                        .map(ministry -> new PersonMinistryMembershipResponseDTO(
-                                ministry.id(),
-                                ministry.name(),
-                                ministry.coordinator()
-                        ))
-                        .toList()
-        );
-    }
-
-    private List<MinistrySummaryDTO> toMinistrySummaries(List<PersonMinistryMembershipView> ministries) {
-        if (ministries == null || ministries.isEmpty()) {
-            return List.of();
-        }
-        return ministries.stream()
-                .sorted(Comparator
-                        .comparing(PersonMinistryMembershipView::name)
-                        .thenComparing(PersonMinistryMembershipView::id))
-                .map(ministry -> new MinistrySummaryDTO(ministry.id(), ministry.name()))
-                .toList();
+    private PersonMinistriesResponseDTO toMinistriesResponseDTO(
+            Long id, Set<MinistryType> ministries, Set<MinistryType> coordinatedMinistries
+    ) {
+        return new PersonMinistriesResponseDTO(id, sortedMinistries(ministries), sortedMinistries(coordinatedMinistries));
     }
 
     private List<MinistryType> sortedMinistries(Set<MinistryType> ministries) {
@@ -434,12 +409,6 @@ public class PersonServiceImpl implements PersonService {
                 .getOrDefault(personId, Set.of());
     }
 
-    private List<PersonMinistryMembershipView> activeMinistryMembershipsForPerson(Long personId) {
-        return personMinistryReadService
-                .findActiveMinistryMembershipsByPersonIds(List.of(personId))
-                .getOrDefault(personId, List.of());
-    }
-
     private List<String> rolesForPerson(Long personId) {
         return userAccountRoleRepository
                 .findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(personId))
@@ -453,20 +422,30 @@ public class PersonServiceImpl implements PersonService {
         return roles.stream().sorted().toList();
     }
 
-    private List<Long> parseDesiredMinistryIds(List<Long> rawMinistryIds) {
-        if (rawMinistryIds == null) {
+    private Set<MinistryType> parseDesiredMinistries(List<String> rawMinistries) {
+        if (rawMinistries == null) {
             throw new BusinessException("O conjunto de ministerios e obrigatorio");
         }
-        Set<Long> desired = new LinkedHashSet<>();
-        for (Long ministryId : rawMinistryIds) {
-            if (ministryId == null || ministryId <= 0) {
-                throw new BadRequestException("Id de ministerio invalido");
-            }
-            if (!desired.add(ministryId)) {
-                throw new BusinessException("Ministerio duplicado no request: " + ministryId);
+        Set<MinistryType> desired = new LinkedHashSet<>();
+        for (String rawMinistry : rawMinistries) {
+            MinistryType ministryType = parseMinistryType(rawMinistry);
+            if (!desired.add(ministryType)) {
+                throw new BusinessException("Ministerio duplicado no request: " + ministryType.name());
             }
         }
-        return List.copyOf(desired);
+        return desired;
+    }
+
+    private MinistryType parseMinistryType(String rawMinistry) {
+        String normalized = normalizeOptionalFilter(rawMinistry);
+        if (normalized == null) {
+            throw new BadRequestException("Tipo de ministerio invalido");
+        }
+        try {
+            return MinistryType.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Tipo de ministerio invalido: " + rawMinistry);
+        }
     }
 
     private void validateId(Long id) {
@@ -491,17 +470,16 @@ public class PersonServiceImpl implements PersonService {
         return value.trim();
     }
 
-    private Long normalizeMinistryIdFilter(Long ministryId) {
-        if (ministryId == null) {
+    private MinistryType normalizeMinistryFilter(String ministry) {
+        String normalized = normalizeOptionalFilter(ministry);
+        if (normalized == null) {
             return null;
         }
-        if (ministryId <= 0) {
-            throw new BadRequestException("Id de ministerio invalido");
+        try {
+            return MinistryType.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Ministerio invalido");
         }
-        if (!ministryRepository.existsById(ministryId)) {
-            throw new ResourceNotFoundException("Ministerio", ministryId);
-        }
-        return ministryId;
     }
 
     private String normalizeRoleFilter(String role) {

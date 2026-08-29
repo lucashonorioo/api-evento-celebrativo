@@ -197,8 +197,8 @@ public class PersonController {
     public ResponseEntity<Page<PersonAdminResponseDTO>> findPeople(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phoneNumber,
-            @Parameter(description = "Id persistente do ministerio ativo")
-            @RequestParam(required = false) Long ministryId,
+            @Parameter(description = "Ministerio ativo: reader, commentator, minister_of_the_word, eucharistic_minister, priest")
+            @RequestParam(required = false) String ministry,
             @Parameter(description = "Perfil de acesso: ROLE_ADMIN ou ROLE_OPERATOR")
             @RequestParam(required = false) String role,
             @Parameter(description = "true: somente pessoas ativas. false: somente pessoas inativas.")
@@ -213,7 +213,7 @@ public class PersonController {
         Page<PersonAdminResponseDTO> people = personService.findPeople(
                 name,
                 phoneNumber,
-                ministryId,
+                ministry,
                 role,
                 personActive,
                 accountExists,

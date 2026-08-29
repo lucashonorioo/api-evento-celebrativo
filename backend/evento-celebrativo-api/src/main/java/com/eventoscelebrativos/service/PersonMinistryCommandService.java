@@ -4,7 +4,6 @@ import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.Person;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -62,6 +61,4 @@ public interface PersonMinistryCommandService {
      * do mesmo tipo.
      */
     PersonMinistrySyncResult syncMinistries(Long personId, Set<MinistryType> desiredMinistries);
-
-    PersonMinistryCatalogSyncResult syncMinistriesById(Long personId, List<Long> desiredMinistryIds);
 }

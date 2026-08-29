@@ -97,9 +97,6 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, "/notificacoes", "/notificacoes/*").hasAnyAuthority("ROLE_ADMIN", "ROLE_OPERATOR")
 				.requestMatchers(HttpMethod.GET, "/admin/notificacoes/*/destinatarios").hasAuthority("ROLE_ADMIN")
 				.requestMatchers(HttpMethod.GET, "/admin/notificacoes", "/admin/notificacoes/*").hasAuthority("ROLE_ADMIN")
-				.requestMatchers(HttpMethod.GET, "/ministerios", "/ministerios/*").hasAuthority("ROLE_ADMIN")
-				.requestMatchers(HttpMethod.POST, "/ministerios").hasAuthority("ROLE_ADMIN")
-				.requestMatchers(HttpMethod.PUT, "/ministerios/*", "/ministerios/*/status").hasAuthority("ROLE_ADMIN")
 				.anyRequest().authenticated());
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer
 				.jwt(jwt -> jwt.jwtAuthenticationConverter(userAccountJwtAuthenticationConverter)));

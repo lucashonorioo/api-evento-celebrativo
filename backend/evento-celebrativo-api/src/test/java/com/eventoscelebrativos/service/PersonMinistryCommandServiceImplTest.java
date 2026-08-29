@@ -11,7 +11,6 @@ import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
-import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
@@ -52,9 +51,6 @@ class PersonMinistryCommandServiceImplTest {
     private PersonRepository personRepository;
 
     @Mock
-    private MinistryRepository ministryRepository;
-
-    @Mock
     private PersonMinistryRepository personMinistryRepository;
 
     @Mock
@@ -88,30 +84,10 @@ class PersonMinistryCommandServiceImplTest {
                     }
                     return ministries;
                 });
-        lenient().when(legacyMinistryTypeResolver.requireTypesByPersistentMinistryId(anyCollection()))
-                .thenAnswer(invocation -> {
-                    @SuppressWarnings("unchecked")
-                    Collection<Long> ministryIds = invocation.getArgument(0);
-                    Map<Long, MinistryType> types = new java.util.LinkedHashMap<>();
-                    for (Long ministryId : ministryIds) {
-                        types.put(ministryId, ministryTypeFor(ministryId));
-                    }
-                    return types;
-                });
         lenient().when(legacyMinistryTypeResolver.requireMinistryType(any(Ministry.class)))
-                .thenAnswer(invocation -> ministryTypeFor(invocation.<Ministry>getArgument(0)));
+                .thenAnswer(invocation -> ministryTypeFor(invocation.getArgument(0)));
         lenient().when(legacyMinistryTypeResolver.requireEventAssignmentType(any(Ministry.class)))
-                .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.<Ministry>getArgument(0)).name()));
-        lenient().when(ministryRepository.findByIdForUpdate(anyLong()))
-                .thenAnswer(invocation -> Optional.of(unitMinistry(ministryTypeFor(invocation.<Long>getArgument(0)))));
-        lenient().when(ministryRepository.findAllByIdInForUpdate(anyCollection()))
-                .thenAnswer(invocation -> {
-                    @SuppressWarnings("unchecked")
-                    Collection<Long> ministryIds = invocation.getArgument(0);
-                    return ministryIds.stream()
-                            .map(id -> unitMinistry(ministryTypeFor(id)))
-                            .toList();
-                });
+                .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.getArgument(0)).name()));
     }
 
     @Test
@@ -142,7 +118,7 @@ class PersonMinistryCommandServiceImplTest {
         ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
-        assertEquals(readerMinistry.getId(), captor.getValue().getMinistry().getId());
+        assertSame(readerMinistry, captor.getValue().getMinistry());
         assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
     }
 
@@ -747,12 +723,8 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     private MinistryType ministryTypeFor(Ministry ministry) {
-        return ministryTypeFor(ministry.getId());
-    }
-
-    private MinistryType ministryTypeFor(Long ministryId) {
         for (MinistryType ministryType : MinistryType.values()) {
-            if (ministryId(ministryType).equals(ministryId)) {
+            if (ministryId(ministryType).equals(ministry.getId())) {
                 return ministryType;
             }
         }
