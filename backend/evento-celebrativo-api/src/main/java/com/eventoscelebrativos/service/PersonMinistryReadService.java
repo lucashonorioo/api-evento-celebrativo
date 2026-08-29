@@ -20,8 +20,6 @@ public interface PersonMinistryReadService {
 
     List<Person> findAllActivePeopleByMinistry(MinistryType ministryType);
 
-    Map<Long, List<PersonMinistryMembershipView>> findActiveMinistryMembershipsByPersonIds(Collection<Long> personIds);
-
     Map<Long, Set<MinistryType>> findActiveMinistriesByPersonIds(Collection<Long> personIds);
 
     /**

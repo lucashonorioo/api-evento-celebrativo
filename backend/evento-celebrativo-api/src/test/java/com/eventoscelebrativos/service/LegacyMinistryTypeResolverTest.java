@@ -2,12 +2,10 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
 import com.eventoscelebrativos.model.EventAssignmentType;
-import com.eventoscelebrativos.model.LegacyMinistryTypeMapping;
 import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
-import com.eventoscelebrativos.repository.LegacyMinistryTypeMappingRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collection;
 import java.util.List;
@@ -25,9 +23,8 @@ import static org.mockito.Mockito.when;
 
 class LegacyMinistryTypeResolverTest {
 
-    private final LegacyMinistryTypeMappingRepository mappingRepository =
-            mock(LegacyMinistryTypeMappingRepository.class);
-    private final LegacyMinistryTypeResolver resolver = new LegacyMinistryTypeResolver(mappingRepository);
+    private final MinistryRepository ministryRepository = mock(MinistryRepository.class);
+    private final LegacyMinistryTypeResolver resolver = new LegacyMinistryTypeResolver(ministryRepository);
 
     @Test
     void shouldParseLegacyMinistryTypeCaseInsensitively() {
@@ -42,24 +39,20 @@ class LegacyMinistryTypeResolverTest {
     }
 
     @Test
-    void shouldResolveLegacyTypeByPersistentMapping() {
+    void shouldResolveLegacyTypeByCatalogNormalizedName() {
         Ministry reader = unitMinistry(MinistryType.READER);
-        when(mappingRepository.findByMinistryType(MinistryType.READER))
-                .thenReturn(Optional.of(mapping(reader, MinistryType.READER)));
+        when(ministryRepository.findByNormalizedName("LEITORES")).thenReturn(Optional.of(reader));
 
         assertSame(reader, resolver.requireMinistry(MinistryType.READER));
-        verify(mappingRepository).findByMinistryType(MinistryType.READER);
+        verify(ministryRepository).findByNormalizedName("LEITORES");
     }
 
     @Test
     void shouldResolveDistinctLegacyTypesInSingleBatch() {
         Ministry reader = unitMinistry(MinistryType.READER);
         Ministry commentator = unitMinistry(MinistryType.COMMENTATOR);
-        when(mappingRepository.findByMinistryTypeIn(argThat(this::containsReaderAndCommentator)))
-                .thenReturn(List.of(
-                        mapping(reader, MinistryType.READER),
-                        mapping(commentator, MinistryType.COMMENTATOR)
-                ));
+        when(ministryRepository.findByNormalizedNameIn(argThat(this::containsReaderAndCommentator)))
+                .thenReturn(List.of(reader, commentator));
 
         Map<MinistryType, Ministry> result = resolver.requireMinistries(List.of(
                 MinistryType.READER,
@@ -73,60 +66,37 @@ class LegacyMinistryTypeResolverTest {
     }
 
     @Test
-    void shouldRejectMissingCatalogMapping() {
-        when(mappingRepository.findByMinistryType(MinistryType.READER)).thenReturn(Optional.empty());
+    void shouldRejectMissingCatalogRow() {
+        when(ministryRepository.findByNormalizedName("LEITORES")).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class, () -> resolver.requireMinistry(MinistryType.READER));
     }
 
     @Test
-    void shouldConvertPersistentMinistryBackToLegacyTypeById() {
-        Ministry reader = unitMinistry(MinistryType.READER);
-        when(mappingRepository.findByMinistryId(reader.getId()))
-                .thenReturn(Optional.of(mapping(reader, MinistryType.READER)));
-
-        assertEquals(MinistryType.READER, resolver.requireMinistryType(reader));
-    }
-
-    @Test
-    void shouldConvertPersistentMinistryBackToLegacyTypeAfterRename() {
-        Ministry reader = unitMinistry(MinistryType.READER);
-        reader.rename("Leitores e Salmistas");
-        when(mappingRepository.findByMinistryId(reader.getId()))
-                .thenReturn(Optional.of(mapping(reader, MinistryType.READER)));
-
-        assertEquals(MinistryType.READER, resolver.requireMinistryType(reader));
+    void shouldConvertPersistentMinistryBackToLegacyType() {
+        assertEquals(MinistryType.READER, resolver.requireMinistryType(unitMinistry(MinistryType.READER)));
+        assertEquals(MinistryType.COMMENTATOR, resolver.requireMinistryType("COMENTARISTAS"));
     }
 
     @Test
     void shouldRejectPersistentMinistryWithoutLegacyEquivalent() {
         Ministry acolitos = new Ministry("Acolitos");
-        ReflectionTestUtils.setField(acolitos, "id", 99L);
-        when(mappingRepository.findByMinistryId(acolitos.getId())).thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class, () -> resolver.requireMinistryType(acolitos));
     }
 
     @Test
     void shouldConvertPersistentMinistryToLegacyEventAssignmentType() {
-        Ministry eucharisticMinister = unitMinistry(MinistryType.EUCHARISTIC_MINISTER);
-        when(mappingRepository.findByMinistryId(eucharisticMinister.getId()))
-                .thenReturn(Optional.of(mapping(eucharisticMinister, MinistryType.EUCHARISTIC_MINISTER)));
-
         assertEquals(
                 EventAssignmentType.EUCHARISTIC_MINISTER,
-                resolver.requireEventAssignmentType(eucharisticMinister)
+                resolver.requireEventAssignmentType(unitMinistry(MinistryType.EUCHARISTIC_MINISTER))
         );
     }
 
-    private LegacyMinistryTypeMapping mapping(Ministry ministry, MinistryType ministryType) {
-        return new LegacyMinistryTypeMapping(ministry, ministryType);
-    }
-
-    private boolean containsReaderAndCommentator(Collection<MinistryType> ministryTypes) {
-        return ministryTypes != null
-                && ministryTypes.size() == 2
-                && ministryTypes.contains(MinistryType.READER)
-                && ministryTypes.contains(MinistryType.COMMENTATOR);
+    private boolean containsReaderAndCommentator(Collection<String> normalizedNames) {
+        return normalizedNames != null
+                && normalizedNames.size() == 2
+                && normalizedNames.contains("LEITORES")
+                && normalizedNames.contains("COMENTARISTAS");
     }
 }

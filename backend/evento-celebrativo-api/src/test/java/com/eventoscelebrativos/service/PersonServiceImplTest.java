@@ -6,9 +6,7 @@ import com.eventoscelebrativos.dto.request.PersonMinistriesUpdateRequestDTO;
 import com.eventoscelebrativos.dto.request.PersonRoleUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserProfileResponseDTO;
 import com.eventoscelebrativos.dto.response.CurrentUserScheduleResponseDTO;
-import com.eventoscelebrativos.dto.response.MinistrySummaryDTO;
 import com.eventoscelebrativos.dto.response.PersonAdminResponseDTO;
-import com.eventoscelebrativos.dto.response.PersonMinistryMembershipResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonMinistriesResponseDTO;
 import com.eventoscelebrativos.dto.response.PersonRoleUpdateResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
@@ -25,13 +23,11 @@ import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.projection.PersonScheduleAssignmentProjection;
 import com.eventoscelebrativos.projection.PersonScheduleEventProjection;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
-import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.repository.RoleRepository;
 import com.eventoscelebrativos.repository.UserAccountRoleRepository;
 import com.eventoscelebrativos.security.AuthenticatedUserResolver;
 import com.eventoscelebrativos.service.impl.PersonServiceImpl;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,9 +57,6 @@ class PersonServiceImplTest {
 
     @Mock
     private PersonRepository personRepository;
-
-    @Mock
-    private MinistryRepository ministryRepository;
 
     @Mock
     private RoleRepository roleRepository;
@@ -104,20 +97,11 @@ class PersonServiceImplTest {
     @Mock
     private PersonCadastralUpdateService personCadastralUpdateService;
 
+    @Mock
+    private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
     @InjectMocks
     private PersonServiceImpl service;
-
-    @BeforeEach
-    void setUpDefaultAdministrativeLookups() {
-        lenient().when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(anyCollection()))
-                .thenReturn(Map.of());
-        lenient().when(personMinistryReadService.findActiveMinistriesByPersonIds(anyCollection()))
-                .thenReturn(Map.of());
-        lenient().when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(anyCollection()))
-                .thenReturn(Map.of());
-        lenient().when(userAccountRepository.findAccountStatesByPersonIdInGroupedByPerson(anyCollection()))
-                .thenReturn(Map.of());
-    }
 
     @Test
     void shouldFindPeopleWithPaginationAndCombinedFilters() {
@@ -126,24 +110,25 @@ class PersonServiceImplTest {
         Person second = person(1L, "Alice", "34922222222");
         Long readerMinistryId = unitMinistry(MinistryType.READER).getId();
 
-        when(ministryRepository.existsById(readerMinistryId)).thenReturn(true);
+        when(legacyMinistryTypeResolver.requireMinistry(MinistryType.READER))
+                .thenReturn(unitMinistry(MinistryType.READER));
         when(personRepository.findAdminPageIds("Ali", "349", readerMinistryId, "ROLE_ADMIN", null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(2L, 1L), pageable, 2));
         when(personRepository.findAllByIdIn(List.of(2L, 1L)))
                 .thenReturn(List.of(second, first));
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(2L, 1L)))
-                .thenReturn(ministriesByPerson(2L, MinistryType.READER));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(2L, 1L)))
+                .thenReturn(Map.of(2L, Set.of(MinistryType.READER)));
         when(personAdminMapper.toDto(first)).thenReturn(adminResponse(2L, "Alice", "ROLE_ADMIN"));
         when(personAdminMapper.toDto(second)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople(" Ali ", " 349 ", readerMinistryId, "ROLE_ADMIN", null, null, null, 0, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople(" Ali ", " 349 ", "reader", "ROLE_ADMIN", null, null, null, 0, 10);
 
         assertEquals(2, result.getTotalElements());
         assertEquals(2L, result.getContent().get(0).getId());
-        assertEquals(List.of(readerMinistryId), ministryIds(result.getContent().get(0).getMinistries()));
+        assertEquals(List.of(MinistryType.READER), result.getContent().get(0).getMinistries());
         assertEquals(1L, result.getContent().get(1).getId());
         assertEquals(List.of(), result.getContent().get(1).getMinistries());
-        verify(personMinistryReadService, times(1)).findActiveMinistryMembershipsByPersonIds(List.of(2L, 1L));
+        verify(personMinistryReadService, times(1)).findActiveMinistriesByPersonIds(List.of(2L, 1L));
     }
 
     @Test
@@ -155,15 +140,15 @@ class PersonServiceImplTest {
                 .thenReturn(new PageImpl<>(List.of(1L), pageable, 1));
         when(personRepository.findAllByIdIn(List.of(1L)))
                 .thenReturn(List.of(person));
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Alice", "ROLE_OPERATOR"));
 
         Page<PersonAdminResponseDTO> result = service.findPeople(null, null, null, null, null, null, null, 0, 10);
 
         assertEquals(
-                List.of(ministryId(MinistryType.READER), ministryId(MinistryType.EUCHARISTIC_MINISTER), ministryId(MinistryType.PRIEST)),
-                ministryIds(result.getContent().get(0).getMinistries())
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                result.getContent().get(0).getMinistries()
         );
     }
 
@@ -184,7 +169,7 @@ class PersonServiceImplTest {
     void shouldThrowBadRequestWhenFiltersOrPaginationAreInvalid() {
         assertAll(
                 () -> assertThrows(BadRequestException.class,
-                        () -> service.findPeople(null, null, 0L, null, null, null, null, 0, 10)),
+                        () -> service.findPeople(null, null, "invalid", null, null, null, null, 0, 10)),
                 () -> assertThrows(BadRequestException.class,
                         () -> service.findPeople(null, null, null, "ROLE_UNKNOWN", null, null, null, 0, 10)),
                 () -> assertThrows(BadRequestException.class,
@@ -210,14 +195,15 @@ class PersonServiceImplTest {
 
     @ParameterizedTest
     @EnumSource(MinistryType.class)
-    void shouldFilterPeopleByEachOfTheFiveLegacyMinistryIds(MinistryType ministryType) {
+    void shouldFilterPeopleByEachOfTheFiveMinistryTypes(MinistryType ministryType) {
         PageRequest pageable = PageRequest.of(0, 10);
+        String filterValue = ministryType.name().toLowerCase();
         Long ministryId = unitMinistry(ministryType).getId();
-        when(ministryRepository.existsById(ministryId)).thenReturn(true);
+        when(legacyMinistryTypeResolver.requireMinistry(ministryType)).thenReturn(unitMinistry(ministryType));
         when(personRepository.findAdminPageIds(null, null, ministryId, null, null, null, null, pageable))
                 .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, ministryId, null, null, null, null, 0, 10);
+        Page<PersonAdminResponseDTO> result = service.findPeople(null, null, filterValue, null, null, null, null, 0, 10);
 
         assertEquals(0, result.getTotalElements());
         verify(personRepository).findAdminPageIds(null, null, ministryId, null, null, null, null, pageable);
@@ -227,6 +213,8 @@ class PersonServiceImplTest {
     void shouldFindPersonById() {
         Person person = person(1L, "Reader", "34999999991");
         when(personRepository.findById(1L)).thenReturn(Optional.of(person));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
 
         PersonAdminResponseDTO response = service.findPersonById(1L);
@@ -240,15 +228,15 @@ class PersonServiceImplTest {
     void shouldFindPersonByIdWithSeveralMinistriesSortedDeterministically() {
         Person person = person(1L, "Reader", "34999999991");
         when(personRepository.findById(1L)).thenReturn(Optional.of(person));
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
         when(personAdminMapper.toDto(person)).thenReturn(adminResponse(1L, "Reader", "ROLE_OPERATOR"));
 
         PersonAdminResponseDTO response = service.findPersonById(1L);
 
         assertEquals(
-                List.of(ministryId(MinistryType.READER), ministryId(MinistryType.EUCHARISTIC_MINISTER), ministryId(MinistryType.PRIEST)),
-                ministryIds(response.getMinistries())
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                response.getMinistries()
         );
     }
 
@@ -273,8 +261,8 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.READER));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
         when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
                 .thenReturn(Map.of(1L, List.of("ROLE_ADMIN")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
@@ -283,7 +271,7 @@ class PersonServiceImplTest {
 
         assertEquals(1L, response.getId());
         assertEquals("ROLE_ADMIN", response.getRoles().get(0));
-        assertEquals(List.of(ministryId(MinistryType.READER)), ministryIds(response.getMinistries()));
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
         verify(userAccountLifecycleService).updateRole(1L, "ROLE_ADMIN");
     }
 
@@ -292,6 +280,8 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_OPERATOR")).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
                 .thenReturn(Map.of(1L, List.of("ROLE_OPERATOR")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_OPERATOR"));
@@ -307,6 +297,8 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
 
         service.updatePersonRole(1L, new PersonRoleUpdateRequestDTO("ROLE_ADMIN"));
@@ -374,6 +366,8 @@ class PersonServiceImplTest {
         Person person = person(1L, "Reader", "34999999991");
 
         when(userAccountLifecycleService.updateRole(1L, "ROLE_ADMIN")).thenReturn(person);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of());
         when(userAccountRoleRepository.findRoleAuthoritiesByPersonIdsGroupedByPerson(List.of(1L)))
                 .thenReturn(Map.of(1L, List.of("ROLE_ADMIN")));
         when(personRoleUpdateMapper.toDto(person)).thenReturn(roleResponse("ROLE_ADMIN"));
@@ -400,6 +394,7 @@ class PersonServiceImplTest {
     @Test
     void shouldFindPersonMinistriesWithZeroMinistries() {
         when(personRepository.existsById(1L)).thenReturn(true);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L))).thenReturn(Map.of());
 
         PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
 
@@ -410,52 +405,52 @@ class PersonServiceImplTest {
     @Test
     void shouldFindPersonMinistriesWithOneMinistry() {
         when(personRepository.existsById(1L)).thenReturn(true);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.READER));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
 
         PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
 
-        assertEquals(List.of(ministryId(MinistryType.READER)), membershipIds(response.getMinistries()));
-        assertEquals(List.of("Leitores"), membershipNames(response.getMinistries()));
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
     }
 
     @Test
     void shouldFindPersonMinistriesWithSeveralMinistriesSortedByNaturalOrder() {
         when(personRepository.existsById(1L)).thenReturn(true);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.EUCHARISTIC_MINISTER, MinistryType.READER, MinistryType.PRIEST)));
 
         PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
 
         assertEquals(
-                List.of(ministryId(MinistryType.READER), ministryId(MinistryType.EUCHARISTIC_MINISTER), ministryId(MinistryType.PRIEST)),
-                membershipIds(response.getMinistries())
+                List.of(MinistryType.PRIEST, MinistryType.READER, MinistryType.EUCHARISTIC_MINISTER),
+                response.getMinistries()
         );
     }
 
     @Test
     void shouldIncludeCoordinatedMinistriesSubsetWhenFindingMinistries() {
         when(personRepository.existsById(1L)).thenReturn(true);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(Map.of(1L, List.of(
-                        membershipView(MinistryType.READER, true),
-                        membershipView(MinistryType.COMMENTATOR, false)
-                )));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)));
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L))
+                .thenReturn(Set.of(MinistryType.READER));
 
         PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
 
-        assertEquals(List.of(false, true), coordinatorFlags(response.getMinistries()));
+        assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
+        assertEquals(List.of(MinistryType.READER), response.getCoordinatedMinistries());
     }
 
     @Test
     void shouldReturnEmptyCoordinatedMinistriesWhenPersonCoordinatesNothing() {
         when(personRepository.existsById(1L)).thenReturn(true);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(Map.of(1L, List.of(membershipView(MinistryType.READER, false))));
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L)))
+                .thenReturn(Map.of(1L, Set.of(MinistryType.READER)));
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L)).thenReturn(Set.of());
 
         PersonMinistriesResponseDTO response = service.findPersonMinistries(1L);
 
-        assertEquals(List.of(false), coordinatorFlags(response.getMinistries()));
+        assertEquals(List.of(), response.getCoordinatedMinistries());
     }
 
     @Test
@@ -479,67 +474,57 @@ class PersonServiceImplTest {
     @Test
     void shouldUpdatePersonMinistriesDelegatingParsedSetToCommandService() {
         Person person = person(1L, "Reader", "34999999991");
-        Long readerMinistryId = ministryId(MinistryType.READER);
-        Long commentatorMinistryId = ministryId(MinistryType.COMMENTATOR);
-        PersonMinistryCatalogSyncResult result = new PersonMinistryCatalogSyncResult(
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
                 person,
-                Set.of(readerMinistryId, commentatorMinistryId),
-                Set.of(commentatorMinistryId),
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                Set.of(MinistryType.COMMENTATOR),
                 Set.of(),
                 Set.of(),
-                Set.of(readerMinistryId)
+                Set.of(MinistryType.READER)
         );
-        when(personMinistryCommandService.syncMinistriesById(1L, List.of(readerMinistryId, commentatorMinistryId)))
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)))
                 .thenReturn(result);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.READER, MinistryType.COMMENTATOR));
 
         PersonMinistriesResponseDTO response = service.updatePersonMinistries(
                 1L,
-                new PersonMinistriesUpdateRequestDTO(List.of(readerMinistryId, commentatorMinistryId))
+                new PersonMinistriesUpdateRequestDTO(List.of("READER", "COMMENTATOR"))
         );
 
         assertEquals(1L, response.getId());
-        assertEquals(List.of(ministryId(MinistryType.COMMENTATOR), ministryId(MinistryType.READER)), membershipIds(response.getMinistries()));
-        verify(personMinistryCommandService).syncMinistriesById(1L, List.of(readerMinistryId, commentatorMinistryId));
+        assertEquals(List.of(MinistryType.READER, MinistryType.COMMENTATOR), response.getMinistries());
     }
 
     @Test
     void shouldIncludeCoordinatedMinistriesAfterSync() {
         Person person = person(1L, "Reader", "34999999991");
-        Long readerMinistryId = ministryId(MinistryType.READER);
-        Long commentatorMinistryId = ministryId(MinistryType.COMMENTATOR);
-        PersonMinistryCatalogSyncResult result = new PersonMinistryCatalogSyncResult(
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
                 person,
-                Set.of(readerMinistryId, commentatorMinistryId),
-                Set.of(commentatorMinistryId),
+                Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
+                Set.of(MinistryType.COMMENTATOR),
                 Set.of(),
                 Set.of(),
-                Set.of(readerMinistryId)
+                Set.of(MinistryType.READER)
         );
-        when(personMinistryCommandService.syncMinistriesById(1L, List.of(readerMinistryId, commentatorMinistryId)))
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER, MinistryType.COMMENTATOR)))
                 .thenReturn(result);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(Map.of(1L, List.of(
-                        membershipView(MinistryType.READER, true),
-                        membershipView(MinistryType.COMMENTATOR, false)
-                )));
+        when(personMinistryReadService.findActiveCoordinatedMinistriesByPersonId(1L))
+                .thenReturn(Set.of(MinistryType.READER));
 
         PersonMinistriesResponseDTO response = service.updatePersonMinistries(
                 1L,
-                new PersonMinistriesUpdateRequestDTO(List.of(readerMinistryId, commentatorMinistryId))
+                new PersonMinistriesUpdateRequestDTO(List.of("READER", "COMMENTATOR"))
         );
 
-        assertEquals(List.of(false, true), coordinatorFlags(response.getMinistries()));
+        assertEquals(List.of(MinistryType.READER), response.getCoordinatedMinistries());
     }
 
     @Test
     void shouldAllowEmptyMinistriesListInUpdateRequestMeaningRemoveAll() {
         Person person = person(1L, "Reader", "34999999991");
-        PersonMinistryCatalogSyncResult result = new PersonMinistryCatalogSyncResult(
-                person, Set.of(), Set.of(), Set.of(), Set.of(ministryId(MinistryType.READER)), Set.of()
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person, Set.of(), Set.of(), Set.of(), Set.of(MinistryType.READER), Set.of()
         );
-        when(personMinistryCommandService.syncMinistriesById(1L, List.of())).thenReturn(result);
+        when(personMinistryCommandService.syncMinistries(1L, Set.of())).thenReturn(result);
 
         PersonMinistriesResponseDTO response = service.updatePersonMinistries(
                 1L,
@@ -558,46 +543,39 @@ class PersonServiceImplTest {
 
     @Test
     void shouldRejectDuplicateMinistryInUpdateRequest() {
-        Long readerMinistryId = ministryId(MinistryType.READER);
         assertThrows(BusinessException.class,
-                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of(readerMinistryId, readerMinistryId))));
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of("READER", "READER"))));
         verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
-    void shouldRejectInvalidMinistryIdInUpdateRequest() {
+    void shouldRejectInvalidMinistryValueInUpdateRequest() {
         assertThrows(BadRequestException.class,
-                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of(0L))));
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of("BISHOP"))));
         verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
-    void shouldRejectNullMinistryIdInUpdateRequest() {
+    void shouldRejectBlankMinistryValueInUpdateRequest() {
         assertThrows(BadRequestException.class,
-                () -> service.updatePersonMinistries(
-                        1L,
-                        new PersonMinistriesUpdateRequestDTO(java.util.Collections.singletonList(null))
-                ));
+                () -> service.updatePersonMinistries(1L, new PersonMinistriesUpdateRequestDTO(List.of(" "))));
         verifyNoInteractions(personMinistryCommandService);
     }
 
     @Test
-    void shouldAcceptMinistryIds() {
+    void shouldAcceptMinistryValueRegardlessOfCase() {
         Person person = person(1L, "Reader", "34999999991");
-        Long readerMinistryId = ministryId(MinistryType.READER);
-        PersonMinistryCatalogSyncResult result = new PersonMinistryCatalogSyncResult(
-                person, Set.of(readerMinistryId), Set.of(readerMinistryId), Set.of(), Set.of(), Set.of()
+        PersonMinistrySyncResult result = new PersonMinistrySyncResult(
+                person, Set.of(MinistryType.READER), Set.of(MinistryType.READER), Set.of(), Set.of(), Set.of()
         );
-        when(personMinistryCommandService.syncMinistriesById(1L, List.of(readerMinistryId))).thenReturn(result);
-        when(personMinistryReadService.findActiveMinistryMembershipsByPersonIds(List.of(1L)))
-                .thenReturn(ministriesByPerson(1L, MinistryType.READER));
+        when(personMinistryCommandService.syncMinistries(1L, Set.of(MinistryType.READER))).thenReturn(result);
 
         PersonMinistriesResponseDTO response = service.updatePersonMinistries(
                 1L,
-                new PersonMinistriesUpdateRequestDTO(List.of(readerMinistryId))
+                new PersonMinistriesUpdateRequestDTO(List.of("reader"))
         );
 
-        assertEquals(List.of(readerMinistryId), membershipIds(response.getMinistries()));
+        assertEquals(List.of(MinistryType.READER), response.getMinistries());
     }
 
     @Test
@@ -832,6 +810,7 @@ class PersonServiceImplTest {
                 requestDTO.getPhoneNumber(),
                 requestDTO.getBirthdayDate()
         )).thenReturn(saved);
+        when(personMinistryReadService.findActiveMinistriesByPersonIds(List.of(1L))).thenReturn(Map.of());
         when(personAdminMapper.toDto(saved)).thenReturn(adminResponse(1L, "New Name", "ROLE_OPERATOR"));
 
         PersonAdminResponseDTO response = service.updatePersonAdmin(1L, requestDTO);
@@ -1268,49 +1247,5 @@ class PersonServiceImplTest {
                 List.of(),
                 List.of(role)
         );
-    }
-
-    private Map<Long, List<PersonMinistryMembershipView>> ministriesByPerson(
-            Long personId,
-            MinistryType... ministryTypes
-    ) {
-        return Map.of(
-                personId,
-                List.of(ministryTypes).stream()
-                        .map(type -> membershipView(type, false))
-                        .toList()
-        );
-    }
-
-    private PersonMinistryMembershipView membershipView(MinistryType ministryType, boolean coordinator) {
-        return new PersonMinistryMembershipView(
-                ministryId(ministryType),
-                ministryName(ministryType),
-                coordinator
-        );
-    }
-
-    private List<Long> ministryIds(List<MinistrySummaryDTO> ministries) {
-        return ministries.stream().map(MinistrySummaryDTO::getId).toList();
-    }
-
-    private List<Long> membershipIds(List<PersonMinistryMembershipResponseDTO> ministries) {
-        return ministries.stream().map(PersonMinistryMembershipResponseDTO::getId).toList();
-    }
-
-    private List<String> membershipNames(List<PersonMinistryMembershipResponseDTO> ministries) {
-        return ministries.stream().map(PersonMinistryMembershipResponseDTO::getName).toList();
-    }
-
-    private List<Boolean> coordinatorFlags(List<PersonMinistryMembershipResponseDTO> ministries) {
-        return ministries.stream().map(PersonMinistryMembershipResponseDTO::isCoordinator).toList();
-    }
-
-    private Long ministryId(MinistryType ministryType) {
-        return unitMinistry(ministryType).getId();
-    }
-
-    private String ministryName(MinistryType ministryType) {
-        return unitMinistry(ministryType).getName();
     }
 }

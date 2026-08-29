@@ -235,8 +235,7 @@ class PersonMinistryRepositoryTest {
         assertEquals(1, result.size());
         assertEquals(reader.getId(), result.get(0).getPersonId());
         assertEquals(persistentMinistry(MinistryType.READER, ministryRepository).getId(), result.get(0).getMinistryId());
-        assertEquals("Leitores", result.get(0).getMinistryName());
-        assertFalse(result.get(0).getCoordinator());
+        assertEquals("LEITORES", result.get(0).getMinistryNormalizedName());
     }
 
     @Test

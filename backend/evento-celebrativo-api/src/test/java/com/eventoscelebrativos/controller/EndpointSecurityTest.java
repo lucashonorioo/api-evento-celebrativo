@@ -618,9 +618,9 @@ class EndpointSecurityTest {
     private String ministriesPayload() {
         return """
                 {
-                  "ministryIds": [%d]
+                  "ministries": ["COMMENTATOR"]
                 }
-                """.formatted(commentatorMinistryId());
+                """;
     }
 
     private String unavailabilityPayload() {

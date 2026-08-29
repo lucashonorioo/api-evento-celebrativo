@@ -1,5 +1,7 @@
 package com.eventoscelebrativos.dto.response;
 
+import com.eventoscelebrativos.model.MinistryType;
+
 import java.util.List;
 
 public class PersonRoleUpdateResponseDTO {
@@ -7,16 +9,10 @@ public class PersonRoleUpdateResponseDTO {
     private Long id;
     private String name;
     private String phoneNumber;
-    private List<MinistrySummaryDTO> ministries;
+    private List<MinistryType> ministries;
     private List<String> roles;
 
-    public PersonRoleUpdateResponseDTO(
-            Long id,
-            String name,
-            String phoneNumber,
-            List<MinistrySummaryDTO> ministries,
-            List<String> roles
-    ) {
+    public PersonRoleUpdateResponseDTO(Long id, String name, String phoneNumber, List<MinistryType> ministries, List<String> roles) {
         this.id = id;
         this.name = name;
         this.phoneNumber = phoneNumber;
@@ -36,7 +32,7 @@ public class PersonRoleUpdateResponseDTO {
         return phoneNumber;
     }
 
-    public List<MinistrySummaryDTO> getMinistries() {
+    public List<MinistryType> getMinistries() {
         return ministries;
     }
 
