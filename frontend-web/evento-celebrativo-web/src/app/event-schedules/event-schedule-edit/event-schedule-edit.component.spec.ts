@@ -921,6 +921,7 @@ describe('EventScheduleEditComponent', () => {
     it('should block a duplicated submit while a contextual save is pending', async () => {
       const pendingSave = new Subject<UpdateEventScheduleResponse>();
       await setup('1', createDetail(), { replacePersonId: '5', replaceAssignmentType: 'READER' });
+      spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
       eventScheduleService.updateEventSchedule.and.returnValue(pendingSave);
       fixture.detectChanges();
 

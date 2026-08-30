@@ -197,8 +197,8 @@ public class PersonController {
     public ResponseEntity<Page<PersonAdminResponseDTO>> findPeople(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phoneNumber,
-            @Parameter(description = "Ministerio ativo: reader, commentator, minister_of_the_word, eucharistic_minister, priest")
-            @RequestParam(required = false) String ministry,
+            @Parameter(description = "Id persistente do ministerio ativo")
+            @RequestParam(required = false) Long ministryId,
             @Parameter(description = "Perfil de acesso: ROLE_ADMIN ou ROLE_OPERATOR")
             @RequestParam(required = false) String role,
             @Parameter(description = "true: somente pessoas ativas. false: somente pessoas inativas.")
@@ -213,7 +213,7 @@ public class PersonController {
         Page<PersonAdminResponseDTO> people = personService.findPeople(
                 name,
                 phoneNumber,
-                ministry,
+                ministryId,
                 role,
                 personActive,
                 accountExists,
@@ -424,7 +424,7 @@ public class PersonController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Ministerios atualizados com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "400", description = "Id de ministerio invalido"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),

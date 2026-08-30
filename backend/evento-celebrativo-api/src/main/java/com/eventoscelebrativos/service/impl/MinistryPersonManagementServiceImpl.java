@@ -4,6 +4,7 @@ import com.eventoscelebrativos.dto.request.MinistryPersonCreateRequestDTO;
 import com.eventoscelebrativos.dto.request.MinistryPersonUpdateRequestDTO;
 import com.eventoscelebrativos.dto.response.MinistryPersonResponseDTO;
 import com.eventoscelebrativos.exception.exceptions.BadRequestException;
+import com.eventoscelebrativos.exception.exceptions.MinistryInactiveException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.mapper.MinistryPersonMapper;
 import com.eventoscelebrativos.model.Ministry;
@@ -49,7 +50,10 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
     public Page<MinistryPersonResponseDTO> findPeople(Long ministryId, int page, int size) {
         validatePagination(page, size);
         Ministry ministry = requireMinistry(ministryId);
-        Page<Person> people = personMinistryReadService.findActivePeopleByMinistryId(ministry.getId(), PageRequest.of(page, size));
+        Page<Person> people = personMinistryReadService.findActivePeopleByMinistryId(
+                ministry.getId(),
+                PageRequest.of(page, size)
+        );
         return people.map(ministryPersonMapper::toDto);
     }
 
@@ -74,7 +78,7 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
     @Override
     @Transactional
     public MinistryPersonResponseDTO update(Long ministryId, Long personId, MinistryPersonUpdateRequestDTO requestDTO) {
-        Ministry ministry = requireMinistry(ministryId);
+        Ministry ministry = requireActiveMinistry(ministryId);
         requestDTO.rejectForbiddenFields();
         Person person = personMinistryCommandService.requireActiveMinistryPersonForUpdate(personId, ministry, ENTITY_LABEL);
         Person saved = personCadastralUpdateService.updateCadastral(
@@ -103,18 +107,26 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
 
     private Ministry requireMinistry(Long ministryId) {
         if (ministryId == null || ministryId <= 0) {
-            throw new BadRequestException("O Id do ministério deve ser positivo e não nulo");
+            throw new BadRequestException("O Id do ministerio deve ser positivo e nao nulo");
         }
         return ministryRepository.findById(ministryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ministério", ministryId));
+                .orElseThrow(() -> new ResourceNotFoundException("Ministerio", ministryId));
+    }
+
+    private Ministry requireActiveMinistry(Long ministryId) {
+        Ministry ministry = requireMinistry(ministryId);
+        if (!ministry.isActive()) {
+            throw new MinistryInactiveException();
+        }
+        return ministry;
     }
 
     private void validatePagination(int page, int size) {
         if (page < 0) {
-            throw new BadRequestException("O número da página deve ser maior ou igual a zero");
+            throw new BadRequestException("O numero da pagina deve ser maior ou igual a zero");
         }
         if (size <= 0 || size > MAX_PAGE_SIZE) {
-            throw new BadRequestException("O tamanho da página deve ser maior que zero e menor ou igual a 100");
+            throw new BadRequestException("O tamanho da pagina deve ser maior que zero e menor ou igual a 100");
         }
     }
 }

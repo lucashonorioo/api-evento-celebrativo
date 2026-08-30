@@ -109,7 +109,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
 
         MigrateResult result = migrateAll(dataSource);
 
-        assertEquals(1, result.migrationsExecuted);
+        assertEquals(2, result.migrationsExecuted);
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
                 SELECT pm.id, pm.person_id, pm.ministry_type, pm.ministry_id, pm.active, pm.coordinator,

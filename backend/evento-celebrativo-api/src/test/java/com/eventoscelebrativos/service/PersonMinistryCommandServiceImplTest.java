@@ -2,6 +2,8 @@ package com.eventoscelebrativos.service;
 
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
+import com.eventoscelebrativos.exception.exceptions.MinistryInactiveException;
+import com.eventoscelebrativos.exception.exceptions.MinistryLegacyCompatibilityRequiredException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -11,10 +13,12 @@ import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
 import com.eventoscelebrativos.repository.EventAssignmentRepository;
+import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.ParishStaffAssignmentRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
 import com.eventoscelebrativos.service.impl.PersonMinistryCommandServiceImpl;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +34,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -51,6 +56,9 @@ class PersonMinistryCommandServiceImplTest {
     private PersonRepository personRepository;
 
     @Mock
+    private MinistryRepository ministryRepository;
+
+    @Mock
     private PersonMinistryRepository personMinistryRepository;
 
     @Mock
@@ -61,6 +69,9 @@ class PersonMinistryCommandServiceImplTest {
 
     @Mock
     private LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+
+    @Mock
+    private EntityManager entityManager;
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneId.of("America/Sao_Paulo"));
@@ -84,10 +95,43 @@ class PersonMinistryCommandServiceImplTest {
                     }
                     return ministries;
                 });
+        lenient().when(legacyMinistryTypeResolver.requireTypesByPersistentMinistryId(anyCollection()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Collection<Long> ministryIds = invocation.getArgument(0);
+                    Map<Long, MinistryType> types = new java.util.LinkedHashMap<>();
+                    for (Long ministryId : ministryIds) {
+                        types.put(ministryId, ministryTypeFor(ministryId));
+                    }
+                    return types;
+                });
         lenient().when(legacyMinistryTypeResolver.requireMinistryType(any(Ministry.class)))
-                .thenAnswer(invocation -> ministryTypeFor(invocation.getArgument(0)));
+                .thenAnswer(invocation -> ministryTypeFor(invocation.<Ministry>getArgument(0)));
         lenient().when(legacyMinistryTypeResolver.requireEventAssignmentType(any(Ministry.class)))
-                .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.getArgument(0)).name()));
+                .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.<Ministry>getArgument(0)).name()));
+        lenient().when(ministryRepository.existsById(anyLong()))
+                .thenAnswer(invocation -> isKnownMinistryId(invocation.getArgument(0)));
+        lenient().when(ministryRepository.findAllById(any()))
+                .thenAnswer(invocation -> {
+                    Iterable<Long> ministryIds = invocation.getArgument(0);
+                    List<Ministry> ministries = new ArrayList<>();
+                    for (Long ministryId : ministryIds) {
+                        if (isKnownMinistryId(ministryId)) {
+                            ministries.add(unitMinistry(ministryTypeFor(ministryId)));
+                        }
+                    }
+                    return ministries;
+                });
+        lenient().when(ministryRepository.findByIdForUpdate(anyLong()))
+                .thenAnswer(invocation -> Optional.of(unitMinistry(ministryTypeFor(invocation.<Long>getArgument(0)))));
+        lenient().when(ministryRepository.findAllByIdInForUpdate(anyCollection()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Collection<Long> ministryIds = invocation.getArgument(0);
+                    return ministryIds.stream()
+                            .map(id -> unitMinistry(ministryTypeFor(id)))
+                            .toList();
+                });
     }
 
     @Test
@@ -118,7 +162,7 @@ class PersonMinistryCommandServiceImplTest {
         ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
-        assertSame(readerMinistry, captor.getValue().getMinistry());
+        assertEquals(readerMinistry.getId(), captor.getValue().getMinistry().getId());
         assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
     }
 
@@ -618,6 +662,54 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldRejectSyncWithMissingPersistentMinistryBeforePessimisticLock() {
+        Person reader = reader(1L);
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(ministryRepository.findAllById(List.of(42L))).thenReturn(List.of());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.syncMinistriesById(1L, List.of(42L)));
+
+        verify(ministryRepository, never()).findAllByIdInForUpdate(anyCollection());
+        verify(personMinistryRepository, never()).findAllByPersonId(anyLong());
+    }
+
+    @Test
+    void shouldRejectSyncWhenDesiredPersistentMinistryIsInactive() {
+        Person reader = reader(1L);
+        Long readerMinistryId = ministryId(MinistryType.READER);
+        Ministry inactiveReaderMinistry = unitMinistry(MinistryType.READER);
+        inactiveReaderMinistry.deactivate();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(ministryRepository.findAllById(List.of(readerMinistryId))).thenReturn(List.of(inactiveReaderMinistry));
+        when(ministryRepository.findAllByIdInForUpdate(List.of(readerMinistryId))).thenReturn(List.of(inactiveReaderMinistry));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
+
+        assertThrows(MinistryInactiveException.class,
+                () -> service.syncMinistriesById(1L, List.of(readerMinistryId)));
+
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectSyncAddForMinistryWithoutLegacyMappingWithDomainException() {
+        Person reader = reader(1L);
+        Long arbitraryMinistryId = 42L;
+        Ministry acolytes = ministry(arbitraryMinistryId, "Acolitos");
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        doReturn(List.of(acolytes)).when(ministryRepository).findAllById(List.of(arbitraryMinistryId));
+        doReturn(List.of(acolytes)).when(ministryRepository).findAllByIdInForUpdate(List.of(arbitraryMinistryId));
+        when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
+        doThrow(new IllegalStateException("no legacy mapping"))
+                .when(legacyMinistryTypeResolver)
+                .requireTypesByPersistentMinistryId(Set.of(arbitraryMinistryId));
+
+        assertThrows(MinistryLegacyCompatibilityRequiredException.class,
+                () -> service.syncMinistriesById(1L, List.of(arbitraryMinistryId)));
+
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
     void shouldTranslateConstraintViolationOnSyncAddToDatabaseException() {
         Person reader = reader(1L);
         when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
@@ -691,6 +783,21 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
+    void shouldRejectAddOrReactivateWhenPersistentMinistryIsInactive() {
+        Person reader = reader(1L);
+        Long readerMinistryId = ministryId(MinistryType.READER);
+        Ministry inactiveReaderMinistry = unitMinistry(MinistryType.READER);
+        inactiveReaderMinistry.deactivate();
+        when(personRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(reader));
+        when(ministryRepository.findByIdForUpdate(readerMinistryId)).thenReturn(Optional.of(inactiveReaderMinistry));
+
+        assertThrows(MinistryInactiveException.class,
+                () -> service.addOrReactivateMinistry(1L, unitMinistry(MinistryType.READER)));
+
+        verify(personMinistryRepository, never()).save(any());
+    }
+
+    @Test
     void shouldThrowResourceNotFoundWhenAddOrReactivateTargetsMissingPerson() {
         when(personRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
@@ -723,11 +830,30 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     private MinistryType ministryTypeFor(Ministry ministry) {
+        return ministryTypeFor(ministry.getId());
+    }
+
+    private MinistryType ministryTypeFor(Long ministryId) {
         for (MinistryType ministryType : MinistryType.values()) {
-            if (ministryId(ministryType).equals(ministry.getId())) {
+            if (ministryId(ministryType).equals(ministryId)) {
                 return ministryType;
             }
         }
         throw new IllegalArgumentException("Ministry de teste sem tipo legado correspondente");
+    }
+
+    private boolean isKnownMinistryId(Long ministryId) {
+        for (MinistryType ministryType : MinistryType.values()) {
+            if (ministryId(ministryType).equals(ministryId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Ministry ministry(Long id, String name) {
+        Ministry ministry = new Ministry(name);
+        ReflectionTestUtils.setField(ministry, "id", id);
+        return ministry;
     }
 }

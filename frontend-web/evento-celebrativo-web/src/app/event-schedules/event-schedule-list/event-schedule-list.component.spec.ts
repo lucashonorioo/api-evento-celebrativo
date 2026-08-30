@@ -427,6 +427,7 @@ describe('EventScheduleListComponent', () => {
       navigateSpy.calls.reset();
 
       component.selectedMonth = '2026-08';
+      component.selectedType = 'PRIEST';
       component.onSubmit();
 
       expect(navigateSpy).toHaveBeenCalledTimes(1);
