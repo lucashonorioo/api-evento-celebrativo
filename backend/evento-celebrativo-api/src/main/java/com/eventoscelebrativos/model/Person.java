@@ -33,7 +33,7 @@ public class Person {
     private LocalDate birthdayDate;
 
     @Column(nullable = false)
-    private boolean active = true;
+    private boolean active = true;  
 
     protected Person(){
 

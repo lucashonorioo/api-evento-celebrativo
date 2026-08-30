@@ -10,8 +10,11 @@ import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.service.MinistryAdministrationService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -25,13 +28,16 @@ public class MinistryAdministrationServiceImpl implements MinistryAdministration
 
     private final MinistryRepository ministryRepository;
     private final PersonMinistryRepository personMinistryRepository;
+    private final EntityManager entityManager;
 
     public MinistryAdministrationServiceImpl(
             MinistryRepository ministryRepository,
-            PersonMinistryRepository personMinistryRepository
+            PersonMinistryRepository personMinistryRepository,
+            EntityManager entityManager
     ) {
         this.ministryRepository = ministryRepository;
         this.personMinistryRepository = personMinistryRepository;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -69,8 +75,7 @@ public class MinistryAdministrationServiceImpl implements MinistryAdministration
     public MinistryResponseDTO rename(Long ministryId, MinistryRequestDTO requestDTO) {
         validateId(ministryId);
         validateRequest(requestDTO);
-        Ministry ministry = ministryRepository.findByIdForUpdate(ministryId)
-                .orElseThrow(() -> new ResourceNotFoundException(MINISTRY_ENTITY, ministryId));
+        Ministry ministry = requireMinistryForUpdate(ministryId);
         try {
             ministry.rename(requestDTO.getName());
             return toResponseDTO(ministryRepository.saveAndFlush(ministry));
@@ -82,15 +87,18 @@ public class MinistryAdministrationServiceImpl implements MinistryAdministration
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public MinistryResponseDTO updateStatus(Long ministryId, MinistryStatusUpdateRequestDTO requestDTO) {
         validateId(ministryId);
         if (requestDTO == null || requestDTO.getActive() == null) {
             throw new BadRequestException("O campo active e obrigatorio");
         }
 
-        Ministry ministry = ministryRepository.findByIdForUpdate(ministryId)
-                .orElseThrow(() -> new ResourceNotFoundException(MINISTRY_ENTITY, ministryId));
+        // Catalog status changes lock only the Ministry row. Membership writers that can create,
+        // reactivate or keep a PersonMinistry active must acquire and refresh this same row before
+        // writing. READ_COMMITTED makes the post-lock membership guard observe rows committed by a
+        // writer that won the Ministry lock first, without adding gap locks for absent memberships.
+        Ministry ministry = requireMinistryForUpdate(ministryId);
         if (Boolean.TRUE.equals(requestDTO.getActive())) {
             if (!ministry.isActive()) {
                 ministry.activate();
@@ -121,6 +129,16 @@ public class MinistryAdministrationServiceImpl implements MinistryAdministration
         if (ministryId == null || ministryId <= 0) {
             throw new BadRequestException("O Id do ministerio deve ser positivo e nao nulo");
         }
+    }
+
+    private Ministry requireMinistryForUpdate(Long ministryId) {
+        if (!ministryRepository.existsById(ministryId)) {
+            throw new ResourceNotFoundException(MINISTRY_ENTITY, ministryId);
+        }
+        Ministry ministry = ministryRepository.findByIdForUpdate(ministryId)
+                .orElseThrow(() -> new ResourceNotFoundException(MINISTRY_ENTITY, ministryId));
+        entityManager.refresh(ministry, LockModeType.PESSIMISTIC_WRITE);
+        return ministry;
     }
 
     private Ministry createMinistry(String name) {

@@ -10,6 +10,7 @@ import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.service.impl.MinistryAdministrationServiceImpl;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,11 +42,14 @@ class MinistryAdministrationServiceImplTest {
     @Mock
     private PersonMinistryRepository personMinistryRepository;
 
+    @Mock
+    private EntityManager entityManager;
+
     private MinistryAdministrationServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new MinistryAdministrationServiceImpl(ministryRepository, personMinistryRepository);
+        service = new MinistryAdministrationServiceImpl(ministryRepository, personMinistryRepository, entityManager);
     }
 
     @Test
@@ -123,6 +127,7 @@ class MinistryAdministrationServiceImplTest {
     @Test
     void shouldRenameWithoutChangingIdOrStatus() {
         Ministry ministry = ministry(2L, "Leitores");
+        when(ministryRepository.existsById(2L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(ministry));
         when(ministryRepository.saveAndFlush(ministry)).thenReturn(ministry);
 
@@ -137,6 +142,7 @@ class MinistryAdministrationServiceImplTest {
     @Test
     void shouldTranslateDuplicateRenameToConflict() {
         Ministry ministry = ministry(2L, "Leitores");
+        when(ministryRepository.existsById(2L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(ministry));
         when(ministryRepository.saveAndFlush(ministry)).thenThrow(new DataIntegrityViolationException("duplicate"));
 
@@ -155,6 +161,7 @@ class MinistryAdministrationServiceImplTest {
     @Test
     void shouldDeactivateWhenNoActiveMembershipExists() {
         Ministry ministry = ministry(10L, "Acolitos");
+        when(ministryRepository.existsById(10L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(ministry));
         when(personMinistryRepository.existsByMinistryIdAndActiveTrue(10L)).thenReturn(false);
         when(ministryRepository.saveAndFlush(ministry)).thenReturn(ministry);
@@ -170,6 +177,7 @@ class MinistryAdministrationServiceImplTest {
     void shouldReturnInactiveMinistryWithoutWriteWhenDeactivationIsIdempotent() {
         Ministry ministry = ministry(10L, "Acolitos");
         ministry.deactivate();
+        when(ministryRepository.existsById(10L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(ministry));
 
         MinistryResponseDTO response = service.updateStatus(10L, new MinistryStatusUpdateRequestDTO(false));
@@ -182,6 +190,7 @@ class MinistryAdministrationServiceImplTest {
     @Test
     void shouldBlockDeactivationWhenActiveMembershipExists() {
         Ministry ministry = ministry(2L, "Leitores");
+        when(ministryRepository.existsById(2L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(ministry));
         when(personMinistryRepository.existsByMinistryIdAndActiveTrue(2L)).thenReturn(true);
 
@@ -197,6 +206,7 @@ class MinistryAdministrationServiceImplTest {
     void shouldReactivateInactiveMinistry() {
         Ministry ministry = ministry(10L, "Acolitos");
         ministry.deactivate();
+        when(ministryRepository.existsById(10L)).thenReturn(true);
         when(ministryRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(ministry));
         when(ministryRepository.saveAndFlush(ministry)).thenReturn(ministry);
 
@@ -212,6 +222,25 @@ class MinistryAdministrationServiceImplTest {
         assertThrows(BadRequestException.class, () -> service.updateStatus(10L, null));
         assertThrows(BadRequestException.class,
                 () -> service.updateStatus(10L, new MinistryStatusUpdateRequestDTO(null)));
+    }
+
+    @Test
+    void shouldNotUsePessimisticLockWhenRenamingMissingMinistry() {
+        when(ministryRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class, () -> service.rename(99L, new MinistryRequestDTO("Acolitos")));
+
+        verify(ministryRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void shouldNotUsePessimisticLockWhenUpdatingMissingMinistryStatus() {
+        when(ministryRepository.existsById(99L)).thenReturn(false);
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.updateStatus(99L, new MinistryStatusUpdateRequestDTO(false)));
+
+        verify(ministryRepository, never()).findByIdForUpdate(any());
     }
 
     private Ministry ministry(Long id, String name) {

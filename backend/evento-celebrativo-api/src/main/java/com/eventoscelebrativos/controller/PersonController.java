@@ -424,7 +424,7 @@ public class PersonController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Ministerios atualizados com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Tipo de ministerio invalido"),
+            @ApiResponse(responseCode = "400", description = "Id de ministerio invalido"),
             @ApiResponse(responseCode = "401", description = "Usuario nao autenticado"),
             @ApiResponse(responseCode = "403", description = "Usuario sem permissao"),
             @ApiResponse(responseCode = "404", description = "Pessoa nao encontrada"),

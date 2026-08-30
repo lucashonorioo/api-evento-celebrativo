@@ -68,7 +68,7 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
     @Override
     @Transactional
     public MinistryPersonResponseDTO create(Long ministryId, MinistryPersonCreateRequestDTO requestDTO) {
-        Ministry ministry = requireActiveMinistry(ministryId);
+        Ministry ministry = requireMinistry(ministryId);
         requestDTO.rejectForbiddenFields();
         Person person = ministryPersonMapper.toEntity(requestDTO);
         Person saved = personMinistryCommandService.create(person, ministry);
@@ -93,7 +93,7 @@ public class MinistryPersonManagementServiceImpl implements MinistryPersonManage
     @Override
     @Transactional
     public MinistryPersonResponseDTO addOrReactivateMinistry(Long ministryId, Long personId) {
-        Ministry ministry = requireActiveMinistry(ministryId);
+        Ministry ministry = requireMinistry(ministryId);
         Person person = personMinistryCommandService.addOrReactivateMinistry(personId, ministry);
         return ministryPersonMapper.toDto(person);
     }

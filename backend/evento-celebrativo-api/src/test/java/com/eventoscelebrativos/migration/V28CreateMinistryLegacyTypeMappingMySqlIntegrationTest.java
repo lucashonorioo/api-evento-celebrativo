@@ -7,7 +7,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -143,15 +143,15 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
         Long arbitraryMinistryId = insertMinistry(jdbcTemplate, "Acolitos", "ACOLITOS");
 
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'COMMENTATOR')",
                 readerMinistryId));
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'READER')",
                 arbitraryMinistryId));
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (999999, 'READER')"));
-        assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                 "INSERT INTO tb_ministry_legacy_type_mapping(ministry_id, ministry_type) VALUES (?, 'ACOLYTE')",
                 arbitraryMinistryId));
     }

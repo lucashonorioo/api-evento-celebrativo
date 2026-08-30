@@ -23,6 +23,8 @@ import com.eventoscelebrativos.service.PersonMinistryCatalogSyncResult;
 import com.eventoscelebrativos.service.PersonMinistryCommandService;
 import com.eventoscelebrativos.service.PersonMinistryDiff;
 import com.eventoscelebrativos.service.PersonMinistrySyncResult;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
     private final EventAssignmentRepository eventAssignmentRepository;
     private final ParishStaffAssignmentRepository parishStaffAssignmentRepository;
     private final LegacyMinistryTypeResolver legacyMinistryTypeResolver;
+    private final EntityManager entityManager;
     private final Clock clock;
 
     public PersonMinistryCommandServiceImpl(
@@ -55,6 +58,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
             EventAssignmentRepository eventAssignmentRepository,
             ParishStaffAssignmentRepository parishStaffAssignmentRepository,
             LegacyMinistryTypeResolver legacyMinistryTypeResolver,
+            EntityManager entityManager,
             Clock clock
     ) {
         this.personRepository = personRepository;
@@ -63,6 +67,7 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         this.eventAssignmentRepository = eventAssignmentRepository;
         this.parishStaffAssignmentRepository = parishStaffAssignmentRepository;
         this.legacyMinistryTypeResolver = legacyMinistryTypeResolver;
+        this.entityManager = entityManager;
         this.clock = clock;
     }
 
@@ -170,6 +175,9 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (personId == null || personId <= 0 || ministry == null) {
             throw new BusinessException("Pessoa e funcao ministerial sao obrigatorias");
         }
+        // Existing-person membership writes use Person -> Ministry -> PersonMinistry. The Ministry
+        // row is refreshed after the pessimistic lock so a Ministry loaded earlier in this
+        // persistence context cannot authorize a stale active=true write after catalog deactivation.
         Person person = personRepository.findByIdForUpdate(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pessoa", personId));
         if (!person.isActive()) {
@@ -316,15 +324,27 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (ministryIds.isEmpty()) {
             return Map.of();
         }
-        Map<Long, Ministry> ministriesById = ministryRepository.findAllByIdInForUpdate(ministryIds)
+        List<Long> sortedMinistryIds = ministryIds.stream().sorted().toList();
+        Set<Long> existingIds = ministryRepository.findAllById(sortedMinistryIds)
                 .stream()
+                .map(Ministry::getId)
+                .collect(Collectors.toSet());
+        for (Long ministryId : sortedMinistryIds) {
+            if (!existingIds.contains(ministryId)) {
+                throw new ResourceNotFoundException("Ministerio", ministryId);
+            }
+        }
+
+        Map<Long, Ministry> ministriesById = ministryRepository.findAllByIdInForUpdate(sortedMinistryIds)
+                .stream()
+                .peek(this::refreshMinistryForUpdate)
                 .collect(Collectors.toMap(
                         Ministry::getId,
                         ministry -> ministry,
                         (left, right) -> left,
                         LinkedHashMap::new
                 ));
-        for (Long ministryId : ministryIds) {
+        for (Long ministryId : sortedMinistryIds) {
             if (!ministriesById.containsKey(ministryId)) {
                 throw new ResourceNotFoundException("Ministerio", ministryId);
             }
@@ -336,12 +356,20 @@ public class PersonMinistryCommandServiceImpl implements PersonMinistryCommandSe
         if (ministryId == null || ministryId <= 0) {
             throw new BusinessException("Funcao ministerial persistente e obrigatoria");
         }
+        if (!ministryRepository.existsById(ministryId)) {
+            throw new ResourceNotFoundException("Ministerio", ministryId);
+        }
         Ministry ministry = ministryRepository.findByIdForUpdate(ministryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ministerio", ministryId));
+        refreshMinistryForUpdate(ministry);
         if (!ministry.isActive()) {
             throw new MinistryInactiveException();
         }
         return ministry;
+    }
+
+    private void refreshMinistryForUpdate(Ministry ministry) {
+        entityManager.refresh(ministry, LockModeType.PESSIMISTIC_WRITE);
     }
 
     private void validateOperationalMinistries(PersonMinistryDiff diff, Map<Long, Ministry> ministriesById) {
