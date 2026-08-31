@@ -122,24 +122,28 @@ test('skills de review Claude e Codex declaram risco mecanicamente ao iniciar ro
 });
 
 
-test('AGENTS backend contém o estado atual de PersonMinistry e handoff histórico não bloqueia revalidação', () => {
+test('AGENTS backend referencia a fonte atual e on-demand de PersonMinistry', () => {
   const backendAgents = read('backend/evento-celebrativo-api/AGENTS.md');
   const backendClaude = read('backend/evento-celebrativo-api/CLAUDE.md');
-  for (const marker of ['## Estado atual do domínio Person/PersonMinistry/EventAssignment', 'não recrie caminhos `LEGACY`/`PARALLEL`', '`PersonMinistry` é a única fonte']) {
-    assert.match(backendAgents, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    assert.match(backendClaude, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const domain = read('.ai/domain/PERSON_MINISTRY_EVENT_ASSIGNMENT.md');
+
+  for (const instructions of [backendAgents, backendClaude]) {
+    assert.match(instructions, /PersonMinistry.*única fonte/i);
+    assert.match(instructions, /não recrie caminhos `LEGACY`\/`PARALLEL`/i);
+    assert.match(instructions, /\.ai\/domain\/PERSON_MINISTRY_EVENT_ASSIGNMENT\.md/);
   }
-  const handoff = read('CLAUDE-AUDITORIA-HANDOFF.md');
-  assert.match(handoff, /histórico.*não normativo/is);
-  assert.match(handoff, /revalide o estado atual/i);
-  assert.doesNotMatch(handoff, /\*\*Não repita a análise\.\*\*/i);
+
+  assert.match(domain, /Leia este arquivo somente em alterações/i);
+  assert.match(domain, /PersonMinistry.*única fonte/i);
+  assert.match(domain, /não recrie `LEGACY\/PARALLEL`/i);
+  assert.match(domain, /confirme no código atual/i);
 });
 
 test('política considera a própria infraestrutura de IA parte da superfície revisável e documenta limite de proveniência', () => {
   const policy = read('.ai/review/ENGINEERING_REVIEW.md');
   assert.match(policy, /\.ai\/.*\.claude\/.*\.codex\/.*\.agents\//s);
-  assert.match(policy, /exigem.*gate/i);
-  assert.match(policy, /não é uma prova criptográfica/i);
+  assert.match(policy, /(?:gate é obrigatório|exigem[^\n]*gate|deve passar por revisão independente)/i);
+  assert.match(policy, /não (?:é|são) uma prova criptográfica/i);
   assert.match(policy, /--review-record-result/);
   assert.match(policy, /guardrail determinístico/i);
   assert.match(policy, /CI|branch protection|aprovação humana/i);
