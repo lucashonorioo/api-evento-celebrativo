@@ -1,38 +1,19 @@
 ---
 name: change-api-contract
-description: Coordena mudança full stack em endpoint, path, request, response, paginação, status HTTP ou autenticação entre backend Spring e frontend Angular. Use quando um contrato compartilhado muda; não use para implementação interna sem impacto nos consumers.
+description: Coordene mudança full stack em endpoint, path, request/response, paginação, status HTTP ou autenticação entre Spring e Angular.
 ---
 
 # Alterar contrato da API
 
-## Princípio
+1. Leia `CLAUDE.md` raiz, backend e frontend.
+2. Localize producer e todos os consumers relevantes: segurança/controller/DTO/mapper/service/testes, models/HTTP/UI/formulários/testes e OpenAPI quando existir.
+3. Registre contrato atual → desejado e classifique compatível/breaking.
+4. Breaking change exige atualização coordenada ou transição explícita.
+5. Implemente fonte de verdade + testes e atualize consumers tipados/estados de erro.
+6. Valide status, serialização, validação, auth e ausência de consumer antigo.
+7. Execute `validate-project` nas áreas afetadas e `review-change` no diff full stack.
+8. Corrija `CHANGES_REQUIRED`, revalide/revise; conclua só com `PASS`/`PASS WITH NOTES`.
 
-Trate o contrato como interface compartilhada. Não atualize apenas um lado e não presuma consumidores.
+Contrato é no mínimo risco MEDIUM; auth/public exposure/dado sensível é HIGH.
 
-## Fluxo
-
-1. Leia os `CLAUDE.md` da raiz, backend e frontend.
-2. Localize producers e consumers: controller/segurança, DTOs, mapper, service, testes, models, serviços HTTP, componentes, formulários e OpenAPI quando existir.
-3. Registre contrato atual e contrato desejado.
-4. Classifique compatibilidade e impacto.
-5. Para breaking change, defina atualização coordenada ou transição.
-6. Implemente a fonte de verdade e seus testes.
-7. Atualize todos os consumers tipados.
-8. Valide status, serialização, validação, autorização e erros.
-9. Revise o diff full stack para localizar consumer antigo ou comportamento incompatível.
-
-## Gate de conclusão obrigatório
-
-Mudança de contrato é, no mínimo, risco médio:
-
-1. use `validate-project` para backend e frontend afetados;
-2. use `review-change` sobre o diff coordenado;
-3. trate `CHANGES_REQUIRED` dentro do escopo;
-4. após correções, repita validações afetadas e a revisão;
-5. conclua somente com `PASS` ou `PASS WITH NOTES`.
-
-Alterações de autenticação, autorização, exposição pública ou dados sensíveis são alto risco e devem incluir `security-reviewer`.
-
-## Entrega
-
-Informe antes/depois do contrato, compatibilidade, consumers atualizados, validações executadas, veredito da revisão de engenharia e riscos residuais.
+Reporte antes/depois, compatibilidade, consumers, validações, Engineering Review e riscos residuais.

@@ -1,36 +1,18 @@
 ---
 name: investigate-bug
-description: Investigue bugs, exceções, comportamento incorreto ou testes falhando com abordagem orientada a evidências. Use antes de corrigir quando a causa raiz ainda não estiver comprovada; não use para features novas bem especificadas.
+description: Investigue bug, exceção, comportamento incorreto ou teste falhando por evidências; use quando a causa raiz ainda não estiver comprovada.
 ---
 
 # Investigar bug
 
-## Objetivo
+1. Leia os `AGENTS.md` aplicáveis e reúna erro/stack/input/esperado disponíveis.
+2. Reproduza com o teste/comando mais específico.
+3. Trace o fluxo até o primeiro ponto onde observado diverge do esperado; procure mudança recente/padrão equivalente.
+4. Teste poucas hipóteses ordenadas; não edite enquanto a causa for apenas suposição.
+5. Com causa comprovada, faça a menor correção segura e teste de regressão quando viável.
+6. Execute `validate-project`; se houve mudança de engenharia, execute `review-change`.
+7. Em `CHANGES_REQUIRED`, corrija, revalide e revise novamente.
 
-Encontrar a causa raiz com evidência reproduzível antes de alterar código e produzir a menor correção segura.
+Se iniciar processo longo para reproduzir, siga `.ai/runtime/PROCESS_LIFECYCLE.md`.
 
-## Workflow
-
-1. Leia os `AGENTS.md` aplicáveis e identifique a área afetada.
-2. Reúna mensagem completa, stack trace, request, dados de entrada e comportamento esperado quando disponíveis.
-3. Reproduza com o teste ou comando mais específico possível.
-4. Trace o fluxo real e localize o primeiro ponto em que o estado observado diverge do esperado.
-5. Procure mudanças recentes e padrões equivalentes no projeto.
-6. Formule poucas hipóteses ordenadas por probabilidade e teste uma de cada vez.
-7. Não edite enquanto a causa raiz estiver sustentada apenas por suposição.
-8. Quando a causa estiver comprovada, implemente a menor correção coerente.
-9. Adicione teste de regressão sempre que viável.
-10. Execute validações específicas e depois amplas conforme o risco.
-
-## Gate de conclusão obrigatório
-
-Se a investigação resultar em alteração de código, teste, contrato, migration ou configuração executável:
-
-1. execute `validate-project` depois da correção;
-2. execute `review-change` depois da última alteração;
-3. trate `CHANGES_REQUIRED` antes de concluir;
-4. após qualquer ajuste motivado pela revisão, revalide e revise novamente.
-
-## Saída esperada
-
-Informe sintomas e reprodução, causa raiz e evidência, correção aplicada, teste de regressão, comandos executados, veredito da revisão de engenharia e riscos ou incertezas restantes.
+Reporte sintoma/reprodução, causa + evidência, correção, regressão, validações, Engineering Review e incertezas reais.

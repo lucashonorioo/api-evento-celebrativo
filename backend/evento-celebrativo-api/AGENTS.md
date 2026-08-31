@@ -1,200 +1,79 @@
-# Backend Evento Celebrativo — Java e Spring Boot
+# Backend Evento Celebrativo — Java/Spring Boot
 
-## Escopo
+Estas regras complementam o `AGENTS.md` da raiz.
 
-Estas regras se aplicam ao backend localizado nesta pasta. Leia também o `AGENTS.md` da raiz do repositório.
+## Fonte de verdade
 
-O backend é uma API REST para eventos celebrativos, pessoas, locais, usuários, perfis de acesso, ministérios e escalas.
+Confirme stack, versões, profiles e dependências no `pom.xml`/configuração. Preserve Java 21, Spring Boot 3.x, Spring Web/Data JPA/Security/OAuth2, Bean Validation, MapStruct, Flyway, Maven Wrapper, JUnit 5/Mockito conforme realmente presentes. Não atualize versões/dependências sem pedido.
 
-## Fonte de verdade e stack
-
-Antes de alterar código, confirme versões e dependências no `pom.xml`. Preserve a stack existente, incluindo quando presentes:
-
-- Java 21;
-- Spring Boot 3.x;
-- Spring Web;
-- Spring Data JPA;
-- Bean Validation;
-- Spring Security, OAuth2 Authorization Server e Resource Server;
-- MapStruct;
-- Maven Wrapper;
-- JUnit 5 e Mockito;
-- Flyway.
-
-Não atualize Java, Spring Boot, plugins ou dependências sem solicitação explícita.
-
-## Comandos oficiais no Windows
-
-Execute a partir desta pasta:
-
-```powershell
-.\mvnw.cmd clean compile
-.\mvnw.cmd test
-.\mvnw.cmd -q test
-.\mvnw.cmd spring-boot:run
-```
-
-Prefira o Maven Wrapper. Não substitua por uma instalação global de Maven sem necessidade.
-
-## Análise antes da implementação
-
-1. Localize controller, DTOs, mapper, service, repository, entidade, segurança e testes relacionados.
-2. Trace o fluxo real da requisição até a persistência.
-3. Procure padrões equivalentes já usados no projeto.
-4. Confirme contratos HTTP e regras de autorização existentes.
-5. Identifique compatibilidade, transações, constraints e efeitos sobre dados.
-6. Implemente somente o necessário.
-
-## Arquitetura
-
-Preserve a divisão atual de responsabilidades:
-
-- `controller`: protocolo HTTP, validação de request, status e composição da resposta;
-- `service`: contratos de negócio;
-- `service.impl`: regras de negócio e limites transacionais;
-- `repository`: persistência Spring Data JPA;
-- `model`: entidades JPA e invariantes persistentes;
-- `dto.request`: entrada da API;
-- `dto.response`: saída da API;
-- `mapper`: conversão entre entidade e DTO, preferencialmente MapStruct;
-- `exception`: exceções de domínio e tratamento global.
-
-Não crie camadas adicionais sem benefício concreto. Não mova pacotes em massa por preferência arquitetural.
-
-## Controllers e contratos HTTP
-
-- Não exponha entidades JPA diretamente.
-- Use DTOs distintos quando request e response tiverem responsabilidades diferentes.
-- Controllers devem validar entrada, aplicar semântica HTTP e delegar regras ao service.
-- Não coloque consultas de repository ou regras complexas no controller.
-- Preserve endpoints, payloads e status codes já validados, salvo requisito explícito.
-- Para novos paths, use nomenclatura consistente com a API existente e evite mudanças cosméticas em endpoints legados.
-- Erros devem ser convertidos em respostas consistentes pelo `GlobalExceptionHandler`.
-- Não devolva stack traces, mensagens internas de banco ou dados sensíveis.
-
-## Services e transações
-
-- Coloque regras de negócio no service.
-- Defina transações nos limites de caso de uso adequados.
-- Use transações somente leitura em consultas quando o padrão atual justificar.
-- Evite lógica de domínio espalhada entre controller, mapper e repository.
-- Não capture exceções genericamente para ocultar falhas.
-- Converta violações conhecidas em exceções de domínio ou respostas HTTP adequadas.
-
-## Persistência e JPA
-
-- Preserve constraints e relacionamentos existentes.
-- Avalie carregamento lazy/eager, N+1, paginação e cascades antes de mudar mapeamentos.
-- Não use `findAll()` indiscriminadamente em fluxos potencialmente grandes.
-- Para consultas customizadas, prefira nomes claros e testes de repository quando o comportamento for relevante.
-- Não altere schema diretamente sem seguir o mecanismo de migrations do projeto.
-- Não modifique migrations Flyway versionadas já aplicáveis; crie uma nova migration incremental.
-- Não inclua credenciais ou secrets em `application*.properties`.
-
-## Estado atual do domínio Person/PersonMinistry/EventAssignment
-
-A migração do modelo legado (entidades por tipo de ministério, ex. `Reader` como entidade JPA, coluna `person_type`, tabela `tb_event_person`) para o modelo unificado está concluída. O runtime atual não possui mais cutover `LEGACY`/`PARALLEL`, shadow-read, `PersonMinistryReadSourceProperties`, `EventAssignmentReadSourceProperties`, write-through legado nem `EventAssignmentCompatibilityService` — nada disso existe mais no código; onde ainda aparecem, é apenas em migrations aplicadas (histórico imutável) ou em nomes de testes que hoje protegem comportamento atual sob um nome antigo.
-
-Fontes oficiais atuais:
-
-- `PersonMinistry` é a única fonte de classificação ministerial de uma `Person`; leia via `PersonMinistryReadService` e escreva via `PersonMinistryCommandService`.
-- `EventAssignment` é a única fonte das funções atribuídas a uma pessoa em um evento; a unicidade é `event_id + person_id + assignment_type` — uma pessoa pode exercer várias funções no mesmo evento.
-- `EventAssignmentCommandService` é o mecanismo oficial de escrita e sincronização de assignments (inclui a limpeza de `EventParticipationResponse` quando a pessoa perde todas as funções no evento).
-- `EventParticipationResponse` registra a confirmação ou recusa de participação da pessoa no evento; é única por `event_id + person_id` (não por função) e é gerenciada por `EventParticipationResponseService`.
-
-Regras para qualquer alteração neste domínio:
-
-- não recrie caminhos `LEGACY`/`PARALLEL` nem qualquer mecanismo de shadow-read;
-- não consulte `tb_event_person` nem dependa da coluna `person_type` — ambos foram removidos por migration e existem apenas para reconstruir bancos antigos;
-- não reintroduza subclasses ministeriais como entidades JPA (`Reader`, `Commentator`, `Priest`, `MinisterOfTheWord`, `EucharisticMinister`); os controllers/services com esses nomes que ainda existem são adaptadores HTTP finos ativos sobre `Person`+`PersonMinistry`, não um modelo de dados paralelo, e continuam necessários enquanto não houver API genérica equivalente para criar pessoa, editar dados de terceiros e definir senha/role inicial;
-- as migrations `V1`–`V9` preservam a evolução histórica do schema e não devem ser alteradas.
-
-## DTOs e MapStruct
-
-- Mapeamentos devem ser explícitos quando nomes ou responsabilidades diferirem.
-- Evite lógica de negócio complexa no mapper.
-- Não reutilize DTO de response como request apenas para reduzir arquivos.
-- Preserve serialização e nomes de campos consumidos pelo frontend.
-- Ao alterar um contrato, use a Skill `change-api-contract` e atualize consumers e testes coordenadamente.
-
-## Validação e erros
-
-- Use Bean Validation para regras estruturais de entrada.
-- Use validação de domínio no service para regras que dependem de estado ou persistência.
-- Diferencie recurso inexistente, conflito de integridade, acesso negado e entrada inválida.
-- Não retorne fallback silencioso que esconda inconsistências.
-- Mensagens externas devem ser claras e seguras; detalhes técnicos ficam em logs adequados.
-
-## Segurança
-
-- Não remova autenticação ou autorização para fazer testes passarem.
-- O backend é a fonte definitiva de permissões.
-- Preserve o fluxo de login e os endpoints públicos existentes até requisito explícito.
-- Novos endpoints são protegidos por padrão; exposição pública exige decisão intencional e teste.
-- Alterações em roles, JWT, claims, password encoding, CORS ou filtros exigem revisão do `security_reviewer` em tarefas de risco médio ou alto.
-- Cubra cenários autenticado, não autenticado e sem permissão quando alterar segurança.
-- Nunca registre senhas, tokens completos ou secrets.
-
-## Invariantes conhecidas a preservar
-
-Confirme no código antes de usar, mas trate como compatibilidade esperada enquanto permanecerem implementadas:
-
-- login público em `POST /public/login`;
-- consultas públicas de eventos e escala eucarística definidas na configuração de segurança;
-- CRUDs administrativos protegidos por `ROLE_ADMIN`;
-- usuários novos recebem o perfil padrão definido pelo domínio;
-- alteração de roles é restrita a administrador;
-- conflito de integridade em exclusões vinculadas retorna resposta amigável, normalmente `409 Conflict`.
-
-## Testes
-
-Use o padrão existente:
-
-- services: JUnit 5 e Mockito;
-- controllers: MockMvc;
-- repositories: `@DataJpaTest`;
-- contexto Spring: somente quando a integração real for necessária.
-
-Regras:
-
-- use `@MockitoBean` quando o projeto estiver padronizado nele;
-- teste comportamento observável e regras de negócio, não detalhes triviais;
-- inclua sucesso, validação, inexistência, conflito e autorização conforme o risco;
-- não enfraqueça assertions para fazer o teste passar;
-- não exclua ou desabilite testes sem causa comprovada;
-- ao corrigir bug, adicione teste de regressão sempre que viável.
-
-## Validação antes de concluir
-
-Escolha validações proporcionais à alteração:
+Comandos usuais, a partir do backend:
 
 ```powershell
 .\mvnw.cmd -q -Dtest=NomeDoTeste test
 .\mvnw.cmd -q test
+.\mvnw.cmd clean compile
 ```
 
-Também verifique:
+Use `spring-boot:run` somente quando validação runtime for necessária; nesse caso siga `.ai/runtime/PROCESS_LIFECYCLE.md`.
 
-- compilação;
-- contexto Spring quando afetado;
-- migrations e profiles relevantes;
-- segurança dos endpoints alterados;
-- contratos utilizados pelo frontend;
-- `git diff --check`;
-- ausência de arquivos gerados, logs e secrets.
+## Análise e arquitetura
 
-Se não puder executar a suíte completa, informe quais testes foram executados e o risco restante.
+Antes de editar, localize controller, DTOs, mapper, service, repository, entidade, segurança, migrations e testes relacionados; trace entrada → regra → persistência → resposta e procure padrão equivalente.
 
-## Proibições
+Preserve responsabilidades:
 
-Sem solicitação explícita, não:
+- controller: HTTP, validação estrutural, status/resposta;
+- service/service.impl: casos de uso, domínio e transação;
+- repository: persistência;
+- model: entidades/invariantes persistentes;
+- DTOs: contratos de entrada/saída;
+- mapper: conversão, sem regra de negócio complexa;
+- exception/handler: erros de domínio e resposta segura.
 
-- atualize dependências ou versões;
-- altere contratos públicos;
-- desative segurança;
-- substitua MapStruct ou a arquitetura atual;
-- introduza fallback silencioso;
-- modifique migrations antigas;
-- altere frontend;
-- faça commit, push, merge ou rebase;
-- execute limpeza destrutiva do repositório ou do banco.
+Não crie camada/interface/pattern nem mova pacotes em massa sem problema concreto que justifique.
+
+## Contratos, domínio e erros
+
+- Não exponha entidade JPA diretamente.
+- Preserve endpoint, payload, serialização e status consumidos; mudança de contrato usa `change-api-contract`.
+- Bean Validation cobre estrutura; regra dependente de estado fica no domínio/service.
+- Diferencie inexistência, entrada inválida, conflito e acesso negado.
+- Não capture exceção genericamente para esconder falha nem retorne sucesso/fallback artificial.
+- Logs devem permitir diagnóstico sem expor dados sensíveis.
+
+
+## Estado atual do domínio Person/PersonMinistry/EventAssignment
+
+`PersonMinistry` é a única fonte atual de classificação ministerial; não recrie caminhos `LEGACY`/`PARALLEL`. Para `Person`, `PersonMinistry`, `EventAssignment`, `EventParticipationResponse` ou adaptadores ministeriais, leia `.ai/domain/PERSON_MINISTRY_EVENT_ASSIGNMENT.md` antes de editar.
+
+## Persistência e desempenho
+
+- Defina transações no limite do caso de uso; evite gravação parcial.
+- Preserve constraints, relacionamentos e cascades; trate concorrência, unicidade/idempotência quando o domínio exigir.
+- Avalie lazy/eager, N+1, paginação, ordenação, volume e queries customizadas.
+- Evite `findAll()` em coleção potencialmente grande.
+- Schema muda por migration incremental; não reescreva migration Flyway já versionada/aplicável.
+- Mudança de dados considera compatibilidade, `null`, índices/backfill e rollout quando relevantes.
+
+## Segurança
+
+- Backend é a fonte definitiva de autorização.
+- Endpoint novo é protegido por padrão; exposição pública é decisão explícita e testada.
+- Não remova autenticação/autorização para fazer teste passar.
+- Mudança em JWT, roles, claims, password encoding, CORS, filtros ou endpoint público exige cenários autenticado/não autenticado/sem permissão conforme aplicável.
+- Nunca registre senha, token completo, secret ou detalhe interno sensível.
+
+## Testes e qualidade
+
+Use a camada mais econômica que prove o comportamento:
+
+- service: JUnit/Mockito;
+- controller: MockMvc;
+- repository: `@DataJpaTest`;
+- contexto Spring completo apenas quando integração real exigir.
+
+Cubra sucesso e falhas relevantes ao risco, autorização quando afetada e regressão de bug quando viável. Não teste detalhe trivial, não enfraqueça assertions e não desabilite teste para obter verde.
+
+Na conclusão, execute validações proporcionais à alteração e verifique também contratos frontend, segurança, migrations/profiles, consultas críticas, `git diff --check`, artefatos, debug e secrets.
+
+Sem solicitação explícita, não altere frontend, contratos públicos, segurança, migrations antigas, dependências ou arquitetura geral.
