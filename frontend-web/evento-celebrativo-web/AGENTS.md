@@ -1,214 +1,65 @@
-# Frontend Evento Celebrativo — Angular e TypeScript
+# Frontend Evento Celebrativo — Angular/TypeScript
 
-## Escopo
+Estas regras complementam o `AGENTS.md` da raiz.
 
-Estas regras se aplicam ao frontend localizado nesta pasta. Leia também o `AGENTS.md` da raiz do repositório.
+## Fonte de verdade
 
-O frontend fornece consultas públicas e funcionalidades autenticadas/administrativas para eventos, escalas, locais, pessoas e usuários.
+Confirme stack/scripts em `package.json`, `angular.json` e `tsconfig*.json`. Preserve Angular 20, standalone/bootstrapApplication, Router/HttpClient, TypeScript estrito, RxJS, Jasmine/Karma/TestBed e Prettier conforme realmente presentes. Não atualize Angular/TypeScript/Node/dependências sem pedido.
 
-## Fonte de verdade e stack
-
-Antes de alterar código, confirme versões e scripts em `package.json`, `angular.json` e `tsconfig*.json`. Preserve a stack existente, incluindo quando presentes:
-
-- Angular 20;
-- standalone components;
-- Angular Router e HttpClient;
-- TypeScript estrito;
-- RxJS;
-- CSS;
-- Jasmine, Karma e TestBed;
-- Prettier.
-
-A aplicação usa `bootstrapApplication` e não deve receber `AppModule` sem necessidade técnica comprovada.
-
-Não atualize Angular, TypeScript ou dependências sem solicitação explícita.
-
-## Comandos oficiais
-
-Confirme os scripts no `package.json`. Os comandos esperados são:
-
-```powershell
-npm install
-npm start
-npm run build
-npm test -- --watch=false
-```
-
-Não execute `npm install` se as dependências existentes já forem suficientes. Não altere lockfile sem uma mudança real de dependência.
-
-## Análise antes da implementação
-
-1. Localize rota, página, componente, serviço, model, guard/interceptor e testes relacionados.
-2. Confirme o contrato real no backend, OpenAPI ou testes.
-3. Procure componentes e padrões equivalentes antes de criar novos.
-4. Verifique autenticação, roles, estados de UI e responsividade afetados.
-5. Implemente o menor conjunto coerente de alterações.
-
-Não presuma que uma funcionalidade ainda não existe com base em roadmaps antigos; confira o código atual.
-
-## Arquitetura Angular
-
-- Novos componentes, diretivas e pipes devem ser standalone.
-- Preserve a organização atual quando ela continuar clara.
-- Crie pastas e abstrações apenas quando houver responsabilidades reais.
-- Evite concentrar integração HTTP, autenticação, estado e apresentação em um único componente.
-- Separe página, componente de apresentação, serviço HTTP, model e formulário quando isso melhorar coesão e teste.
-- Não reorganize todo o projeto para impor uma arquitetura teórica.
-- Prefira lazy loading em páginas e áreas maiores quando compatível com o padrão existente.
-
-## Componentes e estado
-
-- Cada componente deve ter responsabilidade clara.
-- Prefira `ChangeDetectionStrategy.OnPush` em novos componentes quando seguro.
-- Use properties tipadas, signals e computed signals para estado local simples.
-- Use RxJS para HTTP e composição assíncrona.
-- Mantenha estado próximo de onde é usado.
-- Não introduza NgRx, Redux ou estado global sem necessidade comprovada.
-- Evite subscriptions aninhadas; use operadores de composição.
-- Em subscriptions manuais de longa duração, gerencie o ciclo de vida com `takeUntilDestroyed` ou padrão equivalente.
-- Não faça funções custosas repetidamente no template.
-
-## TypeScript
-
-- Preserve `strict` e as opções estritas do projeto.
-- Não use `any` para contornar tipagem. Use `unknown` com validação quando a origem não for confiável.
-- Modele request e response separadamente quando os contratos diferirem.
-- Trate explicitamente `null`, `undefined`, respostas vazias e dados incompletos.
-- Evite `!` sem garantia lógica.
-- Prefira `readonly`, imutabilidade e nomes expressivos.
-- Use `PascalCase` para tipos/classes, `camelCase` para membros e `kebab-case` para arquivos.
-- Textos da interface devem permanecer em português do Brasil; nomes técnicos do código devem seguir o padrão existente.
-
-## Integração HTTP e contratos
-
-- O backend é a fonte de verdade do contrato.
-- Não invente endpoints, campos, roles, paginação ou status codes.
-- Centralize a URL base; não replique `localhost` em serviços.
-- Serviços HTTP devem ser tipados, retornar `Observable` e não manipular DOM ou estado específico da página.
-- Não crie um serviço genérico com todos os endpoints nem abstrações HTTP prematuras.
-- Diferencie DTO de API, estado do formulário e view model quando necessário.
-- Ao alterar contrato, use a Skill `change-api-contract` e coordene backend e frontend.
-- Para datas, diferencie data sem horário de timestamp e evite mudanças de dia por timezone.
-
-## Autenticação e autorização
-
-- Preserve o fluxo OAuth2/JWT existente.
-- Centralize armazenamento, leitura, expiração e remoção do token.
-- Não acesse `localStorage` diretamente em vários componentes.
-- Nunca armazene senha nem registre tokens no console.
-- Interceptors devem tratar autenticação e preocupações HTTP transversais, não regras de página.
-- `401` representa ausência/expiração de sessão; `403` representa usuário autenticado sem permissão.
-- Guards devem preferir retorno de `UrlTree` em vez de navegação imperativa quando aplicável.
-- Roles no frontend controlam experiência de UI, não substituem autorização do backend.
-- Não envie token para origens externas.
-
-## Formulários
-
-- Para formulários novos com validação ou múltiplos campos, prefira Reactive Forms tipados e `NonNullableFormBuilder` quando adequado.
-- Inclua validação, mensagens claras, estado de envio e prevenção de múltiplos submits.
-- Associe `label` aos campos e configure `autocomplete` apropriadamente.
-- Não migre formulários existentes apenas por preferência.
-- Não esconda falhas retornando dados falsos ou sucesso artificial.
-
-## Rotas
-
-- Antes de alterar uma rota, localize todos os links e navegações que a utilizam.
-- Preserve guards e divisão entre rotas públicas, autenticadas e administrativas.
-- Não crie rotas para componentes inexistentes.
-- Use lazy loading conforme o padrão atual e o tamanho da funcionalidade.
-- Não altere a rota inicial ou o layout global sem requisito explícito.
-
-## Estados de interface e erros
-
-Telas assíncronas devem considerar conforme aplicável:
-
-- carregando;
-- conteúdo carregado;
-- vazio;
-- erro;
-- acesso negado;
-- sessão expirada.
-
-Regras:
-
-- apresente mensagens compreensíveis, sem stack trace ou detalhes internos;
-- trate `400`, `401`, `403`, `404`, `409`, `422` e `500` conforme o contrato real;
-- não silencie erros sem estratégia;
-- use `catchError` somente com transformação, mensagem ou fallback seguro real;
-- evite interfaces que aparentem travamento durante requisições.
-
-## Templates, CSS e acessibilidade
-
-- Use a sintaxe moderna do Angular quando compatível com o código atual.
-- Em listas, informe `track` estável.
-- Prefira HTML semântico, botões reais para ações e links reais para navegação.
-- Garanta navegação por teclado, foco visível, labels, mensagens associadas e contraste adequado.
-- Use ARIA somente quando HTML semântico não resolver.
-- Preserve CSS do projeto; não introduza biblioteca visual sem pedido e justificativa.
-- Mantenha estilos específicos próximos ao componente e estilos globais apenas para fundamentos compartilhados.
-- Evite `!important`, seletores globais agressivos e dimensões fixas que prejudiquem responsividade.
-- Verifique pelo menos comportamento básico em telas menores nas alterações visuais.
-
-## Segurança no frontend
-
-- Não exponha secrets, senhas ou tokens.
-- Não use `bypassSecurityTrustHtml` sem análise de segurança comprovada.
-- Não renderize HTML externo sem sanitização.
-- Não confie exclusivamente em validação cliente.
-- Não remova guards, interceptors ou tratamento de sessão para simplificar testes.
-
-## Testes
-
-Use o padrão atual com Jasmine, Karma e TestBed.
-
-Crie ou atualize testes para comportamentos relevantes, como:
-
-- serviços HTTP, URL, método, body e erro;
-- autenticação, armazenamento e expiração de token;
-- guards e interceptors;
-- formulários e validações;
-- renderização por role;
-- estados loading, vazio e erro;
-- transformações de datas ou paginação;
-- regressões de bugs.
-
-Para testes HTTP, use as APIs de teste compatíveis com a versão atual, como `provideHttpClient`, `provideHttpClientTesting` e `HttpTestingController` quando aplicável.
-
-Teste comportamento observável. Não desabilite ou apague testes sem identificar a causa.
-
-## Validação antes de concluir
-
-Escolha validações proporcionais à alteração:
+Comandos usuais:
 
 ```powershell
 npm test -- --watch=false
 npm run build
 ```
 
-Também verifique:
+Não execute `npm install` se as dependências existentes bastarem. Use `npm start`/`ng serve` somente quando validação runtime for necessária; nesse caso siga `.ai/runtime/PROCESS_LIFECYCLE.md`.
 
-- erros TypeScript e de template;
-- imports e código não utilizados;
-- rotas e links alterados;
-- requisições e contratos;
-- responsividade e acessibilidade básicas;
-- ausência de logs sensíveis;
-- `git diff --check`;
-- ausência de `dist`, coverage ou outros artefatos não intencionais.
+## Análise e arquitetura
 
-Compilação não substitui teste funcional. Se não puder validar no navegador, informe essa limitação.
+Antes de editar, localize rota, página/componente, serviço HTTP, model, formulário, guard/interceptor, estilos e testes; confirme o contrato no backend/OpenAPI/testes e procure padrão equivalente.
 
-## Proibições
+- Novos componentes/diretivas/pipes são standalone.
+- Separe apresentação, HTTP, estado e formulário quando houver responsabilidades reais.
+- Preserve alta coesão/baixo acoplamento; não imponha arquitetura teórica nem estado global sem necessidade.
+- Prefira lazy loading em áreas maiores quando coerente.
+- Estado fica próximo do uso; signals/computed para estado local simples e RxJS para composição assíncrona.
+- Evite subscriptions aninhadas; gerencie subscriptions duradouras com `takeUntilDestroyed` ou equivalente.
+- Evite trabalho caro repetido no template e use `track` estável em listas.
 
-Sem solicitação explícita, não:
+## TypeScript e contratos
 
-- migre para outro framework;
-- adicione biblioteca visual ou de estado;
-- atualize dependências;
-- altere backend;
-- modifique contratos da API;
-- desative autenticação ou guards;
-- introduza `any` para silenciar erros;
-- apague testes falhando;
-- faça refatoração estrutural ampla;
-- faça commit, push, merge ou rebase.
+- Preserve `strict`; não use `any` para esconder incerteza. Use tipos específicos ou `unknown` validado.
+- Trate `null`, `undefined`, vazio e dados incompletos explicitamente; evite `!` sem garantia.
+- Modele request/response separadamente quando responsabilidades diferirem.
+- Backend é a fonte de verdade para endpoints, campos, roles, paginação e status.
+- Serviços HTTP são tipados, retornam `Observable` e não manipulam DOM/estado específico de página.
+- Centralize URL base; não replique `localhost`.
+- Diferencie data sem horário de timestamp e evite deslocamento de timezone.
+- Mudança de contrato usa `change-api-contract`.
+
+## Autenticação, segurança e erros
+
+- Preserve OAuth2/JWT; centralize ciclo de vida do token e não espalhe `localStorage`.
+- `401` = sessão ausente/expirada; `403` = autenticado sem permissão, conforme contrato real.
+- Guards preferem `UrlTree` quando aplicável; UI por role não substitui autorização backend.
+- Nunca registre senha/token nem envie token a origem externa.
+- Não renderize HTML externo sem sanitização nem use bypass de segurança sem justificativa comprovada.
+- Não silencie erro: `catchError` apenas para transformação, mensagem ou fallback realmente seguro.
+
+## Formulários, UX, acessibilidade e responsividade
+
+- Em formulário novo relevante, prefira Reactive Forms tipados/`NonNullableFormBuilder` quando adequado; não migre existente por preferência.
+- Trate validação, mensagens, estado de envio e múltiplo submit.
+- Fluxos assíncronos consideram loading, conteúdo, vazio, erro, acesso negado e sessão expirada conforme aplicável.
+- Preserve HTML semântico, teclado, foco visível, labels, mensagens associadas e contraste; ARIA só quando semântica nativa não bastar.
+- Preserve responsividade e evite `!important`, seletor global agressivo e dimensão fixa prejudicial.
+- Não introduza biblioteca visual/framework/estado global sem necessidade e pedido apropriado.
+
+## Testes e qualidade
+
+Use Jasmine/Karma/TestBed conforme o projeto. Cubra comportamento observável relevante: serviços HTTP, auth, guards/interceptors, formulários, renderização por role, estados assíncronos, datas/paginação e regressões.
+
+Não desabilite/apague/enfraqueça testes para obter verde. Na conclusão, valide conforme o risco: testes específicos, suíte/build, TypeScript/templates, rotas, contrato, acessibilidade/responsividade, `git diff --check`, logs e artefatos.
+
+Sem solicitação explícita, não altere backend, contrato API, dependências, autenticação/guards ou arquitetura geral.

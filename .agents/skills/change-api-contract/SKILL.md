@@ -1,42 +1,19 @@
 ---
 name: change-api-contract
-description: Coordene mudanças full stack em endpoint, path, request, response, paginação, status HTTP ou autenticação entre backend Spring e frontend Angular. Use quando um contrato compartilhado muda; não use para implementação interna sem impacto nos consumers.
+description: Coordene mudança full stack em endpoint, path, request/response, paginação, status HTTP ou autenticação entre Spring e Angular.
 ---
 
 # Alterar contrato da API
 
-## Princípio
+1. Leia `AGENTS.md` raiz, backend e frontend.
+2. Localize producer e todos os consumers relevantes: segurança/controller/DTO/mapper/service/testes, models/HTTP/UI/formulários/testes e OpenAPI quando existir.
+3. Registre contrato atual → desejado e classifique compatível/breaking.
+4. Breaking change exige atualização coordenada ou transição explícita.
+5. Implemente fonte de verdade + testes e atualize consumers tipados/estados de erro.
+6. Valide status, serialização, validação, auth e ausência de consumer antigo.
+7. Execute `validate-project` nas áreas afetadas e `review-change` no diff full stack.
+8. Corrija `CHANGES_REQUIRED`, revalide/revise; conclua só com `PASS`/`PASS WITH NOTES`.
 
-Trate o contrato como interface compartilhada. Não atualize apenas um lado e não presuma consumidores.
+Contrato é no mínimo risco MEDIUM; auth/public exposure/dado sensível é HIGH.
 
-## Workflow
-
-1. Leia os `AGENTS.md` da raiz, backend e frontend.
-2. Localize todos os producers e consumers do contrato:
-   - controller e configuração de segurança;
-   - DTOs, mapper, service e testes backend;
-   - models, serviços HTTP, componentes, formulários e testes frontend;
-   - documentação OpenAPI quando existir.
-3. Registre o contrato atual e o contrato desejado.
-4. Classifique a mudança como compatível ou incompatível.
-5. Para breaking change, defina atualização coordenada ou estratégia de transição.
-6. Implemente primeiro a fonte de verdade e seus testes.
-7. Atualize consumers tipados e estados de erro relevantes.
-8. Teste status codes, validação, autorização, serialização e erros.
-9. Revise o diff completo para garantir que nenhum consumer permaneceu no contrato antigo.
-
-## Gate de conclusão obrigatório
-
-Mudança de contrato é, no mínimo, risco médio e deve passar por revisão de engenharia depois da última alteração:
-
-1. execute `validate-project` no backend e frontend afetados;
-2. execute `review-change` sobre o diff full stack;
-3. trate qualquer `CHANGES_REQUIRED` dentro do escopo;
-4. repita validações afetadas e a revisão após correções;
-5. conclua apenas com `PASS` ou `PASS WITH NOTES`.
-
-Em alteração de autenticação, autorização, exposição pública ou dados sensíveis, trate a mudança como alto risco.
-
-## Entrega
-
-Inclua resumo de antes/depois do contrato, compatibilidade, consumers atualizados, validações executadas, veredito da revisão de engenharia e riscos residuais.
+Reporte antes/depois, compatibilidade, consumers, validações, Engineering Review e riscos residuais.

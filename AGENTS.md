@@ -1,122 +1,82 @@
-# Projeto Evento Celebrativo — Instruções do repositório
+# Evento Celebrativo — regras do monorepo
 
-## Objetivo e estrutura
+## Fonte de verdade e escopo
 
-Este repositório contém uma aplicação para gerenciamento de eventos celebrativos, pessoas, locais, usuários, ministérios e escalas.
-
-Estrutura esperada:
+Este repositório contém:
 
 ```text
 backend/evento-celebrativo-api/        API Java/Spring Boot
 frontend-web/evento-celebrativo-web/   aplicação Angular
 ```
 
-Use os arquivos reais do repositório como fonte de verdade. Confirme versões no `pom.xml`, `package.json`, arquivos de configuração e testes antes de assumir detalhes.
+Código, configuração, migrations e testes reais são a fonte de verdade. Antes de editar backend ou frontend, leia o `AGENTS.md` da área correspondente. Em mudança full stack, leia ambos.
 
-## Carregamento das instruções no monorepo
-
-Antes de modificar backend, leia e siga:
-
-```text
-backend/evento-celebrativo-api/AGENTS.md
-```
-
-Antes de modificar frontend, leia e siga:
-
-```text
-frontend-web/evento-celebrativo-web/AGENTS.md
-```
-
-Em uma alteração full stack, leia ambos antes de editar. Esta leitura é obrigatória mesmo quando a sessão foi iniciada na raiz do monorepo.
-
-## Limites entre áreas
-
-- Em tarefa exclusivamente backend, não altere frontend sem solicitação explícita.
-- Em tarefa exclusivamente frontend, pode ler controllers, DTOs, OpenAPI e testes do backend para confirmar contratos, mas não deve alterá-los por iniciativa própria.
-- Em mudanças de contrato da API, trate backend e frontend como uma única alteração coordenada e use a Skill `change-api-contract`.
-- Não altere simultaneamente código sem relação apenas porque os dois projetos estão no mesmo repositório.
+- Não altere a outra aplicação em tarefa exclusivamente backend/frontend sem necessidade do requisito.
+- Mudança de contrato HTTP é coordenada entre producer e consumers; use `change-api-contract`.
+- Preserve alterações locais e evite mudanças sem relação com a tarefa.
 
 ## Fluxo obrigatório
 
-1. Identifique o escopo e a área afetada.
-2. Leia o AGENTS especializado e os arquivos diretamente relacionados.
-3. Procure implementação equivalente antes de criar uma nova estrutura.
-4. Confirme contratos e comportamento existente por código e testes.
-5. Implemente uma alteração mínima e coerente.
-6. Atualize testes relevantes.
-7. Execute `validate-project` com validações proporcionais ao risco.
-8. Depois da última alteração relevante, execute `review-change` conforme `.ai/review/ENGINEERING_REVIEW.md`.
-9. Se a revisão retornar `CHANGES_REQUIRED`, corrija os achados relacionados à tarefa, revalide e revise novamente.
-10. Conclua somente com `PASS` ou `PASS WITH NOTES` e reporte resultados reais.
+1. Confirme requisito, critérios de aceite, escopo e comportamento atual.
+2. Localize implementação, testes, contratos e dependências diretamente afetados; procure padrão equivalente antes de criar outro.
+3. Avalie segurança, dados, compatibilidade, desempenho e operação quando aplicáveis.
+4. Implemente o menor conjunto coerente de alterações e atualize testes relevantes.
+5. Execute `validate-project` com validações proporcionais ao risco.
+6. Depois da última alteração relevante, execute `review-change`.
+7. Se houver `CHANGES_REQUIRED`, corrija apenas achados acionáveis da tarefa, revalide e abra nova revisão.
+8. Conclua somente com `PASS` ou `PASS WITH NOTES`.
 
-## Contratos backend/frontend
+Testes/build passando não substituem a revisão independente.
 
-- O backend é a fonte definitiva de autenticação, autorização e regras de negócio.
-- O frontend não deve inventar campos, endpoints, roles ou formatos de paginação.
-- Antes de alterar requests ou responses, localize controller, DTO, mapper, service, testes e consumers no frontend.
-- Preserve compatibilidade quando o contrato já estiver em uso, salvo requisito explícito de breaking change.
-- Mudanças incompatíveis devem incluir plano de migração ou atualização coordenada dos consumers.
+## Regras transversais
 
-## Segurança
-
-- Nunca inclua secrets em código, exemplos, fixtures, logs ou documentação versionada.
-- Não reduza segurança para simplificar desenvolvimento ou testes.
-- Não confie em ocultação de UI como autorização; o backend deve validar permissões.
-- Alterações em autenticação, JWT, roles, CORS ou endpoints públicos exigem revisão específica de segurança e testes de autorização.
-
-## Persistência e migrations
-
-- Antes de alterar banco, confira o mecanismo atual de migrations e o estado dos schemas.
-- Não edite uma migration Flyway versionada que já possa ter sido aplicada. Crie uma nova migration incremental.
-- Não execute operações destrutivas ou limpeza de banco sem solicitação explícita.
+- O backend é a fonte definitiva de autenticação, autorização, regras de negócio e persistência.
+- O frontend não inventa endpoints, campos, roles, paginação ou status HTTP.
+- Preserve compatibilidade de contratos em uso; breaking changes exigem atualização coordenada ou estratégia de transição.
+- Nunca inclua secrets, senhas, tokens ou dados sensíveis em código, fixtures, logs ou documentação.
+- Autorização é server-side; ocultação de UI não é controle de segurança.
+- Não edite migration Flyway versionada que já possa ter sido aplicada; crie migration incremental.
+- Não execute limpeza destrutiva de banco/repositório sem solicitação explícita.
+- Não reduza autenticação, autorização, validações ou testes para fazer uma tarefa passar.
+- Não introduza dependência, camada, pattern ou refatoração ampla sem benefício concreto.
 
 ## Git
 
-- Não faça commit, push, merge, rebase, PR ou exclusão de branch sem solicitação explícita.
-- Não descarte alterações existentes do usuário.
-- Quando solicitado, use branches no formato `tipo/objetivo-da-tarefa`.
-- Prefixos usuais: `feature/`, `fix/`, `test/`, `chore/`, `docs/`, `refactor/`, `perf/`.
-- Prefira commits profissionais em inglês e com escopo coerente.
+Sem solicitação explícita, não faça commit, push, merge, rebase, PR nem exclua branch. Não descarte trabalho existente. Quando solicitado, use branches `feature/`, `fix/`, `test/`, `chore/`, `docs/`, `refactor/` ou `perf/`, com objetivo claro.
 
-## Uso das Skills
+## Skills e subagents
 
-- Bug ou teste falhando: `investigate-bug`.
-- Feature ou correção backend: `implement-backend-feature`.
-- Feature ou correção frontend: `implement-frontend-feature`.
-- Mudança de request/response/endpoint: `change-api-contract`.
-- Build e testes finais: `validate-project`.
-- Revisão de branch ou diff: `review-change`.
+- bug/teste falhando: `investigate-bug`;
+- backend: `implement-backend-feature`;
+- frontend: `implement-frontend-feature`;
+- contrato API: `change-api-contract`;
+- validação: `validate-project`;
+- revisão: `review-change`.
 
-A política comum de revisão está em `.ai/review/ENGINEERING_REVIEW.md`. Para qualquer alteração de implementação **ou da própria infraestrutura de IA versionada** (`.ai/`, `.claude/`, `.codex/`, `.agents/`, `AGENTS.md`, `CLAUDE.md`), `review-change` é um gate obrigatório de conclusão e não deve ser substituído apenas por build ou testes passando.
+Use subagents somente quando a especialização ou divisão de contexto melhorar a tarefa. Exploração e reviewers são somente leitura; o agente principal integra alterações.
 
-## Delegação para Subagents
+A política canônica da revisão é `.ai/review/ENGINEERING_REVIEW.md`. Alterações de implementação e da infraestrutura de IA versionada (`.ai/`, `.claude/`, `.codex/`, `.agents/`, `AGENTS.md`, `CLAUDE.md`) exigem esse gate.
 
-Quando o ambiente disponibilizar subagents, use-os em tarefas grandes quando houver frentes independentes. A ausência de subagents especializados não dispensa `review-change`, que continua responsável pela revisão completa. Exemplos:
+## Processos de desenvolvimento
 
-- `codebase_explorer`: mapear fluxo e arquivos antes da implementação;
-- `backend_reviewer`: revisar Java/Spring;
-- `frontend_reviewer`: revisar Angular/TypeScript/acessibilidade;
-- `test_reviewer`: encontrar lacunas ou fragilidade de testes;
-- `security_reviewer`: revisar autenticação, autorização e exposição de dados.
+Prefira comandos finitos (`test`, `build`, validações específicas). Não inicie servidor backend/frontend apenas para validar algo que um comando finito comprova.
 
-Aguarde os subagents necessários e consolide as evidências antes de editar. Evite subagents em alterações pequenas e evite escritas paralelas.
+Se precisar iniciar `spring-boot:run`, `npm start`, `ng serve` ou outro processo de longa duração, leia `.ai/runtime/PROCESS_LIFECYCLE.md`, registre o PID/process tree iniciado pelo agente e encerre-o antes da conclusão. Nunca finalize processos Java/Node do usuário por nome global.
 
 ## Definição de concluído
 
-Uma tarefa só está concluída quando:
+A tarefa só termina quando:
 
-- o requisito foi atendido sem alterações fora do escopo;
-- contratos e segurança foram preservados;
-- testes relevantes foram atualizados;
-- build/testes aplicáveis foram executados ou a limitação foi documentada;
-- `git diff --check` não aponta problemas;
-- o diff foi revisado quanto a arquivos inesperados e segredos;
-- a revisão de engenharia terminou em `PASS` ou `PASS WITH NOTES`;
-- não restam `BLOCKER`, `HIGH` ou `MEDIUM` introduzidos pela tarefa e ainda acionáveis dentro do escopo;
-- a resposta final informa exatamente o que foi validado e o veredito da revisão.
+- requisito/aceite estão atendidos sem mudança fora do escopo;
+- contratos, segurança, dados e boas práticas aplicáveis foram preservados;
+- testes relevantes foram atualizados e validações reais reportadas;
+- `git diff --check` está limpo e o diff não contém artefatos, logs temporários ou segredos;
+- nenhum processo de longa duração iniciado pelo agente permanece ativo;
+- Engineering Review está em `PASS` ou `PASS WITH NOTES`, sem `MEDIUM/HIGH/BLOCKER` acionável da tarefa;
+- a resposta final informa o que foi alterado, validado, não validado e o veredito.
 
 ## Graphify
 
-A política canônica compartilhada está em `.ai/graphify/GRAPHIFY_POLICY.md`. Leia e siga esse arquivo para consulta, atualização, custo semântico, proveniência e critérios de encerramento.
+Use Graphify para restringir exploração quando a tarefa envolver arquitetura, dependências, impacto, símbolos ou localização ampla. Nesse caso, leia `.ai/graphify/GRAPHIFY_POLICY.md` antes da consulta. Não carregue essa política por rotina em tarefas locais simples.
 
-Quando o usuário invocar `$graphify` ou `/graphify`, siga `.ai/graphify/GRAPHIFY_POLICY.md`. No Claude Code, use a Skill `graphify` instalada no projeto; no Codex, use o CLI `graphify` disponível no PATH quando aplicável. Não assuma que uma Skill específica de outra plataforma está instalada.
+Quando o usuário invocar `$graphify`/`/graphify`, siga a política canônica; no Claude use a Skill instalada e no Codex use o CLI disponível.
