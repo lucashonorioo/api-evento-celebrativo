@@ -228,10 +228,11 @@ class LocalFlywayMigrationIntegrationTest {
                 """
                 SELECT COUNT(*)
                 FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
                 JOIN tb_user_account ua ON ua.person_id = pm.person_id
                 JOIN tb_user_account_role uar ON uar.user_account_id = ua.id
                 JOIN tb_role r ON r.id = uar.role_id
-                WHERE pm.ministry_type = ? AND r.authority = ?
+                WHERE lm.ministry_type = ? AND r.authority = ?
                 """,
                 Integer.class,
                 ministryType,
@@ -245,7 +246,8 @@ class LocalFlywayMigrationIntegrationTest {
                 """
                 SELECT COUNT(*)
                 FROM tb_person_ministry pm
-                WHERE pm.ministry_type = ?
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE lm.ministry_type = ?
                   AND NOT EXISTS (SELECT 1 FROM tb_user_account ua WHERE ua.person_id = pm.person_id)
                 """,
                 Integer.class,
@@ -355,9 +357,9 @@ class LocalFlywayMigrationIntegrationTest {
                 """
                 SELECT COUNT(*)
                 FROM (
-                    SELECT person_id, ministry_type
+                    SELECT person_id, ministry_id
                     FROM tb_person_ministry
-                    GROUP BY person_id, ministry_type
+                    GROUP BY person_id, ministry_id
                     HAVING COUNT(*) > 1
                 ) duplicated
                 """,

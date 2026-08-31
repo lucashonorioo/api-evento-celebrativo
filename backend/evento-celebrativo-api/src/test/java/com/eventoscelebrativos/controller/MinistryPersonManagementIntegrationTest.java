@@ -3,6 +3,7 @@ package com.eventoscelebrativos.controller;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.ParishResponsibilityType;
 import com.eventoscelebrativos.model.ParishStaffAssignment;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -95,6 +97,9 @@ class MinistryPersonManagementIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private final List<Long> createdStaffPersonIds = new ArrayList<>();
 
     @AfterEach
@@ -129,6 +134,50 @@ class MinistryPersonManagementIntegrationTest {
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
 
         assertScopedEndpoints(coordinator, true, targetId, 403);
+    }
+
+    @Test
+    void arbitraryMinistryCoordinatorCanManageOwnMinistryScopeById() throws Exception {
+        Long ministryId = null;
+        try {
+            Ministry ministry = ministryRepository.saveAndFlush(new Ministry("Acólitos " + PHONE_SEQ.incrementAndGet()));
+            ministryId = ministry.getId();
+            assertFalse(hasLegacyMapping(ministryId));
+
+            long coordinatorId = createCoordinator(ministry, "Arbitrary Scope Coordinator");
+            long targetId = createPerson("Arbitrary Scope Target");
+            RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
+
+            mockMvc.perform(put(ministryVinculoPath(ministryId, targetId)).with(coordinator))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(targetId));
+            assertActiveMinistry(targetId, ministryId, true);
+            assertFalse(findPersonMinistry(targetId, ministryId).orElseThrow().getCoordinator());
+
+            mockMvc.perform(get(ministryPeoplePath(ministryId)).with(coordinator))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(targetId)).isNotEmpty());
+
+            mockMvc.perform(get(ministryPersonPath(ministryId, targetId)).with(coordinator))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(targetId));
+
+            String createdResponse = mockMvc.perform(post(ministryPeoplePath(ministryId)).with(coordinator)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createPayload("Criado Por Coordenador Arbitrario")))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long createdId = extractId(createdResponse);
+            assertActiveMinistry(createdId, ministryId, true);
+
+            mockMvc.perform(delete(ministryVinculoPath(ministryId, targetId)).with(coordinator))
+                    .andExpect(status().isNoContent());
+            PersonMinistry removed = findPersonMinistry(targetId, ministryId).orElseThrow();
+            assertFalse(removed.getActive());
+            assertFalse(removed.getCoordinator());
+        } finally {
+            cleanupMinistry(ministryId);
+        }
     }
 
     @Test
@@ -270,9 +319,9 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.PRIEST, priestId)).with(coordinator))
                 .andExpect(status().isForbidden());
 
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(multiMinistryId, MinistryType.READER).orElseThrow().getActive());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(multiMinistryId, MinistryType.COMMENTATOR).orElseThrow().getActive());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(priestId, MinistryType.PRIEST).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(multiMinistryId, MinistryType.READER).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(multiMinistryId, MinistryType.COMMENTATOR).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(priestId, MinistryType.PRIEST).orElseThrow().getActive());
     }
 
     @Test
@@ -310,7 +359,7 @@ class MinistryPersonManagementIntegrationTest {
 
         Person unchangedPerson = personRepository.findById(inactiveTargetId).orElseThrow();
         assertFalse(unchangedPerson.isActive());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(inactiveTargetId, MinistryType.READER)
+        assertTrue(findPersonMinistry(inactiveTargetId, MinistryType.READER)
                 .orElseThrow().getActive());
     }
 
@@ -336,7 +385,7 @@ class MinistryPersonManagementIntegrationTest {
         Person created = personRepository.findById(createdId).orElseThrow();
         assertTrue(created.isActive());
         assertTrue(userAccountRepository.findByPersonId(createdId).isEmpty());
-        PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(createdId, MinistryType.READER).orElseThrow();
+        PersonMinistry ministry = findPersonMinistry(createdId, MinistryType.READER).orElseThrow();
         assertTrue(ministry.getActive());
         assertFalse(ministry.getCoordinator());
     }
@@ -384,17 +433,17 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, existingId)).with(coordinator))
                 .andExpect(status().isOk());
 
-        PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(existingId, MinistryType.READER).orElseThrow();
+        PersonMinistry ministry = findPersonMinistry(existingId, MinistryType.READER).orElseThrow();
         assertTrue(ministry.getActive());
         assertFalse(ministry.getCoordinator());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(existingId, MinistryType.COMMENTATOR).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(existingId, MinistryType.COMMENTATOR).orElseThrow().getActive());
     }
 
     @Test
     void addVinculoReactivatesWithoutRestoringCoordination() throws Exception {
         long coordinatorId = createReaderCoordinator("Reactivate Vinculo Coordinator");
         long targetId = createReader("Reactivate Vinculo Target");
-        PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
+        PersonMinistry ministry = findPersonMinistry(targetId, MinistryType.READER).orElseThrow();
         ministry.grantCoordination();
         ministry.deactivate();
         personMinistryRepository.saveAndFlush(ministry);
@@ -403,7 +452,7 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isOk());
 
-        PersonMinistry reactivated = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
+        PersonMinistry reactivated = findPersonMinistry(targetId, MinistryType.READER).orElseThrow();
         assertTrue(reactivated.getActive());
         assertFalse(reactivated.getCoordinator());
     }
@@ -412,7 +461,7 @@ class MinistryPersonManagementIntegrationTest {
     void addVinculoIsIdempotentAndPreservesExistingCoordination() throws Exception {
         long coordinatorId = createReaderCoordinator("Idempotent Vinculo Coordinator");
         long targetId = createReader("Idempotent Vinculo Target");
-        PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
+        PersonMinistry ministry = findPersonMinistry(targetId, MinistryType.READER).orElseThrow();
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
         RequestPostProcessor coordinator = asUser(coordinatorId, "ROLE_OPERATOR");
@@ -420,7 +469,7 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(put(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isOk());
 
-        PersonMinistry unchanged = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
+        PersonMinistry unchanged = findPersonMinistry(targetId, MinistryType.READER).orElseThrow();
         assertTrue(unchanged.getActive());
         assertTrue(unchanged.getCoordinator());
     }
@@ -509,7 +558,7 @@ class MinistryPersonManagementIntegrationTest {
 
         Person unchanged = personRepository.findById(targetId).orElseThrow();
         assertEquals("Update MassAssignment Target", unchanged.getName());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(targetId, MinistryType.READER).orElseThrow().getActive());
     }
 
     @Test
@@ -549,10 +598,10 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, targetId)).with(coordinator))
                 .andExpect(status().isNoContent());
 
-        PersonMinistry readerMinistry = personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER).orElseThrow();
+        PersonMinistry readerMinistry = findPersonMinistry(targetId, MinistryType.READER).orElseThrow();
         assertFalse(readerMinistry.getActive());
         assertFalse(readerMinistry.getCoordinator());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.COMMENTATOR).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(targetId, MinistryType.COMMENTATOR).orElseThrow().getActive());
         assertTrue(personRepository.findById(targetId).orElseThrow().isActive());
     }
 
@@ -579,11 +628,11 @@ class MinistryPersonManagementIntegrationTest {
 
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, activeBlockedTargetId)).with(coordinator))
                 .andExpect(status().isConflict());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(activeBlockedTargetId, MinistryType.READER).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(activeBlockedTargetId, MinistryType.READER).orElseThrow().getActive());
 
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, cancelledOnlyTargetId)).with(coordinator))
                 .andExpect(status().isNoContent());
-        assertFalse(personMinistryRepository.findByPersonIdAndMinistryType(cancelledOnlyTargetId, MinistryType.READER).orElseThrow().getActive());
+        assertFalse(findPersonMinistry(cancelledOnlyTargetId, MinistryType.READER).orElseThrow().getActive());
     }
 
     @Test
@@ -599,7 +648,7 @@ class MinistryPersonManagementIntegrationTest {
 
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.PRIEST, pastorId)).with(coordinator))
                 .andExpect(status().isConflict());
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(pastorId, MinistryType.PRIEST).orElseThrow().getActive());
+        assertTrue(findPersonMinistry(pastorId, MinistryType.PRIEST).orElseThrow().getActive());
     }
 
     // --- Revogacao imediata e auto-remocao ---
@@ -612,7 +661,7 @@ class MinistryPersonManagementIntegrationTest {
 
         mockMvc.perform(get(ministryPersonPath(MinistryType.READER, targetId)).with(coordinator)).andExpect(status().isOk());
 
-        PersonMinistry ministry = personMinistryRepository.findByPersonIdAndMinistryType(coordinatorId, MinistryType.READER).orElseThrow();
+        PersonMinistry ministry = findPersonMinistry(coordinatorId, MinistryType.READER).orElseThrow();
         ministry.revokeCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
@@ -627,7 +676,7 @@ class MinistryPersonManagementIntegrationTest {
         mockMvc.perform(delete(ministryVinculoPath(MinistryType.READER, coordinatorId)).with(coordinator))
                 .andExpect(status().isNoContent());
 
-        PersonMinistry selfMinistry = personMinistryRepository.findByPersonIdAndMinistryType(coordinatorId, MinistryType.READER).orElseThrow();
+        PersonMinistry selfMinistry = findPersonMinistry(coordinatorId, MinistryType.READER).orElseThrow();
         assertFalse(selfMinistry.getActive());
         assertFalse(selfMinistry.getCoordinator());
 
@@ -700,6 +749,15 @@ class MinistryPersonManagementIntegrationTest {
         return personId;
     }
 
+    private long createCoordinator(Ministry ministry, String name) {
+        long personId = createPerson(name);
+        Person person = personRepository.findById(personId).orElseThrow();
+        PersonMinistry personMinistry = new PersonMinistry(person, ministry);
+        personMinistry.grantCoordination();
+        personMinistryRepository.saveAndFlush(personMinistry);
+        return personId;
+    }
+
     private long createCommentatorCoordinator(String name) {
         long personId = createPerson(name);
         Person person = personRepository.findById(personId).orElseThrow();
@@ -742,12 +800,24 @@ class MinistryPersonManagementIntegrationTest {
         return "/ministerios/" + ministryId(ministryType) + "/pessoas";
     }
 
+    private String ministryPeoplePath(Long ministryId) {
+        return "/ministerios/" + ministryId + "/pessoas";
+    }
+
     private String ministryPersonPath(MinistryType ministryType, long personId) {
         return ministryPeoplePath(ministryType) + "/" + personId;
     }
 
+    private String ministryPersonPath(Long ministryId, long personId) {
+        return ministryPeoplePath(ministryId) + "/" + personId;
+    }
+
     private String ministryVinculoPath(MinistryType ministryType, long personId) {
         return ministryPersonPath(ministryType, personId) + "/vinculo";
+    }
+
+    private String ministryVinculoPath(Long ministryId, long personId) {
+        return ministryPersonPath(ministryId, personId) + "/vinculo";
     }
 
     private String ministryCoordinatorPath(long personId, MinistryType ministryType) {
@@ -756,5 +826,37 @@ class MinistryPersonManagementIntegrationTest {
 
     private Long ministryId(MinistryType ministryType) {
         return ministryRepository.findByNormalizedName(normalizedName(ministryType)).orElseThrow().getId();
+    }
+
+    private Optional<PersonMinistry> findPersonMinistry(long personId, MinistryType ministryType) {
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId(ministryType));
+    }
+
+    private Optional<PersonMinistry> findPersonMinistry(long personId, Long ministryId) {
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
+    }
+
+    private void assertActiveMinistry(long personId, Long ministryId, boolean expectedActive) {
+        boolean active = findPersonMinistry(personId, ministryId)
+                .map(PersonMinistry::getActive)
+                .orElse(false);
+        assertEquals(expectedActive, active);
+    }
+
+    private boolean hasLegacyMapping(Long ministryId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_ministry_legacy_type_mapping WHERE ministry_id = ?",
+                Integer.class,
+                ministryId
+        );
+        return count != null && count > 0;
+    }
+
+    private void cleanupMinistry(Long ministryId) {
+        if (ministryId == null) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE ministry_id = ?", ministryId);
+        jdbcTemplate.update("DELETE FROM tb_ministry WHERE id = ?", ministryId);
     }
 }

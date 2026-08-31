@@ -488,7 +488,7 @@ class NotificationDeliveryServiceIntegrationTest {
     }
 
     private void deactivatePersonMinistry(Long personId, MinistryType ministryType) {
-        PersonMinistry personMinistry = personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType).orElseThrow();
+        PersonMinistry personMinistry = findPersonMinistry(personId, ministryType).orElseThrow();
         personMinistry.deactivate();
         personMinistryRepository.saveAndFlush(personMinistry);
         entityManager.clear();
@@ -498,6 +498,14 @@ class NotificationDeliveryServiceIntegrationTest {
         Person person = personRepository.findById(personId).orElseThrow();
         personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
         entityManager.clear();
+    }
+
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, MinistryType ministryType) {
+        Long ministryId = ministryRepository.findByNormalizedName(
+                        com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
     }
 
     private Person createPersonWithoutAccount(String name, boolean active) {

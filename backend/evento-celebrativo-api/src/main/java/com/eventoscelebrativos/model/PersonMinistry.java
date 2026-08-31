@@ -2,8 +2,6 @@ package com.eventoscelebrativos.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -33,10 +31,6 @@ public class PersonMinistry {
     @JoinColumn(name = "ministry_id", nullable = false, updatable = false)
     private Ministry ministry;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "ministry_type", nullable = false, length = 50)
-    private MinistryType legacyMinistryType;
-
     @Column(nullable = false)
     private Boolean active = true;
 
@@ -58,13 +52,9 @@ public class PersonMinistry {
     public PersonMinistry() {
     }
 
-    public PersonMinistry(Person person, Ministry ministry, MinistryType legacyMinistryType) {
+    public PersonMinistry(Person person, Ministry ministry) {
         this.person = Objects.requireNonNull(person, "Pessoa e obrigatoria");
         this.ministry = Objects.requireNonNull(ministry, "Ministerio e obrigatorio");
-        this.legacyMinistryType = Objects.requireNonNull(
-                legacyMinistryType,
-                "Tipo ministerial legado e obrigatorio"
-        );
         this.active = true;
         this.coordinator = false;
     }
@@ -137,10 +127,6 @@ public class PersonMinistry {
 
     public Ministry getMinistry() {
         return ministry;
-    }
-
-    public MinistryType getMinistryType() {
-        return legacyMinistryType;
     }
 
     public Boolean getActive() {

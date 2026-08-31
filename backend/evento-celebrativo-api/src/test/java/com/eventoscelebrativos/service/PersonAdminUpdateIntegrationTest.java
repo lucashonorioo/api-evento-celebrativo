@@ -316,9 +316,10 @@ class PersonAdminUpdateIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
                   AND active = TRUE
                 """,
                 Integer.class,

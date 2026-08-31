@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -63,8 +64,8 @@ class MinistryControllerTest {
                 .andExpect(jsonPath("$[0].id").value(10))
                 .andExpect(jsonPath("$[0].name").value("Acólitos"))
                 .andExpect(jsonPath("$[0].active").value(true))
+                .andExpect(jsonPath("$[0].*", hasSize(3)))
                 .andExpect(jsonPath("$[0].normalizedName").doesNotExist())
-                .andExpect(jsonPath("$[0].legacyMinistryType").doesNotExist())
                 .andExpect(jsonPath("$[1].id").value(2))
                 .andExpect(jsonPath("$[1].name").value("Leitores"))
                 .andExpect(jsonPath("$[1].active").value(false));

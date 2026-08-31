@@ -13,7 +13,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, Subject, switchMap } from 'rxjs';
 
-import { apiErrorCode, apiErrorMessage } from '../../api-error.utils';
+import { apiErrorCode } from '../../api-error.utils';
 import { AuthSessionService } from '../../auth-session.service';
 import {
   MinistryCatalogItem,
@@ -913,13 +913,6 @@ function ministriesUpdateErrorMessageFor(error: unknown): string {
 
     if (error.status === 409) {
       const errorCode = apiErrorCode(error.error);
-
-      if (errorCode === 'MINISTRY_LEGACY_COMPATIBILITY_REQUIRED') {
-        return (
-          apiErrorMessage(error.error) ??
-          'Este ministério ainda não pode ser vinculado a pessoas nesta etapa da migração.'
-        );
-      }
 
       if (errorCode === 'MINISTRY_INACTIVE') {
         return 'Ministério inativo não pode ser associado ou reativado para uma pessoa.';

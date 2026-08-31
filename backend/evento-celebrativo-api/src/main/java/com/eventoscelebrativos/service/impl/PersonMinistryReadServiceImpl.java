@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -154,12 +155,16 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         List<PersonMinistryRepository.PersonMinistryCatalogView> rows =
                 personMinistryRepository.findActiveMinistriesByPersonIds(distinctIds);
         Map<Long, MinistryType> legacyTypesByMinistryId = legacyMinistryTypeResolver
-                .requireTypesByPersistentMinistryId(rows.stream()
+                .findTypesByPersistentMinistryId(rows.stream()
                         .map(PersonMinistryRepository.PersonMinistryCatalogView::getMinistryId)
                         .toList());
 
-        rows.forEach(row -> mutableResult.get(row.getPersonId())
-                .add(legacyTypesByMinistryId.get(row.getMinistryId())));
+        rows.forEach(row -> {
+            MinistryType ministryType = legacyTypesByMinistryId.get(row.getMinistryId());
+            if (ministryType != null) {
+                mutableResult.get(row.getPersonId()).add(ministryType);
+            }
+        });
 
         Map<Long, Set<MinistryType>> result = new LinkedHashMap<>();
         mutableResult.forEach((personId, ministries) -> result.put(personId, immutableEnumSet(ministries)));
@@ -174,7 +179,8 @@ public class PersonMinistryReadServiceImpl implements PersonMinistryReadService 
         }
         List<MinistryType> coordinated = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(personId)
                 .stream()
-                .map(legacyMinistryTypeResolver::requireMinistryType)
+                .map(legacyMinistryTypeResolver::findMinistryType)
+                .flatMap(Optional::stream)
                 .toList();
         if (coordinated.isEmpty()) {
             return Collections.emptySet();

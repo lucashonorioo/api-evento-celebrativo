@@ -195,9 +195,9 @@ class TestProfileFlywayIntegrationTest {
                 """
                 SELECT COUNT(*)
                 FROM (
-                    SELECT person_id, ministry_type
+                    SELECT person_id, ministry_id
                     FROM tb_person_ministry
-                    GROUP BY person_id, ministry_type
+                    GROUP BY person_id, ministry_id
                     HAVING COUNT(*) > 1
                 ) duplicated
                 """,

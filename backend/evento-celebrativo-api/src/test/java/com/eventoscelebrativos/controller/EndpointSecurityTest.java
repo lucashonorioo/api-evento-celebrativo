@@ -350,7 +350,12 @@ class EndpointSecurityTest {
         // coordinator=true diretamente no banco para provar que possuir a responsabilidade de
         // coordenacao nao desbloqueia autoridade administrativa nenhuma nesta branch.
         jdbcTemplate.update(
-                "UPDATE tb_person_ministry SET coordinator = TRUE WHERE person_id = 4 AND ministry_type = 'READER'");
+                """
+                UPDATE tb_person_ministry
+                SET coordinator = TRUE
+                WHERE person_id = 4
+                  AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                """);
         try {
             mockMvc.perform(put("/pessoas/1/ministries/" + commentatorMinistryId() + "/coordinator"))
                     .andExpect(status().isForbidden());
@@ -362,7 +367,12 @@ class EndpointSecurityTest {
                     .andExpect(status().isForbidden());
         } finally {
             jdbcTemplate.update(
-                    "UPDATE tb_person_ministry SET coordinator = FALSE WHERE person_id = 4 AND ministry_type = 'READER'");
+                    """
+                    UPDATE tb_person_ministry
+                    SET coordinator = FALSE
+                    WHERE person_id = 4
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """);
         }
     }
 

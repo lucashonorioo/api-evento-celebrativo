@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
 
 /**
  * Fonte oficial de elegibilidade ministerial para a escrita de escalas: responde se uma pessoa
- * possui, em {@code tb_person_ministry}, o {@link MinistryType} solicitado - sem consultar
+ * possui, em {@code tb_person_ministry}, o {@link com.eventoscelebrativos.model.Ministry} persistente
+ * correspondente ao {@link MinistryType} solicitado pelo boundary legado - sem consultar
  * repositories de subtipo legado nem {@code person_type}.
  */
 @Component

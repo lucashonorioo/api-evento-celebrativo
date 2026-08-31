@@ -156,9 +156,10 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
         Boolean active = jdbcTemplate.queryForObject(
                 """
                 SELECT active
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
                 """,
                 Boolean.class,
                 personId,
@@ -174,7 +175,7 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
                 SET active = FALSE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
-                  AND ministry_type = ?
+                  AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?)
                 """,
                 personId,
                 ministryType.name()
@@ -188,7 +189,7 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
                 SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
-                  AND ministry_type = ?
+                  AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?)
                 """,
                 personId,
                 ministryType.name()
@@ -198,12 +199,11 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
     private void addMinistry(Long personId, MinistryType ministryType) {
         assertEquals(1, jdbcTemplate.update(
                 """
-                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, created_at, updated_at)
-                VALUES (?, ?, (SELECT id FROM tb_ministry WHERE normalized_name = ?),
+                INSERT INTO tb_person_ministry(person_id, ministry_id, active, created_at, updated_at)
+                VALUES (?, (SELECT id FROM tb_ministry WHERE normalized_name = ?),
                         TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """,
                 personId,
-                ministryType.name(),
                 normalizedName(ministryType)
         ));
     }
@@ -230,9 +230,10 @@ class ReaderParallelCutoverIsolatedLifecycleIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
                 """,
                 Integer.class,
                 personId,

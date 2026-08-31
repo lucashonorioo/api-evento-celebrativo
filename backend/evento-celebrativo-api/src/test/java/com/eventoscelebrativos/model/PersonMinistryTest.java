@@ -39,13 +39,12 @@ class PersonMinistryTest {
 
         assertNotNull(ministry.getMinistry());
         assertEquals(unitMinistry(MinistryType.READER).getId(), ministry.getMinistry().getId());
-        assertEquals(MinistryType.READER, ministry.getMinistryType());
     }
 
     @Test
     void shouldRejectMissingMinistryWhenCreated() {
         assertThrows(NullPointerException.class,
-                () -> new PersonMinistry(person(), null, MinistryType.READER));
+                () -> new PersonMinistry(person(), null));
     }
 
     @Test

@@ -174,7 +174,7 @@ class CurrentUserProfileIntegrationTest {
             assertEquals(newBirthday, updatedTarget.getBirthdayDate());
             assertEquals(targetPhone, updatedTarget.getPhoneNumber());
             assertEquals(Set.of("ROLE_OPERATOR"), roleAuthoritiesOfPerson(targetId));
-            assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(targetId, MinistryType.READER)
+            assertTrue(findPersonMinistry(targetId, MinistryType.READER)
                     .map(PersonMinistry::getActive).orElse(false));
             assertEquals(1, countAssignments(targetId));
 
@@ -267,6 +267,14 @@ class CurrentUserProfileIntegrationTest {
         PersonMinistry ministry = personMinistry(person, ministryType, ministryRepository);
         ministry.setActive(true);
         personMinistryRepository.saveAndFlush(ministry);
+    }
+
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, MinistryType ministryType) {
+        Long ministryId = ministryRepository.findByNormalizedName(
+                        com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
     }
 
     private CelebrationEvent saveEvent(String name) {

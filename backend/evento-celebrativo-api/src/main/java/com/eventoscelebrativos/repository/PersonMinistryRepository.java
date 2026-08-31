@@ -1,7 +1,6 @@
 package com.eventoscelebrativos.repository;
 
 import com.eventoscelebrativos.model.Ministry;
-import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.PersonMinistry;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -32,41 +31,6 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
     Optional<PersonMinistry> findByPersonIdAndMinistryId(Long personId, Long ministryId);
 
     List<PersonMinistry> findAllByPersonId(Long personId);
-
-    @Query("""
-            SELECT pm
-            FROM PersonMinistry pm
-            WHERE pm.person.id = :personId
-              AND pm.legacyMinistryType = :ministryType
-            """)
-    Optional<PersonMinistry> findByPersonIdAndMinistryType(
-            @Param("personId") Long personId,
-            @Param("ministryType") MinistryType ministryType
-    );
-
-    @Query("""
-            SELECT CASE WHEN COUNT(pm) > 0 THEN TRUE ELSE FALSE END
-            FROM PersonMinistry pm
-            WHERE pm.person.id = :personId
-              AND pm.legacyMinistryType = :ministryType
-            """)
-    boolean existsByPersonIdAndMinistryType(
-            @Param("personId") Long personId,
-            @Param("ministryType") MinistryType ministryType
-    );
-
-    @Query("""
-            SELECT CASE WHEN COUNT(pm) > 0 THEN TRUE ELSE FALSE END
-            FROM PersonMinistry pm
-            WHERE pm.person.id = :personId
-              AND pm.legacyMinistryType = :ministryType
-              AND pm.active = TRUE
-              AND pm.coordinator = TRUE
-            """)
-    boolean existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-            @Param("personId") Long personId,
-            @Param("ministryType") MinistryType ministryType
-    );
 
     @Query(
             value = """
@@ -102,40 +66,6 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
             @Param("ministryId") Long ministryId
     );
 
-    @Query(
-            value = """
-                    SELECT pm.person.id
-                    FROM PersonMinistry pm
-                    WHERE pm.legacyMinistryType = :ministryType
-                      AND pm.active = TRUE
-                      AND pm.person.active = TRUE
-                    ORDER BY pm.person.name ASC, pm.person.id ASC
-                    """,
-            countQuery = """
-                    SELECT COUNT(DISTINCT pm.person.id)
-                    FROM PersonMinistry pm
-                    WHERE pm.legacyMinistryType = :ministryType
-                      AND pm.active = TRUE
-                      AND pm.person.active = TRUE
-                    """
-    )
-    Page<Long> findActivePersonIdsByMinistryType(
-            @Param("ministryType") MinistryType ministryType,
-            Pageable pageable
-    );
-
-    @Query("""
-            SELECT pm.person
-            FROM PersonMinistry pm
-            WHERE pm.legacyMinistryType = :ministryType
-              AND pm.active = TRUE
-              AND pm.person.active = TRUE
-            ORDER BY pm.person.name ASC, pm.person.id ASC
-            """)
-    List<com.eventoscelebrativos.model.Person> findActivePeopleByMinistryType(
-            @Param("ministryType") MinistryType ministryType
-    );
-
     @Query("""
             SELECT pm.person.id AS personId,
                    pm.ministry.id AS ministryId,
@@ -169,26 +99,6 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
             """)
     List<Ministry> findActiveCoordinatedMinistriesByPersonId(@Param("personId") Long personId);
 
-    @Query("""
-            SELECT pm.person.id AS personId,
-                   pm.legacyMinistryType AS ministryType
-            FROM PersonMinistry pm
-            WHERE pm.active = TRUE
-              AND pm.person.id IN :personIds
-            ORDER BY pm.person.id ASC, pm.legacyMinistryType ASC
-            """)
-    List<PersonMinistryTypeView> findActiveMinistryTypesByPersonIds(@Param("personIds") Collection<Long> personIds);
-
-    @Query("""
-            SELECT pm.legacyMinistryType
-            FROM PersonMinistry pm
-            WHERE pm.person.id = :personId
-              AND pm.active = TRUE
-              AND pm.coordinator = TRUE
-            ORDER BY pm.legacyMinistryType ASC
-            """)
-    List<MinistryType> findActiveCoordinatedMinistryTypesByPersonId(@Param("personId") Long personId);
-
     void deleteAllByPersonId(Long personId);
 
     /**
@@ -205,16 +115,6 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
     List<PersonMinistry> findByPersonIdAndMinistryIdInForUpdate(
             @Param("personId") Long personId,
             @Param("ministryIds") Collection<Long> ministryIds
-    );
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            SELECT pm FROM PersonMinistry pm
-            WHERE pm.person.id = :personId AND pm.legacyMinistryType IN :ministryTypes
-            """)
-    List<PersonMinistry> findByPersonIdAndMinistryTypeInForUpdate(
-            @Param("personId") Long personId,
-            @Param("ministryTypes") Collection<MinistryType> ministryTypes
     );
 
     interface PersonMinistryCatalogView {
@@ -237,17 +137,4 @@ public interface PersonMinistryRepository extends JpaRepository<PersonMinistry, 
         Boolean getActive();
     }
 
-    interface PersonMinistryTypeView {
-        Long getPersonId();
-
-        MinistryType getMinistryType();
-    }
-
-    interface PersonMinistryStatusView {
-        Long getPersonId();
-
-        MinistryType getMinistryType();
-
-        Boolean getActive();
-    }
 }
