@@ -106,7 +106,7 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
         migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        MigrateResult result = migrateAll(dataSource);
+        MigrateResult result = migrateUntilResult(dataSource, "28");
 
         assertEquals(1, result.migrationsExecuted);
         assertEquals(5, jdbcTemplate.queryForObject(
@@ -138,7 +138,7 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
     @Test
     void shouldEnforceMappingConstraintsOnRealMySql() throws SQLException {
         DataSource dataSource = createDatabase("v28my_constraints");
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
         Long arbitraryMinistryId = insertMinistry(jdbcTemplate, "Acolitos", "ACOLITOS");
@@ -159,7 +159,7 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
     @Test
     void shouldKeepMappingStableWhenLegacyMinistryIsRenamedOnRealMySql() throws SQLException {
         DataSource dataSource = createDatabase("v28my_rename");
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
 
@@ -201,7 +201,7 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
                 Timestamp.valueOf(createdAt),
                 Timestamp.valueOf(updatedAt));
 
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
@@ -225,7 +225,7 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("DELETE FROM tb_ministry WHERE normalized_name = 'LEITORES'");
 
-        assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        assertThrows(FlywayException.class, () -> migrateUntil(dataSource, "28"));
     }
 
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
@@ -291,18 +291,14 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
     }
 
     private void migrateUntil(DataSource dataSource, String target) {
-        Flyway.configure()
-                .dataSource(dataSource)
-                .locations(VERSIONED_MIGRATIONS_LOCATION)
-                .target(target)
-                .load()
-                .migrate();
+        migrateUntilResult(dataSource, target);
     }
 
-    private MigrateResult migrateAll(DataSource dataSource) {
+    private MigrateResult migrateUntilResult(DataSource dataSource, String target) {
         return Flyway.configure()
                 .dataSource(dataSource)
                 .locations(VERSIONED_MIGRATIONS_LOCATION)
+                .target(target)
                 .load()
                 .migrate();
     }

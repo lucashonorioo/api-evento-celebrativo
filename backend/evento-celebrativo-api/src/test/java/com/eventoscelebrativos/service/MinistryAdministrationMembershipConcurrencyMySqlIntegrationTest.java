@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -54,7 +55,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
 
     private static final String READER_NORMALIZED_NAME = "LEITORES";
-    private static final String READER_MINISTRY_TYPE = "READER";
     private static final String TEST_PHONE_PREFIX = "3495";
 
     private static String host;
@@ -313,6 +313,22 @@ class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
         assertNoInactiveMinistryWithActiveMembership();
     }
 
+    @Test
+    void arbitraryMinistryDuplicateMembershipRaceShouldBeRejectedByCanonicalUniqueConstraint() throws Exception {
+        Long ministryId = insertArbitraryMinistry("Acolitos Duplicate Race");
+        Long personId = insertPerson("Duplicate Arbitrary Membership Race");
+
+        RaceOutcome outcome = runFirstOperationHoldingCommit(
+                () -> insertActiveMembership(personId, ministryId),
+                () -> insertActiveMembership(personId, ministryId)
+        );
+
+        assertEquals(1, countSucceeded(outcome));
+        assertInstanceOf(DataIntegrityViolationException.class, failed(outcome));
+        assertEquals(1, membershipCount(personId, ministryId));
+        assertFalse(hasLegacyMapping(ministryId));
+    }
+
     private RaceOutcome runFirstOperationHoldingCommit(Operation firstOperation, Operation secondOperation)
             throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -444,16 +460,41 @@ class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
     }
 
+    private Long insertArbitraryMinistry(String label) {
+        String name = label + " " + UUID.randomUUID();
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_ministry(name, normalized_name, active, created_at, updated_at)
+                VALUES (?, ?, TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                name,
+                name.toUpperCase()
+        );
+        return jdbcTemplate.queryForObject("SELECT id FROM tb_ministry WHERE name = ?", Long.class, name);
+    }
+
+    private void insertActiveMembership(Long personId, Long ministryId) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO tb_person_ministry(
+                    person_id, ministry_id, active, coordinator, created_at, updated_at
+                )
+                VALUES (?, ?, TRUE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                personId,
+                ministryId
+        );
+    }
+
     private void insertInactiveMembership(Long personId, Long ministryId) {
         jdbcTemplate.update(
                 """
                 INSERT INTO tb_person_ministry(
-                    person_id, ministry_type, ministry_id, active, coordinator, created_at, updated_at
+                    person_id, ministry_id, active, coordinator, created_at, updated_at
                 )
-                VALUES (?, ?, ?, FALSE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                VALUES (?, ?, FALSE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """,
                 personId,
-                READER_MINISTRY_TYPE,
                 ministryId
         );
     }
@@ -473,6 +514,24 @@ class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
                 Integer.class,
                 ministryId
         );
+    }
+
+    private int membershipCount(Long personId, Long ministryId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_person_ministry WHERE person_id = ? AND ministry_id = ?",
+                Integer.class,
+                personId,
+                ministryId
+        );
+    }
+
+    private boolean hasLegacyMapping(Long ministryId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_ministry_legacy_type_mapping WHERE ministry_id = ?",
+                Integer.class,
+                ministryId
+        );
+        return count != null && count > 0;
     }
 
     private void assertNoActiveMemberships(Long ministryId) {
@@ -537,6 +596,19 @@ class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
             return number.intValue() == 1;
         }
         return false;
+    }
+
+    private long countSucceeded(RaceOutcome outcome) {
+        return java.util.stream.Stream.of(outcome.firstFailure(), outcome.secondFailure())
+                .filter(java.util.Objects::isNull)
+                .count();
+    }
+
+    private Throwable failed(RaceOutcome outcome) {
+        return java.util.stream.Stream.of(outcome.firstFailure(), outcome.secondFailure())
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElseThrow();
     }
 
     private void await(CountDownLatch latch) {

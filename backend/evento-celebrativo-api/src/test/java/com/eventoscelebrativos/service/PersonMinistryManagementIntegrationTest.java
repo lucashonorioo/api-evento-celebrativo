@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.eventoscelebrativos.model.CelebrationEvent;
 import com.eventoscelebrativos.model.EventAssignment;
 import com.eventoscelebrativos.model.EventAssignmentType;
+import com.eventoscelebrativos.model.Ministry;
 import com.eventoscelebrativos.model.MinistryType;
 import com.eventoscelebrativos.model.Person;
 import com.eventoscelebrativos.model.PersonMinistry;
@@ -155,6 +156,76 @@ class PersonMinistryManagementIntegrationTest {
     }
 
     @Test
+    void shouldManageArbitraryMinistryMembershipByMinistryIdWithoutLegacyMapping() throws Exception {
+        Long personId = null;
+        Long ministryId = null;
+        String ministryName = "Acólitos " + UUID.randomUUID();
+        try {
+            personId = savePerson("Arbitrary Ministry Person");
+            Ministry ministry = ministryRepository.saveAndFlush(new Ministry(ministryName));
+            ministryId = ministry.getId();
+            assertFalse(hasLegacyMapping(ministryId));
+
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayloadWithIds(ministryId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(personId))
+                    .andExpect(jsonPath("$.ministries.length()").value(1))
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
+
+            PersonMinistry created = findPersonMinistry(personId, ministryId).orElseThrow();
+            assertTrue(created.getActive());
+            assertFalse(created.getCoordinator());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries.length()").value(1))
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId))
+                    .andExpect(jsonPath("$.ministries[0].name").value(ministryName));
+
+            mockMvc.perform(get("/pessoas").param("ministryId", ministryId.toString()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == %d)]".formatted(personId)).isNotEmpty());
+
+            mockMvc.perform(put(coordinatorPath(personId, ministryId)))
+                    .andExpect(status().isNoContent());
+
+            mockMvc.perform(get("/pessoas/{id}/ministries", personId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(true));
+
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayloadWithIds()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries").isEmpty());
+
+            PersonMinistry deactivated = findPersonMinistry(personId, ministryId).orElseThrow();
+            assertFalse(deactivated.getActive());
+            assertFalse(deactivated.getCoordinator());
+
+            mockMvc.perform(put("/pessoas/{id}/ministries", personId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ministriesPayloadWithIds(ministryId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ministries.length()").value(1))
+                    .andExpect(jsonPath("$.ministries[0].id").value(ministryId))
+                    .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
+
+            PersonMinistry reactivated = findPersonMinistry(personId, ministryId).orElseThrow();
+            assertTrue(reactivated.getActive());
+            assertFalse(reactivated.getCoordinator());
+        } finally {
+            cleanupPerson(personId);
+            cleanupMinistry(ministryId);
+        }
+    }
+
+    @Test
     void shouldReactivateInactiveMinistry() throws Exception {
         Long personId = null;
         try {
@@ -170,7 +241,7 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
                     .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
-            PersonMinistry reactivated = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+            PersonMinistry reactivated = findPersonMinistry(personId, MinistryType.READER)
                     .orElseThrow();
             assertTrue(reactivated.getActive());
             assertEquals(ministryId, reactivated.getId());
@@ -222,7 +293,7 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.ministries[0].name").value(ministryName(MinistryType.READER)))
                     .andExpect(jsonPath("$.ministries[0].coordinator").value(false));
 
-            PersonMinistry unchanged = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+            PersonMinistry unchanged = findPersonMinistry(personId, MinistryType.READER)
                     .orElseThrow();
             assertEquals(ministryId, unchanged.getId());
             assertTrue(unchanged.getActive());
@@ -486,7 +557,7 @@ class PersonMinistryManagementIntegrationTest {
                     .andExpect(jsonPath("$.ministries").isEmpty())
                     .andExpect(jsonPath("$.ministries").isEmpty());
 
-            PersonMinistry deactivated = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+            PersonMinistry deactivated = findPersonMinistry(personId, MinistryType.READER)
                     .orElseThrow();
             assertFalse(deactivated.getActive());
             assertFalse(deactivated.getCoordinator());
@@ -651,8 +722,16 @@ class PersonMinistryManagementIntegrationTest {
                 .getName();
     }
 
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, MinistryType ministryType) {
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId(ministryType));
+    }
+
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, Long ministryId) {
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
+    }
+
     private void assertActiveMinistry(Long personId, MinistryType ministryType, boolean expectedActive) {
-        boolean active = personMinistryRepository.findByPersonIdAndMinistryType(personId, ministryType)
+        boolean active = findPersonMinistry(personId, ministryType)
                 .map(PersonMinistry::getActive)
                 .orElse(false);
         assertEquals(expectedActive, active);
@@ -673,14 +752,23 @@ class PersonMinistryManagementIntegrationTest {
                 SELECT COUNT(*)
                 FROM tb_person_ministry
                 WHERE person_id = ?
-                  AND ministry_type = ?
+                  AND ministry_id = ?
                   AND active = TRUE
                 """,
                 Integer.class,
                 personId,
-                ministryType.name()
+                ministryId(ministryType)
         );
         return count == null ? 0 : count;
+    }
+
+    private boolean hasLegacyMapping(Long ministryId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM tb_ministry_legacy_type_mapping WHERE ministry_id = ?",
+                Integer.class,
+                ministryId
+        );
+        return count != null && count > 0;
     }
 
     private void cleanupEvent(Long eventId) {
@@ -702,6 +790,14 @@ class PersonMinistryManagementIntegrationTest {
                 + "(SELECT id FROM tb_user_account WHERE person_id = ?)", personId);
         jdbcTemplate.update("DELETE FROM tb_user_account WHERE person_id = ?", personId);
         jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+    }
+
+    private void cleanupMinistry(Long ministryId) {
+        if (ministryId == null) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE ministry_id = ?", ministryId);
+        jdbcTemplate.update("DELETE FROM tb_ministry WHERE id = ?", ministryId);
     }
 
     private String uniquePhoneNumber() {

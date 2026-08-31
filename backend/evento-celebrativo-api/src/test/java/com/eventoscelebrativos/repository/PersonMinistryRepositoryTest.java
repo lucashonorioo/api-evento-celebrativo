@@ -11,14 +11,17 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
 
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.persistentMinistry;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
 class PersonMinistryRepositoryTest {
@@ -32,13 +35,12 @@ class PersonMinistryRepositoryTest {
     @Autowired
     private TestEntityManager entityManager;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
     @Test
-    void shouldSaveAndFindPersonMinistry() {
-        Person reader = saveReader("Ministry Person", "34971000001");
-        PersonMinistry ministry = personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+    void shouldSaveAndFindPersonMinistryByPersistentMinistry() {
+        Person reader = savePerson("Ministry Person", "34971000001");
+        PersonMinistry ministry = personMinistryRepository.saveAndFlush(
+                personMinistry(reader, MinistryType.READER, ministryRepository)
+        );
 
         assertTrue(personMinistryRepository.existsByPersonIdAndMinistryId(
                 reader.getId(), ministry.getMinistry().getId()));
@@ -49,67 +51,53 @@ class PersonMinistryRepositoryTest {
                         ministry.getMinistry().getId()
                 ).orElseThrow().getId()
         );
-        assertTrue(personMinistryRepository.existsByPersonIdAndMinistryType(reader.getId(), MinistryType.READER));
-        assertEquals(
-                ministry.getId(),
-                personMinistryRepository.findByPersonIdAndMinistryType(reader.getId(), MinistryType.READER).orElseThrow().getId()
-        );
+    }
+
+    @Test
+    void shouldPersistArbitraryMinistryWithoutLegacyMapping() {
+        Person person = savePerson("Arbitrary Ministry Person", "34971000014");
+        Ministry acolytes = saveMinistry("Acolitos");
+
+        PersonMinistry ministry = personMinistryRepository.saveAndFlush(new PersonMinistry(person, acolytes));
+
+        assertEquals(acolytes.getId(), ministry.getMinistry().getId());
+        assertTrue(personMinistryRepository.existsByPersonIdAndMinistryId(person.getId(), acolytes.getId()));
     }
 
     @Test
     void shouldListAllMinistriesForPerson() {
-        Person reader = saveReader("Multi Ministry Person", "34971000002");
-        personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
-        personMinistryRepository.save(personMinistry(reader, MinistryType.COMMENTATOR, ministryRepository));
+        Person reader = savePerson("Multi Ministry Person", "34971000002");
+        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        Ministry commentatorMinistry = persistentMinistry(MinistryType.COMMENTATOR, ministryRepository);
+        personMinistryRepository.save(new PersonMinistry(reader, readerMinistry));
+        personMinistryRepository.save(new PersonMinistry(reader, commentatorMinistry));
         personMinistryRepository.flush();
 
-        List<MinistryType> ministries = personMinistryRepository.findAllByPersonId(reader.getId()).stream()
-                .map(PersonMinistry::getMinistryType)
+        List<Long> ministryIds = personMinistryRepository.findAllByPersonId(reader.getId()).stream()
+                .map(personMinistry -> personMinistry.getMinistry().getId())
                 .toList();
 
-        assertEquals(2, ministries.size());
-        assertTrue(ministries.contains(MinistryType.READER));
-        assertTrue(ministries.contains(MinistryType.COMMENTATOR));
+        assertEquals(2, ministryIds.size());
+        assertTrue(ministryIds.contains(readerMinistry.getId()));
+        assertTrue(ministryIds.contains(commentatorMinistry.getId()));
     }
 
     @Test
-    void shouldEnforceUniquePersonAndMinistryType() {
-        Person reader = saveReader("Unique Ministry Person", "34971000003");
-        personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+    void shouldEnforceUniquePersonAndPersistentMinistry() {
+        Person reader = savePerson("Unique Ministry Person", "34971000003");
+        Ministry readerMinistry = saveMinistry("Catalog Page Arbitrary");
+        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, readerMinistry));
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository)));
-    }
-
-    @Test
-    void shouldEnforceUniquePersonAndPersistentMinistryEvenWhenLegacyTypeDiffers() {
-        Person reader = saveReader("Unique Persistent Ministry Person", "34971000013");
-        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
-        personMinistryRepository.saveAndFlush(new PersonMinistry(reader, readerMinistry, MinistryType.READER));
-
-        assertThrows(DataIntegrityViolationException.class,
-                () -> personMinistryRepository.saveAndFlush(
-                        new PersonMinistry(reader, readerMinistry, MinistryType.COMMENTATOR)));
-    }
-
-    @Test
-    void shouldPersistEnumAsConstraintValue() {
-        Person reader = saveReader("Enum Ministry Person", "34971000004");
-        PersonMinistry ministry = personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.EUCHARISTIC_MINISTER, ministryRepository));
-
-        String value = jdbcTemplate.queryForObject(
-                "SELECT ministry_type FROM tb_person_ministry WHERE id = ?",
-                String.class,
-                ministry.getId()
-        );
-
-        assertEquals("EUCHARISTIC_MINISTER", value);
+                () -> personMinistryRepository.saveAndFlush(new PersonMinistry(reader, readerMinistry)));
     }
 
     @Test
     void shouldFillTimestampsWhenSaving() {
-        Person reader = saveReader("Timestamp Ministry Person", "34971000005");
-        PersonMinistry ministry = personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+        Person reader = savePerson("Timestamp Ministry Person", "34971000005");
+        PersonMinistry ministry = personMinistryRepository.saveAndFlush(
+                personMinistry(reader, MinistryType.READER, ministryRepository)
+        );
 
         assertNotNull(ministry.getCreatedAt());
         assertNotNull(ministry.getUpdatedAt());
@@ -117,7 +105,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldReactivateInactiveMinistryWhenUpdated() {
-        Person reader = saveReader("Inactive Ministry Person", "34971000006");
+        Person reader = savePerson("Inactive Ministry Person", "34971000006");
         PersonMinistry ministry = personMinistry(reader, MinistryType.READER, ministryRepository);
         ministry.setActive(false);
         ministry = personMinistryRepository.saveAndFlush(ministry);
@@ -130,7 +118,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldDeleteAllMinistriesByPersonId() {
-        Person reader = saveReader("Delete Ministry Person", "34971000007");
+        Person reader = savePerson("Delete Ministry Person", "34971000007");
         personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
         personMinistryRepository.save(personMinistry(reader, MinistryType.COMMENTATOR, ministryRepository));
         personMinistryRepository.flush();
@@ -144,8 +132,10 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldNotCascadeDeletePersonWhenDeletingMinistry() {
-        Person reader = saveReader("Cascade Ministry Person", "34971000008");
-        PersonMinistry ministry = personMinistryRepository.saveAndFlush(personMinistry(reader, MinistryType.READER, ministryRepository));
+        Person reader = savePerson("Cascade Ministry Person", "34971000008");
+        PersonMinistry ministry = personMinistryRepository.saveAndFlush(
+                personMinistry(reader, MinistryType.READER, ministryRepository)
+        );
 
         personMinistryRepository.delete(ministry);
         personMinistryRepository.flush();
@@ -155,40 +145,16 @@ class PersonMinistryRepositoryTest {
     }
 
     @Test
-    void shouldPageDistinctActivePersonIdsByMinistryOrderedByNameAndId() {
-        Person first = saveReader("000 Ministry Page Same", "34971000101");
-        Person second = saveReader("000 Ministry Page Same", "34971000102");
-        Person inactive = saveReader("000 Ministry Page Inactive", "34971000103");
-
-        personMinistryRepository.save(personMinistry(first, MinistryType.READER, ministryRepository));
-        personMinistryRepository.save(personMinistry(second, MinistryType.READER, ministryRepository));
-        personMinistryRepository.save(personMinistry(second, MinistryType.COMMENTATOR, ministryRepository));
-        PersonMinistry inactiveMinistry = personMinistry(inactive, MinistryType.READER, ministryRepository);
-        inactiveMinistry.setActive(false);
-        personMinistryRepository.save(inactiveMinistry);
-        personMinistryRepository.flush();
-
-        Page<Long> result = personMinistryRepository.findActivePersonIdsByMinistryType(
-                MinistryType.READER,
-                PageRequest.of(0, 2)
-        );
-
-        assertEquals(List.of(first.getId(), second.getId()), result.getContent());
-        assertEquals(countActivePeopleByMinistry(MinistryType.READER), result.getTotalElements());
-        assertFalse(result.getContent().contains(inactive.getId()));
-    }
-
-    @Test
     void shouldPageDistinctActivePersonIdsByPersistentMinistryOrderedByNameAndId() {
-        Person first = saveReader("000 Catalog Page Same", "34971000111");
-        Person second = saveReader("000 Catalog Page Same", "34971000112");
-        Person inactive = saveReader("000 Catalog Page Inactive", "34971000113");
-        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        Person first = savePerson("000 Catalog Page Same", "34971000111");
+        Person second = savePerson("000 Catalog Page Same", "34971000112");
+        Person inactive = savePerson("000 Catalog Page Inactive", "34971000113");
+        Ministry readerMinistry = saveMinistry("Catalog Page Arbitrary");
 
-        personMinistryRepository.save(personMinistry(first, MinistryType.READER, ministryRepository));
-        personMinistryRepository.save(personMinistry(second, MinistryType.READER, ministryRepository));
+        personMinistryRepository.save(new PersonMinistry(first, readerMinistry));
+        personMinistryRepository.save(new PersonMinistry(second, readerMinistry));
         personMinistryRepository.save(personMinistry(second, MinistryType.COMMENTATOR, ministryRepository));
-        PersonMinistry inactiveMinistry = personMinistry(inactive, MinistryType.READER, ministryRepository);
+        PersonMinistry inactiveMinistry = new PersonMinistry(inactive, readerMinistry);
         inactiveMinistry.setActive(false);
         personMinistryRepository.save(inactiveMinistry);
         personMinistryRepository.flush();
@@ -199,30 +165,13 @@ class PersonMinistryRepositoryTest {
         );
 
         assertEquals(List.of(first.getId(), second.getId()), result.getContent());
-        assertEquals(countActivePeopleByMinistryId(readerMinistry.getId()), result.getTotalElements());
+        assertEquals(2, result.getTotalElements());
         assertFalse(result.getContent().contains(inactive.getId()));
     }
 
     @Test
-    void shouldLoadActiveMinistryTypesByPersonIdsInOneBatchProjection() {
-        Person reader = saveReader("Batch Active Ministry Person", "34971000104");
-        personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
-        PersonMinistry inactiveCommentator = personMinistry(reader, MinistryType.COMMENTATOR, ministryRepository);
-        inactiveCommentator.setActive(false);
-        personMinistryRepository.save(inactiveCommentator);
-        personMinistryRepository.flush();
-
-        List<PersonMinistryRepository.PersonMinistryTypeView> result =
-                personMinistryRepository.findActiveMinistryTypesByPersonIds(List.of(reader.getId()));
-
-        assertEquals(1, result.size());
-        assertEquals(reader.getId(), result.get(0).getPersonId());
-        assertEquals(MinistryType.READER, result.get(0).getMinistryType());
-    }
-
-    @Test
     void shouldLoadActivePersistentMinistriesByPersonIdsInOneBatchProjection() {
-        Person reader = saveReader("Batch Active Catalog Ministry Person", "34971000114");
+        Person reader = savePerson("Batch Active Catalog Ministry Person", "34971000114");
         personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
         PersonMinistry inactiveCommentator = personMinistry(reader, MinistryType.COMMENTATOR, ministryRepository);
         inactiveCommentator.setActive(false);
@@ -241,7 +190,7 @@ class PersonMinistryRepositoryTest {
 
     @Test
     void shouldLoadAllMinistryStatusesByPersonIdsInOneBatchProjection() {
-        Person reader = saveReader("Batch Status Ministry Person", "34971000105");
+        Person reader = savePerson("Batch Status Ministry Person", "34971000105");
         personMinistryRepository.save(personMinistry(reader, MinistryType.READER, ministryRepository));
         PersonMinistry inactiveCommentator = personMinistry(reader, MinistryType.COMMENTATOR, ministryRepository);
         inactiveCommentator.setActive(false);
@@ -263,20 +212,8 @@ class PersonMinistryRepositoryTest {
     }
 
     @Test
-    void shouldReturnMinistryTypeWhenActiveAndCoordinator() {
-        Person person = saveReader("Coordinator Person", "34971000201");
-        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
-        ministry.grantCoordination();
-        personMinistryRepository.saveAndFlush(ministry);
-
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
-
-        assertEquals(List.of(MinistryType.READER), result);
-    }
-
-    @Test
     void shouldReturnPersistentMinistryWhenActiveAndCoordinator() {
-        Person person = saveReader("Coordinator Catalog Person", "34971000211");
+        Person person = savePerson("Coordinator Catalog Person", "34971000211");
         PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
@@ -288,30 +225,45 @@ class PersonMinistryRepositoryTest {
     }
 
     @Test
-    void shouldNotReturnActiveMinistryThatIsNotCoordinated() {
-        Person person = saveReader("Active Non Coordinator Person", "34971000202");
-        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
-
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void shouldNotReturnInactiveNonCoordinatedMinistry() {
-        Person person = saveReader("Inactive Non Coordinator Person", "34971000203");
-        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
-        ministry.setActive(false);
+    void shouldReturnArbitraryPersistentMinistryWhenActiveAndCoordinator() {
+        Person person = savePerson("Arbitrary Coordinator Person", "34971000212");
+        Ministry acolytes = saveMinistry("Acolitos Coordenacao");
+        PersonMinistry ministry = new PersonMinistry(person, acolytes);
+        ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+        List<Ministry> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(person.getId());
+
+        assertEquals(1, result.size());
+        assertEquals(acolytes.getId(), result.get(0).getId());
+    }
+
+    @Test
+    void shouldNotReturnActiveMinistryThatIsNotCoordinated() {
+        Person person = savePerson("Active Non Coordinator Person", "34971000202");
+        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
+
+        List<Ministry> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(person.getId());
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void shouldReturnAllActiveCoordinatedMinistryTypesOrderedByMinistryTypeAscending() {
-        Person person = saveReader("Multi Coordinator Person", "34971000204");
+    void shouldNotReturnInactiveCoordinatedMinistry() {
+        Person person = savePerson("Inactive Coordinator Person", "34971000203");
+        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
+        ministry.grantCoordination();
+        ministry.deactivate();
+        personMinistryRepository.saveAndFlush(ministry);
+
+        List<Ministry> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(person.getId());
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldReturnAllActiveCoordinatedMinistriesOrderedByMinistryIdAscending() {
+        Person person = savePerson("Multi Coordinator Person", "34971000204");
 
         PersonMinistry reader = personMinistry(person, MinistryType.READER, ministryRepository);
         reader.grantCoordination();
@@ -327,109 +279,99 @@ class PersonMinistryRepositoryTest {
         personMinistryRepository.save(eucharisticMinister);
         personMinistryRepository.flush();
 
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+        List<Long> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(person.getId()).stream()
+                .map(Ministry::getId)
+                .toList();
 
-        assertEquals(List.of(MinistryType.COMMENTATOR, MinistryType.PRIEST, MinistryType.READER), result);
+        assertEquals(List.of(
+                persistentMinistry(MinistryType.PRIEST, ministryRepository).getId(),
+                persistentMinistry(MinistryType.READER, ministryRepository).getId(),
+                persistentMinistry(MinistryType.COMMENTATOR, ministryRepository).getId()
+        ), result);
     }
 
     @Test
     void shouldNotReturnCoordinatedMinistryFromAnotherPerson() {
-        Person target = saveReader("Target Person", "34971000205");
-        Person other = saveReader("Other Coordinator Person", "34971000206");
+        Person target = savePerson("Target Person", "34971000205");
+        Person other = savePerson("Other Coordinator Person", "34971000206");
 
         PersonMinistry otherMinistry = personMinistry(other, MinistryType.READER, ministryRepository);
         otherMinistry.grantCoordination();
         personMinistryRepository.saveAndFlush(otherMinistry);
 
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(target.getId());
+        List<Ministry> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(target.getId());
 
         assertTrue(result.isEmpty());
     }
 
     @Test
     void shouldReturnEmptyListWhenPersonHasNoCoordinatedMinistry() {
-        Person person = saveReader("No Ministry Person", "34971000207");
+        Person person = savePerson("No Ministry Person", "34971000207");
 
-        List<MinistryType> result = personMinistryRepository.findActiveCoordinatedMinistryTypesByPersonId(person.getId());
+        List<Ministry> result = personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(person.getId());
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void shouldExistWhenPersonMinistryTypeActiveAndCoordinator() {
-        Person person = saveReader("Exists Coordinator Person", "34971000301");
-        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
+    void shouldExistWhenPersonMinistryActiveAndCoordinator() {
+        Person person = savePerson("Exists Coordinator Person", "34971000301");
+        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        PersonMinistry ministry = new PersonMinistry(person, readerMinistry);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        assertTrue(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-                person.getId(), MinistryType.READER));
+        assertTrue(personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
+                person.getId(), readerMinistry.getId()));
     }
 
     @Test
     void shouldNotExistWhenCoordinatorFalse() {
-        Person person = saveReader("Exists Non Coordinator Person", "34971000302");
-        personMinistryRepository.saveAndFlush(personMinistry(person, MinistryType.READER, ministryRepository));
+        Person person = savePerson("Exists Non Coordinator Person", "34971000302");
+        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        personMinistryRepository.saveAndFlush(new PersonMinistry(person, readerMinistry));
 
-        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-                person.getId(), MinistryType.READER));
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
+                person.getId(), readerMinistry.getId()));
     }
 
     @Test
-    void shouldNotExistForAnotherMinistryType() {
-        Person person = saveReader("Exists Other Ministry Person", "34971000303");
-        PersonMinistry ministry = personMinistry(person, MinistryType.READER, ministryRepository);
+    void shouldNotExistForAnotherMinistry() {
+        Person person = savePerson("Exists Other Ministry Person", "34971000303");
+        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        Ministry commentatorMinistry = persistentMinistry(MinistryType.COMMENTATOR, ministryRepository);
+        PersonMinistry ministry = new PersonMinistry(person, readerMinistry);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-                person.getId(), MinistryType.COMMENTATOR));
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
+                person.getId(), commentatorMinistry.getId()));
     }
 
     @Test
     void shouldNotExistForAnotherPerson() {
-        Person target = saveReader("Exists Target Person", "34971000304");
-        Person other = saveReader("Exists Other Person", "34971000305");
-        PersonMinistry ministry = personMinistry(other, MinistryType.READER, ministryRepository);
+        Person target = savePerson("Exists Target Person", "34971000304");
+        Person other = savePerson("Exists Other Person", "34971000305");
+        Ministry readerMinistry = persistentMinistry(MinistryType.READER, ministryRepository);
+        PersonMinistry ministry = new PersonMinistry(other, readerMinistry);
         ministry.grantCoordination();
         personMinistryRepository.saveAndFlush(ministry);
 
-        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryTypeAndActiveTrueAndCoordinatorTrue(
-                target.getId(), MinistryType.READER));
+        assertFalse(personMinistryRepository.existsByPersonIdAndMinistryIdAndActiveTrueAndCoordinatorTrue(
+                target.getId(), readerMinistry.getId()));
     }
 
-    private Person saveReader(String name, String phoneNumber) {
-        Person reader = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
-        entityManager.persist(reader);
+    private Person savePerson(String name, String phoneNumber) {
+        Person person = new Person(name, phoneNumber, LocalDate.of(1990, 1, 10));
+        entityManager.persist(person);
         entityManager.flush();
-        return reader;
+        return person;
     }
 
-    private long countActivePeopleByMinistry(MinistryType ministryType) {
-        Long count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(DISTINCT person_id)
-                FROM tb_person_ministry
-                WHERE ministry_type = ?
-                  AND active = TRUE
-                """,
-                Long.class,
-                ministryType.name()
-        );
-        return count == null ? 0 : count;
-    }
-
-    private long countActivePeopleByMinistryId(Long ministryId) {
-        Long count = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(DISTINCT person_id)
-                FROM tb_person_ministry
-                WHERE ministry_id = ?
-                  AND active = TRUE
-                """,
-                Long.class,
-                ministryId
-        );
-        return count == null ? 0 : count;
+    private Ministry saveMinistry(String name) {
+        Ministry ministry = new Ministry(name);
+        entityManager.persist(ministry);
+        entityManager.flush();
+        return ministry;
     }
 }

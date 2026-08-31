@@ -158,10 +158,20 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
             }
 
             Boolean active = jdbcTemplate.queryForObject(
-                    "SELECT active FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'READER'",
+                    """
+                    SELECT active
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """,
                     Boolean.class, personId);
             Boolean coordinator = jdbcTemplate.queryForObject(
-                    "SELECT coordinator FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'READER'",
+                    """
+                    SELECT coordinator
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """,
                     Boolean.class, personId);
 
             boolean invariantViolated = Boolean.TRUE.equals(coordinator) && Boolean.FALSE.equals(active);
@@ -194,7 +204,12 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
             assertNull(revokeException, "revokeCoordinator nao deveria falhar: " + revokeException);
 
             Boolean active = jdbcTemplate.queryForObject(
-                    "SELECT active FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'READER'",
+                    """
+                    SELECT active
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """,
                     Boolean.class, personId);
             assertTrue(active, "O ministerio nunca foi tocado por este teste; deve continuar ativo");
             // Estado final de coordinator depende de qual operacao venceu a serializacao pelo lock
@@ -229,10 +244,20 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
             assertNull(exceptionB, "Rodada: grant de B deveria ter sucesso, mas lancou " + exceptionB);
 
             assertTrue(jdbcTemplate.queryForObject(
-                    "SELECT coordinator FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'READER'",
+                    """
+                    SELECT coordinator
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """,
                     Boolean.class, personA));
             assertTrue(jdbcTemplate.queryForObject(
-                    "SELECT coordinator FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'READER'",
+                    """
+                    SELECT coordinator
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'READER')
+                    """,
                     Boolean.class, personB));
         } finally {
             executor.shutdownNow();
@@ -296,10 +321,12 @@ class MinistryCoordinationConcurrencyMySqlIntegrationTest {
 
     private void insertActiveMinistry(long personId, MinistryType ministryType) {
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, coordinator, created_at, updated_at) "
-                        + "VALUES (?, ?, (SELECT id FROM tb_ministry WHERE normalized_name = ?), "
-                        + "TRUE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
-                personId, ministryType.name(), normalizedName(ministryType));
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_id, active, coordinator, created_at, updated_at)
+                VALUES (?, (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?),
+                        TRUE, FALSE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                personId, ministryType.name());
     }
 
     private Long ministryId(MinistryType ministryType) {

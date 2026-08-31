@@ -283,9 +283,10 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
         List<MinistrySnapshot> rows = jdbcTemplate.query(
                 """
                 SELECT id, active, created_at, updated_at
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
                 """,
                 (rs, rowNum) -> new MinistrySnapshot(
                         rs.getLong("id"),
@@ -312,7 +313,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                 SET active = FALSE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
-                  AND ministry_type = ?
+                  AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?)
                 """,
                 personId,
                 MinistryType.MINISTER_OF_THE_WORD.name()
@@ -326,7 +327,7 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                 SET active = TRUE,
                     updated_at = CURRENT_TIMESTAMP(6)
                 WHERE person_id = ?
-                  AND ministry_type = ?
+                  AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?)
                 """,
                 personId,
                 MinistryType.MINISTER_OF_THE_WORD.name()
@@ -336,12 +337,11 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
     private void addMinistry(Long personId, MinistryType ministryType) {
         assertEquals(1, jdbcTemplate.update(
                 """
-                INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, created_at, updated_at)
-                VALUES (?, ?, (SELECT id FROM tb_ministry WHERE normalized_name = ?),
+                INSERT INTO tb_person_ministry(person_id, ministry_id, active, created_at, updated_at)
+                VALUES (?, (SELECT id FROM tb_ministry WHERE normalized_name = ?),
                         TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """,
                 personId,
-                ministryType.name(),
                 normalizedName(ministryType)
         ));
     }
@@ -355,8 +355,9 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
                 """
                 SELECT p.id
                 FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
                 INNER JOIN tb_person p ON p.id = pm.person_id
-                WHERE pm.ministry_type = ?
+                WHERE lm.ministry_type = ?
                   AND pm.active = TRUE
                 ORDER BY p.name ASC, p.id ASC
                 """,
@@ -370,8 +371,18 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
     }
 
     private List<MinistryType> ministryTypes(Long personId) {
-        return personMinistryRepository.findAllByPersonId(personId).stream()
-                .map(ministry -> ministry.getMinistryType())
+        return jdbcTemplate.queryForList(
+                        """
+                        SELECT lm.ministry_type
+                        FROM tb_person_ministry pm
+                        JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                        WHERE pm.person_id = ?
+                        ORDER BY lm.ministry_type ASC
+                        """,
+                        String.class,
+                        personId
+                ).stream()
+                .map(MinistryType::valueOf)
                 .toList();
     }
 
@@ -393,9 +404,10 @@ class MinisterOfTheWordParallelCutoverConsistencyIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
                 """,
                 Integer.class,
                 personId,

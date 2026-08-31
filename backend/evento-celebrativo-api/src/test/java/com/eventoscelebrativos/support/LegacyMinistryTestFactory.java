@@ -39,7 +39,7 @@ public final class LegacyMinistryTestFactory {
     }
 
     public static PersonMinistry personMinistry(Person person, MinistryType ministryType) {
-        return new PersonMinistry(person, unitMinistry(ministryType), ministryType);
+        return new PersonMinistry(person, unitMinistry(ministryType));
     }
 
     public static PersonMinistry personMinistry(
@@ -47,7 +47,7 @@ public final class LegacyMinistryTestFactory {
             MinistryType ministryType,
             MinistryRepository ministryRepository
     ) {
-        return new PersonMinistry(person, persistentMinistry(ministryType, ministryRepository), ministryType);
+        return new PersonMinistry(person, persistentMinistry(ministryType, ministryRepository));
     }
 
     public static Ministry unitMinistry(MinistryType ministryType) {

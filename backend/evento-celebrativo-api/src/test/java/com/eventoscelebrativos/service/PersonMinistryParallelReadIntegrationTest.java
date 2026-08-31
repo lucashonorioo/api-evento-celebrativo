@@ -110,7 +110,12 @@ class PersonMinistryParallelReadIntegrationTest {
 
     @Test
     void shouldReturnEmptyPageWhenMinistryHasNoActivePeople() {
-        jdbcTemplate.update("DELETE FROM tb_person_ministry WHERE ministry_type = ?", MinistryType.PRIEST.name());
+        jdbcTemplate.update(
+                """
+                DELETE FROM tb_person_ministry
+                WHERE ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = ?)
+                """,
+                MinistryType.PRIEST.name());
 
         Page<Person> result = readService.findActivePeopleByMinistry(MinistryType.PRIEST, PageRequest.of(0, 10));
 
@@ -207,10 +212,11 @@ class PersonMinistryParallelReadIntegrationTest {
     private long countActivePeopleByMinistry(MinistryType ministryType) {
         Long count = jdbcTemplate.queryForObject(
                 """
-                SELECT COUNT(DISTINCT person_id)
-                FROM tb_person_ministry
-                WHERE ministry_type = ?
-                  AND active = TRUE
+                SELECT COUNT(DISTINCT pm.person_id)
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE lm.ministry_type = ?
+                  AND pm.active = TRUE
                 """,
                 Long.class,
                 ministryType.name()
@@ -231,10 +237,11 @@ class PersonMinistryParallelReadIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
-                FROM tb_person_ministry
-                WHERE person_id = ?
-                  AND ministry_type = ?
-                  AND active = ?
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
+                  AND pm.active = ?
                 """,
                 Integer.class,
                 personId,

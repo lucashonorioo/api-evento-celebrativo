@@ -547,7 +547,14 @@ class MinisterialAccessLifecycleIntegrationTest {
 
     private int activeMinistryCount(long personId, MinistryType ministryType) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM tb_person_ministry WHERE person_id = ? AND ministry_type = ? AND active = TRUE",
+                """
+                SELECT COUNT(*)
+                FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
+                WHERE pm.person_id = ?
+                  AND lm.ministry_type = ?
+                  AND pm.active = TRUE
+                """,
                 Integer.class,
                 personId,
                 ministryType.name()

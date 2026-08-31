@@ -39,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName;
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.personMinistry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -154,7 +155,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
 
         assertThrows(DatabaseException.class,
                 () -> personMinistryCommandService.removeMinistry(person.getId(), MinistryType.READER, "Pessoa"));
-        assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(person.getId(), MinistryType.READER)
+        assertTrue(findPersonMinistry(person.getId(), MinistryType.READER)
                 .orElseThrow().getActive());
     }
 
@@ -171,7 +172,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
 
         personMinistryCommandService.removeMinistry(person.getId(), MinistryType.READER, "Pessoa");
 
-        assertFalse(personMinistryRepository.findByPersonIdAndMinistryType(person.getId(), MinistryType.READER)
+        assertFalse(findPersonMinistry(person.getId(), MinistryType.READER)
                 .orElseThrow().getActive());
     }
 
@@ -227,7 +228,7 @@ class MinistryPersonManagementMySqlIntegrationTest {
             fail("addOrReactivateMinistry nao deveria falhar nesta corrida: " + addFailure.get());
         }
 
-        PersonMinistry finalState = personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+        PersonMinistry finalState = findPersonMinistry(personId, MinistryType.READER)
                 .orElseThrow();
         if (removeFailure.get() == null) {
             assertFalse(finalState.getActive(),
@@ -258,6 +259,13 @@ class MinistryPersonManagementMySqlIntegrationTest {
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3499" + String.format("%07d", suffix);
+    }
+
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, MinistryType ministryType) {
+        Long ministryId = ministryRepository.findByNormalizedName(normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
     }
 
     private static String bootstrapUrl() {

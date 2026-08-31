@@ -3,7 +3,6 @@ package com.eventoscelebrativos.service;
 import com.eventoscelebrativos.exception.exceptions.BusinessException;
 import com.eventoscelebrativos.exception.exceptions.DatabaseException;
 import com.eventoscelebrativos.exception.exceptions.MinistryInactiveException;
-import com.eventoscelebrativos.exception.exceptions.MinistryLegacyCompatibilityRequiredException;
 import com.eventoscelebrativos.exception.exceptions.PastorPriestMinistryRequiredException;
 import com.eventoscelebrativos.exception.exceptions.ResourceNotFoundException;
 import com.eventoscelebrativos.model.EventAssignmentType;
@@ -105,10 +104,38 @@ class PersonMinistryCommandServiceImplTest {
                     }
                     return types;
                 });
+        lenient().when(legacyMinistryTypeResolver.findTypesByPersistentMinistryId(anyCollection()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Collection<Long> ministryIds = invocation.getArgument(0);
+                    Map<Long, MinistryType> types = new java.util.LinkedHashMap<>();
+                    for (Long ministryId : ministryIds) {
+                        if (isKnownMinistryId(ministryId)) {
+                            types.put(ministryId, ministryTypeFor(ministryId));
+                        }
+                    }
+                    return types;
+                });
         lenient().when(legacyMinistryTypeResolver.requireMinistryType(any(Ministry.class)))
                 .thenAnswer(invocation -> ministryTypeFor(invocation.<Ministry>getArgument(0)));
+        lenient().when(legacyMinistryTypeResolver.findMinistryType(any(Ministry.class)))
+                .thenAnswer(invocation -> {
+                    Ministry ministry = invocation.getArgument(0);
+                    if (ministry == null || !isKnownMinistryId(ministry.getId())) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(ministryTypeFor(ministry));
+                });
         lenient().when(legacyMinistryTypeResolver.requireEventAssignmentType(any(Ministry.class)))
                 .thenAnswer(invocation -> EventAssignmentType.valueOf(ministryTypeFor(invocation.<Ministry>getArgument(0)).name()));
+        lenient().when(legacyMinistryTypeResolver.findEventAssignmentType(any(Ministry.class)))
+                .thenAnswer(invocation -> {
+                    Ministry ministry = invocation.getArgument(0);
+                    if (ministry == null || !isKnownMinistryId(ministry.getId())) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(EventAssignmentType.valueOf(ministryTypeFor(ministry).name()));
+                });
         lenient().when(ministryRepository.existsById(anyLong()))
                 .thenAnswer(invocation -> isKnownMinistryId(invocation.getArgument(0)));
         lenient().when(ministryRepository.findAllById(any()))
@@ -146,7 +173,7 @@ class PersonMinistryCommandServiceImplTest {
         ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
-        assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
+        assertEquals(ministryId(MinistryType.READER), captor.getValue().getMinistry().getId());
     }
 
     @Test
@@ -163,7 +190,6 @@ class PersonMinistryCommandServiceImplTest {
         verify(personMinistryRepository).save(captor.capture());
         assertSame(saved, captor.getValue().getPerson());
         assertEquals(readerMinistry.getId(), captor.getValue().getMinistry().getId());
-        assertEquals(MinistryType.READER, captor.getValue().getMinistryType());
     }
 
     @Test
@@ -691,7 +717,7 @@ class PersonMinistryCommandServiceImplTest {
     }
 
     @Test
-    void shouldRejectSyncAddForMinistryWithoutLegacyMappingWithDomainException() {
+    void shouldAcceptSyncAddForMinistryWithoutLegacyMapping() {
         Person reader = reader(1L);
         Long arbitraryMinistryId = 42L;
         Ministry acolytes = ministry(arbitraryMinistryId, "Acolitos");
@@ -699,14 +725,14 @@ class PersonMinistryCommandServiceImplTest {
         doReturn(List.of(acolytes)).when(ministryRepository).findAllById(List.of(arbitraryMinistryId));
         doReturn(List.of(acolytes)).when(ministryRepository).findAllByIdInForUpdate(List.of(arbitraryMinistryId));
         when(personMinistryRepository.findAllByPersonId(1L)).thenReturn(List.of());
-        doThrow(new IllegalStateException("no legacy mapping"))
-                .when(legacyMinistryTypeResolver)
-                .requireTypesByPersistentMinistryId(Set.of(arbitraryMinistryId));
 
-        assertThrows(MinistryLegacyCompatibilityRequiredException.class,
-                () -> service.syncMinistriesById(1L, List.of(arbitraryMinistryId)));
+        PersonMinistryCatalogSyncResult result = service.syncMinistriesById(1L, List.of(arbitraryMinistryId));
 
-        verify(personMinistryRepository, never()).save(any());
+        assertEquals(Set.of(arbitraryMinistryId), result.activeMinistryIds());
+        assertEquals(Set.of(arbitraryMinistryId), result.added());
+        ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
+        verify(personMinistryRepository).save(captor.capture());
+        assertEquals(arbitraryMinistryId, captor.getValue().getMinistry().getId());
     }
 
     @Test
@@ -733,7 +759,7 @@ class PersonMinistryCommandServiceImplTest {
         ArgumentCaptor<PersonMinistry> captor = ArgumentCaptor.forClass(PersonMinistry.class);
         verify(personMinistryRepository).save(captor.capture());
         assertSame(reader, captor.getValue().getPerson());
-        assertEquals(MinistryType.COMMENTATOR, captor.getValue().getMinistryType());
+        assertEquals(ministryId(MinistryType.COMMENTATOR), captor.getValue().getMinistry().getId());
         assertTrue(captor.getValue().getActive());
         assertFalse(captor.getValue().getCoordinator());
     }

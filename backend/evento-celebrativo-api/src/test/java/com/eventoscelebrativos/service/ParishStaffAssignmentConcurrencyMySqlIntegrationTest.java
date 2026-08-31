@@ -228,7 +228,12 @@ class ParishStaffAssignmentConcurrencyMySqlIntegrationTest {
                     rs -> rs.next() ? rs.getBoolean(1) : null,
                     personId);
             Boolean priestActive = jdbcTemplate.queryForObject(
-                    "SELECT active FROM tb_person_ministry WHERE person_id = ? AND ministry_type = 'PRIEST'",
+                    """
+                    SELECT active
+                    FROM tb_person_ministry
+                    WHERE person_id = ?
+                      AND ministry_id = (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'PRIEST')
+                    """,
                     Boolean.class, personId);
 
             boolean invariantViolated = Boolean.TRUE.equals(pastorActive) && Boolean.FALSE.equals(priestActive);
@@ -413,10 +418,12 @@ class ParishStaffAssignmentConcurrencyMySqlIntegrationTest {
 
     private void insertActivePriestMinistry(long personId) {
         jdbcTemplate.update(
-                "INSERT INTO tb_person_ministry(person_id, ministry_type, ministry_id, active, created_at, updated_at) "
-                        + "VALUES (?, 'PRIEST', (SELECT id FROM tb_ministry WHERE normalized_name = ?), "
-                        + "TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
-                personId, normalizedName(MinistryType.PRIEST));
+                """
+                INSERT INTO tb_person_ministry(person_id, ministry_id, active, created_at, updated_at)
+                VALUES (?, (SELECT ministry_id FROM tb_ministry_legacy_type_mapping WHERE ministry_type = 'PRIEST'),
+                        TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """,
+                personId);
     }
 
     private String uniquePhoneNumber() {

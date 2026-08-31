@@ -56,9 +56,9 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
                 Long.class,
                 personId);
 
-        MigrateResult result = migrateAll(dataSource);
+        MigrateResult result = migrateUntilResult(dataSource, "27");
 
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(1, result.migrationsExecuted);
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
                 SELECT pm.id, pm.person_id, pm.ministry_type, pm.ministry_id, pm.active, pm.coordinator,
@@ -98,7 +98,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
                     ministryType);
         }
 
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "27");
 
         Map<String, String> actualByType = new LinkedHashMap<>();
         jdbcTemplate.queryForList(
@@ -119,7 +119,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
     @Test
     void shouldCreateNotNullForeignKeyAndUniqueConstraint() {
         DataSource dataSource = newIsolatedH2DataSource();
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long personId = insertPerson(jdbcTemplate, "Leitor Constraints", "34988772030");
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
@@ -148,7 +148,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("DELETE FROM tb_ministry WHERE normalized_name = 'LEITORES'");
 
-        assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        assertThrows(FlywayException.class, () -> migrateUntil(dataSource, "27"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
                 "INSERT INTO tb_person_ministry(person_id, ministry_type, active, coordinator) VALUES (?, 'UNKNOWN', TRUE, FALSE)",
                 personId);
 
-        assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        assertThrows(FlywayException.class, () -> migrateUntil(dataSource, "27"));
     }
 
     @Test
@@ -170,10 +170,10 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
         DataSource dataSource = newIsolatedH2DataSource();
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        MigrateResult first = migrateAll(dataSource);
-        MigrateResult second = migrateAll(dataSource);
+        MigrateResult first = migrateUntilResult(dataSource, "27");
+        MigrateResult second = migrateUntilResult(dataSource, "27");
 
-        assertEquals(28, first.migrationsExecuted);
+        assertEquals(27, first.migrationsExecuted);
         assertTrue(second.migrations.isEmpty());
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '27' AND success = TRUE",
@@ -214,7 +214,11 @@ class V27LinkPersonMinistryToMinistryCatalogIntegrationTest {
     }
 
     private void migrateUntil(DataSource dataSource, String target) {
-        Flyway.configure()
+        migrateUntilResult(dataSource, target);
+    }
+
+    private MigrateResult migrateUntilResult(DataSource dataSource, String target) {
+        return Flyway.configure()
                 .dataSource(dataSource)
                 .locations(VERSIONED_MIGRATIONS_LOCATION)
                 .target(target)

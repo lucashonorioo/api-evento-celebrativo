@@ -107,9 +107,9 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
                 Long.class,
                 personId);
 
-        MigrateResult result = migrateAll(dataSource);
+        MigrateResult result = migrateUntilResult(dataSource, "27");
 
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(1, result.migrationsExecuted);
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
                 SELECT pm.id, pm.person_id, pm.ministry_type, pm.ministry_id, pm.active, pm.coordinator,
@@ -149,7 +149,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
                     ministryType);
         }
 
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "27");
 
         Map<String, String> actualByType = new LinkedHashMap<>();
         jdbcTemplate.queryForList(
@@ -166,7 +166,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     @Test
     void shouldEnforceMinistryIdConstraintsOnRealMySql() throws SQLException {
         DataSource dataSource = createDatabase("v27my_constraints");
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long personId = insertPerson(jdbcTemplate, "Leitor Constraints MySQL", "34988773030");
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
@@ -196,7 +196,7 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("DELETE FROM tb_ministry WHERE normalized_name = 'LEITORES'");
 
-        assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        assertThrows(FlywayException.class, () -> migrateUntil(dataSource, "27"));
     }
 
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
@@ -249,7 +249,11 @@ class V27LinkPersonMinistryToMinistryCatalogMySqlIntegrationTest {
     }
 
     private void migrateUntil(DataSource dataSource, String target) {
-        Flyway.configure()
+        migrateUntilResult(dataSource, target);
+    }
+
+    private MigrateResult migrateUntilResult(DataSource dataSource, String target) {
+        return Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
                 .target(target)

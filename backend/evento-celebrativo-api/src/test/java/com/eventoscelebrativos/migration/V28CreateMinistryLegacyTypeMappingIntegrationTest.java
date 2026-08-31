@@ -40,7 +40,7 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
         migrateUntil(dataSource, "27");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
 
-        MigrateResult result = migrateAll(dataSource);
+        MigrateResult result = migrateUntilResult(dataSource, "28");
 
         assertEquals(1, result.migrationsExecuted);
         assertEquals(5, jdbcTemplate.queryForObject(
@@ -75,7 +75,7 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
     @Test
     void shouldEnforcePrimaryKeyUniqueTypeForeignKeyAndCheckConstraints() {
         DataSource dataSource = newIsolatedH2DataSource();
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
         Long arbitraryMinistryId = insertMinistry(jdbcTemplate, "Acolitos", "ACOLITOS");
@@ -96,7 +96,7 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
     @Test
     void shouldKeepMappingStableWhenMinistryIsRenamedAfterMigration() {
         DataSource dataSource = newIsolatedH2DataSource();
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         Long readerMinistryId = ministryId(jdbcTemplate, "LEITORES");
 
@@ -138,7 +138,7 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
                 Timestamp.valueOf(createdAt),
                 Timestamp.valueOf(updatedAt));
 
-        migrateAll(dataSource);
+        migrateUntil(dataSource, "28");
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 """
@@ -162,7 +162,7 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("DELETE FROM tb_ministry WHERE normalized_name = 'LEITORES'");
 
-        assertThrows(FlywayException.class, () -> migrateAll(dataSource));
+        assertThrows(FlywayException.class, () -> migrateUntil(dataSource, "28"));
     }
 
     private Long insertPerson(JdbcTemplate jdbcTemplate, String name, String phoneNumber) {
@@ -209,7 +209,11 @@ class V28CreateMinistryLegacyTypeMappingIntegrationTest {
     }
 
     private void migrateUntil(DataSource dataSource, String target) {
-        Flyway.configure()
+        migrateUntilResult(dataSource, target);
+    }
+
+    private MigrateResult migrateUntilResult(DataSource dataSource, String target) {
+        return Flyway.configure()
                 .dataSource(dataSource)
                 .locations(VERSIONED_MIGRATIONS_LOCATION)
                 .target(target)

@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.eventoscelebrativos.support.LegacyMinistryTestFactory.unitMinistry;
@@ -62,6 +63,19 @@ class PersonMinistryReadServiceImplTest {
 
         verify(personMinistryRepository).findActiveMinistriesByPersonIds(argThat(ids ->
                 ids.stream().toList().equals(List.of(1L, 2L))));
+    }
+
+    @Test
+    void shouldIgnoreUnmappedMinistriesWhenReturningLegacyTypes() {
+        Long readerMinistryId = unitMinistry(MinistryType.READER).getId();
+        when(personMinistryRepository.findActiveMinistriesByPersonIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(view(1L, MinistryType.READER), view(1L, 42L, "Acolitos")));
+        when(legacyMinistryTypeResolver.findTypesByPersistentMinistryId(List.of(readerMinistryId, 42L)))
+                .thenReturn(Map.of(readerMinistryId, MinistryType.READER));
+
+        Map<Long, Set<MinistryType>> result = service.findActiveMinistriesByPersonIds(List.of(1L));
+
+        assertEquals(Set.of(MinistryType.READER), result.get(1L));
     }
 
     @Test
@@ -123,8 +137,8 @@ class PersonMinistryReadServiceImplTest {
         var commentator = unitMinistry(MinistryType.COMMENTATOR);
         when(personMinistryRepository.findActiveCoordinatedMinistriesByPersonId(1L))
                 .thenReturn(List.of(reader, commentator));
-        when(legacyMinistryTypeResolver.requireMinistryType(reader)).thenReturn(MinistryType.READER);
-        when(legacyMinistryTypeResolver.requireMinistryType(commentator)).thenReturn(MinistryType.COMMENTATOR);
+        when(legacyMinistryTypeResolver.findMinistryType(reader)).thenReturn(Optional.of(MinistryType.READER));
+        when(legacyMinistryTypeResolver.findMinistryType(commentator)).thenReturn(Optional.of(MinistryType.COMMENTATOR));
 
         assertEquals(
                 Set.of(MinistryType.READER, MinistryType.COMMENTATOR),
@@ -139,6 +153,10 @@ class PersonMinistryReadServiceImplTest {
     }
 
     private PersonMinistryRepository.PersonMinistryCatalogView view(Long personId, MinistryType ministryType) {
+        return view(personId, unitMinistry(ministryType).getId(), unitMinistry(ministryType).getName());
+    }
+
+    private PersonMinistryRepository.PersonMinistryCatalogView view(Long personId, Long ministryId, String ministryName) {
         return new PersonMinistryRepository.PersonMinistryCatalogView() {
             @Override
             public Long getPersonId() {
@@ -147,12 +165,12 @@ class PersonMinistryReadServiceImplTest {
 
             @Override
             public Long getMinistryId() {
-                return unitMinistry(ministryType).getId();
+                return ministryId;
             }
 
             @Override
             public String getMinistryName() {
-                return unitMinistry(ministryType).getName();
+                return ministryName;
             }
 
             @Override

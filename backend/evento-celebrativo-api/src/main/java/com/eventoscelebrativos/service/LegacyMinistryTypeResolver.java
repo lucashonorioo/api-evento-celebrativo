@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -91,16 +92,34 @@ public class LegacyMinistryTypeResolver {
         return requireTypesByPersistentMinistryId(ministryIds);
     }
 
+    public Map<Long, MinistryType> findTypesByPersistentMinistryId(Collection<Long> ministryIds) {
+        List<Long> distinctIds = validatePersistentMinistryIds(ministryIds);
+        if (distinctIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, MinistryType> mappedTypesByMinistryId = mappingRepository
+                .findByMinistryIdIn(distinctIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        LegacyMinistryTypeMapping::getMinistryId,
+                        LegacyMinistryTypeMapping::getMinistryType,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+
+        Map<Long, MinistryType> result = new LinkedHashMap<>();
+        for (Long ministryId : distinctIds) {
+            MinistryType ministryType = mappedTypesByMinistryId.get(ministryId);
+            if (ministryType != null) {
+                result.put(ministryId, ministryType);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
     public Map<Long, MinistryType> requireTypesByPersistentMinistryId(Collection<Long> ministryIds) {
-        List<Long> distinctIds = ministryIds.stream()
-                .map(ministryId -> {
-                    if (ministryId == null || ministryId <= 0) {
-                        throw new IllegalStateException("Ministerio persistente sem id valido");
-                    }
-                    return ministryId;
-                })
-                .distinct()
-                .toList();
+        List<Long> distinctIds = validatePersistentMinistryIds(ministryIds);
         if (distinctIds.isEmpty()) {
             return Map.of();
         }
@@ -126,19 +145,39 @@ public class LegacyMinistryTypeResolver {
         return Map.copyOf(result);
     }
 
-    public MinistryType requireMinistryType(Ministry ministry) {
+    public Optional<MinistryType> findMinistryType(Ministry ministry) {
         Objects.requireNonNull(ministry, "Ministerio e obrigatorio");
         Long ministryId = ministry.getId();
         if (ministryId == null || ministryId <= 0) {
             throw new IllegalStateException("Ministerio persistente sem id valido");
         }
         return mappingRepository.findByMinistryId(ministryId)
-                .map(LegacyMinistryTypeMapping::getMinistryType)
-                .orElseThrow(() -> noLegacyEquivalent(ministryId));
+                .map(LegacyMinistryTypeMapping::getMinistryType);
+    }
+
+    public MinistryType requireMinistryType(Ministry ministry) {
+        return findMinistryType(ministry)
+                .orElseThrow(() -> noLegacyEquivalent(ministry.getId()));
+    }
+
+    public Optional<EventAssignmentType> findEventAssignmentType(Ministry ministry) {
+        return findMinistryType(ministry).map(type -> EventAssignmentType.valueOf(type.name()));
     }
 
     public EventAssignmentType requireEventAssignmentType(Ministry ministry) {
         return EventAssignmentType.valueOf(requireMinistryType(ministry).name());
+    }
+
+    private List<Long> validatePersistentMinistryIds(Collection<Long> ministryIds) {
+        return ministryIds.stream()
+                .map(ministryId -> {
+                    if (ministryId == null || ministryId <= 0) {
+                        throw new IllegalStateException("Ministerio persistente sem id valido");
+                    }
+                    return ministryId;
+                })
+                .distinct()
+                .toList();
     }
 
     private IllegalStateException inconsistentCatalog(MinistryType ministryType) {

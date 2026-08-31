@@ -62,13 +62,27 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("16");
         assertSuccessfulMigration("17");
         assertSuccessfulMigration("18");
+        assertSuccessfulMigration("19");
+        assertSuccessfulMigration("20");
+        assertSuccessfulMigration("21");
+        assertSuccessfulMigration("22");
+        assertSuccessfulMigration("23");
+        assertSuccessfulMigration("24");
+        assertSuccessfulMigration("25");
+        assertSuccessfulMigration("26");
+        assertSuccessfulMigration("27");
+        assertSuccessfulMigration("28");
+        assertSuccessfulMigration("29");
         assertTableExists("flyway_schema_history");
         assertTableExists("tb_event_participation_response");
         assertTableExists("tb_person_unavailability");
+        assertTableExists("tb_ministry");
+        assertTableExists("tb_ministry_legacy_type_mapping");
         assertTableDoesNotExist("tb_event_person");
         assertTableDoesNotExist("tb_person_role");
         assertColumnDoesNotExist("tb_person", "person_type");
         assertColumnDoesNotExist("tb_person", "password");
+        assertColumnDoesNotExist("tb_person_ministry", "ministry_type");
         assertColumnDoesNotExist("tb_celebration_event", "event_date");
         assertColumnDoesNotExist("tb_celebration_event", "event_time");
         assertColumnExists("tb_celebration_event", "start_at");
@@ -88,11 +102,16 @@ class FlywayMigrationIntegrationTest {
         assertColumnExists("tb_person", "updated_at");
         assertColumnExists("tb_user_account", "token_version");
         assertColumnNotNullable("tb_user_account", "token_version");
+        assertColumnExists("tb_person_ministry", "ministry_id");
+        assertColumnNotNullable("tb_person_ministry", "ministry_id");
 
         assertMainConstraintExists("tb_person_ministry", "pk_tb_person_ministry");
-        assertMainConstraintExists("tb_person_ministry", "uk_tb_person_ministry_person_type");
-        assertMainConstraintExists("tb_person_ministry", "chk_tb_person_ministry_type");
+        assertMainConstraintExists("tb_person_ministry", "uk_tb_person_ministry_person_ministry");
         assertMainConstraintExists("tb_person_ministry", "fk_tb_person_ministry_person");
+        assertMainConstraintExists("tb_person_ministry", "fk_tb_person_ministry_ministry");
+        assertMainConstraintExists("tb_ministry_legacy_type_mapping", "pk_tb_ministry_legacy_type_mapping");
+        assertMainConstraintExists("tb_ministry_legacy_type_mapping", "uk_tb_ministry_legacy_type_mapping_type");
+        assertMainConstraintExists("tb_ministry_legacy_type_mapping", "fk_tb_ministry_legacy_type_mapping_ministry");
         assertMainConstraintExists("tb_user_account", "pk_tb_user_account");
         assertMainConstraintExists("tb_user_account", "uk_tb_user_account_person_id");
         assertMainConstraintExists("tb_user_account", "uk_tb_user_account_username");
@@ -109,16 +128,19 @@ class FlywayMigrationIntegrationTest {
 
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
+        assertEquals(5, countRows("tb_ministry"));
+        assertEquals(5, countRows("tb_ministry_legacy_type_mapping"));
         assertEquals(0, countRows("tb_person"));
         assertEquals(0, countRows("tb_celebration_event"));
 
         Integer successfulVersions = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history "
-                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18') "
+                        + "WHERE version IN ('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18',"
+                        + "'19','20','21','22','23','24','25','26','27','28','29') "
                         + "AND success = TRUE",
                 Integer.class
         );
-        assertEquals(18, successfulVersions);
+        assertEquals(29, successfulVersions);
     }
 
     @Test
@@ -147,10 +169,24 @@ class FlywayMigrationIntegrationTest {
         assertSuccessfulMigration("16");
         assertSuccessfulMigration("17");
         assertSuccessfulMigration("18");
+        assertSuccessfulMigration("19");
+        assertSuccessfulMigration("20");
+        assertSuccessfulMigration("21");
+        assertSuccessfulMigration("22");
+        assertSuccessfulMigration("23");
+        assertSuccessfulMigration("24");
+        assertSuccessfulMigration("25");
+        assertSuccessfulMigration("26");
+        assertSuccessfulMigration("27");
+        assertSuccessfulMigration("28");
+        assertSuccessfulMigration("29");
         assertTableDoesNotExist("tb_event_person");
         assertTableDoesNotExist("tb_person_role");
         assertColumnDoesNotExist("tb_person", "person_type");
         assertColumnDoesNotExist("tb_person", "password");
+        assertColumnDoesNotExist("tb_person_ministry", "ministry_type");
+        assertEquals(5, countRows("tb_ministry"));
+        assertEquals(5, countRows("tb_ministry_legacy_type_mapping"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_OPERATOR"));
         assertEquals(1, countRows("tb_role", "authority", "ROLE_ADMIN"));
         for (String table : PARALLEL_DOMAIN_TABLES) {

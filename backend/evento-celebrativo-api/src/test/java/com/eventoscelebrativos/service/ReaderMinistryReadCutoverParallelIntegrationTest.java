@@ -131,8 +131,9 @@ class ReaderMinistryReadCutoverParallelIntegrationTest {
                 """
                 SELECT p.id
                 FROM tb_person_ministry pm
+                JOIN tb_ministry_legacy_type_mapping lm ON lm.ministry_id = pm.ministry_id
                 INNER JOIN tb_person p ON p.id = pm.person_id
-                WHERE pm.ministry_type = ?
+                WHERE lm.ministry_type = ?
                   AND pm.active = TRUE
                 ORDER BY p.name ASC, p.id ASC
                 """,

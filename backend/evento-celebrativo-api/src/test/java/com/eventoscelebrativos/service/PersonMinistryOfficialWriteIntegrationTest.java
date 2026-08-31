@@ -166,7 +166,7 @@ class PersonMinistryOfficialWriteIntegrationTest {
             mockMvc.perform(delete("/leitores/{id}", personId))
                     .andExpect(status().isConflict());
 
-            assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+            assertTrue(findPersonMinistry(personId, MinistryType.READER)
                     .orElseThrow().getActive());
         } finally {
             cleanupEvent(eventId);
@@ -187,7 +187,7 @@ class PersonMinistryOfficialWriteIntegrationTest {
             mockMvc.perform(delete("/leitores/{id}", personId))
                     .andExpect(status().isNoContent());
 
-            assertTrue(personMinistryRepository.findByPersonIdAndMinistryType(personId, MinistryType.READER)
+            assertTrue(findPersonMinistry(personId, MinistryType.READER)
                     .map(pm -> !pm.getActive())
                     .orElse(false));
         } finally {
@@ -217,6 +217,14 @@ class PersonMinistryOfficialWriteIntegrationTest {
     private void addExtraMinistry(Long personId, MinistryType ministryType) {
         var person = personRepository.findById(personId).orElseThrow();
         personMinistryRepository.saveAndFlush(personMinistry(person, ministryType, ministryRepository));
+    }
+
+    private java.util.Optional<PersonMinistry> findPersonMinistry(Long personId, MinistryType ministryType) {
+        Long ministryId = ministryRepository.findByNormalizedName(
+                        com.eventoscelebrativos.support.LegacyMinistryTestFactory.normalizedName(ministryType))
+                .orElseThrow()
+                .getId();
+        return personMinistryRepository.findByPersonIdAndMinistryId(personId, ministryId);
     }
 
     private String readerPayload(String name) throws Exception {

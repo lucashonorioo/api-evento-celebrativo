@@ -127,7 +127,7 @@ class LocalDemoDataRepeatableReapplicationIntegrationTest {
         assertEquals(3, countRows(jdbcTemplate, "tb_celebration_event"));
         assertEquals(21, countRows(jdbcTemplate, "tb_event_assignment"));
         assertEquals(3, countRows(jdbcTemplate, "tb_event_location"));
-        assertEquals(0, countDuplicated(jdbcTemplate, "tb_person_ministry", "person_id, ministry_type"));
+        assertEquals(0, countDuplicated(jdbcTemplate, "tb_person_ministry", "person_id, ministry_id"));
         assertEquals(0, countDuplicated(jdbcTemplate, "tb_event_assignment", "event_id, person_id"));
         assertEquals(0, countAccountsWithMoreThanOneRole(jdbcTemplate));
 
