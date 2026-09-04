@@ -14,24 +14,13 @@ import com.eventoscelebrativos.repository.LocationRepository;
 import com.eventoscelebrativos.repository.PersonMinistryRepository;
 import com.eventoscelebrativos.repository.MinistryRepository;
 import com.eventoscelebrativos.repository.PersonRepository;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -49,86 +38,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Prova, com transacoes reais e threads concorrentes contra MySQL 8.4 real, que o invariante
+ * Prova, com transacoes reais e threads concorrentes contra PostgreSQL real via Testcontainers, que o invariante
  * "no maximo um EventAssignment por (event_id, person_id)" (V12) se mantem sob concorrencia,
  * tanto na protecao direta do banco (Cenario A) quanto em atualizacoes completas concorrentes
  * da escala (Cenario B), onde a politica desta branch e: atualizacoes completas concorrentes sao
- * serializadas pelo lock do evento; o ultimo estado valido confirmado vence. Cada execucao usa uma
- * database isolada. Sem MySQL 8.4 acessivel, os testes sao ignorados.
+ * serializadas pelo lock do evento; o ultimo estado valido confirmado vence.
  */
 @SpringBootTest
 class EventAssignmentConcurrencyIntegrationTest {
 
     private static final LocalDate BIRTHDAY = LocalDate.of(1990, 1, 10);
-    private static String host;
-    private static String port;
-    private static String username;
-    private static String password;
-    private static String databaseName;
-    private static boolean mysqlAvailable;
-
-    @BeforeAll
-    static void provisionIsolatedMySqlDatabase() throws SQLException {
-        host = System.getProperty("mysql.validation.host", "localhost");
-        port = System.getProperty("mysql.validation.port", "3307");
-        username = System.getProperty("mysql.validation.username", "root");
-        password = System.getProperty(
-                "mysql.validation.password",
-                System.getenv("MYSQL_VALIDATION_PASSWORD")
-        );
-
-        if (password == null || password.isBlank()) {
-            mysqlAvailable = false;
-            return;
-        }
-
-        try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
-             Statement statement = connection.createStatement()) {
-            String version = queryVersion(statement);
-            mysqlAvailable = connection.isValid(3) && version.startsWith("8.4.");
-            if (!mysqlAvailable) {
-                return;
-            }
-            databaseName = "v12_assignment_concurrency_" + UUID.randomUUID().toString().replace("-", "");
-            statement.execute("CREATE DATABASE `" + databaseName + "`");
-        } catch (SQLException exception) {
-            mysqlAvailable = false;
-        }
-    }
-
-    @DynamicPropertySource
-    static void registerMySqlProperties(DynamicPropertyRegistry registry) {
-        if (!mysqlAvailable) {
-            return;
-        }
-        registry.add(
-                "spring.datasource.url",
-                () -> "jdbc:mysql://" + host + ":" + port + "/" + databaseName
-                        + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo"
-        );
-        registry.add("spring.datasource.username", () -> username);
-        registry.add("spring.datasource.password", () -> password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("app.time-zone", () -> "America/Sao_Paulo");
-    }
-
-    @AfterAll
-    static void dropIsolatedMySqlDatabase() {
-        if (!mysqlAvailable || databaseName == null) {
-            return;
-        }
-        try (Connection connection = DriverManager.getConnection(bootstrapUrl(), username, password);
-             Statement statement = connection.createStatement()) {
-            statement.execute("DROP DATABASE IF EXISTS `" + databaseName + "`");
-        } catch (SQLException ignored) {
-            // best-effort cleanup
-        }
-    }
-
-    @BeforeEach
-    void requireMySql84() {
-        Assumptions.assumeTrue(mysqlAvailable, "MySQL 8.4 real nao acessivel; teste ignorado.");
-    }
 
     @Autowired
     private CelebrationEventService celebrationEventService;
@@ -300,17 +219,5 @@ class EventAssignmentConcurrencyIntegrationTest {
     private String uniquePhoneNumber() {
         int suffix = Math.floorMod(UUID.randomUUID().hashCode(), 10_000_000);
         return "3499" + String.format("%07d", suffix);
-    }
-
-    private static String bootstrapUrl() {
-        return "jdbc:mysql://" + host + ":" + port
-                + "/?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo";
-    }
-
-    private static String queryVersion(Statement statement) throws SQLException {
-        try (ResultSet resultSet = statement.executeQuery("SELECT VERSION()")) {
-            resultSet.next();
-            return resultSet.getString(1);
-        }
     }
 }

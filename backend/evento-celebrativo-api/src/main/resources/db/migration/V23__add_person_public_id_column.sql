@@ -1,2 +1,2 @@
 ALTER TABLE tb_person
-    ADD COLUMN public_id BINARY(16);
+    ADD COLUMN public_id UUID;

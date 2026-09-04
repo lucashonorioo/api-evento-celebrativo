@@ -240,14 +240,14 @@ Comportamento:
 - sem `APP_PROFILE`, a aplicacao sobe com profile `local`;
 - em desenvolvimento isso e conveniente porque carrega H2 local, Flyway local e dados demonstrativos;
 - em testes, `src/test/resources/application.properties` define `spring.profiles.active=test`, entao a suite usa profile `test`;
-- em MySQL, e necessario definir `APP_PROFILE=mysql` e as variaveis de datasource;
-- em homologacao/producao, se `APP_PROFILE` ficar ausente por erro operacional, o sistema tentara subir com profile `local`, H2 em memoria e seeds locais.
+- MySQL deixou de ser um profile operacional suportado na migracao PostgreSQL/Supabase; qualquer retomada futura exige migrations/configuracao especificas por vendor;
+- em homologacao/producao, defina `APP_PROFILE=prod`; se `APP_PROFILE` ficar ausente por erro operacional, o sistema tentara subir com profile `local`, H2 em memoria e seeds locais.
 
 Recomendacao profissional:
 
-- manter nesta auditoria sem alteracao;
+- nao anunciar MySQL como suporte operacional atual;
 - em branch separada de hardening operacional, trocar o default para falhar fechado em ambientes nao locais ou exigir `APP_PROFILE` explicitamente fora de desenvolvimento;
-- documentar em deploy que `APP_PROFILE=mysql` e obrigatorio em MySQL/producao.
+- documentar em deploy que `APP_PROFILE=prod` e obrigatorio para homologacao/producao.
 
 ## 10. Migrations e banco
 

@@ -19,7 +19,7 @@ import java.util.List;
  * mesmo evento. Antes de remover a constraint atual, valida que nao existam duplicidades
  * reais de (event_id, person_id); se existirem, a migration falha com diagnostico explicito
  * em vez de escolher automaticamente uma funcao ou apagar dados. A sintaxe de DROP de
- * constraint/indice unico diverge entre H2 e MySQL, por isso o banco e detectado via
+ * constraint/indice unico diverge entre H2, MySQL e PostgreSQL, por isso o banco e detectado via
  * metadata da conexao (mesmo mecanismo da V6).
  */
 public class V12__restore_single_assignment_per_person_per_event extends BaseJavaMigration {
@@ -106,7 +106,7 @@ public class V12__restore_single_assignment_per_person_per_event extends BaseJav
         }
 
         String normalizedProductName = databaseProductName.toUpperCase();
-        if (normalizedProductName.contains("H2")) {
+        if (normalizedProductName.contains("H2") || normalizedProductName.contains("POSTGRESQL")) {
             statement.execute("ALTER TABLE tb_event_assignment DROP CONSTRAINT " + OLD_CONSTRAINT_NAME);
         } else if (normalizedProductName.contains("MYSQL")) {
             statement.execute("ALTER TABLE tb_event_assignment DROP INDEX " + OLD_CONSTRAINT_NAME);

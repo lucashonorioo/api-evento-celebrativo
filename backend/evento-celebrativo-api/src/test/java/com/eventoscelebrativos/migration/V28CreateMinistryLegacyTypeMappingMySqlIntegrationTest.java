@@ -13,7 +13,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
-import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -255,12 +254,8 @@ class V28CreateMinistryLegacyTypeMappingMySqlIntegrationTest {
                 normalizedName);
     }
 
-    private byte[] newPublicId() {
-        UUID uuid = UUID.randomUUID();
-        return ByteBuffer.allocate(16)
-                .putLong(uuid.getMostSignificantBits())
-                .putLong(uuid.getLeastSignificantBits())
-                .array();
+    private UUID newPublicId() {
+        return UUID.randomUUID();
     }
 
     private boolean isTrue(Object value) {

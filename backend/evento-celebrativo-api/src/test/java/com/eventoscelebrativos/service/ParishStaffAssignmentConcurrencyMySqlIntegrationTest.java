@@ -28,7 +28,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -408,12 +407,8 @@ class ParishStaffAssignmentConcurrencyMySqlIntegrationTest {
         return jdbcTemplate.queryForObject("SELECT id FROM tb_person WHERE phone_number = ?", Long.class, phoneNumber);
     }
 
-    private byte[] newPublicId() {
-        UUID uuid = UUID.randomUUID();
-        return ByteBuffer.allocate(16)
-                .putLong(uuid.getMostSignificantBits())
-                .putLong(uuid.getLeastSignificantBits())
-                .array();
+    private UUID newPublicId() {
+        return UUID.randomUUID();
     }
 
     private void insertActivePriestMinistry(long personId) {

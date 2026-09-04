@@ -73,7 +73,7 @@ public class V25__enforce_person_public_id_constraints extends BaseJavaMigration
     private void makePublicIdNotNull(Connection connection) throws SQLException {
         String sql = isMySql(connection)
                 ? "ALTER TABLE tb_person MODIFY public_id BINARY(16) NOT NULL"
-                : "ALTER TABLE tb_person ALTER COLUMN public_id BINARY(16) NOT NULL";
+                : "ALTER TABLE tb_person ALTER COLUMN public_id SET NOT NULL";
 
         execute(connection, sql);
     }

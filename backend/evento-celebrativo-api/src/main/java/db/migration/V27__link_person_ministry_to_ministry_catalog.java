@@ -114,7 +114,7 @@ public class V27__link_person_ministry_to_ministry_catalog extends BaseJavaMigra
     private void makeMinistryIdNotNull(Connection connection) throws SQLException {
         String sql = isMySql(connection)
                 ? "ALTER TABLE tb_person_ministry MODIFY ministry_id BIGINT NOT NULL"
-                : "ALTER TABLE tb_person_ministry ALTER COLUMN ministry_id BIGINT NOT NULL";
+                : "ALTER TABLE tb_person_ministry ALTER COLUMN ministry_id SET NOT NULL";
 
         execute(connection, sql);
     }

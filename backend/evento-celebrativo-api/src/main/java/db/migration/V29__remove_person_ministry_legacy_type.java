@@ -260,19 +260,22 @@ public class V29__remove_person_ministry_legacy_type extends BaseJavaMigration {
             }
         }
 
-        try (PreparedStatement statement = connection.prepareStatement("""
-                SELECT COUNT(*)
-                FROM information_schema.indexes
-                WHERE LOWER(table_name) = LOWER(?)
-                  AND LOWER(index_name) = LOWER(?)
-                """)) {
-            statement.setString(1, tableName);
-            statement.setString(2, indexName);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                resultSet.next();
-                return resultSet.getLong(1) > 0;
+        DatabaseMetaData metaData = connection.getMetaData();
+        try (ResultSet resultSet = metaData.getIndexInfo(
+                connection.getCatalog(),
+                connection.getSchema(),
+                tableName,
+                false,
+                false
+        )) {
+            while (resultSet.next()) {
+                String candidate = resultSet.getString("INDEX_NAME");
+                if (candidate != null && candidate.equalsIgnoreCase(indexName)) {
+                    return true;
+                }
             }
         }
+        return false;
     }
 
     private boolean isMySql(Connection connection) throws SQLException {

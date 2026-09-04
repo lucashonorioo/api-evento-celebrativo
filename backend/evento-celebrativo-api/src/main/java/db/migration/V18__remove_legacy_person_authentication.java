@@ -20,8 +20,8 @@ import java.util.Map;
  * UserAccountRole passam a ser a unica fonte de credenciais e autorizacao; Person representa
  * somente a pessoa fisica.
  * <p>
- * Ordem obrigatoria de execucao (documentada aqui porque MySQL nao oferece transacao completa para
- * multiplos DDLs - cada ALTER/DROP e efetivamente auto-commit nesse dialeto):
+ * Ordem obrigatoria de execucao (documentada aqui porque dialetos diferem em transacionalidade de
+ * DDL; no MySQL, por exemplo, cada ALTER/DROP e efetivamente auto-commit):
  * <ol>
  *     <li>validar estrutura (tabelas/colunas/constraints existem, dialeto suportado);</li>
  *     <li>validar dados (paridade Person-legado vs UserAccount) - falha aqui NAO altera nada;</li>
@@ -70,9 +70,10 @@ public class V18__remove_legacy_person_authentication extends BaseJavaMigration 
             return;
         }
         String productName = connection.getMetaData().getDatabaseProductName();
-        if (productName == null || !productName.toUpperCase(Locale.ROOT).contains("H2")) {
+        String normalizedProductName = productName == null ? "" : productName.toUpperCase(Locale.ROOT);
+        if (!normalizedProductName.contains("H2") && !normalizedProductName.contains("POSTGRESQL")) {
             throw new FlywayException(
-                    "V18 so suporta H2 e MySQL; dialeto detectado: " + productName
+                    "V18 so suporta H2, MySQL e PostgreSQL; dialeto detectado: " + productName
                             + ". Nenhuma alteracao foi realizada.");
         }
     }

@@ -39,8 +39,8 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
             value = """
                     SELECT p.id
                     FROM Person p
-                    WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
-                      AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
+                    WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%')))
+                      AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', CAST(:phoneNumber AS string), '%'))
                       AND (:ministryId IS NULL OR EXISTS (
                           SELECT pm
                           FROM PersonMinistry pm
@@ -67,8 +67,8 @@ public interface PersonRepository extends JpaRepository<Person, Long> {
             countQuery = """
                     SELECT COUNT(p.id)
                     FROM Person p
-                    WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
-                      AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', :phoneNumber, '%'))
+                    WHERE (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:name AS string), '%')))
+                      AND (:phoneNumber IS NULL OR p.phoneNumber LIKE CONCAT('%', CAST(:phoneNumber AS string), '%'))
                       AND (:ministryId IS NULL OR EXISTS (
                           SELECT pm
                           FROM PersonMinistry pm

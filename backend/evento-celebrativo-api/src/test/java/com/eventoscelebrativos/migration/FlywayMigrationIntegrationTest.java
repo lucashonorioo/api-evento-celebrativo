@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +35,41 @@ class FlywayMigrationIntegrationTest {
             "tb_user_account",
             "tb_user_account_role",
             "tb_event_assignment"
+    };
+
+    private static final String[] GENERATED_IDENTITY_TABLES = {
+            "tb_celebration_event",
+            "tb_location",
+            "tb_person",
+            "tb_role",
+            "tb_person_ministry",
+            "tb_user_account",
+            "tb_event_assignment",
+            "tb_event_participation_response",
+            "tb_person_unavailability",
+            "tb_notification",
+            "tb_notification_recipient",
+            "tb_parish_staff_assignment",
+            "tb_ministry"
+    };
+
+    private static final String[] REQUIRED_INDEXES = {
+            "idx_tb_event_location_event_id",
+            "idx_tb_event_location_location_id",
+            "idx_tb_event_assignment_event_id",
+            "idx_tb_event_assignment_person_id",
+            "idx_tb_event_assignment_assignment_type",
+            "idx_tb_person_unavailability_person_end_start",
+            "idx_tb_person_unavailability_range_person",
+            "idx_tb_notification_created_at_id",
+            "idx_tb_notification_sender_created_at_id",
+            "idx_tb_notification_source",
+            "idx_tb_notification_category_resolved_at",
+            "idx_tb_notification_reference",
+            "idx_tb_notification_recipient_account_read_notification",
+            "idx_tb_notification_recipient_notification_read_name_id",
+            "idx_tb_parish_staff_assignment_responsibility_active",
+            "idx_tb_person_ministry_ministry_id"
     };
 
     @Autowired
@@ -144,6 +180,50 @@ class FlywayMigrationIntegrationTest {
     }
 
     @Test
+    void shouldExposePostgreSqlNativeTypesIdentitiesAndIndexes() {
+        assertColumnDataType("tb_person", "public_id", "uuid");
+        assertColumnNotNullable("tb_person", "public_id");
+        assertMainConstraintExists("tb_person", "uk_tb_person_public_id");
+
+        assertColumnDataType("tb_celebration_event", "start_at", "timestamp without time zone");
+        assertColumnDataType("tb_celebration_event", "end_at", "timestamp without time zone");
+        assertColumnDataType("tb_person_unavailability", "start_at", "timestamp without time zone");
+        assertColumnDataType("tb_person_unavailability", "end_at", "timestamp without time zone");
+        assertColumnDataType("tb_user_account", "created_at", "timestamp without time zone");
+        assertColumnDataType("tb_user_account", "updated_at", "timestamp without time zone");
+
+        for (String table : GENERATED_IDENTITY_TABLES) {
+            assertColumnIsIdentity(table, "id");
+        }
+
+        for (String index : REQUIRED_INDEXES) {
+            assertIndexExists(index);
+        }
+
+        UUID publicId = UUID.randomUUID();
+        Long personId = jdbcTemplate.queryForObject(
+                """
+                        INSERT INTO tb_person (birthday_date, name, phone_number, active, public_id)
+                        VALUES (DATE '1990-01-01', ?, ?, TRUE, ?)
+                        RETURNING id
+                        """,
+                Long.class,
+                "PostgreSQL Schema Check",
+                "3499" + String.format("%07d", Math.floorMod(publicId.hashCode(), 10_000_000)),
+                publicId
+        );
+
+        assertTrue(personId != null && personId > 0);
+        assertEquals(publicId, jdbcTemplate.queryForObject(
+                "SELECT public_id FROM tb_person WHERE id = ?",
+                UUID.class,
+                personId
+        ));
+
+        jdbcTemplate.update("DELETE FROM tb_person WHERE id = ?", personId);
+    }
+
+    @Test
     void shouldKeepMigrationsStableWhenMigrateRunsAgain() {
         Map<String, String> checksumsBefore = migrationChecksums();
 
@@ -240,6 +320,26 @@ class FlywayMigrationIntegrationTest {
         assertEquals(expected, nullable);
     }
 
+    private void assertColumnDataType(String tableName, String columnName, String expected) {
+        String dataType = jdbcTemplate.queryForObject(
+                "SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
+                String.class,
+                tableName,
+                columnName
+        );
+        assertEquals(expected, dataType);
+    }
+
+    private void assertColumnIsIdentity(String tableName, String columnName) {
+        String isIdentity = jdbcTemplate.queryForObject(
+                "SELECT is_identity FROM information_schema.columns WHERE table_schema = current_schema() AND LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
+                String.class,
+                tableName,
+                columnName
+        );
+        assertEquals("YES", isIdentity, tableName + "." + columnName + " deve ser identity no PostgreSQL");
+    }
+
     private void assertColumnDoesNotExist(String tableName, String columnName) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns WHERE LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
@@ -256,6 +356,15 @@ class FlywayMigrationIntegrationTest {
                 Integer.class,
                 tableName,
                 constraintName
+        );
+        assertEquals(1, count);
+    }
+
+    private void assertIndexExists(String indexName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = current_schema() AND LOWER(indexname) = LOWER(?)",
+                Integer.class,
+                indexName
         );
         assertEquals(1, count);
     }
