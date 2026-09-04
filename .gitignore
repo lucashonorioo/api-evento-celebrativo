@@ -12,6 +12,12 @@
 # VS Code — configurações locais da raiz
 /.vscode/
 
+# Variaveis e secrets locais
+.env
+.env.*
+!.env.example
+application-*-secret.properties
+
 # Arquivos do sistema operacional
 .DS_Store
 Thumbs.db

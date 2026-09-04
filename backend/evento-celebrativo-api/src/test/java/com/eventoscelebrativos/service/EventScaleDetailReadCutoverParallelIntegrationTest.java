@@ -18,7 +18,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -297,11 +296,7 @@ class EventScaleDetailReadCutoverParallelIntegrationTest {
         return "3497" + String.format("%07d", suffix);
     }
 
-    private byte[] newPublicId() {
-        UUID uuid = UUID.randomUUID();
-        return ByteBuffer.allocate(16)
-                .putLong(uuid.getMostSignificantBits())
-                .putLong(uuid.getLeastSignificantBits())
-                .array();
+    private UUID newPublicId() {
+        return UUID.randomUUID();
     }
 }

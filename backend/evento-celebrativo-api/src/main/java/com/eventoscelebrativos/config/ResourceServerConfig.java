@@ -5,6 +5,7 @@ import java.util.Arrays;
 import com.eventoscelebrativos.security.UserAccountJwtAuthenticationConverter;
 import com.eventoscelebrativos.service.UserAccountAuthenticationService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -36,6 +37,7 @@ public class ResourceServerConfig {
 
 	@Bean
 	@Profile({ "test", "local" })
+	@ConditionalOnProperty(prefix = "spring.h2.console", name = "enabled", havingValue = "true")
 	@Order(1)
 	public SecurityFilterChain h2SecurityFilterChain(HttpSecurity http) throws Exception {
 

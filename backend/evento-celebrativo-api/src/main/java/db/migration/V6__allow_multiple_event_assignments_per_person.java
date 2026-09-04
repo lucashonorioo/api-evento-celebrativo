@@ -12,7 +12,7 @@ import java.sql.Statement;
  * Substitui a unicidade de tb_event_assignment de (event_id, person_id) para
  * (event_id, person_id, assignment_type), permitindo que a mesma pessoa exerca mais de uma
  * funcao ministerial no mesmo evento. A sintaxe de DROP de constraint/indice unico diverge entre
- * H2 e MySQL, por isso o banco e detectado via metadata da conexao.
+ * H2, MySQL e PostgreSQL, por isso o banco e detectado via metadata da conexao.
  */
 public class V6__allow_multiple_event_assignments_per_person extends BaseJavaMigration {
 
@@ -39,7 +39,7 @@ public class V6__allow_multiple_event_assignments_per_person extends BaseJavaMig
         }
 
         String normalizedProductName = databaseProductName.toUpperCase();
-        if (normalizedProductName.contains("H2")) {
+        if (normalizedProductName.contains("H2") || normalizedProductName.contains("POSTGRESQL")) {
             statement.execute("ALTER TABLE tb_event_assignment DROP CONSTRAINT " + OLD_CONSTRAINT_NAME);
         } else if (normalizedProductName.contains("MYSQL")) {
             statement.execute("ALTER TABLE tb_event_assignment DROP INDEX " + OLD_CONSTRAINT_NAME);

@@ -28,7 +28,7 @@ public class V15__support_user_account_lifecycle extends BaseJavaMigration {
     private void allowNullablePersonPassword(Connection connection) throws SQLException {
         String sql = isMySql(connection)
                 ? "ALTER TABLE tb_person MODIFY password VARCHAR(255) NULL"
-                : "ALTER TABLE tb_person ALTER COLUMN password VARCHAR(255) NULL";
+                : "ALTER TABLE tb_person ALTER COLUMN password DROP NOT NULL";
         execute(connection, sql);
     }
 

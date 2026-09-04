@@ -36,16 +36,18 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
         Connection connection = context.getConnection();
         String databaseProductName = connection.getMetaData().getDatabaseProductName();
         boolean h2 = isH2(databaseProductName);
-        if (!h2 && !isMySql(databaseProductName)) {
+        boolean mysql = isMySql(databaseProductName);
+        boolean postgresql = isPostgreSql(databaseProductName);
+        if (!h2 && !mysql && !postgresql) {
             throw new FlywayException("Banco nao suportado pela V11: " + databaseProductName);
         }
 
-        migratePersonUnavailability(connection, h2);
-        migrateCelebrationEvent(connection, h2);
+        migratePersonUnavailability(connection, h2, mysql, postgresql);
+        migrateCelebrationEvent(connection, h2, mysql);
     }
 
-    private void migratePersonUnavailability(Connection connection, boolean h2) throws SQLException {
-        String dateTimeType = businessDateTimeType(h2);
+    private void migratePersonUnavailability(Connection connection, boolean h2, boolean mysql, boolean postgresql) throws SQLException {
+        String dateTimeType = businessDateTimeType(mysql);
         addColumnIfMissing(connection, "tb_person_unavailability", "start_at", dateTimeType);
         addColumnIfMissing(connection, "tb_person_unavailability", "end_at", dateTimeType);
 
@@ -53,8 +55,8 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
         validateNoNullRange(connection, "tb_person_unavailability");
 
         try (Statement statement = connection.createStatement()) {
-            applyNotNull(statement, "tb_person_unavailability", "start_at", dateTimeType, h2);
-            applyNotNull(statement, "tb_person_unavailability", "end_at", dateTimeType, h2);
+            applyNotNull(statement, "tb_person_unavailability", "start_at", dateTimeType, h2, mysql);
+            applyNotNull(statement, "tb_person_unavailability", "end_at", dateTimeType, h2, mysql);
 
             /*
              * A nova UNIQUE e criada antes da remocao de qualquer indice antigo iniciado por
@@ -67,7 +69,7 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
                             + "UNIQUE (person_id, start_at, end_at)"
             );
 
-            if (h2) {
+            if (h2 || postgresql) {
                 statement.execute(
                         "ALTER TABLE tb_person_unavailability "
                                 + "DROP CONSTRAINT uk_tb_person_unavailability_person_dates"
@@ -147,8 +149,8 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
         }
     }
 
-    private void migrateCelebrationEvent(Connection connection, boolean h2) throws SQLException {
-        String dateTimeType = businessDateTimeType(h2);
+    private void migrateCelebrationEvent(Connection connection, boolean h2, boolean mysql) throws SQLException {
+        String dateTimeType = businessDateTimeType(mysql);
         addColumnIfMissing(connection, "tb_celebration_event", "start_at", dateTimeType);
         addColumnIfMissing(connection, "tb_celebration_event", "end_at", dateTimeType);
 
@@ -156,8 +158,8 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
         validateNoNullRange(connection, "tb_celebration_event");
 
         try (Statement statement = connection.createStatement()) {
-            applyNotNull(statement, "tb_celebration_event", "start_at", dateTimeType, h2);
-            applyNotNull(statement, "tb_celebration_event", "end_at", dateTimeType, h2);
+            applyNotNull(statement, "tb_celebration_event", "start_at", dateTimeType, h2, mysql);
+            applyNotNull(statement, "tb_celebration_event", "end_at", dateTimeType, h2, mysql);
 
             statement.execute(
                     "ALTER TABLE tb_celebration_event ADD CONSTRAINT "
@@ -265,23 +267,28 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
             String tableName,
             String columnName,
             String dateTimeType,
-            boolean h2
+            boolean h2,
+            boolean mysql
     ) throws SQLException {
         if (h2) {
             statement.execute(
                     "ALTER TABLE " + tableName + " ALTER COLUMN " + columnName + " "
                             + dateTimeType + " NOT NULL"
             );
-        } else {
+        } else if (mysql) {
             statement.execute(
                     "ALTER TABLE " + tableName + " MODIFY COLUMN " + columnName + " "
                             + dateTimeType + " NOT NULL"
             );
+        } else {
+            statement.execute(
+                    "ALTER TABLE " + tableName + " ALTER COLUMN " + columnName + " SET NOT NULL"
+            );
         }
     }
 
-    private String businessDateTimeType(boolean h2) {
-        return h2 ? "TIMESTAMP(0)" : "DATETIME(0)";
+    private String businessDateTimeType(boolean mysql) {
+        return mysql ? "DATETIME(0)" : "TIMESTAMP(0)";
     }
 
     private boolean isH2(String databaseProductName) {
@@ -290,5 +297,9 @@ public class V11__migrate_to_time_range_model extends BaseJavaMigration {
 
     private boolean isMySql(String databaseProductName) {
         return databaseProductName != null && databaseProductName.toUpperCase().contains("MYSQL");
+    }
+
+    private boolean isPostgreSql(String databaseProductName) {
+        return databaseProductName != null && databaseProductName.toUpperCase().contains("POSTGRESQL");
     }
 }

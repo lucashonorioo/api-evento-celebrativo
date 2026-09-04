@@ -20,7 +20,6 @@ import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -575,12 +574,8 @@ class MinistryAdministrationMembershipConcurrencyMySqlIntegrationTest {
         );
     }
 
-    private byte[] newPublicId() {
-        UUID uuid = UUID.randomUUID();
-        return ByteBuffer.allocate(16)
-                .putLong(uuid.getMostSignificantBits())
-                .putLong(uuid.getLeastSignificantBits())
-                .array();
+    private UUID newPublicId() {
+        return UUID.randomUUID();
     }
 
     private String uniquePhoneNumber() {

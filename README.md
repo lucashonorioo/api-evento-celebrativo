@@ -16,14 +16,14 @@ O projeto nasceu de uma necessidade real de organização de escalas em contexto
 | Linguagem e framework | Java 21, Spring Boot 3.4.5 |
 | Build | Maven Wrapper |
 | API | Spring Web, Bean Validation |
-| Persistência | Spring Data JPA, Flyway (migrations versionadas), H2 no perfil `local`/`test`, MySQL no perfil `mysql` |
+| Persistência | Spring Data JPA, Hibernate, Flyway, PostgreSQL no perfil `dev`, Supabase como PostgreSQL gerenciado de desenvolvimento |
 | Segurança | Spring Security, OAuth2, JWT |
 | Mapeamento | MapStruct |
 | Documentação | SpringDoc OpenAPI, Swagger UI |
-| Testes | JUnit 5, Mockito, MockMvc, `@DataJpaTest` |
+| Testes | JUnit 5, Mockito, MockMvc, `@DataJpaTest`, Testcontainers PostgreSQL |
 | Testes manuais | Postman, Swagger UI |
 
-> Observação: o perfil padrão (`APP_PROFILE=local`, usado quando a variável não é definida) usa H2 com Flyway aplicando as migrations versionadas em `src/main/resources/db/migration`. O perfil `mysql` (`APP_PROFILE=mysql`) usa um datasource MySQL real, configurado por variáveis de ambiente (`MYSQL_DATASOURCE_URL`, `MYSQL_DATASOURCE_USERNAME`, `MYSQL_DATASOURCE_PASSWORD`), com o mesmo mecanismo de migrations.
+> Observação: o perfil `dev` (`APP_PROFILE=dev`) usa PostgreSQL via JDBC e foi preparado para o Supabase DEV por Direct Connection IPv6 com SSL. O perfil padrão ainda é `local`, usando H2 apenas para execução local leve. Testes automatizados de integração usam PostgreSQL real temporário via Testcontainers. MySQL não faz mais parte do fluxo operacional normal; dependências e testes históricos permanecem apenas como legado para uma futura reintrodução explícita.
 
 ---
 
@@ -50,12 +50,12 @@ O projeto nasceu de uma necessidade real de organização de escalas em contexto
 - Tratamento de erro referencial em deletes com resposta controlada.
 - Testes automatizados de service, repository e controller.
 - Documentação Swagger/OpenAPI.
-- Banco relacional real (MySQL) com migrations versionadas usando Flyway, no perfil `mysql`.
+- Banco relacional real PostgreSQL com migrations versionadas usando Flyway, no perfil `dev`.
 
 ### Planejadas
 
 - Integração com frontend.
-- Perfis separados para `test`, `dev` e `prod`.
+- Evolução incremental de relatórios e operação.
 - Remoção de secrets default antes de ambiente real.
 - Remoção de hardcoded `localhost` antes de deploy.
 - Relatórios.
@@ -127,7 +127,42 @@ Exigem autenticação com `ROLE_ADMIN`.
 - Java 21 instalado
 - Git instalado
 - IDE de sua preferência, como IntelliJ IDEA
+- Docker Desktop apenas para executar testes de integração com Testcontainers
+- Credenciais PostgreSQL do Supabase DEV configuradas localmente para o perfil `dev`
 - Postman opcional para testes manuais
+
+---
+
+## Banco de dados
+
+O banco principal de desenvolvimento é PostgreSQL hospedado no Supabase:
+
+```text
+Project: api-evento-celebrativo-dev
+Host: db.kjtdagsyipxllikuhejz.supabase.co
+Port: 5432
+Database: postgres
+User: postgres
+Connection: Direct JDBC
+SSL: required
+```
+
+Use variáveis de ambiente. Não grave senha em arquivos versionados:
+
+```text
+APP_PROFILE=dev
+DB_URL=jdbc:postgresql://db.kjtdagsyipxllikuhejz.supabase.co:5432/postgres?sslmode=require
+DB_USERNAME=postgres
+DB_PASSWORD=<defina localmente>
+```
+
+Em producao, use `APP_PROFILE=prod` e configure tambem `CLIENT_ID` e `CLIENT_SECRET` exclusivamente pelo ambiente. O profile `prod` nao define defaults para credenciais de banco nem para secrets OAuth.
+
+O arquivo `.env.example` existe apenas como referência de nomes de variáveis. O projeto não carrega `.env` automaticamente; configure as variáveis no shell, na IDE ou no ambiente de execução.
+
+MySQL deixou de ser um profile operacional suportado nesta migração. A cadeia oficial de migrations versionadas agora é PostgreSQL e é validada contra PostgreSQL real.
+
+Dependências e testes históricos MySQL foram preservados como conhecimento legado, mas ficam fora do fluxo normal. Uma futura volta a MySQL deve ser tratada como trabalho específico, com migrations próprias por vendor ou outra estratégia explícita de compatibilidade.
 
 ---
 
@@ -138,8 +173,19 @@ Execute os comandos a partir da pasta do backend:
 ```powershell
 cd backend\evento-celebrativo-api
 .\mvnw.cmd clean compile
+```
+
+Para iniciar usando o Supabase DEV no PowerShell:
+
+```powershell
+$env:APP_PROFILE = "dev"
+$env:DB_URL = "jdbc:postgresql://db.kjtdagsyipxllikuhejz.supabase.co:5432/postgres?sslmode=require"
+$env:DB_USERNAME = "postgres"
+$env:DB_PASSWORD = "<informe-a-senha-localmente>"
 .\mvnw.cmd spring-boot:run
 ```
+
+No IntelliJ IDEA, configure as mesmas variáveis em `Run/Debug Configurations` > `Environment variables`. Não coloque a senha em arquivos do projeto.
 
 URL base local:
 
@@ -155,6 +201,20 @@ http://localhost:8080
 cd backend\evento-celebrativo-api
 .\mvnw.cmd test
 .\mvnw.cmd -q test
+```
+
+Os testes automatizados de integração usam PostgreSQL real via Testcontainers (`postgres:16-alpine`). Docker precisa estar disponível apenas durante a execução desses testes; não é necessário manter um MySQL Docker ligado para o desenvolvimento normal.
+
+Para executar apenas a validação PostgreSQL/Flyway:
+
+```powershell
+.\mvnw.cmd -q "-Dtest=FlywayMigrationIntegrationTest,ApiDeEventosCelebrativosApplicationTests" test
+```
+
+Para executar testes de concorrência PostgreSQL principais:
+
+```powershell
+.\mvnw.cmd -q "-Dtest=EventAssignmentConcurrencyIntegrationTest,PersonUnavailabilityConcurrencyIntegrationTest,ParishProfileContactConcurrencyIntegrationTest" test
 ```
 
 ---

@@ -1,22 +1,22 @@
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000001', 'Luana Odinson', '34989374748', '1988-05-21');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000002', 'Miguel Souza', '34962165544', '1995-02-18');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000003', 'Helena Oliveira', '34991564562', '1999-09-06');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000001', 'Luana Odinson', '34989374748', '1988-05-21');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000002', 'Miguel Souza', '34962165544', '1995-02-18');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000003', 'Helena Oliveira', '34991564562', '1999-09-06');
 
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000004', 'Alice Lima', '34983246978', '1989-08-24');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000005', 'Arthur Costa', '34978956324', '2005-03-24');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000006', 'Heloísa Ribeiro', '34998632145', '1986-10-17');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000004', 'Alice Lima', '34983246978', '1989-08-24');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000005', 'Arthur Costa', '34978956324', '2005-03-24');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000006', 'Heloísa Ribeiro', '34998632145', '1986-10-17');
 
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000007', 'Davi Gomes', '34963284523', '2003-06-02');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000008', 'Laura Alves', '34998563215', '2006-07-11');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'00000000000000000000000000000009', 'Bernardo Ferreira', '34936984562', '1982-12-08');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000007', 'Davi Gomes', '34963284523', '2003-06-02');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000008', 'Laura Alves', '34998563215', '2006-07-11');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-000000000009', 'Bernardo Ferreira', '34936984562', '1982-12-08');
 
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000A', 'Mariana Ferraz', '34989374749', '1988-05-21');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000B', 'Carlos Silva', '34991234567', '1975-11-10');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000C', 'Fernanda Souza', '34987654321', '1992-03-25');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000a', 'Mariana Ferraz', '34989374749', '1988-05-21');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000b', 'Carlos Silva', '34991234567', '1975-11-10');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000c', 'Fernanda Souza', '34987654321', '1992-03-25');
 
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000D', 'Padre Miguel', '34988776655', '1968-07-14');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000E', 'Padre Paulo', '34999887766', '1980-01-08');
-INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES (X'0000000000000000000000000000000F', 'Padre Roberto', '34981112233', '1972-09-03');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000d', 'Padre Miguel', '34988776655', '1968-07-14');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000e', 'Padre Paulo', '34999887766', '1980-01-08');
+INSERT INTO tb_person(public_id, name, phone_number, birthday_date) VALUES ('00000000-0000-0000-0000-00000000000f', 'Padre Roberto', '34981112233', '1972-09-03');
 
 INSERT INTO tb_person_ministry(person_id, ministry_id, active, created_at, updated_at) VALUES (1, (SELECT id FROM tb_ministry WHERE normalized_name = 'COMENTARISTAS'), TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
 INSERT INTO tb_person_ministry(person_id, ministry_id, active, created_at, updated_at) VALUES (2, (SELECT id FROM tb_ministry WHERE normalized_name = 'COMENTARISTAS'), TRUE, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));

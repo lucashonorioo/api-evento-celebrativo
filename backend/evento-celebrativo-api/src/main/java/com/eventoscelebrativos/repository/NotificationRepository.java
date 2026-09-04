@@ -32,26 +32,26 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                     SELECT n FROM Notification n
                     LEFT JOIN FETCH n.senderUserAccount sender
                     LEFT JOIN FETCH sender.person
-                    WHERE (:origin IS NULL OR n.origin = :origin)
-                      AND (:audience IS NULL OR n.audience = :audience)
-                      AND (:senderPersonId IS NULL OR sender.person.id = :senderPersonId)
-                      AND (:startInclusive IS NULL OR n.createdAt >= :startInclusive)
-                      AND (:endExclusive IS NULL OR n.createdAt < :endExclusive)
-                      AND (:categoryFilter IS NULL OR n.category = :categoryFilter)
-                      AND (:resolvedFilter IS NULL
+                    WHERE (:#{#origin == null} = TRUE OR n.origin = :origin)
+                      AND (:#{#audience == null} = TRUE OR n.audience = :audience)
+                      AND (:#{#senderPersonId == null} = TRUE OR sender.person.id = :senderPersonId)
+                      AND (:#{#startInclusive == null} = TRUE OR n.createdAt >= :startInclusive)
+                      AND (:#{#endExclusive == null} = TRUE OR n.createdAt < :endExclusive)
+                      AND (:#{#categoryFilter == null} = TRUE OR n.category = :categoryFilter)
+                      AND (:#{#resolvedFilter == null} = TRUE
                            OR (:resolvedFilter = TRUE AND n.resolvedAt IS NOT NULL)
                            OR (:resolvedFilter = FALSE AND n.resolvedAt IS NULL))
                     ORDER BY n.createdAt DESC, n.id DESC
                     """,
             countQuery = """
                     SELECT COUNT(n) FROM Notification n
-                    WHERE (:origin IS NULL OR n.origin = :origin)
-                      AND (:audience IS NULL OR n.audience = :audience)
-                      AND (:senderPersonId IS NULL OR n.senderUserAccount.person.id = :senderPersonId)
-                      AND (:startInclusive IS NULL OR n.createdAt >= :startInclusive)
-                      AND (:endExclusive IS NULL OR n.createdAt < :endExclusive)
-                      AND (:categoryFilter IS NULL OR n.category = :categoryFilter)
-                      AND (:resolvedFilter IS NULL
+                    WHERE (:#{#origin == null} = TRUE OR n.origin = :origin)
+                      AND (:#{#audience == null} = TRUE OR n.audience = :audience)
+                      AND (:#{#senderPersonId == null} = TRUE OR n.senderUserAccount.person.id = :senderPersonId)
+                      AND (:#{#startInclusive == null} = TRUE OR n.createdAt >= :startInclusive)
+                      AND (:#{#endExclusive == null} = TRUE OR n.createdAt < :endExclusive)
+                      AND (:#{#categoryFilter == null} = TRUE OR n.category = :categoryFilter)
+                      AND (:#{#resolvedFilter == null} = TRUE
                            OR (:resolvedFilter = TRUE AND n.resolvedAt IS NOT NULL)
                            OR (:resolvedFilter = FALSE AND n.resolvedAt IS NULL))
                     """

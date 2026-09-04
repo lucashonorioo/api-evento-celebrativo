@@ -1,6 +1,6 @@
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000001',
+           '00000000-0000-0000-0000-000000000001',
            'Luana Odinson',
            '34989374748',
            '1988-05-21'
@@ -8,7 +8,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000002',
+           '00000000-0000-0000-0000-000000000002',
            'Miguel Souza',
            '34962165544',
            '1995-02-18'
@@ -16,7 +16,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000003',
+           '00000000-0000-0000-0000-000000000003',
            'Helena Oliveira',
            '34991564562',
            '1999-09-06'
@@ -24,7 +24,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000004',
+           '00000000-0000-0000-0000-000000000004',
            'Alice Lima',
            '34983246978',
            '1989-08-24'
@@ -32,7 +32,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000005',
+           '00000000-0000-0000-0000-000000000005',
            'Arthur Costa',
            '34978956324',
            '2005-03-24'
@@ -40,7 +40,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000006',
+           '00000000-0000-0000-0000-000000000006',
            'Heloísa Ribeiro',
            '34998632145',
            '1986-10-17'
@@ -48,7 +48,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000007',
+           '00000000-0000-0000-0000-000000000007',
            'Davi Gomes',
            '34963284523',
            '2003-06-02'
@@ -56,7 +56,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000008',
+           '00000000-0000-0000-0000-000000000008',
            'Laura Alves',
            '34998563215',
            '2006-07-11'
@@ -64,7 +64,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'00000000000000000000000000000009',
+           '00000000-0000-0000-0000-000000000009',
            'Bernardo Ferreira',
            '34936984562',
            '1982-12-08'
@@ -72,7 +72,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000A',
+           '00000000-0000-0000-0000-00000000000a',
            'Mariana Ferraz',
            '34989374749',
            '1988-05-21'
@@ -80,7 +80,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000B',
+           '00000000-0000-0000-0000-00000000000b',
            'Carlos Silva',
            '34991234567',
            '1975-11-10'
@@ -88,7 +88,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000C',
+           '00000000-0000-0000-0000-00000000000c',
            'Fernanda Souza',
            '34987654321',
            '1992-03-25'
@@ -96,7 +96,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000D',
+           '00000000-0000-0000-0000-00000000000d',
            'Padre Miguel',
            '34988776655',
            '1968-07-14'
@@ -104,7 +104,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000E',
+           '00000000-0000-0000-0000-00000000000e',
            'Padre Paulo',
            '34999887766',
            '1980-01-08'
@@ -112,7 +112,7 @@ VALUES (
 
 INSERT INTO tb_person(public_id, name, phone_number, birthday_date)
 VALUES (
-           X'0000000000000000000000000000000F',
+           '00000000-0000-0000-0000-00000000000f',
            'Padre Roberto',
            '34981112233',
            '1972-09-03'

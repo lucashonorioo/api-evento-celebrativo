@@ -3,9 +3,6 @@ package com.eventoscelebrativos.model;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import java.util.UUID;
 
 @Entity
@@ -16,13 +13,11 @@ public class Person {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @JdbcTypeCode(SqlTypes.BINARY)
     @Column(
             name = "public_id",
             nullable = false,
             unique = true,
-            updatable = false,
-            length = 16
+            updatable = false
     )
     private UUID publicId = UUID.randomUUID();
 

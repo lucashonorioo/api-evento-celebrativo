@@ -297,7 +297,8 @@ class V18RemoveLegacyPersonAuthenticationMigrationIntegrationTest {
     }
 
     private long insertRole(JdbcTemplate jdbcTemplate, String authority) {
-        jdbcTemplate.update("INSERT INTO tb_role(authority) VALUES (?)", authority);
+        long roleId = 999L;
+        jdbcTemplate.update("INSERT INTO tb_role(id, authority) VALUES (?, ?)", roleId, authority);
         return jdbcTemplate.queryForObject("SELECT id FROM tb_role WHERE authority = ?", Long.class, authority);
     }
 
@@ -335,7 +336,7 @@ class V18RemoveLegacyPersonAuthenticationMigrationIntegrationTest {
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
         dataSource.setDriverClassName("org.h2.Driver");
         dataSource.setUrl("jdbc:h2:mem:" + namePrefix + "_" + UUID.randomUUID().toString().replace("-", "")
-                + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1");
+                + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1");
         dataSource.setUsername("sa");
         dataSource.setPassword("");
         return dataSource;
